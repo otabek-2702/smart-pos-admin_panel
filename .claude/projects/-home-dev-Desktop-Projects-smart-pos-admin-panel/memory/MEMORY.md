@@ -1,0 +1,2 @@
+- [UX/UI Priority](feedback_ux_ui_priority.md) — Always verify visual polish; UX/UI is user's top priority
+- [Dialog Design Rules](feedback_dialog_design.md) — No Cancel btn, no colored headers, integers only, consistent sizing, apply fixes globally

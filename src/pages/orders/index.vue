@@ -258,7 +258,7 @@ function toggleExpand(id: number) {
           :items="orderStatuses"
           :placeholder="t('Filter by Status')"
           density="compact"
-          style="max-inline-size: 200px;"
+          style="min-inline-size: 220px;"
           hide-details
           clearable
           multiple
@@ -268,7 +268,7 @@ function toggleExpand(id: number) {
           :items="paymentStatuses"
           :placeholder="t('Payment Status')"
           density="compact"
-          style="max-inline-size: 180px;"
+          style="min-inline-size: 200px;"
           hide-details
           clearable
         />

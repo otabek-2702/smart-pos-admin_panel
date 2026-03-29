@@ -135,6 +135,7 @@
   "Registered users": "Зарегистрированные",
   "Currently active": "Сейчас активны",
   "Recent Orders": "Последние заказы",
+  "Unsaved changes! Use the close button to discard.": "Несохранённые изменения! Нажмите кнопку закрытия.",
   "$vuetify": {
     "badge": "Значок",
     "pagination": {

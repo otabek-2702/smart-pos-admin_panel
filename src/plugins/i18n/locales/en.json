@@ -223,6 +223,7 @@
   "Registered users": "Registered users",
   "Currently active": "Currently active",
   "Recent Orders": "Recent Orders",
+  "Unsaved changes! Use the close button to discard.": "Unsaved changes! Use the close button to discard.",
   "$vuetify": {
     "badge": "Badge",
     "pagination": {

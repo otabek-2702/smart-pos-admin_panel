@@ -135,6 +135,7 @@
   "Registered users": "Ro'yxatdan o'tgan foydalanuvchilar",
   "Currently active": "Hozir faol",
   "Recent Orders": "So'nggi buyurtmalar",
+  "Unsaved changes! Use the close button to discard.": "Saqlanmagan o'zgarishlar! Yopish tugmasini bosing.",
   "$vuetify": {
     "badge": "Belgi",
     "pagination": {

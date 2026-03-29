@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppPriceInput from '@core/components/AppPriceInput.vue'
 import axios from '@axios'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -73,7 +74,10 @@ function formatDate(val: string) {
 }
 
 function formatCurrency(val: number | string) {
-  return new Intl.NumberFormat('ru-RU').format(Number(val) || 0)
+  const num = Number(val) || 0
+  const parts = String(num).split('.')
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return parts.join('.')
 }
 
 // ---- load ----
@@ -123,10 +127,24 @@ watch(categoryFilter, () => {
   loadProducts()
 })
 
+// ---- dirty tracking ----
+const initialForm = ref({ name: '', description: '', price: 0, category_id: null as number | null })
+const isDirty = computed(() => JSON.stringify(form.value) !== JSON.stringify(initialForm.value))
+
+function tryCloseDialog(val: boolean) {
+  if (val) return
+  if (isDirty.value) {
+    notify(t('Unsaved changes! Use the close button to discard.'), 'warning')
+    return
+  }
+  dialogOpen.value = false
+}
+
 // ---- CRUD ----
 function openCreate() {
   editingProduct.value = null
   form.value = { name: '', description: '', price: 0, category_id: null }
+  initialForm.value = { ...form.value }
   dialogOpen.value = true
 }
 
@@ -138,6 +156,7 @@ function openEdit(product: any) {
     price: product.price ?? 0,
     category_id: product.category?.id ?? product.category_id ?? null,
   }
+  initialForm.value = { ...form.value }
   dialogOpen.value = true
 }
 
@@ -201,7 +220,7 @@ async function deleteProduct() {
           :items="categoryOptions"
           :placeholder="t('All Categories')"
           density="compact"
-          style="max-inline-size: 200px;"
+          style="min-inline-size: 220px;"
           hide-details
           clearable
         />
@@ -329,10 +348,10 @@ async function deleteProduct() {
     </VCard>
 
     <!-- Create/Edit Dialog -->
-    <VDialog v-model="dialogOpen" max-width="500" persistent>
+    <VDialog :model-value="dialogOpen" max-width="500" :persistent="isDirty" @update:model-value="tryCloseDialog">
       <VCard :title="editingProduct ? t('Edit Product') : t('Add Product')">
         <DialogCloseBtn @click="dialogOpen = false" />
-        <VCardText>
+        <VCardText class="pb-2">
           <VRow>
             <VCol cols="12">
               <VTextField v-model="form.name" :label="t('Name')" density="compact" />
@@ -341,7 +360,7 @@ async function deleteProduct() {
               <VTextField v-model="form.description" :label="t('Description')" density="compact" />
             </VCol>
             <VCol cols="12">
-              <VTextField v-model.number="form.price" :label="t('Price')" type="number" density="compact" />
+              <AppPriceInput v-model="form.price" :label="t('Price')" density="compact" />
             </VCol>
             <VCol cols="12">
               <VSelect
@@ -355,9 +374,6 @@ async function deleteProduct() {
           </VRow>
         </VCardText>
         <VCardActions class="justify-end pt-0 pb-4 px-4">
-          <VBtn variant="tonal" color="secondary" @click="dialogOpen = false">
-            {{ t('Cancel') }}
-          </VBtn>
           <VBtn :loading="dialogLoading" @click="saveProduct">
             {{ t('Save') }}
           </VBtn>

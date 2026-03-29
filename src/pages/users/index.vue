@@ -124,10 +124,24 @@ watch(roleFilter, () => {
   loadUsers()
 })
 
+// ---- dirty tracking ----
+const initialForm = ref({ first_name: '', last_name: '', role: 'USER', password: '' })
+const isDirty = computed(() => JSON.stringify(form.value) !== JSON.stringify(initialForm.value))
+
+function tryCloseDialog(val: boolean) {
+  if (val) return
+  if (isDirty.value) {
+    notify(t('Unsaved changes! Use the close button to discard.'), 'warning')
+    return
+  }
+  dialogOpen.value = false
+}
+
 // ---- CRUD ----
 function openCreate() {
   editingUser.value = null
   form.value = { first_name: '', last_name: '', role: rolesList.value[0]?.code ?? 'USER', password: '' }
+  initialForm.value = { ...form.value }
   dialogOpen.value = true
 }
 
@@ -139,6 +153,7 @@ function openEdit(user: any) {
     role: user.role ?? 'USER',
     password: '',
   }
+  initialForm.value = { ...form.value }
   dialogOpen.value = true
 }
 
@@ -228,7 +243,7 @@ async function toggleStatus(user: any) {
             item-title="name"
             item-value="code"
             density="compact"
-            style="max-inline-size: 180px;"
+            style="min-inline-size: 200px;"
             hide-details
             clearable
           />
@@ -361,13 +376,14 @@ async function toggleStatus(user: any) {
 
     <!-- Create/Edit Dialog -->
     <VDialog
-      v-model="dialogOpen"
+      :model-value="dialogOpen"
       max-width="500"
-      persistent
+      :persistent="isDirty"
+      @update:model-value="tryCloseDialog"
     >
       <VCard :title="editingUser ? t('Edit User') : t('Add User')">
         <DialogCloseBtn @click="dialogOpen = false" />
-        <VCardText>
+        <VCardText class="pb-2">
           <VRow>
             <VCol cols="6">
               <VTextField
@@ -407,13 +423,6 @@ async function toggleStatus(user: any) {
           </VRow>
         </VCardText>
         <VCardActions class="justify-end pt-0 pb-4 px-4">
-          <VBtn
-            variant="tonal"
-            color="secondary"
-            @click="dialogOpen = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
           <VBtn
             :loading="dialogLoading"
             @click="saveUser"

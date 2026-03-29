@@ -33,17 +33,20 @@ const form = ref({
 // Color mode: 'none' = no color (empty), 'pick' = user chose a color
 const colorMode = ref<'none' | 'pick'>('none')
 
-// Color picker ref
-const colorPicker = ref<HTMLInputElement | null>(null)
+// Color menu
+const colorMenuOpen = ref(false)
 
-// When switching to 'none' clear color; switching to 'pick' set a default if empty
+// Sync colorMode with form.color
 watch(colorMode, mode => {
-  if (mode === 'none') {
+  if (mode === 'none')
     form.value.color = ''
-  }
-  else if (!form.value.color) {
+  else if (!form.value.color)
     form.value.color = '#e74c3c'
-  }
+})
+
+watch(() => form.value.color, val => {
+  if (val && colorMode.value === 'none')
+    colorMode.value = 'pick'
 })
 
 // Drag state
@@ -149,10 +152,24 @@ async function saveOrder(items: any[]) {
   catch { /* ignore */ }
 }
 
+// ---- dirty tracking ----
+const initialForm = ref({ name: '', description: '', color: '' })
+const isDirty = computed(() => JSON.stringify(form.value) !== JSON.stringify(initialForm.value))
+
+function tryCloseDialog(val: boolean) {
+  if (val) return
+  if (isDirty.value) {
+    notify(t('Unsaved changes! Use the close button to discard.'), 'warning')
+    return
+  }
+  dialogOpen.value = false
+}
+
 // ---- CRUD ----
 function openCreate() {
   editingCategory.value = null
   form.value = { name: '', description: '', color: '' }
+  initialForm.value = { ...form.value }
   colorMode.value = 'none'
   dialogOpen.value = true
 }
@@ -165,6 +182,7 @@ function openEdit(cat: any) {
     description: cat.description ?? '',
     color: existingColor,
   }
+  initialForm.value = { ...form.value }
   colorMode.value = existingColor ? 'pick' : 'none'
   dialogOpen.value = true
 }
@@ -359,37 +377,14 @@ async function deleteCategory() {
 
     <!-- Create/Edit Dialog -->
     <VDialog
-      v-model="dialogOpen"
+      :model-value="dialogOpen"
       max-width="480"
-      persistent
+      :persistent="isDirty"
+      @update:model-value="tryCloseDialog"
     >
-      <VCard>
-        <!-- Colored header — falls back to neutral when no color chosen -->
-        <div
-          class="dialog-gradient-header"
-          :style="{ background: form.color || 'rgb(var(--v-theme-surface-variant))' }"
-        >
-          <div class="dialog-gradient-header__icon" />
-          <div>
-            <div class="text-h6 text-white">
-              {{ editingCategory ? t('Edit Category') : t('Add Category') }}
-            </div>
-            <div
-              v-if="form.name"
-              class="text-caption"
-              style="color: rgba(255,255,255,0.75)"
-            >
-              {{ form.name }}
-            </div>
-          </div>
-          <VSpacer />
-          <DialogCloseBtn
-            style="color: white;"
-            @click="dialogOpen = false"
-          />
-        </div>
-
-        <VCardText class="pt-5">
+      <VCard :title="editingCategory ? t('Edit Category') : t('Add Category')">
+        <DialogCloseBtn @click="dialogOpen = false" />
+        <VCardText class="pb-2">
           <VRow>
             <VCol cols="12">
               <VTextField
@@ -407,45 +402,41 @@ async function deleteCategory() {
               />
             </VCol>
 
-            <!-- Color mode toggle + picker -->
+            <!-- Color picker -->
             <VCol cols="12">
-              <div class="text-body-2 mb-2 text-medium-emphasis">
-                {{ t('Primary Color') }}
-              </div>
-
-              <!-- Toggle: No Color / Pick Color -->
-              <VBtnToggle
-                v-model="colorMode"
-                density="compact"
-                variant="outlined"
-                rounded="lg"
-                class="mb-3"
-                mandatory
-              >
-                <VBtn value="none" size="small">
-                  <VIcon icon="bx-x" size="14" class="me-1" />
-                  {{ t('No Color') }}
-                </VBtn>
-                <VBtn value="pick" size="small">
-                  <VIcon icon="bx-palette" size="14" class="me-1" />
-                  {{ t('Pick Color') }}
-                </VBtn>
-              </VBtnToggle>
-
-              <!-- Swatch — only when pick mode -->
-              <div
-                v-if="colorMode === 'pick'"
-                class="color-picker-swatch"
-                :style="{ background: form.color }"
-                @click="colorPicker?.click()"
-              >
-                <input
-                  ref="colorPicker"
-                  v-model="form.color"
-                  type="color"
-                  class="hidden-color-input"
+              <div class="d-flex align-center gap-3">
+                <VMenu
+                  v-model="colorMenuOpen"
+                  :close-on-content-click="false"
+                  location="bottom start"
                 >
-                <span class="color-picker-swatch__label">{{ form.color.toUpperCase() }}</span>
+                  <template #activator="{ props: menuProps }">
+                    <div
+                      v-bind="menuProps"
+                      class="color-dot"
+                      :style="{ background: form.color || 'rgba(var(--v-theme-on-surface), 0.12)' }"
+                    />
+                  </template>
+                  <VColorPicker
+                    v-model="form.color"
+                    mode="hex"
+                    :modes="['hex']"
+                    show-swatches
+                    elevation="0"
+                  />
+                </VMenu>
+                <span v-if="form.color" class="text-body-2 text-medium-emphasis">{{ form.color.toUpperCase() }}</span>
+                <span v-else class="text-body-2 text-disabled">{{ t('No Color') }}</span>
+                <VSpacer />
+                <VBtn
+                  v-if="form.color"
+                  icon
+                  variant="text"
+                  size="x-small"
+                  @click="form.color = ''; colorMode = 'none'"
+                >
+                  <VIcon icon="bx-x" size="18" />
+                </VBtn>
               </div>
             </VCol>
           </VRow>
@@ -461,24 +452,13 @@ async function deleteCategory() {
           >
             {{ t('Delete') }}
           </VBtn>
-          <div
-            class="d-flex gap-2"
-            :class="editingCategory ? '' : 'ms-auto'"
+          <VSpacer />
+          <VBtn
+            :loading="dialogLoading"
+            @click="saveCategory"
           >
-            <VBtn
-              variant="tonal"
-              color="secondary"
-              @click="dialogOpen = false"
-            >
-              {{ t('Cancel') }}
-            </VBtn>
-            <VBtn
-              :loading="dialogLoading"
-              @click="saveCategory"
-            >
-              {{ t('Save') }}
-            </VBtn>
-          </div>
+            {{ t('Save') }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
@@ -609,56 +589,21 @@ async function deleteCategory() {
   padding: 64px 0;
 }
 
-/* ── Dialog ── */
-.dialog-gradient-header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 20px 20px 20px 24px;
-  border-radius: 4px 4px 0 0;
-}
-
-.dialog-gradient-header__icon {
+/* ── Color dot ── */
+.color-dot {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.25);
-  border: 2px solid rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  position: relative;
+  transition: box-shadow 0.15s;
   flex-shrink: 0;
 }
 
-/* ── Color picker swatch ── */
-.color-picker-swatch {
-  height: 48px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  position: relative;
-  transition: filter 0.15s;
-  border: 2px solid rgba(255, 255, 255, 0.12);
+.color-dot:hover {
+  box-shadow: 0 0 0 3px rgba(var(--v-theme-on-surface), 0.15);
 }
 
-.color-picker-swatch:hover {
-  filter: brightness(1.1);
-}
-
-.color-picker-swatch__label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: white;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  letter-spacing: 0.05em;
-}
-
-.hidden-color-input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-}
 </style>
 
 <route lang="yaml">

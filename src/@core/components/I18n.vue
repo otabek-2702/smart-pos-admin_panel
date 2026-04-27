@@ -17,11 +17,17 @@ interface Props {
 
 const { locale } = useI18n({ useScope: 'global' })
 
+// Initialize from localStorage or default to 'uz'
+const savedLocale = localStorage.getItem('appLocale') || 'uz'
+
+locale.value = savedLocale
+
+const currentLang = ref([savedLocale])
+
 watch(locale, val => {
   document.documentElement.setAttribute('lang', val as string)
+  localStorage.setItem('appLocale', val as string)
 })
-
-const currentLang = ref(['en'])
 </script>
 
 <template>

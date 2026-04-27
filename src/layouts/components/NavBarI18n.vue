@@ -7,21 +7,21 @@ const { isAppRtl } = useThemeConfig()
 
 const i18nCompLanguages: I18nLanguage[] = [
   {
+    label: "O'zbekcha",
+    i18nLang: 'uz',
+  },
+  {
+    label: 'Русский',
+    i18nLang: 'ru',
+  },
+  {
     label: 'English',
     i18nLang: 'en',
   },
-  {
-    label: 'French',
-    i18nLang: 'fr',
-  },
-  {
-    label: 'Arabic',
-    i18nLang: 'ar',
-  },
 ]
 
-const handleLangChange = (lang: string) => {
-  isAppRtl.value = lang === 'ar'
+const handleLangChange = (_lang: string) => {
+  isAppRtl.value = false
 }
 </script>
 

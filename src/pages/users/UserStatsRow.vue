@@ -76,13 +76,3 @@ const { t } = useI18n({ useScope: 'global' })
   </VRow>
 </template>
 
-<style scoped>
-.sk-box {
-  background: rgba(var(--v-theme-on-surface), 0.1);
-  animation: sk-pulse 1.5s ease-in-out infinite;
-}
-@keyframes sk-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-</style>

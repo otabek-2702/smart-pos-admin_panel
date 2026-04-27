@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ROLE_COLOR as roleColors } from '@/constants/statusColors'
+import DataTableFooter from '@core/components/DataTableFooter.vue'
 import axios from '@axios'
 import UserStatsRow from './UserStatsRow.vue'
 
@@ -15,6 +17,7 @@ const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
 const roleFilter = ref<string | undefined>(undefined)
+const statusFilter = ref<string | undefined>(undefined)
 
 // Dialog
 const dialogOpen = ref(false)
@@ -25,10 +28,7 @@ const dialogLoading = ref(false)
 const deleteDialog = ref(false)
 const deletingUser = ref<any>(null)
 
-// Snackbar
-const snackbar = ref(false)
-const snackbarMsg = ref('')
-const snackbarColor = ref('success')
+const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 
 // Form — no email/username
 const form = ref({
@@ -38,32 +38,18 @@ const form = ref({
   password: '',
 })
 
-const roleColors: Record<string, string> = {
-  ADMIN: 'error',
-  CASHIER: 'warning',
-  RESELLER: 'info',
-  USER: 'secondary',
-}
-
 // code → display name  (reactive function so slot templates always get latest)
 function getRoleName(code: string): string {
   return rolesList.value.find((r: any) => r.code === code)?.name ?? code
 }
 
-const headers = [
+const headers = computed(() => [
   { title: t('ID'), key: 'id', sortable: false, width: '60px' },
   { title: t('First Name'), key: 'first_name', sortable: false },
   { title: t('Last Name'), key: 'last_name', sortable: false },
   { title: t('Role'), key: 'role', sortable: false },
   { title: t('Actions'), key: 'actions', sortable: false, align: 'end' },
-]
-
-// ---- helpers ----
-function notify(msg: string, color = 'success') {
-  snackbarMsg.value = msg
-  snackbarColor.value = color
-  snackbar.value = true
-}
+])
 
 // ---- load ----
 async function loadRoles() {
@@ -80,6 +66,7 @@ async function loadUsers() {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
     if (search.value) params.search = search.value
     if (roleFilter.value) params.role = roleFilter.value
+    if (statusFilter.value) params.status = statusFilter.value
 
     const res = await axios.get('/users', { params })
     const d = res.data?.data
@@ -118,8 +105,8 @@ const debouncedSearch = useDebounceFn(() => {
 }, 400)
 watch(search, debouncedSearch)
 
-// role filter is instant
-watch(roleFilter, () => {
+// role & status filters are instant
+watch([roleFilter, statusFilter], () => {
   page.value = 1
   loadUsers()
 })
@@ -161,11 +148,14 @@ async function saveUser() {
   dialogLoading.value = true
   try {
     if (editingUser.value) {
-      await axios.put(`/users/${editingUser.value.id}/update`, {
+      const payload: any = {
         first_name: form.value.first_name,
         last_name: form.value.last_name,
         role: form.value.role,
-      })
+      }
+      if (form.value.password)
+        payload.password = form.value.password
+      await axios.put(`/users/${editingUser.value.id}/update`, payload)
       notify(t('User updated'))
     }
     else {
@@ -247,6 +237,15 @@ async function toggleStatus(user: any) {
             hide-details
             clearable
           />
+          <VSelect
+            v-model="statusFilter"
+            :items="[{ title: t('Active'), value: 'ACTIVE' }, { title: t('Suspended'), value: 'SUSPENDED' }]"
+            :placeholder="t('All Statuses')"
+            density="compact"
+            style="min-inline-size: 180px;"
+            hide-details
+            clearable
+          />
           <VSpacer />
           <VBtn
             prepend-icon="bx-plus"
@@ -264,35 +263,12 @@ async function toggleStatus(user: any) {
           :items-per-page="itemsPerPage"
           :page="page"
         >
-        <!-- Custom footer with numbered pagination -->
         <template #bottom>
-          <div class="v-data-table-footer" style="align-items:center;">
-            <div class="v-data-table-footer__items-per-page">
-              <span>{{ t('Items per page:') }}</span>
-              <VSelect
-                v-model="itemsPerPage"
-                :items="[5, 10, 25, 50]"
-                density="compact"
-                variant="plain"
-                hide-details
-                style="width:75px;"
-                @update:model-value="page = 1"
-              />
-            </div>
-            <div class="v-data-table-footer__info">
-              {{ Math.min((page - 1) * itemsPerPage + 1, totalUsers) }}-{{ Math.min(page * itemsPerPage, totalUsers) }} {{ t('of') }} {{ totalUsers }}
-            </div>
-            <div class="v-data-table-footer__pagination" style="display:flex;align-items:center;">
-              <VPagination
-                v-model="page"
-                :length="Math.ceil(totalUsers / itemsPerPage) || 1"
-                :total-visible="5"
-                density="compact"
-                variant="text"
-                rounded="lg"
-              />
-            </div>
-          </div>
+          <DataTableFooter
+            v-model:page="page"
+            v-model:items-per-page="itemsPerPage"
+            :total-items="totalUsers"
+          />
         </template>
 
         <!-- Skeleton rows on initial load -->
@@ -378,7 +354,6 @@ async function toggleStatus(user: any) {
     <VDialog
       :model-value="dialogOpen"
       max-width="500"
-      :persistent="isDirty"
       @update:model-value="tryCloseDialog"
     >
       <VCard :title="editingUser ? t('Edit User') : t('Add User')">
@@ -409,15 +384,20 @@ async function toggleStatus(user: any) {
                 density="compact"
               />
             </VCol>
-            <VCol
-              v-if="!editingUser"
-              cols="12"
-            >
+            <VCol cols="12">
               <VTextField
                 v-model="form.password"
                 :label="t('Password')"
-                type="password"
+                :placeholder="editingUser ? t('Leave empty to keep current') : ''"
+                :persistent-placeholder="!!editingUser"
                 density="compact"
+                maxlength="4"
+                :rules="[
+                  (v: string) => !v || /^\d+$/.test(v) || t('Only numbers allowed'),
+                  (v: string) => !v || v.length === 4 || t('Must be 4 digits'),
+                  (v: string) => editingUser || !!v || t('Password is required'),
+                ]"
+                append-inner-icon="bx-dialpad"
               />
             </VCol>
           </VRow>
@@ -468,19 +448,6 @@ async function toggleStatus(user: any) {
     </VSnackbar>
   </div>
 </template>
-
-<style scoped>
-.sk-row { height: 52px; }
-.sk-cell { padding: 0 16px; }
-.sk-box {
-  background: rgba(var(--v-theme-on-surface), 0.08);
-  animation: sk-pulse 1.5s ease-in-out infinite;
-}
-@keyframes sk-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-</style>
 
 <route lang="yaml">
 meta:

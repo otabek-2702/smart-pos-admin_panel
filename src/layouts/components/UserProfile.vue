@@ -2,25 +2,30 @@
 import { initialAbility } from '@/plugins/casl/ability'
 import { useAppAbility } from '@/plugins/casl/useAppAbility'
 
+const { t } = useI18n({ useScope: 'global' })
 const router = useRouter()
 const ability = useAppAbility()
 const userData = JSON.parse(localStorage.getItem('userData') || 'null')
 
-const logout = () => {
-  // Remove "userData" from localStorage
-  localStorage.removeItem('userData')
+const userFullName = computed(() => {
+  if (!userData) return ''
+  if (userData.first_name || userData.last_name)
+    return `${userData.first_name || ''} ${userData.last_name || ''}`.trim()
+  return userData.fullName || userData.username || userData.email || ''
+})
 
-  // Remove "accessToken" from localStorage
+const userRole = computed(() => {
+  if (!userData) return ''
+  return userData.role || ''
+})
+
+const logout = () => {
+  localStorage.removeItem('userData')
   localStorage.removeItem('accessToken')
 
-  // Redirect to login page
   router.push('/login')
     .then(() => {
-      // ℹ️ We had to remove abilities in then block because if we don't nav menu items mutation is visible while redirecting user to login page
-      // Remove "userAbilities" from localStorage
       localStorage.removeItem('userAbilities')
-
-      // Reset ability to initial ability
       ability.update(initialAbility)
     })
 }
@@ -49,15 +54,13 @@ const logout = () => {
         icon="bx-user"
       />
 
-      <!-- SECTION Menu -->
       <VMenu
         activator="parent"
-        width="230"
+        width="250"
         location="bottom end"
         offset="14px"
       >
         <VList>
-          <!-- 👉 User Avatar & Name -->
           <VListItem>
             <template #prepend>
               <VListItemAction start>
@@ -86,69 +89,44 @@ const logout = () => {
             </template>
 
             <VListItemTitle class="font-weight-semibold">
-              {{ userData.fullName || userData.username }}
+              {{ userFullName }}
             </VListItemTitle>
-            <VListItemSubtitle>{{ userData.role }}</VListItemSubtitle>
+            <VListItemSubtitle>{{ userRole }}</VListItemSubtitle>
           </VListItem>
 
           <VDivider class="my-2" />
 
-          <!-- 👉 Profile -->
-          <VListItem :to="{ name: 'apps-user-view-id', params: { id: 21 } }">
+          <VListItem v-if="userData?.email">
             <template #prepend>
               <VIcon
                 class="me-2"
-                icon="bx-user"
+                icon="bx-envelope"
                 size="22"
               />
             </template>
-
-            <VListItemTitle>Profile</VListItemTitle>
+            <VListItemTitle class="text-body-2">
+              {{ userData.email }}
+            </VListItemTitle>
           </VListItem>
 
-          <!-- 👉 Settings -->
-          <VListItem :to="{ name: 'pages-account-settings-tab', params: { tab: 'account' } }">
+          <VListItem v-if="userData?.last_login_at">
             <template #prepend>
               <VIcon
                 class="me-2"
-                icon="bx-cog"
+                icon="bx-time"
                 size="22"
               />
             </template>
-
-            <VListItemTitle>Settings</VListItemTitle>
+            <VListItemTitle class="text-body-2">
+              {{ t('Last Login') }}
+            </VListItemTitle>
+            <VListItemSubtitle class="text-caption">
+              {{ new Date(userData.last_login_at).toLocaleString() }}
+            </VListItemSubtitle>
           </VListItem>
 
-          <!-- 👉 Pricing -->
-          <VListItem :to="{ name: 'pages-pricing' }">
-            <template #prepend>
-              <VIcon
-                class="me-2"
-                icon="bx-dollar"
-                size="22"
-              />
-            </template>
-
-            <VListItemTitle>Pricing</VListItemTitle>
-          </VListItem>
-
-          <!-- 👉 FAQ -->
-          <VListItem :to="{ name: 'pages-faq' }">
-            <template #prepend>
-              <VIcon
-                class="me-2"
-                icon="bx-help-circle"
-                size="22"
-              />
-            </template>
-
-            <VListItemTitle>FAQ</VListItemTitle>
-          </VListItem>
-
-          <!-- Divider -->
           <VDivider class="my-2" />
 
-          <!-- 👉 Logout -->
           <VListItem
             link
             @click="logout"
@@ -158,14 +136,15 @@ const logout = () => {
                 class="me-2"
                 icon="bx-log-out"
                 size="22"
+                color="error"
               />
             </template>
-
-            <VListItemTitle>Logout</VListItemTitle>
+            <VListItemTitle class="text-error">
+              {{ t('Logout') }}
+            </VListItemTitle>
           </VListItem>
         </VList>
       </VMenu>
-      <!-- !SECTION -->
     </VAvatar>
   </VBadge>
 </template>

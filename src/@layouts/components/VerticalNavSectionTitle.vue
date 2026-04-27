@@ -29,8 +29,9 @@ const shallRenderIcon = isVerticalNavMini(windowWidth)
           :key="shallRenderIcon"
           :class="shallRenderIcon ? 'placeholder-icon' : 'title-text'"
           v-bind="{ ...config.icons.sectionTitlePlaceholder, ...dynamicI18nProps(item.heading, 'span') }"
-          v-text="!shallRenderIcon ? item.heading : null"
-        />
+        >
+          {{ !shallRenderIcon ? item.heading : null }}
+        </Component>
         <!-- eslint-enable vue/no-v-text-v-html-on-component -->
       </Transition>
     </div>

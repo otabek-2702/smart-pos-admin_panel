@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-import { useRouter, useRoute } from 'vue-router'
 import { useGenerateImageVariant } from '@/@core/composable/useGenerateImageVariant'
 import boyWithRocketDark from '@images/illustrations/boy-with-rocket-dark.png'
 import boyWithRocketLight from '@images/illustrations/boy-with-rocket-light.png'
@@ -23,6 +21,7 @@ const boyWithRocket = useGenerateImageVariant(boyWithRocketLight, boyWithRocketD
 const languages = [
   { code: 'uz', label: "O'zbek" },
   { code: 'ru', label: 'Русский' },
+  { code: 'en', label: 'English' },
 ]
 
 const setLocale = (code: string) => {

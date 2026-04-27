@@ -1,13 +1,17 @@
 <script setup lang="ts">
+import DataTableFooter from '@core/components/DataTableFooter.vue'
 import axios from '@axios'
 
 const { t } = useI18n({ useScope: 'global' })
 
 // ---- state ----
 const categories = ref<any[]>([])
+const totalCategories = ref(0)
 const loading = ref(false)
 const stats = ref<any>(null)
 const search = ref('')
+const page = ref(1)
+const itemsPerPage = ref(10)
 
 // Dialog
 const dialogOpen = ref(false)
@@ -18,10 +22,7 @@ const dialogLoading = ref(false)
 const deleteDialog = ref(false)
 const deletingCategory = ref<any>(null)
 
-// Snackbar
-const snackbar = ref(false)
-const snackbarMsg = ref('')
-const snackbarColor = ref('success')
+const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 
 // Form — single color only
 const form = ref({
@@ -36,12 +37,53 @@ const colorMode = ref<'none' | 'pick'>('none')
 // Color menu
 const colorMenuOpen = ref(false)
 
+// Intensity: controls how vivid the color appears (blends with white)
+const intensityOptions = [
+  { label: '70%', value: 0.7 },
+  { label: '50%', value: 0.5 },
+  { label: '35%', value: 0.35 },
+  { label: '20%', value: 0.2 },
+]
+const intensity = ref(0.7)
+
+// Base color (full saturation) — the raw picked color before intensity
+const baseColor = ref('#e74c3c')
+
+function hexToRgb(hex: string) {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return { r, g, b }
+}
+
+function rgbToHex(r: number, g: number, b: number) {
+  return '#' + [r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('')
+}
+
+function applyIntensity(hex: string, alpha: number) {
+  const { r, g, b } = hexToRgb(hex)
+  return rgbToHex(
+    r + (255 - r) * (1 - alpha),
+    g + (255 - g) * (1 - alpha),
+    b + (255 - b) * (1 - alpha),
+  )
+}
+
+// When base color or intensity changes, update form.color
+watch([() => baseColor.value, intensity], ([hex, a]) => {
+  if (colorMode.value === 'pick' && hex)
+    form.value.color = applyIntensity(hex, a)
+})
+
 // Sync colorMode with form.color
 watch(colorMode, mode => {
-  if (mode === 'none')
+  if (mode === 'none') {
     form.value.color = ''
-  else if (!form.value.color)
-    form.value.color = '#e74c3c'
+  }
+  else if (!form.value.color) {
+    baseColor.value = '#e74c3c'
+    form.value.color = applyIntensity(baseColor.value, intensity.value)
+  }
 })
 
 watch(() => form.value.color, val => {
@@ -54,22 +96,9 @@ const draggedIndex = ref<number | null>(null)
 const dragOverIndex = ref<number | null>(null)
 
 // Debounced search
-const debouncedSearch = useDebounceFn(() => loadCategories(), 400)
-
-// ---- computed ----
-const filteredCategories = computed(() => {
-  if (!search.value) return categories.value
-  const q = search.value.toLowerCase()
-  return categories.value.filter(c => c.name.toLowerCase().includes(q))
-})
+const debouncedSearch = useDebounceFn(() => { page.value = 1; loadCategories() }, 400)
 
 // ---- helpers ----
-function notify(msg: string, color = 'success') {
-  snackbarMsg.value = msg
-  snackbarColor.value = color
-  snackbar.value = true
-}
-
 function cardColor(cat: any): string {
   return cat.colors?.[0] ?? '#9e9e9e'
 }
@@ -78,9 +107,12 @@ function cardColor(cat: any): string {
 async function loadCategories() {
   loading.value = true
   try {
-    const res = await axios.get('/categories', { params: { page: 1, per_page: 100 } })
+    const params: any = { page: page.value, per_page: itemsPerPage.value }
+    if (search.value) params.search = search.value
+    const res = await axios.get('/categories', { params })
     const d = res.data?.data
     categories.value = (d?.categories ?? []).sort((a: any, b: any) => a.sort_order - b.sort_order)
+    totalCategories.value = d?.pagination?.total_categories ?? d?.pagination?.total ?? categories.value.length
   }
   catch {
     notify(t('Failed to load categories'), 'error')
@@ -104,6 +136,7 @@ onMounted(() => {
 })
 
 watch(search, debouncedSearch)
+watch([page, itemsPerPage], loadCategories)
 
 // ---- drag & drop ----
 function onDragStart(e: DragEvent, index: number) {
@@ -168,22 +201,26 @@ function tryCloseDialog(val: boolean) {
 // ---- CRUD ----
 function openCreate() {
   editingCategory.value = null
-  form.value = { name: '', description: '', color: '' }
-  initialForm.value = { ...form.value }
   colorMode.value = 'none'
+  baseColor.value = '#e74c3c'
+  intensity.value = 0.7
+  form.value = { name: '', description: '', color: '' }
+  nextTick(() => { initialForm.value = { ...form.value } })
   dialogOpen.value = true
 }
 
 function openEdit(cat: any) {
   editingCategory.value = cat
   const existingColor = cat.colors?.[0] ?? ''
+  baseColor.value = existingColor || '#e74c3c'
+  intensity.value = 0.7
+  colorMode.value = existingColor ? 'pick' : 'none'
   form.value = {
     name: cat.name ?? '',
     description: cat.description ?? '',
     color: existingColor,
   }
-  initialForm.value = { ...form.value }
-  colorMode.value = existingColor ? 'pick' : 'none'
+  nextTick(() => { initialForm.value = { ...form.value } })
   dialogOpen.value = true
 }
 
@@ -237,9 +274,9 @@ async function deleteCategory() {
 </script>
 
 <template>
-  <div>
+  <div class="categories-page">
     <!-- Stats row — compact, always shown -->
-    <VRow class="mb-3">
+    <VRow class="mb-3 flex-0-0">
       <VCol cols="4">
         <VCard>
           <VCardText class="d-flex align-center gap-2 py-3">
@@ -302,7 +339,7 @@ async function deleteCategory() {
     </div>
 
     <!-- Category card grid -->
-    <div class="category-grid">
+    <div class="category-grid mb-4">
       <!-- Skeleton cards on initial load -->
       <template v-if="loading && categories.length === 0">
         <div
@@ -321,10 +358,11 @@ async function deleteCategory() {
       </template>
 
       <template v-else>
-        <div
-          v-for="(cat, index) in filteredCategories"
+        <VCard
+          v-for="(cat, index) in categories"
           :key="cat.id"
           class="category-card"
+          flat
           :class="{
             'is-dragging': draggedIndex === index,
             'is-drag-over': dragOverIndex === index && draggedIndex !== index,
@@ -360,11 +398,11 @@ async function deleteCategory() {
               {{ cat.status === 'ACTIVE' ? t('Active') : t('Inactive') }}
             </VChip>
           </div>
-        </div>
+        </VCard>
 
         <!-- Empty state -->
         <div
-          v-if="filteredCategories.length === 0"
+          v-if="categories.length === 0"
           class="category-grid__empty"
         >
           <VIcon icon="bx-category" size="56" color="disabled" />
@@ -375,16 +413,57 @@ async function deleteCategory() {
       </template>
     </div>
 
+    <VCard style="margin-block-start: auto; padding-block-start: 8px;">
+      <DataTableFooter
+        v-model:page="page"
+        v-model:items-per-page="itemsPerPage"
+        :total-items="totalCategories"
+      />
+    </VCard>
+
     <!-- Create/Edit Dialog -->
     <VDialog
       :model-value="dialogOpen"
       max-width="480"
-      :persistent="isDirty"
       @update:model-value="tryCloseDialog"
     >
       <VCard :title="editingCategory ? t('Edit Category') : t('Add Category')">
         <DialogCloseBtn @click="dialogOpen = false" />
         <VCardText class="pb-2">
+          <!-- POS Preview -->
+          <div class="pos-preview mb-4">
+            <span class="text-caption text-disabled d-block mb-2">{{ t('POS Preview') }}</span>
+            <div class="pos-preview__bar">
+              <div
+                class="pos-category-btn pos-category-btn--active"
+                :style="{ backgroundColor: form.color || '#9e9e9e' }"
+              >
+                {{ form.name || t('Name') }}
+              </div>
+              <div class="pos-category-btn pos-category-btn--dim">
+                {{ t('Other') }}
+              </div>
+              <div class="pos-category-btn pos-category-btn--dim">
+                {{ t('Other') }}
+              </div>
+            </div>
+
+            <div class="pos-preview__products mt-3">
+              <div class="pos-product-card" :style="{ backgroundColor: form.color || '#9e9e9e' }">
+                <div class="pos-product-card__name">{{ t('Product') }} 1</div>
+                <div class="pos-product-card__price">25 000 so'm</div>
+              </div>
+              <div class="pos-product-card" :style="{ backgroundColor: form.color || '#9e9e9e' }">
+                <div class="pos-product-card__name">{{ t('Product') }} 2</div>
+                <div class="pos-product-card__price">18 000 so'm</div>
+              </div>
+              <div class="pos-product-card" :style="{ backgroundColor: form.color || '#9e9e9e' }">
+                <div class="pos-product-card__name">{{ t('Product') }} 3</div>
+                <div class="pos-product-card__price">32 000 so'm</div>
+              </div>
+            </div>
+          </div>
+
           <VRow>
             <VCol cols="12">
               <VTextField
@@ -418,7 +497,7 @@ async function deleteCategory() {
                     />
                   </template>
                   <VColorPicker
-                    v-model="form.color"
+                    v-model="baseColor"
                     mode="hex"
                     :modes="['hex']"
                     show-swatches
@@ -437,6 +516,24 @@ async function deleteCategory() {
                 >
                   <VIcon icon="bx-x" size="18" />
                 </VBtn>
+              </div>
+            </VCol>
+
+            <!-- Intensity -->
+            <VCol v-if="form.color" cols="12">
+              <span class="text-caption text-disabled d-block mb-1">{{ t('Intensity') }}</span>
+              <div class="d-flex gap-2">
+                <button
+                  v-for="opt in intensityOptions"
+                  :key="opt.value"
+                  type="button"
+                  class="intensity-btn"
+                  :class="{ 'intensity-btn--active': intensity === opt.value }"
+                  :style="{ backgroundColor: applyIntensity(baseColor, opt.value) }"
+                  @click="intensity = opt.value"
+                >
+                  {{ opt.label }}
+                </button>
               </div>
             </VCol>
           </VRow>
@@ -500,14 +597,11 @@ async function deleteCategory() {
 </template>
 
 <style scoped>
-/* ── Skeleton ── */
-.sk-box {
-  background: rgba(var(--v-theme-on-surface), 0.08);
-  animation: sk-pulse 1.5s ease-in-out infinite;
-}
-@keyframes sk-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+/* ── Page layout ── */
+.categories-page {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 64px - 56px - 40px);
 }
 
 /* ── Card grid ── */
@@ -520,8 +614,6 @@ async function deleteCategory() {
 .category-card {
   border-radius: 12px;
   overflow: hidden;
-  background: rgb(var(--v-theme-surface));
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   cursor: grab;
   transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
   user-select: none;
@@ -589,6 +681,66 @@ async function deleteCategory() {
   padding: 64px 0;
 }
 
+/* ── POS Preview ── */
+.pos-preview {
+  background: rgba(var(--v-theme-on-surface), 0.04);
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.pos-preview__bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pos-category-btn {
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 140px;
+}
+
+.pos-category-btn--dim {
+  background: rgba(var(--v-theme-on-surface), 0.1);
+  color: rgba(var(--v-theme-on-surface), 0.4);
+}
+
+/* ── POS Product preview ── */
+.pos-preview__products {
+  display: flex;
+  gap: 8px;
+}
+
+.pos-product-card {
+  flex: 1;
+  border-radius: 8px;
+  padding: 10px 8px;
+  text-align: center;
+  color: #fff;
+  min-width: 0;
+}
+
+.pos-product-card__name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pos-product-card__price {
+  font-size: 0.625rem;
+  opacity: 0.85;
+  margin-top: 1px;
+}
+
 /* ── Color dot ── */
 .color-dot {
   width: 36px;
@@ -602,6 +754,27 @@ async function deleteCategory() {
 
 .color-dot:hover {
   box-shadow: 0 0 0 3px rgba(var(--v-theme-on-surface), 0.15);
+}
+
+/* ── Intensity buttons ── */
+.intensity-btn {
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.12s, transform 0.12s;
+}
+
+.intensity-btn:hover {
+  transform: scale(1.05);
+}
+
+.intensity-btn--active {
+  border-color: rgb(var(--v-theme-primary));
+  box-shadow: 0 0 0 2px rgba(var(--v-theme-primary), 0.3);
 }
 
 </style>

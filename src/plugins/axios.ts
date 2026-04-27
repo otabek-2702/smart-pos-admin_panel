@@ -23,4 +23,22 @@ axiosIns.interceptors.request.use(config => {
   return config
 })
 
+// ℹ️ Add response interceptor to handle 401 — clear auth and redirect to login
+axiosIns.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('userData')
+      localStorage.removeItem('userAbilities')
+
+      // Redirect to login if not already there
+      if (window.location.pathname !== '/login')
+        window.location.href = '/login'
+    }
+
+    return Promise.reject(error)
+  },
+)
+
 export default axiosIns

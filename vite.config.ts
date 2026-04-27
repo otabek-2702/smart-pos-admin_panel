@@ -34,6 +34,7 @@ export default defineConfig({
     }),
     AutoImport({
       imports: ['vue', 'vue-router', '@vueuse/core', '@vueuse/math', 'vue-i18n', 'pinia'],
+      dirs: ['src/composables'],
       vueTemplate: true,
     }),
     VueI18nPlugin({

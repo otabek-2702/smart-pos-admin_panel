@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppPriceInput from '@core/components/AppPriceInput.vue'
+import DataTableFooter from '@core/components/DataTableFooter.vue'
 import axios from '@axios'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -36,10 +37,7 @@ const dialogLoading = ref(false)
 const deleteDialog = ref(false)
 const deletingProduct = ref<any>(null)
 
-// Snackbar
-const snackbar = ref(false)
-const snackbarMsg = ref('')
-const snackbarColor = ref('success')
+const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 
 // Form
 const form = ref({
@@ -47,6 +45,30 @@ const form = ref({
   description: '',
   price: 0,
   category_id: null as number | null,
+  color: '',
+})
+
+// Color picker
+const colorMenuOpen = ref(false)
+
+// Characteristic colors
+const characteristicColors = computed(() => [
+  { hex: '#E53935', key: 'Spicy', label: t('Spicy') },
+  { hex: '#FDD835', key: 'Cheese', label: t('Cheese') },
+  { hex: '#43A047', key: 'Jalapeño', label: t('Jalapeño') },
+  { hex: '#8D6E63', key: 'Grilled', label: t('Grilled') },
+  { hex: '#1E88E5', key: 'Seafood', label: t('Seafood') },
+  { hex: '#EC407A', key: 'Sweet', label: t('Sweet') },
+  { hex: '#FB8C00', key: 'Chicken', label: t('Chicken') },
+  { hex: '#00ACC1', key: 'Cold', label: t('Cold') },
+  { hex: '#7CB342', key: 'Vegetarian', label: t('Vegetarian') },
+  { hex: '#8E24AA', key: 'Premium', label: t('Premium') },
+])
+
+// Preview: selected category color
+const previewColor = computed(() => {
+  if (!form.value.category_id) return '#9e9e9e'
+  return categoryColorMap.value[form.value.category_id] || '#9e9e9e'
 })
 
 const headers = [
@@ -58,27 +80,7 @@ const headers = [
   { title: t('Actions'), key: 'actions', sortable: false, align: 'end' },
 ]
 
-// ---- helpers ----
-function notify(msg: string, color = 'success') {
-  snackbarMsg.value = msg
-  snackbarColor.value = color
-  snackbar.value = true
-}
-
-function formatDate(val: string) {
-  if (!val) return '—'
-  const d = new Date(val)
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  return `${dd}/${mm}/${d.getFullYear()}`
-}
-
-function formatCurrency(val: number | string) {
-  const num = Number(val) || 0
-  const parts = String(num).split('.')
-  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
-  return parts.join('.')
-}
+const { formatCurrency, formatDateShort: formatDate } = useFormatters()
 
 // ---- load ----
 async function loadProducts() {
@@ -128,7 +130,7 @@ watch(categoryFilter, () => {
 })
 
 // ---- dirty tracking ----
-const initialForm = ref({ name: '', description: '', price: 0, category_id: null as number | null })
+const initialForm = ref({ name: '', description: '', price: 0, category_id: null as number | null, color: '' })
 const isDirty = computed(() => JSON.stringify(form.value) !== JSON.stringify(initialForm.value))
 
 function tryCloseDialog(val: boolean) {
@@ -143,7 +145,7 @@ function tryCloseDialog(val: boolean) {
 // ---- CRUD ----
 function openCreate() {
   editingProduct.value = null
-  form.value = { name: '', description: '', price: 0, category_id: null }
+  form.value = { name: '', description: '', price: 0, category_id: null, color: '' }
   initialForm.value = { ...form.value }
   dialogOpen.value = true
 }
@@ -155,6 +157,7 @@ function openEdit(product: any) {
     description: product.description ?? '',
     price: product.price ?? 0,
     category_id: product.category?.id ?? product.category_id ?? null,
+    color: product.colors?.[0] ?? '',
   }
   initialForm.value = { ...form.value }
   dialogOpen.value = true
@@ -163,12 +166,19 @@ function openEdit(product: any) {
 async function saveProduct() {
   dialogLoading.value = true
   try {
+    const payload = {
+      name: form.value.name,
+      description: form.value.description,
+      price: form.value.price,
+      category_id: form.value.category_id,
+      colors: form.value.color ? [form.value.color] : [],
+    }
     if (editingProduct.value) {
-      await axios.put(`/products/${editingProduct.value.id}/update`, form.value)
+      await axios.put(`/products/${editingProduct.value.id}/update`, payload)
       notify(t('Product updated'))
     }
     else {
-      await axios.post('/products/create', form.value)
+      await axios.post('/products/create', payload)
       notify(t('Product created'))
     }
     dialogOpen.value = false
@@ -240,33 +250,11 @@ async function deleteProduct() {
       >
         <!-- Custom footer with numbered pagination -->
         <template #bottom>
-          <div class="v-data-table-footer" style="align-items:center;">
-            <div class="v-data-table-footer__items-per-page">
-              <span>{{ t('Items per page:') }}</span>
-              <VSelect
-                v-model="itemsPerPage"
-                :items="[5, 10, 25, 50]"
-                density="compact"
-                variant="plain"
-                hide-details
-                style="width:75px;"
-                @update:model-value="page = 1"
-              />
-            </div>
-            <div class="v-data-table-footer__info">
-              {{ Math.min((page - 1) * itemsPerPage + 1, totalProducts) }}-{{ Math.min(page * itemsPerPage, totalProducts) }} {{ t('of') }} {{ totalProducts }}
-            </div>
-            <div class="v-data-table-footer__pagination" style="display:flex;align-items:center;">
-              <VPagination
-                v-model="page"
-                :length="Math.ceil(totalProducts / itemsPerPage) || 1"
-                :total-visible="5"
-                density="compact"
-                variant="text"
-                rounded="lg"
-              />
-            </div>
-          </div>
+          <DataTableFooter
+            v-model:page="page"
+            v-model:items-per-page="itemsPerPage"
+            :total-items="totalProducts"
+          />
         </template>
 
         <!-- Skeleton rows on initial load -->
@@ -348,10 +336,26 @@ async function deleteProduct() {
     </VCard>
 
     <!-- Create/Edit Dialog -->
-    <VDialog :model-value="dialogOpen" max-width="500" :persistent="isDirty" @update:model-value="tryCloseDialog">
+    <VDialog :model-value="dialogOpen" max-width="500" @update:model-value="tryCloseDialog">
       <VCard :title="editingProduct ? t('Edit Product') : t('Add Product')">
         <DialogCloseBtn @click="dialogOpen = false" />
         <VCardText class="pb-2">
+          <!-- POS Preview -->
+          <div class="pos-preview mb-3">
+            <span class="text-caption text-disabled d-block mb-2">{{ t('POS Preview') }}</span>
+            <div class="pos-preview__cards">
+              <div class="pos-product-card" :style="{ backgroundColor: previewColor }">
+                <div class="pos-product-card__name">{{ form.name || t('Name') }}</div>
+                <div class="pos-product-card__price">{{ form.price ? formatCurrency(form.price) + ' so\'m' : '0 so\'m' }}</div>
+                <div
+                  v-if="form.color"
+                  class="pos-product-card__stripe"
+                  :style="{ backgroundColor: form.color }"
+                />
+              </div>
+            </div>
+          </div>
+
           <VRow>
             <VCol cols="12">
               <VTextField v-model="form.name" :label="t('Name')" density="compact" />
@@ -359,10 +363,10 @@ async function deleteProduct() {
             <VCol cols="12">
               <VTextField v-model="form.description" :label="t('Description')" density="compact" />
             </VCol>
-            <VCol cols="12">
+            <VCol cols="6">
               <AppPriceInput v-model="form.price" :label="t('Price')" density="compact" />
             </VCol>
-            <VCol cols="12">
+            <VCol cols="6">
               <VSelect
                 v-model="form.category_id"
                 :label="t('Category')"
@@ -370,6 +374,71 @@ async function deleteProduct() {
                 density="compact"
                 clearable
               />
+            </VCol>
+
+            <!-- Product color (characteristic) -->
+            <VCol cols="12">
+              <span class="text-caption text-disabled">{{ t('Product Color') }}</span>
+              <div class="char-colors mt-1">
+                <VTooltip
+                  v-for="c in characteristicColors"
+                  :key="c.key"
+                  location="top"
+                >
+                  <template #activator="{ props: tip }">
+                    <button
+                      v-bind="tip"
+                      type="button"
+                      class="char-dot"
+                      :class="{ 'char-dot--active': form.color === c.hex }"
+                      :style="{ backgroundColor: c.hex }"
+                      @click="form.color = form.color === c.hex ? '' : c.hex"
+                    />
+                  </template>
+                  {{ c.label }}
+                </VTooltip>
+
+                <!-- Custom color -->
+                <VMenu
+                  v-model="colorMenuOpen"
+                  :close-on-content-click="false"
+                  location="top"
+                >
+                  <template #activator="{ props: menuProps }">
+                    <VTooltip location="top">
+                      <template #activator="{ props: tip }">
+                        <button
+                          v-bind="{ ...menuProps, ...tip }"
+                          type="button"
+                          class="char-dot char-dot--custom"
+                          :class="{ 'char-dot--active': form.color && !characteristicColors.some(c => c.hex === form.color) }"
+                          :style="form.color && !characteristicColors.some(c => c.hex === form.color) ? { backgroundColor: form.color } : {}"
+                        >
+                          <VIcon icon="bx-palette" size="14" />
+                        </button>
+                      </template>
+                      {{ t('Custom') }}
+                    </VTooltip>
+                  </template>
+                  <VColorPicker
+                    v-model="form.color"
+                    mode="hex"
+                    :modes="['hex']"
+                    show-swatches
+                    elevation="0"
+                  />
+                </VMenu>
+
+                <!-- Clear -->
+                <button
+                  v-if="form.color"
+                  type="button"
+                  class="char-dot char-dot--clear"
+                  @click="form.color = ''"
+                >
+                  <VIcon icon="bx-x" size="14" />
+                </button>
+              </div>
             </VCol>
           </VRow>
         </VCardText>
@@ -403,16 +472,89 @@ async function deleteProduct() {
   </div>
 </template>
 
-<style scoped>
-.sk-row { height: 52px; }
-.sk-cell { padding: 0 16px; }
-.sk-box {
-  background: rgba(var(--v-theme-on-surface), 0.08);
-  animation: sk-pulse 1.5s ease-in-out infinite;
+<style scoped>/* ── POS Preview ── */
+.pos-preview {
+  background: rgba(var(--v-theme-on-surface), 0.04);
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 10px;
+  padding: 14px;
 }
-@keyframes sk-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+
+.pos-preview__cards {
+  display: flex;
+  gap: 10px;
+}
+
+.pos-product-card {
+  width: 100%;
+  max-width: 220px;
+  border-radius: 8px;
+  padding: 12px 16px;
+  text-align: center;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+
+.pos-product-card__name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pos-product-card__price {
+  font-size: 0.75rem;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
+.pos-product-card__stripe {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+}
+
+/* ── Characteristic colors ── */
+.char-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.char-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.char-dot:hover {
+  transform: scale(1.15);
+}
+
+.char-dot--active {
+  border-color: rgb(var(--v-theme-primary));
+  box-shadow: 0 0 0 2px rgba(var(--v-theme-primary), 0.3);
+}
+
+.char-dot--custom {
+  background: rgba(var(--v-theme-on-surface), 0.1);
+  color: rgba(var(--v-theme-on-surface), 0.6);
+}
+
+.char-dot--clear {
+  background: rgba(var(--v-theme-on-surface), 0.08);
+  color: rgba(var(--v-theme-on-surface), 0.5);
 }
 </style>
 

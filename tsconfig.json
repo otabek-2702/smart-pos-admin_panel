@@ -71,6 +71,8 @@
   "exclude": [
     "dist",
     "node_modules",
-    "src/@iconify/*"
+    "src/@iconify/*",
+    "tests",
+    "playwright.config.ts"
   ]
 }

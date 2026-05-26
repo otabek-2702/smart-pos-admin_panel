@@ -28,11 +28,18 @@ Login at `/login` with `admin@gmail.com` / `123` (local dev seed user).
 | `yarn dev` | Start Vite dev server on port `5181` (auto-increments if busy) |
 | `yarn build` | Type-check + build static SPA bundle into `dist/` |
 | `yarn preview` | Preview production build on port `5050` |
-| `yarn lint` | ESLint with auto-fix |
+| `yarn lint` | ESLint with auto-fix (lints the whole tree, including template internals) |
+| `yarn lint:ci` | Scoped lint — app code only, errors-only. Used by CI. |
+| `yarn ci` | Local equivalent of CI: `lint:ci` + `build`. Run before pushing. |
 | `yarn typecheck` | TypeScript check only, no emit |
+| `yarn smoke` | Playwright smoke test — login + visit every nav route. Needs backend + dev server running. |
+| `yarn smoke:install` | One-time: install Playwright's Chromium browser. |
 
-No tests configured. CI smoke test is on the roadmap — see
-[docs/review-answers.md](docs/review-answers.md) Q11.
+### CI
+
+GitHub Actions runs `lint:ci` + `build` on every PR / push to `main`
+(`.github/workflows/ci.yml`). The Playwright smoke test job is opt-in via
+`workflow_dispatch` until we have a staging backend reachable from CI runners.
 
 ---
 

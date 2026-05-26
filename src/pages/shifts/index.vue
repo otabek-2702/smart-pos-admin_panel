@@ -169,10 +169,10 @@ async function reconcileConfirm() {
   }
 }
 
-function openTplDialog(t: any = null) {
-  tplEdit.value = t
-  tplForm.value = t
-    ? { name: t.name, start_time: (t.start_time ?? '').slice(0, 5), end_time: (t.end_time ?? '').slice(0, 5) }
+function openTplDialog(tpl: any = null) {
+  tplEdit.value = tpl
+  tplForm.value = tpl
+    ? { name: tpl.name, start_time: (tpl.start_time ?? '').slice(0, 5), end_time: (tpl.end_time ?? '').slice(0, 5) }
     : { name: '', start_time: '08:00', end_time: '20:00' }
   tplDialog.value = true
 }
@@ -192,11 +192,11 @@ async function saveTpl() {
   }
 }
 
-async function deleteTpl(t: any) {
+async function deleteTpl(tpl: any) {
   if (!confirm('Delete this template?'))
     return
   try {
-    await axios.delete(`/shift-templates/${t.id}`)
+    await axios.delete(`/shift-templates/${tpl.id}`)
     notify('Template deleted')
     loadTemplates()
   }
@@ -401,12 +401,12 @@ async function deleteTpl(t: any) {
               />
             </VListItem>
             <VListItem
-              v-for="t in templates"
-              :key="t.id"
+              v-for="tpl in templates"
+              :key="tpl.id"
               class="border-b"
             >
-              <VListItemTitle>{{ t.name }}</VListItemTitle>
-              <VListItemSubtitle>{{ t.start_time }} → {{ t.end_time }}</VListItemSubtitle>
+              <VListItemTitle>{{ tpl.name }}</VListItemTitle>
+              <VListItemSubtitle>{{ tpl.start_time }} → {{ tpl.end_time }}</VListItemSubtitle>
               <template #append>
                 <div
                   class="d-flex"
@@ -416,7 +416,7 @@ async function deleteTpl(t: any) {
                     icon
                     variant="text"
                     size="small"
-                    @click="openTplDialog(t)"
+                    @click="openTplDialog(tpl)"
                   >
                     <VIcon
                       icon="bx-edit-alt"
@@ -428,7 +428,7 @@ async function deleteTpl(t: any) {
                     variant="text"
                     size="small"
                     color="error"
-                    @click="deleteTpl(t)"
+                    @click="deleteTpl(tpl)"
                   >
                     <VIcon
                       icon="bx-trash"

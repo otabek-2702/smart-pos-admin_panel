@@ -20,7 +20,7 @@ const i18nCompLanguages: I18nLanguage[] = [
   },
 ]
 
-const handleLangChange = (_lang: string) => {
+const handleLangChange = (_: string) => {
   isAppRtl.value = false
 }
 </script>

@@ -9,6 +9,10 @@
     "preview": "vite preview --port 5050",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint . -c .eslintrc.js --fix --rulesdir eslint-internal-rules/ --ext .ts,.js,.vue,.tsx,.jsx",
+    "lint:ci": "eslint src/pages src/composables src/plugins src/navigation src/layouts/components src/constants src/types -c .eslintrc.js --rulesdir eslint-internal-rules/ --ext .ts,.js,.vue,.tsx,.jsx --max-warnings 0",
+    "smoke": "playwright test",
+    "smoke:install": "playwright install --with-deps chromium",
+    "ci": "yarn lint:ci && yarn build",
     "build:icons": "tsc -b src/@iconify && node src/@iconify/build-icons.js",
     "postinstall": "npm run build:icons"
   },
@@ -46,6 +50,7 @@
     "@iconify/tools": "2.2.6",
     "@iconify/vue": "4.1.1",
     "@intlify/unplugin-vue-i18n": "0.10.0",
+    "@playwright/test": "^1.60.0",
     "@types/node": "18.16.3",
     "@types/webfontloader": "1.6.35",
     "@typescript-eslint/eslint-plugin": "5.59.2",

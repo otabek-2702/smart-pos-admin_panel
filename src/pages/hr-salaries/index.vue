@@ -4,7 +4,7 @@ import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
-const { formatCurrency, formatDate } = useFormatters()
+const { formatCurrency } = useFormatters()
 
 const items = ref<any[]>([])
 const total = ref(0)

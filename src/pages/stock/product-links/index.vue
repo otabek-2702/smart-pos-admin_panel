@@ -171,11 +171,11 @@ const deductStatusItems = computed(() =>
   deductStatuses.value.length
     ? deductStatuses.value.map((s: any) => ({ title: s.label, value: s.value }))
     : [
-        { title: t('Order Created'), value: 'CREATED' },
-        { title: t('Preparing'), value: 'PREPARING' },
-        { title: t('Ready'), value: 'READY' },
-        { title: t('Paid'), value: 'PAID' },
-      ],
+      { title: t('Order Created'), value: 'CREATED' },
+      { title: t('Preparing'), value: 'PREPARING' },
+      { title: t('Ready'), value: 'READY' },
+      { title: t('Paid'), value: 'PAID' },
+    ],
 )
 </script>
 

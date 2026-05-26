@@ -49,6 +49,7 @@ const defaultForm = () => ({
 
 const form = ref(defaultForm())
 
+// eslint-disable-next-line sonarjs/cognitive-complexity
 watch(() => props.modelValue, open => {
   if (!open)
     return

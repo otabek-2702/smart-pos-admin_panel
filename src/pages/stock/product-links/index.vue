@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import axios from '@axios'
+import adminApi, { stockApi as axios } from '@axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -56,14 +56,18 @@ async function loadLinks() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value) params.search = search.value
+    if (search.value)
+      params.search = search.value
 
     const res = await axios.get('/product-links/', { params })
-    const d = res.data
+    const d = res.data?.data ?? res.data
+
     links.value = d.links ?? []
     total.value = d.pagination?.total_items ?? d.count ?? links.value.length
-    if (d.link_types) linkTypes.value = d.link_types
-    if (d.deduct_statuses) deductStatuses.value = d.deduct_statuses
+    if (d.link_types)
+      linkTypes.value = d.link_types
+    if (d.deduct_statuses)
+      deductStatuses.value = d.deduct_statuses
   }
   catch {
     notify(t('Failed to load product links'), 'error')
@@ -76,11 +80,12 @@ async function loadLinks() {
 async function loadOptions() {
   try {
     const [prodRes, recRes, itemRes, unitRes] = await Promise.all([
-      axios.get('/products', { params: { per_page: 200 } }),
+      adminApi.get('/products', { params: { per_page: 200 } }),
       axios.get('/recipes/', { params: { per_page: 300, is_active: true } }),
       axios.get('/items/', { params: { per_page: 300 } }),
       axios.get('/units/', { params: { per_page: 200 } }),
     ])
+
     products.value = (prodRes.data.products ?? prodRes.data.results ?? []).map((p: any) => ({ title: p.name, value: p.id }))
     recipes.value = (recRes.data.recipes ?? recRes.data.results ?? []).map((r: any) => ({ title: r.name, value: r.id }))
     stockItems.value = (itemRes.data.items ?? itemRes.data.results ?? []).map((i: any) => ({ title: i.name, value: i.id }))
@@ -188,7 +193,12 @@ const deductStatusItems = computed(() =>
           clearable
         />
         <VSpacer />
-        <VBtn prepend-icon="bx-link" @click="openLink">{{ t('Link Product') }}</VBtn>
+        <VBtn
+          prepend-icon="bx-link"
+          @click="openLink"
+        >
+          {{ t('Link Product') }}
+        </VBtn>
       </VCardText>
 
       <VDataTableServer
@@ -207,13 +217,50 @@ const deductStatusItems = computed(() =>
           />
         </template>
 
-        <template v-if="loading && links.length === 0" #body>
-          <tr v-for="n in itemsPerPage" :key="n" class="sk-row">
-            <td class="sk-cell"><div class="sk-box" style="width:120px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:90px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:140px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:80px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell" style="text-align:end;"><div class="d-flex justify-end gap-1"><div class="sk-box" style="width:28px;height:28px;border-radius:6px;" /></div></td>
+        <template
+          v-if="loading && links.length === 0"
+          #body
+        >
+          <tr
+            v-for="n in itemsPerPage"
+            :key="n"
+            class="sk-row"
+          >
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:120px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:90px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:140px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:80px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td
+              class="sk-cell"
+              style="text-align:end;"
+            >
+              <div class="d-flex justify-end gap-1">
+                <div
+                  class="sk-box"
+                  style="width:28px;height:28px;border-radius:6px;"
+                />
+              </div>
+            </td>
           </tr>
         </template>
 
@@ -221,7 +268,11 @@ const deductStatusItems = computed(() =>
           {{ item.raw.product?.name ?? item.raw.product_name ?? '—' }}
         </template>
         <template #item.link_type="{ item }">
-          <VChip :color="typeColor[item.raw.link_type] ?? 'default'" size="small" variant="tonal">
+          <VChip
+            :color="typeColor[item.raw.link_type] ?? 'default'"
+            size="small"
+            variant="tonal"
+          >
             {{ item.raw.link_type_display ?? item.raw.link_type }}
           </VChip>
         </template>
@@ -229,22 +280,47 @@ const deductStatusItems = computed(() =>
           {{ item.raw.recipe?.name ?? item.raw.stock_item?.name ?? item.raw.linked_name ?? '—' }}
         </template>
         <template #item.deduct_on_status="{ item }">
-          <VChip color="info" size="small" variant="tonal">
+          <VChip
+            color="info"
+            size="small"
+            variant="tonal"
+          >
             {{ item.raw.deduct_on_status_display ?? item.raw.deduct_on_status }}
           </VChip>
         </template>
         <template #item.actions="{ item }">
-          <div class="d-flex justify-end" style="gap:2px;">
-            <VBtn icon variant="text" size="small" color="error" @click="confirmUnlink(item.raw)">
-              <VIcon size="18" icon="bx-unlink" />
-              <VTooltip activator="parent" location="top">{{ t('Unlink') }}</VTooltip>
+          <div
+            class="d-flex justify-end"
+            style="gap:2px;"
+          >
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              color="error"
+              @click="confirmUnlink(item.raw)"
+            >
+              <VIcon
+                size="18"
+                icon="bx-unlink"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Unlink') }}
+              </VTooltip>
             </VBtn>
           </div>
         </template>
       </VDataTableServer>
     </VCard>
 
-    <VDialog v-model="dialog" max-width="520" persistent>
+    <VDialog
+      v-model="dialog"
+      max-width="520"
+      persistent
+    >
       <VCard :title="t('Link Product')">
         <VCardText>
           <VRow>
@@ -257,7 +333,10 @@ const deductStatusItems = computed(() =>
                 required
               />
             </VCol>
-            <VCol cols="12" sm="6">
+            <VCol
+              cols="12"
+              sm="6"
+            >
               <VSelect
                 v-model="form.link_type"
                 :items="linkTypeItems"
@@ -265,7 +344,10 @@ const deductStatusItems = computed(() =>
                 required
               />
             </VCol>
-            <VCol cols="12" sm="6">
+            <VCol
+              cols="12"
+              sm="6"
+            >
               <VSelect
                 v-model="form.deduct_on_status"
                 :items="deductStatusItems"
@@ -294,7 +376,10 @@ const deductStatusItems = computed(() =>
                   required
                 />
               </VCol>
-              <VCol cols="12" sm="6">
+              <VCol
+                cols="12"
+                sm="6"
+              >
                 <VTextField
                   v-model.number="form.quantity_per_sale"
                   :label="t('Quantity per Sale')"
@@ -303,7 +388,10 @@ const deductStatusItems = computed(() =>
                   :min="0.01"
                 />
               </VCol>
-              <VCol cols="12" sm="6">
+              <VCol
+                cols="12"
+                sm="6"
+              >
                 <VSelect
                   v-model="form.unit_id"
                   :items="units"
@@ -315,23 +403,55 @@ const deductStatusItems = computed(() =>
           </VRow>
         </VCardText>
         <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn variant="tonal" color="default" @click="dialog = false">{{ t('Cancel') }}</VBtn>
-          <VBtn :loading="saving" @click="save">{{ t('Save') }}</VBtn>
+          <VBtn
+            variant="tonal"
+            color="default"
+            @click="dialog = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            :loading="saving"
+            @click="save"
+          >
+            {{ t('Save') }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
 
-    <VDialog v-model="unlinkDialog" max-width="400">
+    <VDialog
+      v-model="unlinkDialog"
+      max-width="400"
+    >
       <VCard :title="t('Unlink Product')">
         <VCardText>{{ t('Are you sure you want to unlink') }} <strong>{{ selectedItem?.product?.name ?? selectedItem?.product_name }}</strong>?</VCardText>
         <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn variant="tonal" color="default" @click="unlinkDialog = false">{{ t('Cancel') }}</VBtn>
-          <VBtn color="error" :loading="unlinking" @click="doUnlink">{{ t('Unlink') }}</VBtn>
+          <VBtn
+            variant="tonal"
+            color="default"
+            @click="unlinkDialog = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            color="error"
+            :loading="unlinking"
+            @click="doUnlink"
+          >
+            {{ t('Unlink') }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
 
-    <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">{{ snackbarMsg }}</VSnackbar>
+    <VSnackbar
+      v-model="snackbar"
+      :color="snackbarColor"
+      :timeout="3000"
+    >
+      {{ snackbarMsg }}
+    </VSnackbar>
   </div>
 </template>
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import axios from '@axios'
+import { stockApi as axios } from '@/plugins/axios'
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, te } = useI18n({ useScope: 'global' })
 
 interface Message {
   id: number
@@ -42,6 +42,7 @@ catch {}
 
 const userInitial = computed(() => {
   const name = userData.value?.first_name || userData.value?.email || 'U'
+
   return String(name).charAt(0).toUpperCase()
 })
 
@@ -52,18 +53,19 @@ const priorityColor: Record<string, string> = {
 }
 
 const iconFor: Record<string, string> = {
-  warning: 'bx-error',
-  clock: 'bx-time',
-  chart: 'bx-bar-chart-alt-2',
-  fire: 'bx-trending-up',
-  truck: 'bx-package',
+  'warning': 'bx-error',
+  'clock': 'bx-time',
+  'chart': 'bx-bar-chart-alt-2',
+  'fire': 'bx-trending-up',
+  'truck': 'bx-package',
   'crystal-ball': 'bx-bulb',
 }
 
 function scrollToBottom() {
   nextTick(() => {
     const el = logRef.value
-    if (el) el.scrollTop = el.scrollHeight
+    if (el)
+      el.scrollTop = el.scrollHeight
   })
 }
 
@@ -74,6 +76,7 @@ async function loadMeta() {
       axios.get('/ai/suggestions/'),
       axios.get('/ai/quick-actions/'),
     ])
+
     suggestions.value = sRes.data?.suggestions ?? []
     quickActions.value = qRes.data?.actions ?? []
   }
@@ -88,7 +91,8 @@ async function loadMeta() {
 
 async function send(text?: string) {
   const query = (text ?? input.value).trim()
-  if (!query || sending.value) return
+  if (!query || sending.value)
+    return
 
   messages.value.push({
     id: Date.now(),
@@ -105,7 +109,9 @@ async function send(text?: string) {
       query,
       context: chatContext.value,
     })
+
     const d = res.data ?? {}
+
     chatContext.value = d.context ?? chatContext.value
     messages.value.push({
       id: Date.now() + 1,
@@ -137,6 +143,7 @@ function clearChat() {
 
 function formatTime(ts: number) {
   const d = new Date(ts)
+
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
@@ -154,7 +161,10 @@ onMounted(() => {
           color="primary"
           variant="tonal"
         >
-          <VIcon icon="bx-bot" size="22" />
+          <VIcon
+            icon="bx-bot"
+            size="22"
+          />
         </VAvatar>
         <div class="ms-3 flex-grow-1">
           <div class="text-h6">
@@ -171,8 +181,14 @@ onMounted(() => {
           :disabled="!messages.length"
           @click="clearChat"
         >
-          <VIcon icon="bx-trash" size="20" />
-          <VTooltip activator="parent" location="top">
+          <VIcon
+            icon="bx-trash"
+            size="20"
+          />
+          <VTooltip
+            activator="parent"
+            location="top"
+          >
             {{ t('Clear chat') }}
           </VTooltip>
         </VBtn>
@@ -180,13 +196,24 @@ onMounted(() => {
 
       <VDivider />
 
-      <div ref="logRef" class="chat-log flex-grow-1 pa-4">
+      <div
+        ref="logRef"
+        class="chat-log flex-grow-1 pa-4"
+      >
         <div
           v-if="!messages.length"
           class="empty-state d-flex flex-column align-center justify-center h-100 text-center"
         >
-          <VAvatar size="80" color="primary" variant="tonal" class="mb-4">
-            <VIcon icon="bx-bot" size="40" />
+          <VAvatar
+            size="80"
+            color="primary"
+            variant="tonal"
+            class="mb-4"
+          >
+            <VIcon
+              icon="bx-bot"
+              size="40"
+            />
           </VAvatar>
           <div class="text-h5 mb-2">
             {{ t('How can I help you today?') }}
@@ -195,7 +222,10 @@ onMounted(() => {
             {{ t('Ask anything about your stock, batches, or orders.') }}
           </div>
 
-          <div v-if="quickActions.length" class="quick-actions d-flex flex-wrap justify-center gap-2 mb-6">
+          <div
+            v-if="quickActions.length"
+            class="quick-actions d-flex flex-wrap justify-center gap-2 mb-6"
+          >
             <VBtn
               v-for="qa in quickActions"
               :key="qa.id"
@@ -208,7 +238,11 @@ onMounted(() => {
             </VBtn>
           </div>
 
-          <div v-if="suggestions.length" class="suggestions w-100" style="max-width: 600px;">
+          <div
+            v-if="suggestions.length"
+            class="suggestions w-100"
+            style="max-width: 600px;"
+          >
             <div class="text-overline text-medium-emphasis mb-2">
               {{ t('Suggestions') }}
             </div>
@@ -230,13 +264,16 @@ onMounted(() => {
                 </VChip>
                 <div class="flex-grow-1 text-start">
                   <div class="text-body-2 font-weight-medium">
-                    {{ s.query }}
+                    {{ te(s.query) ? t(s.query) : s.query }}
                   </div>
                   <div class="text-caption text-medium-emphasis">
-                    {{ s.reason }}
+                    {{ te(s.reason) ? t(s.reason) : s.reason }}
                   </div>
                 </div>
-                <VIcon icon="bx-chevron-right" size="18" />
+                <VIcon
+                  icon="bx-chevron-right"
+                  size="18"
+                />
               </div>
             </VCard>
           </div>
@@ -256,7 +293,10 @@ onMounted(() => {
               variant="tonal"
               class="me-2 flex-shrink-0"
             >
-              <VIcon icon="bx-bot" size="20" />
+              <VIcon
+                icon="bx-bot"
+                size="20"
+              />
             </VAvatar>
 
             <div class="msg-bubble-wrap">
@@ -264,13 +304,19 @@ onMounted(() => {
                 class="msg-bubble"
                 :class="m.role === 'user' ? 'bubble-user' : 'bubble-bot'"
               >
-                <div class="msg-text" v-text="m.text" />
+                <div
+                  class="msg-text"
+                  v-text="m.text"
+                />
               </div>
               <div
                 class="msg-meta text-caption text-medium-emphasis mt-1"
                 :class="m.role === 'user' ? 'text-end' : 'text-start'"
               >
-                <span v-if="m.intent" class="me-2">{{ m.intent }}</span>
+                <span
+                  v-if="m.intent"
+                  class="me-2"
+                >{{ m.intent }}</span>
                 <span>{{ formatTime(m.timestamp) }}</span>
               </div>
               <div
@@ -301,9 +347,20 @@ onMounted(() => {
             </VAvatar>
           </div>
 
-          <div v-if="sending" class="msg-row d-flex justify-start mb-4">
-            <VAvatar size="36" color="primary" variant="tonal" class="me-2">
-              <VIcon icon="bx-bot" size="20" />
+          <div
+            v-if="sending"
+            class="msg-row d-flex justify-start mb-4"
+          >
+            <VAvatar
+              size="36"
+              color="primary"
+              variant="tonal"
+              class="me-2"
+            >
+              <VIcon
+                icon="bx-bot"
+                size="20"
+              />
             </VAvatar>
             <div class="msg-bubble bubble-bot typing">
               <span class="dot" />
@@ -336,7 +393,10 @@ onMounted(() => {
                 icon
                 @click="() => send()"
               >
-                <VIcon icon="bx-send" size="18" />
+                <VIcon
+                  icon="bx-send"
+                  size="18"
+                />
               </VBtn>
             </template>
           </VTextField>

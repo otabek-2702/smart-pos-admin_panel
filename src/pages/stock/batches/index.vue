@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import axios from '@axios'
+import { stockApi as axios } from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -47,8 +47,10 @@ const headers = [
 ]
 
 function formatQty(val: any) {
-  if (val === null || val === undefined) return '0'
+  if (val === null || val === undefined)
+    return '0'
   const n = Number(val)
+
   return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '')
 }
 
@@ -56,14 +58,20 @@ async function loadBatches() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value) params.search = search.value
-    if (statusFilter.value) params.status = statusFilter.value
-    if (locationFilter.value) params.location_id = locationFilter.value
-    if (expiryFilter.value === 'expiring_soon') params.expiring_days = 7
-    else if (expiryFilter.value === 'expired') params.expired = true
+    if (search.value)
+      params.search = search.value
+    if (statusFilter.value)
+      params.status = statusFilter.value
+    if (locationFilter.value)
+      params.location_id = locationFilter.value
+    if (expiryFilter.value === 'expiring_soon')
+      params.expiring_days = 7
+    else if (expiryFilter.value === 'expired')
+      params.expired = true
 
     const res = await axios.get('/batches/', { params })
-    const d = res.data
+    const d = res.data?.data ?? res.data
+
     batches.value = d.batches ?? []
     total.value = d.pagination?.total_items ?? batches.value.length
 
@@ -81,6 +89,7 @@ async function loadBatches() {
 async function loadLocations() {
   try {
     const res = await axios.get('/locations/', { params: { per_page: 200 } })
+
     locationsList.value = res.data.locations ?? []
   }
   catch { /* ignore */ }
@@ -134,7 +143,13 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
           clearable
         />
         <VSpacer />
-        <VBtn variant="tonal" prepend-icon="bx-refresh" @click="loadBatches">{{ t('Refresh') }}</VBtn>
+        <VBtn
+          variant="tonal"
+          prepend-icon="bx-refresh"
+          @click="loadBatches"
+        >
+          {{ t('Refresh') }}
+        </VBtn>
       </VCardText>
 
       <VDataTableServer
@@ -153,17 +168,69 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
           />
         </template>
 
-        <template v-if="loading && batches.length === 0" #body>
-          <tr v-for="n in itemsPerPage" :key="n" class="sk-row">
-            <td class="sk-cell"><div class="sk-box" style="width:140px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:100px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:110px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:60px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:60px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:80px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:80px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:80px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:70px;height:22px;border-radius:12px;" /></td>
+        <template
+          v-if="loading && batches.length === 0"
+          #body
+        >
+          <tr
+            v-for="n in itemsPerPage"
+            :key="n"
+            class="sk-row"
+          >
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:140px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:100px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:110px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:80px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:80px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:80px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:70px;height:22px;border-radius:12px;"
+              />
+            </td>
           </tr>
         </template>
 
@@ -188,7 +255,11 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
           {{ formatCurrency(item.raw.unit_cost) }}
         </template>
         <template #item.status="{ item }">
-          <VChip :color="BATCH_STATUS_COLOR[item.raw.status] ?? 'default'" size="small" variant="tonal">
+          <VChip
+            :color="BATCH_STATUS_COLOR[item.raw.status] ?? 'default'"
+            size="small"
+            variant="tonal"
+          >
             {{ item.raw.status_display ?? item.raw.status }}
           </VChip>
         </template>
@@ -196,14 +267,24 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
           <span class="text-body-2">{{ item.raw.expiry_date ? formatDateShort(item.raw.expiry_date) : '—' }}</span>
         </template>
         <template #item.quality_status="{ item }">
-          <VChip :color="QUALITY_STATUS_COLOR[item.raw.quality_status] ?? 'default'" size="small" variant="tonal">
+          <VChip
+            :color="QUALITY_STATUS_COLOR[item.raw.quality_status] ?? 'default'"
+            size="small"
+            variant="tonal"
+          >
             {{ item.raw.quality_status?.replace(/_/g, ' ') ?? '—' }}
           </VChip>
         </template>
       </VDataTableServer>
     </VCard>
 
-    <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">{{ snackbarMsg }}</VSnackbar>
+    <VSnackbar
+      v-model="snackbar"
+      :color="snackbarColor"
+      :timeout="3000"
+    >
+      {{ snackbarMsg }}
+    </VSnackbar>
   </div>
 </template>
 

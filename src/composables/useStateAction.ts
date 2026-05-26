@@ -1,10 +1,12 @@
-import axios from '@axios'
+import type { AxiosInstance } from 'axios'
+import defaultAxios from '@axios'
 
 export function useStateAction(
   baseUrl: string,
   onSuccess: () => void,
   notify: (msg: string, color?: string) => void,
   t: (key: string) => string,
+  api: AxiosInstance = defaultAxios,
 ) {
   const actionDialog = ref(false)
   const actionItem = ref<any>(null)
@@ -20,7 +22,7 @@ export function useStateAction(
   async function doAction(successMsg?: string, errorMsg?: string) {
     actioning.value = true
     try {
-      await axios.post(`${baseUrl}${actionItem.value.id}/${actionType.value}/`)
+      await api.post(`${baseUrl}${actionItem.value.id}/${actionType.value}/`)
       notify(successMsg ?? t('Updated'))
       actionDialog.value = false
       onSuccess()

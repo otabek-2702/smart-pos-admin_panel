@@ -3,13 +3,6 @@ export default [
     heading: 'Management',
   },
   {
-    title: 'Users',
-    icon: { icon: 'bx-group' },
-    to: 'users',
-    action: 'manage',
-    subject: 'all',
-  },
-  {
     title: 'Categories',
     icon: { icon: 'bx-category' },
     to: 'categories',
@@ -31,7 +24,28 @@ export default [
     subject: 'all',
   },
   {
-    title: 'Inkassa',
+    title: 'Places & Tables',
+    icon: { icon: 'bx-grid' },
+    to: 'places',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
+    title: 'Discounts',
+    icon: { icon: 'bx-purchase-tag' },
+    to: 'discounts',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
+    title: 'Shifts',
+    icon: { icon: 'bx-time-five' },
+    to: 'shifts',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
+    title: 'Cash Register',
     icon: { icon: 'bx-wallet' },
     to: 'inkassa',
     action: 'manage',

@@ -16,15 +16,19 @@ const search = ref('')
 const categoryFilter = ref<number | undefined>(undefined)
 
 const categoriesList = ref<any[]>([])
+
 const categoryOptions = computed(() =>
-  categoriesList.value.map((c: any) => ({ title: c.name, value: c.id }))
+  categoriesList.value.map((c: any) => ({ title: c.name, value: c.id })),
 )
 
 // id → hex color lookup for categories
 const categoryColorMap = computed(() => {
   const map: Record<number, string> = {}
-  for (const c of categoriesList.value)
-    if (c.colors?.[0]) map[c.id] = c.colors[0]
+  for (const c of categoriesList.value) {
+    if (c.colors?.[0])
+      map[c.id] = c.colors[0]
+  }
+
   return map
 })
 
@@ -67,7 +71,9 @@ const characteristicColors = computed(() => [
 
 // Preview: selected category color
 const previewColor = computed(() => {
-  if (!form.value.category_id) return '#9e9e9e'
+  if (!form.value.category_id)
+    return '#9e9e9e'
+
   return categoryColorMap.value[form.value.category_id] || '#9e9e9e'
 })
 
@@ -87,11 +93,14 @@ async function loadProducts() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value) params.search = search.value
-    if (categoryFilter.value) params.category_ids = categoryFilter.value
+    if (search.value)
+      params.search = search.value
+    if (categoryFilter.value)
+      params.category_ids = categoryFilter.value
 
     const res = await axios.get('/products', { params })
     const d = res.data?.data
+
     products.value = d?.products ?? []
     totalProducts.value = d?.pagination?.total_products ?? products.value.length
   }
@@ -106,6 +115,7 @@ async function loadProducts() {
 async function loadCategories() {
   try {
     const res = await axios.get('/categories', { params: { per_page: 100 } })
+
     categoriesList.value = res.data?.data?.categories ?? []
   }
   catch { /* ignore */ }
@@ -122,6 +132,7 @@ const debouncedSearch = useDebounceFn(() => {
   page.value = 1
   loadProducts()
 }, 400)
+
 watch(search, debouncedSearch)
 
 watch(categoryFilter, () => {
@@ -134,9 +145,11 @@ const initialForm = ref({ name: '', description: '', price: 0, category_id: null
 const isDirty = computed(() => JSON.stringify(form.value) !== JSON.stringify(initialForm.value))
 
 function tryCloseDialog(val: boolean) {
-  if (val) return
+  if (val)
+    return
   if (isDirty.value) {
     notify(t('Unsaved changes! Use the close button to discard.'), 'warning')
+
     return
   }
   dialogOpen.value = false
@@ -173,12 +186,13 @@ async function saveProduct() {
       category_id: form.value.category_id,
       colors: form.value.color ? [form.value.color] : [],
     }
+
     if (editingProduct.value) {
-      await axios.put(`/products/${editingProduct.value.id}/update`, payload)
+      await axios.patch(`/products/${editingProduct.value.id}`, payload)
       notify(t('Product updated'))
     }
     else {
-      await axios.post('/products/create', payload)
+      await axios.post('/products', payload)
       notify(t('Product created'))
     }
     dialogOpen.value = false
@@ -198,9 +212,10 @@ function confirmDelete(product: any) {
 }
 
 async function deleteProduct() {
-  if (!deletingProduct.value) return
+  if (!deletingProduct.value)
+    return
   try {
-    await axios.delete(`/products/${deletingProduct.value.id}/delete`)
+    await axios.delete(`/products/${deletingProduct.value.id}`)
     notify(t('Product deleted'))
     deleteDialog.value = false
     loadProducts()
@@ -235,7 +250,10 @@ async function deleteProduct() {
           clearable
         />
         <VSpacer />
-        <VBtn prepend-icon="bx-plus" @click="openCreate">
+        <VBtn
+          prepend-icon="bx-plus"
+          @click="openCreate"
+        >
           {{ t('Add Product') }}
         </VBtn>
       </VCardText>
@@ -258,27 +276,70 @@ async function deleteProduct() {
         </template>
 
         <!-- Skeleton rows on initial load -->
-        <template v-if="loading && products.length === 0" #body>
-          <tr v-for="n in itemsPerPage" :key="n" class="sk-row">
-            <td class="sk-cell"><div class="sk-box" style="width:30px;height:13px;border-radius:4px;" /></td>
+        <template
+          v-if="loading && products.length === 0"
+          #body
+        >
+          <tr
+            v-for="n in itemsPerPage"
+            :key="n"
+            class="sk-row"
+          >
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:30px;height:13px;border-radius:4px;"
+              />
+            </td>
             <td class="sk-cell">
               <div class="d-flex align-center gap-2">
-                <div class="sk-box" style="width:10px;height:10px;border-radius:50%;flex-shrink:0;" />
-                <div class="sk-box" style="width:110px;height:13px;border-radius:4px;" />
+                <div
+                  class="sk-box"
+                  style="width:10px;height:10px;border-radius:50%;flex-shrink:0;"
+                />
+                <div
+                  class="sk-box"
+                  style="width:110px;height:13px;border-radius:4px;"
+                />
               </div>
             </td>
-            <td class="sk-cell"><div class="sk-box" style="width:80px;height:13px;border-radius:4px;" /></td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:80px;height:13px;border-radius:4px;"
+              />
+            </td>
             <td class="sk-cell">
               <div class="d-flex align-center gap-2">
-                <div class="sk-box" style="width:10px;height:10px;border-radius:3px;flex-shrink:0;" />
-                <div class="sk-box" style="width:80px;height:22px;border-radius:12px;" />
+                <div
+                  class="sk-box"
+                  style="width:10px;height:10px;border-radius:3px;flex-shrink:0;"
+                />
+                <div
+                  class="sk-box"
+                  style="width:80px;height:22px;border-radius:12px;"
+                />
               </div>
             </td>
-            <td class="sk-cell"><div class="sk-box" style="width:90px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell" style="text-align:end;">
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:90px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td
+              class="sk-cell"
+              style="text-align:end;"
+            >
               <div class="d-flex justify-end gap-1">
-                <div class="sk-box" style="width:28px;height:28px;border-radius:50%;" />
-                <div class="sk-box" style="width:28px;height:28px;border-radius:50%;" />
+                <div
+                  class="sk-box"
+                  style="width:28px;height:28px;border-radius:50%;"
+                />
+                <div
+                  class="sk-box"
+                  style="width:28px;height:28px;border-radius:50%;"
+                />
               </div>
             </td>
           </tr>
@@ -308,12 +369,15 @@ async function deleteProduct() {
             size="small"
             variant="tonal"
             :style="categoryColorMap[item.raw.category.id]
-              ? { backgroundColor: categoryColorMap[item.raw.category.id] + '28', color: categoryColorMap[item.raw.category.id] }
+              ? { backgroundColor: `${categoryColorMap[item.raw.category.id]}28`, color: categoryColorMap[item.raw.category.id] }
               : {}"
           >
             {{ item.raw.category.name }}
           </VChip>
-          <span v-else class="text-disabled">—</span>
+          <span
+            v-else
+            class="text-disabled"
+          >—</span>
         </template>
 
         <template #item.created_at="{ item }">
@@ -321,14 +385,44 @@ async function deleteProduct() {
         </template>
 
         <template #item.actions="{ item }">
-          <div class="d-flex justify-end" style="gap:2px;">
-            <VBtn icon variant="text" size="small" @click="openEdit(item.raw)">
-              <VIcon icon="bx-edit" size="18" />
-              <VTooltip activator="parent" location="top">{{ t('Edit') }}</VTooltip>
+          <div
+            class="d-flex justify-end"
+            style="gap:2px;"
+          >
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              @click="openEdit(item.raw)"
+            >
+              <VIcon
+                icon="bx-edit"
+                size="18"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Edit') }}
+              </VTooltip>
             </VBtn>
-            <VBtn icon variant="text" size="small" color="error" @click="confirmDelete(item.raw)">
-              <VIcon icon="bx-trash" size="18" />
-              <VTooltip activator="parent" location="top">{{ t('Delete') }}</VTooltip>
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              color="error"
+              @click="confirmDelete(item.raw)"
+            >
+              <VIcon
+                icon="bx-trash"
+                size="18"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Delete') }}
+              </VTooltip>
             </VBtn>
           </div>
         </template>
@@ -336,7 +430,11 @@ async function deleteProduct() {
     </VCard>
 
     <!-- Create/Edit Dialog -->
-    <VDialog :model-value="dialogOpen" max-width="500" @update:model-value="tryCloseDialog">
+    <VDialog
+      :model-value="dialogOpen"
+      max-width="500"
+      @update:model-value="tryCloseDialog"
+    >
       <VCard :title="editingProduct ? t('Edit Product') : t('Add Product')">
         <DialogCloseBtn @click="dialogOpen = false" />
         <VCardText class="pb-2">
@@ -344,9 +442,16 @@ async function deleteProduct() {
           <div class="pos-preview mb-3">
             <span class="text-caption text-disabled d-block mb-2">{{ t('POS Preview') }}</span>
             <div class="pos-preview__cards">
-              <div class="pos-product-card" :style="{ backgroundColor: previewColor }">
-                <div class="pos-product-card__name">{{ form.name || t('Name') }}</div>
-                <div class="pos-product-card__price">{{ form.price ? formatCurrency(form.price) + ' so\'m' : '0 so\'m' }}</div>
+              <div
+                class="pos-product-card"
+                :style="{ backgroundColor: previewColor }"
+              >
+                <div class="pos-product-card__name">
+                  {{ form.name || t('Name') }}
+                </div>
+                <div class="pos-product-card__price">
+                  {{ form.price ? `${formatCurrency(form.price)} so'm` : '0 so\'m' }}
+                </div>
                 <div
                   v-if="form.color"
                   class="pos-product-card__stripe"
@@ -358,13 +463,25 @@ async function deleteProduct() {
 
           <VRow>
             <VCol cols="12">
-              <VTextField v-model="form.name" :label="t('Name')" density="compact" />
+              <VTextField
+                v-model="form.name"
+                :label="t('Name')"
+                density="compact"
+              />
             </VCol>
             <VCol cols="12">
-              <VTextField v-model="form.description" :label="t('Description')" density="compact" />
+              <VTextField
+                v-model="form.description"
+                :label="t('Description')"
+                density="compact"
+              />
             </VCol>
             <VCol cols="6">
-              <AppPriceInput v-model="form.price" :label="t('Price')" density="compact" />
+              <AppPriceInput
+                v-model="form.price"
+                :label="t('Price')"
+                density="compact"
+              />
             </VCol>
             <VCol cols="6">
               <VSelect
@@ -414,7 +531,10 @@ async function deleteProduct() {
                           :class="{ 'char-dot--active': form.color && !characteristicColors.some(c => c.hex === form.color) }"
                           :style="form.color && !characteristicColors.some(c => c.hex === form.color) ? { backgroundColor: form.color } : {}"
                         >
-                          <VIcon icon="bx-palette" size="14" />
+                          <VIcon
+                            icon="bx-palette"
+                            size="14"
+                          />
                         </button>
                       </template>
                       {{ t('Custom') }}
@@ -436,14 +556,20 @@ async function deleteProduct() {
                   class="char-dot char-dot--clear"
                   @click="form.color = ''"
                 >
-                  <VIcon icon="bx-x" size="14" />
+                  <VIcon
+                    icon="bx-x"
+                    size="14"
+                  />
                 </button>
               </div>
             </VCol>
           </VRow>
         </VCardText>
         <VCardActions class="justify-end pt-0 pb-4 px-4">
-          <VBtn :loading="dialogLoading" @click="saveProduct">
+          <VBtn
+            :loading="dialogLoading"
+            @click="saveProduct"
+          >
             {{ t('Save') }}
           </VBtn>
         </VCardActions>
@@ -451,14 +577,24 @@ async function deleteProduct() {
     </VDialog>
 
     <!-- Delete Confirm Dialog -->
-    <VDialog v-model="deleteDialog" max-width="400">
+    <VDialog
+      v-model="deleteDialog"
+      max-width="400"
+    >
       <VCard :title="t('Delete Product')">
         <VCardText>{{ t('Are you sure you want to delete this product?') }}</VCardText>
         <VCardActions class="justify-end">
-          <VBtn variant="tonal" color="secondary" @click="deleteDialog = false">
+          <VBtn
+            variant="tonal"
+            color="secondary"
+            @click="deleteDialog = false"
+          >
             {{ t('Cancel') }}
           </VBtn>
-          <VBtn color="error" @click="deleteProduct">
+          <VBtn
+            color="error"
+            @click="deleteProduct"
+          >
             {{ t('Delete') }}
           </VBtn>
         </VCardActions>
@@ -466,13 +602,18 @@ async function deleteProduct() {
     </VDialog>
 
     <!-- Snackbar -->
-    <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">
+    <VSnackbar
+      v-model="snackbar"
+      :color="snackbarColor"
+      :timeout="3000"
+    >
       {{ snackbarMsg }}
     </VSnackbar>
   </div>
 </template>
 
-<style scoped>/* ── POS Preview ── */
+<style scoped>
+/* ── POS Preview ── */
 .pos-preview {
   background: rgba(var(--v-theme-on-surface), 0.04);
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));

@@ -1,80 +1,78 @@
 <script setup lang="ts">
-import { ROLE_COLOR as roleColors } from '@/constants/statusColors'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
-import axios from '@axios'
 import UserStatsRow from './UserStatsRow.vue'
+import { ROLE_COLOR as roleColors } from '@/constants/statusColors'
+import { hrApi as axios } from '@/plugins/axios'
+import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
+const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
+const { formatCurrency, formatDate } = useFormatters()
 
-// ---- state ----
-const users = ref<any[]>([])
-const totalUsers = ref(0)
+const employees = ref<any[]>([])
+const totalEmployees = ref(0)
 const loading = ref(false)
 const stats = ref<any>(null)
-const rolesList = ref<any[]>([])
+const departments = ref<any[]>([])
 
 const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
-const roleFilter = ref<string | undefined>(undefined)
-const statusFilter = ref<string | undefined>(undefined)
+const departmentFilter = ref<number | undefined>(undefined)
+const contractTypeFilter = ref<string | undefined>(undefined)
 
-// Dialog
 const dialogOpen = ref(false)
-const editingUser = ref<any>(null)
+const editing = ref<any>(null)
 const dialogLoading = ref(false)
 
-// Confirm delete
 const deleteDialog = ref(false)
-const deletingUser = ref<any>(null)
+const deleting = ref<any>(null)
 
-const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
-
-// Form — no email/username
 const form = ref({
-  first_name: '',
-  last_name: '',
-  role: 'USER',
-  password: '',
+  user_id: null as number | null,
+  position: '',
+  department_id: null as number | null,
+  hire_date: new Date().toISOString().slice(0, 10),
+  contract_type: 'FULL_TIME',
+  base_salary: 0,
+  payment_frequency: 'MONTHLY',
+  phone: '',
+  address: '',
+  notes: '',
 })
 
-// code → display name  (reactive function so slot templates always get latest)
-function getRoleName(code: string): string {
-  return rolesList.value.find((r: any) => r.code === code)?.name ?? code
-}
+const contractTypes = ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERN', 'TEMPORARY']
+const paymentFrequencies = ['MONTHLY', 'WEEKLY', 'BIWEEKLY', 'DAILY', 'HOURLY']
 
 const headers = computed(() => [
   { title: t('ID'), key: 'id', sortable: false, width: '60px' },
-  { title: t('First Name'), key: 'first_name', sortable: false },
-  { title: t('Last Name'), key: 'last_name', sortable: false },
-  { title: t('Role'), key: 'role', sortable: false },
+  { title: t('Name'), key: 'name', sortable: false },
+  { title: t('Position'), key: 'position', sortable: false },
+  { title: t('Department'), key: 'department', sortable: false },
+  { title: t('Contract'), key: 'contract_type', sortable: false },
+  { title: t('Salary'), key: 'base_salary', sortable: false },
+  { title: t('Hire Date'), key: 'hire_date', sortable: false },
+  { title: t('Status'), key: 'is_active', sortable: false },
   { title: t('Actions'), key: 'actions', sortable: false, align: 'end' },
 ])
 
-// ---- load ----
-async function loadRoles() {
-  try {
-    const res = await axios.get('/roles')
-    rolesList.value = res.data?.data?.roles ?? []
-  }
-  catch { /* ignore */ }
-}
-
-async function loadUsers() {
+async function loadEmployees() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value) params.search = search.value
-    if (roleFilter.value) params.role = roleFilter.value
-    if (statusFilter.value) params.status = statusFilter.value
+    if (search.value)
+      params.search = search.value
+    if (departmentFilter.value)
+      params.department_id = departmentFilter.value
+    if (contractTypeFilter.value)
+      params.contract_type = contractTypeFilter.value
+    const res = await axios.get('/employees/', { params })
+    const d = res.data?.data ?? res.data
 
-    const res = await axios.get('/users', { params })
-    const d = res.data?.data
-    users.value = d?.users ?? []
-    totalUsers.value = d?.pagination?.total_users ?? users.value.length
+    employees.value = d?.employees ?? []
+    totalEmployees.value = d?.pagination?.total_items ?? d?.pagination?.total ?? employees.value.length
   }
   catch {
-    notify(t('Failed to load users'), 'error')
+    notify(t('Failed to load employees'), 'error')
   }
   finally {
     loading.value = false
@@ -83,129 +81,107 @@ async function loadUsers() {
 
 async function loadStats() {
   try {
-    const res = await axios.get('/users/stats')
-    stats.value = res.data?.data ?? res.data
+    const res = await axios.get('/employees/stats/')
+    const d = res.data?.data ?? res.data
+    stats.value = d?.stats ?? d
+  }
+  catch { /* ignore */ }
+}
+
+async function loadDepartments() {
+  try {
+    const res = await axios.get('/departments/', { params: { per_page: 200 } })
+    const d = res.data?.data ?? res.data
+
+    departments.value = d?.departments ?? d?.items ?? []
   }
   catch { /* ignore */ }
 }
 
 onMounted(() => {
-  loadRoles()
-  loadUsers()
+  loadEmployees()
   loadStats()
+  loadDepartments()
 })
 
-// pagination
-watch([page, itemsPerPage], loadUsers)
+watch([page, itemsPerPage], loadEmployees)
 
-// debounced search — waits 400ms after last keystroke
-const debouncedSearch = useDebounceFn(() => {
-  page.value = 1
-  loadUsers()
-}, 400)
+const debouncedSearch = useDebounceFn(() => { page.value = 1; loadEmployees() }, 400)
+
 watch(search, debouncedSearch)
+watch([departmentFilter, contractTypeFilter], () => { page.value = 1; loadEmployees() })
 
-// role & status filters are instant
-watch([roleFilter, statusFilter], () => {
-  page.value = 1
-  loadUsers()
-})
-
-// ---- dirty tracking ----
-const initialForm = ref({ first_name: '', last_name: '', role: 'USER', password: '' })
-const isDirty = computed(() => JSON.stringify(form.value) !== JSON.stringify(initialForm.value))
-
-function tryCloseDialog(val: boolean) {
-  if (val) return
-  if (isDirty.value) {
-    notify(t('Unsaved changes! Use the close button to discard.'), 'warning')
-    return
-  }
-  dialogOpen.value = false
-}
-
-// ---- CRUD ----
 function openCreate() {
-  editingUser.value = null
-  form.value = { first_name: '', last_name: '', role: rolesList.value[0]?.code ?? 'USER', password: '' }
-  initialForm.value = { ...form.value }
-  dialogOpen.value = true
-}
-
-function openEdit(user: any) {
-  editingUser.value = user
+  editing.value = null
   form.value = {
-    first_name: user.first_name ?? '',
-    last_name: user.last_name ?? '',
-    role: user.role ?? 'USER',
-    password: '',
+    user_id: null,
+    position: '',
+    department_id: null,
+    hire_date: new Date().toISOString().slice(0, 10),
+    contract_type: 'FULL_TIME',
+    base_salary: 0,
+    payment_frequency: 'MONTHLY',
+    phone: '',
+    address: '',
+    notes: '',
   }
-  initialForm.value = { ...form.value }
   dialogOpen.value = true
 }
 
-async function saveUser() {
+function openEdit(emp: any) {
+  editing.value = emp
+  form.value = {
+    user_id: emp.user_id ?? emp.user?.id ?? null,
+    position: emp.position ?? '',
+    department_id: emp.department?.id ?? emp.department_id ?? null,
+    hire_date: emp.hire_date ?? new Date().toISOString().slice(0, 10),
+    contract_type: emp.contract_type ?? 'FULL_TIME',
+    base_salary: Number(emp.base_salary ?? 0),
+    payment_frequency: emp.payment_frequency ?? 'MONTHLY',
+    phone: emp.phone ?? '',
+    address: emp.address ?? '',
+    notes: emp.notes ?? '',
+  }
+  dialogOpen.value = true
+}
+
+async function save() {
   dialogLoading.value = true
   try {
-    if (editingUser.value) {
-      const payload: any = {
-        first_name: form.value.first_name,
-        last_name: form.value.last_name,
-        role: form.value.role,
-      }
-      if (form.value.password)
-        payload.password = form.value.password
-      await axios.put(`/users/${editingUser.value.id}/update`, payload)
-      notify(t('User updated'))
-    }
-    else {
-      await axios.post('/users/create', {
-        first_name: form.value.first_name,
-        last_name: form.value.last_name,
-        role: form.value.role,
-        password: form.value.password,
-      })
-      notify(t('User created'))
-    }
+    if (editing.value)
+      await axios.put(`/employees/${editing.value.id}/`, form.value)
+    else
+      await axios.post('/employees/', form.value)
+    notify(t(editing.value ? 'Employee updated' : 'Employee created'))
     dialogOpen.value = false
-    loadUsers()
+    loadEmployees()
     loadStats()
   }
   catch (e: any) {
-    notify(e?.response?.data?.message ?? t('Error saving user'), 'error')
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
   }
   finally {
     dialogLoading.value = false
   }
 }
 
-function confirmDelete(user: any) {
-  deletingUser.value = user
+function confirmDelete(emp: any) {
+  deleting.value = emp
   deleteDialog.value = true
 }
 
-async function deleteUser() {
-  if (!deletingUser.value) return
+async function doDelete() {
+  if (!deleting.value)
+    return
   try {
-    await axios.delete(`/users/${deletingUser.value.id}/delete`)
-    notify(t('User deleted'))
+    await axios.delete(`/employees/${deleting.value.id}/`)
+    notify(t('Employee deleted'))
     deleteDialog.value = false
-    loadUsers()
+    loadEmployees()
     loadStats()
   }
   catch (e: any) {
-    notify(e?.response?.data?.message ?? t('Error deleting user'), 'error')
-  }
-}
-
-async function toggleStatus(user: any) {
-  try {
-    await axios.post(`/users/${user.id}/status`)
-    notify(t('Status updated'))
-    loadUsers()
-  }
-  catch (e: any) {
-    notify(e?.response?.data?.message ?? t('Error updating status'), 'error')
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
   }
 }
 </script>
@@ -214,198 +190,344 @@ async function toggleStatus(user: any) {
   <div>
     <UserStatsRow :stats="stats" />
 
-    <!-- Table card -->
-      <VCard>
-        <VCardText class="d-flex align-center gap-3 py-3">
-          <VTextField
-            v-model="search"
-            :placeholder="t('Search')"
-            prepend-inner-icon="bx-search"
-            density="compact"
-            style="max-inline-size: 260px;"
-            hide-details
-            clearable
-          />
-          <VSelect
-            v-model="roleFilter"
-            :items="rolesList"
-            :placeholder="t('All Roles')"
-            item-title="name"
-            item-value="code"
-            density="compact"
-            style="min-inline-size: 200px;"
-            hide-details
-            clearable
-          />
-          <VSelect
-            v-model="statusFilter"
-            :items="[{ title: t('Active'), value: 'ACTIVE' }, { title: t('Suspended'), value: 'SUSPENDED' }]"
-            :placeholder="t('All Statuses')"
-            density="compact"
-            style="min-inline-size: 180px;"
-            hide-details
-            clearable
-          />
-          <VSpacer />
-          <VBtn
-            prepend-icon="bx-plus"
-            @click="openCreate"
-          >
-            {{ t('Add User') }}
-          </VBtn>
-        </VCardText>
-
-        <VDataTableServer
-          :headers="headers"
-          :items="users"
-          :items-length="totalUsers"
-          :loading="loading"
-          :items-per-page="itemsPerPage"
-          :page="page"
+    <VCard>
+      <VCardText class="d-flex align-center gap-3 py-3 flex-wrap">
+        <VTextField
+          v-model="search"
+          :placeholder="t('Search employees...')"
+          prepend-inner-icon="bx-search"
+          density="compact"
+          style="min-inline-size:200px;max-inline-size:280px;"
+          hide-details
+          clearable
+        />
+        <VSelect
+          v-model="departmentFilter"
+          :items="departments.map((d: any) => ({ title: d.name, value: d.id }))"
+          :placeholder="t('Department')"
+          density="compact"
+          style="min-inline-size:180px;"
+          hide-details
+          clearable
+        />
+        <VSelect
+          v-model="contractTypeFilter"
+          :items="contractTypes"
+          :placeholder="t('Contract Type')"
+          density="compact"
+          style="min-inline-size:180px;"
+          hide-details
+          clearable
+        />
+        <VSpacer />
+        <VBtn
+          color="primary"
+          prepend-icon="bx-plus"
+          @click="openCreate"
         >
+          {{ t('New Employee') }}
+        </VBtn>
+      </VCardText>
+
+      <VDataTableServer
+        :headers="headers"
+        :items="employees"
+        :items-length="totalEmployees"
+        :loading="loading"
+        :items-per-page="itemsPerPage"
+        :page="page"
+      >
         <template #bottom>
           <DataTableFooter
             v-model:page="page"
             v-model:items-per-page="itemsPerPage"
-            :total-items="totalUsers"
+            :total-items="totalEmployees"
           />
         </template>
 
-        <!-- Skeleton rows on initial load -->
-        <template v-if="loading && users.length === 0" #body>
-          <tr v-for="n in itemsPerPage" :key="n" class="sk-row">
-            <td class="sk-cell"><div class="sk-box" style="width:30px;height:13px;border-radius:4px;" /></td>
+        <template
+          v-if="loading && employees.length === 0"
+          #body
+        >
+          <tr
+            v-for="n in itemsPerPage"
+            :key="n"
+            class="sk-row"
+          >
             <td class="sk-cell">
-              <div class="d-flex align-center gap-2">
-                <div class="sk-box" style="width:32px;height:32px;border-radius:50%;flex-shrink:0;" />
-                <div class="sk-box" style="width:96px;height:13px;border-radius:4px;" />
-              </div>
+              <div
+                class="sk-box"
+                style="width:30px;height:13px;border-radius:4px;"
+              />
             </td>
-            <td class="sk-cell"><div class="sk-box" style="width:110px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:70px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell" style="text-align:end;">
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:140px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:100px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:90px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:80px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:80px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:90px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td
+              class="sk-cell"
+              style="text-align:end;"
+            >
               <div class="d-flex justify-end gap-1">
-                <div class="sk-box" style="width:28px;height:28px;border-radius:50%;" />
-                <div class="sk-box" style="width:28px;height:28px;border-radius:50%;" />
-                <div class="sk-box" style="width:28px;height:28px;border-radius:50%;" />
+                <div
+                  class="sk-box"
+                  style="width:32px;height:32px;border-radius:6px;"
+                />
+                <div
+                  class="sk-box"
+                  style="width:32px;height:32px;border-radius:6px;"
+                />
               </div>
             </td>
           </tr>
         </template>
 
-        <template #item.id="{ item }">
-          <span class="text-sm text-disabled font-weight-medium">#{{ item.raw.id }}</span>
-        </template>
-
-        <template #item.first_name="{ item }">
+        <template #item.name="{ item }">
           <div class="d-flex align-center gap-2">
             <VAvatar
               size="32"
-              color="primary"
+              :color="roleColors[item.raw.user?.role] ?? 'primary'"
               variant="tonal"
             >
-              <span class="text-xs">{{ (item.raw.first_name?.[0] ?? '?').toUpperCase() }}</span>
+              <span class="text-caption">{{ (item.raw.user?.first_name ?? '?')[0] }}</span>
             </VAvatar>
-            <span class="font-weight-medium">{{ item.raw.first_name }}</span>
+            <div>
+              <div class="text-body-2 font-weight-medium">
+                {{ item.raw.user?.first_name }} {{ item.raw.user?.last_name }}
+              </div>
+              <div class="text-caption text-disabled">
+                {{ item.raw.user?.email }}
+              </div>
+            </div>
           </div>
         </template>
-
-        <template #item.last_name="{ item }">
-          <span>{{ item.raw.last_name }}</span>
+        <template #item.department="{ item }">
+          {{ item.raw.department?.name ?? '—' }}
         </template>
-
-        <template #item.role="{ item }">
+        <template #item.contract_type="{ item }">
           <VChip
             size="small"
-            :color="roleColors[item.raw.role] ?? 'default'"
+            color="info"
             variant="tonal"
-            label
           >
-            {{ getRoleName(item.raw.role) }}
+            {{ item.raw.contract_type }}
           </VChip>
         </template>
-
+        <template #item.base_salary="{ item }">
+          {{ formatCurrency(item.raw.base_salary ?? 0) }}
+        </template>
+        <template #item.hire_date="{ item }">
+          {{ formatDate(item.raw.hire_date) }}
+        </template>
+        <template #item.is_active="{ item }">
+          <VChip
+            size="small"
+            :color="item.raw.is_active ? 'success' : 'default'"
+            variant="tonal"
+          >
+            {{ item.raw.is_active ? t('Active') : t('Inactive') }}
+          </VChip>
+        </template>
         <template #item.actions="{ item }">
-          <div class="d-flex justify-end" style="gap:2px;">
-            <VBtn icon variant="text" size="small" @click="openEdit(item.raw)">
-              <VIcon icon="bx-edit" size="18" />
-              <VTooltip activator="parent" location="top">{{ t('Edit') }}</VTooltip>
-            </VBtn>
+          <div
+            class="d-flex justify-end"
+            style="gap:2px;"
+          >
             <VBtn
-              icon variant="text" size="small"
-              :color="item.raw.status === 'ACTIVE' ? 'warning' : 'success'"
-              @click="toggleStatus(item.raw)"
+              icon
+              variant="text"
+              size="small"
+              @click="openEdit(item.raw)"
             >
-              <VIcon :icon="item.raw.status === 'ACTIVE' ? 'bx-user-x' : 'bx-user-check'" size="18" />
-              <VTooltip activator="parent" location="top">
-                {{ item.raw.status === 'ACTIVE' ? t('Suspend') : t('Activate') }}
+              <VIcon
+                icon="bx-edit-alt"
+                size="18"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Edit') }}
               </VTooltip>
             </VBtn>
-            <VBtn icon variant="text" size="small" color="error" @click="confirmDelete(item.raw)">
-              <VIcon icon="bx-trash" size="18" />
-              <VTooltip activator="parent" location="top">{{ t('Delete') }}</VTooltip>
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              color="error"
+              @click="confirmDelete(item.raw)"
+            >
+              <VIcon
+                icon="bx-trash"
+                size="18"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Delete') }}
+              </VTooltip>
             </VBtn>
           </div>
         </template>
       </VDataTableServer>
     </VCard>
 
-    <!-- Create/Edit Dialog -->
     <VDialog
-      :model-value="dialogOpen"
-      max-width="500"
-      @update:model-value="tryCloseDialog"
+      v-model="dialogOpen"
+      max-width="640"
+      persistent
     >
-      <VCard :title="editingUser ? t('Edit User') : t('Add User')">
-        <DialogCloseBtn @click="dialogOpen = false" />
-        <VCardText class="pb-2">
+      <VCard :title="editing ? t('Edit Employee') : t('New Employee')">
+        <VCardText>
           <VRow>
-            <VCol cols="6">
+            <VCol
+              v-if="!editing"
+              cols="12"
+            >
               <VTextField
-                v-model="form.first_name"
-                :label="t('First Name')"
-                density="compact"
+                v-model.number="form.user_id"
+                :label="t('User ID')"
+                type="number"
               />
             </VCol>
-            <VCol cols="6">
+            <VCol
+              cols="12"
+              sm="6"
+            >
               <VTextField
-                v-model="form.last_name"
-                :label="t('Last Name')"
-                density="compact"
+                v-model="form.position"
+                :label="t('Position')"
               />
             </VCol>
-            <VCol cols="12">
+            <VCol
+              cols="12"
+              sm="6"
+            >
               <VSelect
-                v-model="form.role"
-                :label="t('Role')"
-                :items="rolesList"
-                item-title="name"
-                item-value="code"
-                density="compact"
+                v-model="form.department_id"
+                :items="departments.map((d: any) => ({ title: d.name, value: d.id }))"
+                :label="t('Department')"
+                clearable
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VTextField
+                v-model="form.hire_date"
+                type="date"
+                :label="t('Hire Date')"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VSelect
+                v-model="form.contract_type"
+                :items="contractTypes"
+                :label="t('Contract Type')"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VTextField
+                v-model.number="form.base_salary"
+                :label="t('Base Salary')"
+                type="number"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VSelect
+                v-model="form.payment_frequency"
+                :items="paymentFrequencies"
+                :label="t('Payment Frequency')"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VTextField
+                v-model="form.phone"
+                :label="t('Phone')"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VTextField
+                v-model="form.address"
+                :label="t('Address')"
               />
             </VCol>
             <VCol cols="12">
-              <VTextField
-                v-model="form.password"
-                :label="t('Password')"
-                :placeholder="editingUser ? t('Leave empty to keep current') : ''"
-                :persistent-placeholder="!!editingUser"
-                density="compact"
-                maxlength="4"
-                :rules="[
-                  (v: string) => !v || /^\d+$/.test(v) || t('Only numbers allowed'),
-                  (v: string) => !v || v.length === 4 || t('Must be 4 digits'),
-                  (v: string) => editingUser || !!v || t('Password is required'),
-                ]"
-                append-inner-icon="bx-dialpad"
+              <VTextarea
+                v-model="form.notes"
+                :label="t('Notes')"
+                rows="2"
               />
             </VCol>
           </VRow>
         </VCardText>
-        <VCardActions class="justify-end pt-0 pb-4 px-4">
+        <VCardActions>
+          <VSpacer />
           <VBtn
+            variant="text"
+            @click="dialogOpen = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            color="primary"
             :loading="dialogLoading"
-            @click="saveUser"
+            @click="save"
           >
             {{ t('Save') }}
           </VBtn>
@@ -413,24 +535,25 @@ async function toggleStatus(user: any) {
       </VCard>
     </VDialog>
 
-    <!-- Delete Confirm Dialog -->
     <VDialog
       v-model="deleteDialog"
-      max-width="400"
+      max-width="420"
     >
-      <VCard :title="t('Delete User')">
-        <VCardText>{{ t('Are you sure you want to delete this user?') }}</VCardText>
-        <VCardActions class="justify-end">
+      <VCard :title="t('Delete Employee')">
+        <VCardText>
+          {{ t('Are you sure you want to delete this employee?') }}
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
           <VBtn
-            variant="tonal"
-            color="secondary"
+            variant="text"
             @click="deleteDialog = false"
           >
             {{ t('Cancel') }}
           </VBtn>
           <VBtn
             color="error"
-            @click="deleteUser"
+            @click="doDelete"
           >
             {{ t('Delete') }}
           </VBtn>
@@ -438,7 +561,6 @@ async function toggleStatus(user: any) {
       </VCard>
     </VDialog>
 
-    <!-- Snackbar -->
     <VSnackbar
       v-model="snackbar"
       :color="snackbarColor"

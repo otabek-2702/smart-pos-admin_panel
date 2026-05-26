@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useGenerateImageVariant } from '@/@core/composable/useGenerateImageVariant'
 import pageMiscErrorDark from '@images/pages/page-misc-error-dark.png'
 import pageMiscErrorLight from '@images/pages/page-misc-error-light.png'
+import { useGenerateImageVariant } from '@/@core/composable/useGenerateImageVariant'
 
 const pageMiscError = useGenerateImageVariant(pageMiscErrorLight, pageMiscErrorDark)
 </script>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import axios from '@axios'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
 import ItemFormDialog from './ItemFormDialog.vue'
+import { stockApi as axios } from '@/plugins/axios'
+import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -52,12 +52,16 @@ async function loadItems() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value) params.search = search.value
-    if (typeFilter.value) params.item_type = typeFilter.value
-    if (categoryFilter.value) params.category_id = categoryFilter.value
+    if (search.value)
+      params.search = search.value
+    if (typeFilter.value)
+      params.item_type = typeFilter.value
+    if (categoryFilter.value)
+      params.category_id = categoryFilter.value
 
     const res = await axios.get('/items/', { params })
-    const d = res.data
+    const d = res.data?.data ?? res.data
+
     items.value = d.items ?? []
     total.value = d.pagination?.total_items ?? items.value.length
   }
@@ -75,6 +79,7 @@ async function loadMeta() {
       axios.get('/categories/', { params: { per_page: 200 } }),
       axios.get('/units/', { params: { per_page: 200 } }),
     ])
+
     categoriesList.value = catRes.data.categories ?? []
     unitsList.value = unitRes.data.units ?? []
   }
@@ -165,7 +170,12 @@ async function toggleActive(item: any) {
           clearable
         />
         <VSpacer />
-        <VBtn prepend-icon="bx-plus" @click="openCreate">{{ t('Add Item') }}</VBtn>
+        <VBtn
+          prepend-icon="bx-plus"
+          @click="openCreate"
+        >
+          {{ t('Add Item') }}
+        </VBtn>
       </VCardText>
 
       <VDataTableServer
@@ -184,16 +194,71 @@ async function toggleActive(item: any) {
           />
         </template>
 
-        <template v-if="loading && items.length === 0" #body>
-          <tr v-for="n in itemsPerPage" :key="n" class="sk-row">
-            <td class="sk-cell"><div class="sk-box" style="width:70px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:130px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:80px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:90px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:60px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:80px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:60px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell" style="text-align:end;"><div class="d-flex justify-end gap-1"><div class="sk-box" style="width:28px;height:28px;border-radius:6px;" /><div class="sk-box" style="width:28px;height:28px;border-radius:6px;" /></div></td>
+        <template
+          v-if="loading && items.length === 0"
+          #body
+        >
+          <tr
+            v-for="n in itemsPerPage"
+            :key="n"
+            class="sk-row"
+          >
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:70px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:130px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:80px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:90px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:80px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td
+              class="sk-cell"
+              style="text-align:end;"
+            >
+              <div class="d-flex justify-end gap-1">
+                <div
+                  class="sk-box"
+                  style="width:28px;height:28px;border-radius:6px;"
+                /><div
+                  class="sk-box"
+                  style="width:28px;height:28px;border-radius:6px;"
+                />
+              </div>
+            </td>
           </tr>
         </template>
 
@@ -201,7 +266,13 @@ async function toggleActive(item: any) {
           <span class="font-weight-medium text-body-2">{{ item.raw.sku ?? '—' }}</span>
         </template>
         <template #item.item_type="{ item }">
-          <VChip :color="typeColor[item.raw.item_type] ?? 'default'" size="small" variant="tonal">{{ item.raw.item_type_display ?? item.raw.item_type }}</VChip>
+          <VChip
+            :color="typeColor[item.raw.item_type] ?? 'default'"
+            size="small"
+            variant="tonal"
+          >
+            {{ item.raw.item_type_display ?? item.raw.item_type }}
+          </VChip>
         </template>
         <template #item.category="{ item }">
           {{ item.raw.category?.name ?? '—' }}
@@ -213,23 +284,71 @@ async function toggleActive(item: any) {
           {{ formatCurrency(item.raw.cost_price ?? 0) }}
         </template>
         <template #item.is_active="{ item }">
-          <VChip :color="item.raw.is_active ? 'success' : 'default'" size="small" variant="tonal">
+          <VChip
+            :color="item.raw.is_active ? 'success' : 'default'"
+            size="small"
+            variant="tonal"
+          >
             {{ item.raw.is_active ? t('Active') : t('Inactive') }}
           </VChip>
         </template>
         <template #item.actions="{ item }">
-          <div class="d-flex justify-end" style="gap:2px;">
-            <VBtn icon variant="text" size="small" @click="openEdit(item.raw)">
-              <VIcon size="18" icon="bx-edit" />
-              <VTooltip activator="parent" location="top">{{ t('Edit') }}</VTooltip>
+          <div
+            class="d-flex justify-end"
+            style="gap:2px;"
+          >
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              @click="openEdit(item.raw)"
+            >
+              <VIcon
+                size="18"
+                icon="bx-edit"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Edit') }}
+              </VTooltip>
             </VBtn>
-            <VBtn icon variant="text" size="small" :color="item.raw.is_active ? 'warning' : 'success'" @click="toggleActive(item.raw)">
-              <VIcon size="18" :icon="item.raw.is_active ? 'bx-pause' : 'bx-play'" />
-              <VTooltip activator="parent" location="top">{{ item.raw.is_active ? t('Deactivate') : t('Activate') }}</VTooltip>
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              :color="item.raw.is_active ? 'warning' : 'success'"
+              @click="toggleActive(item.raw)"
+            >
+              <VIcon
+                size="18"
+                :icon="item.raw.is_active ? 'bx-pause' : 'bx-play'"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ item.raw.is_active ? t('Deactivate') : t('Activate') }}
+              </VTooltip>
             </VBtn>
-            <VBtn icon variant="text" size="small" color="error" @click="confirmDelete(item.raw)">
-              <VIcon size="18" icon="bx-trash" />
-              <VTooltip activator="parent" location="top">{{ t('Delete') }}</VTooltip>
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              color="error"
+              @click="confirmDelete(item.raw)"
+            >
+              <VIcon
+                size="18"
+                icon="bx-trash"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Delete') }}
+              </VTooltip>
             </VBtn>
           </div>
         </template>
@@ -246,17 +365,38 @@ async function toggleActive(item: any) {
       @saved="loadItems"
     />
 
-    <VDialog v-model="deleteDialog" max-width="400">
+    <VDialog
+      v-model="deleteDialog"
+      max-width="400"
+    >
       <VCard :title="t('Delete Item')">
         <VCardText>{{ t('Are you sure you want to delete') }} <strong>{{ selectedItem?.name }}</strong>?</VCardText>
         <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn variant="tonal" color="default" @click="deleteDialog = false">{{ t('Cancel') }}</VBtn>
-          <VBtn color="error" :loading="deleting" @click="doDelete">{{ t('Delete') }}</VBtn>
+          <VBtn
+            variant="tonal"
+            color="default"
+            @click="deleteDialog = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            color="error"
+            :loading="deleting"
+            @click="doDelete"
+          >
+            {{ t('Delete') }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
 
-    <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">{{ snackbarMsg }}</VSnackbar>
+    <VSnackbar
+      v-model="snackbar"
+      :color="snackbarColor"
+      :timeout="3000"
+    >
+      {{ snackbarMsg }}
+    </VSnackbar>
   </div>
 </template>
 

@@ -26,7 +26,7 @@ const debouncedSearch = useDebounceFn(() => {
   loadOrders()
 }, 400)
 
-const orderStatuses = ['OPEN', 'PREPARING', 'READY', 'COMPLETED', 'CANCELED']
+const orderStatuses = ['OPEN', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED']
 const paymentStatuses = ['PAID', 'UNPAID']
 
 const headers = [
@@ -47,14 +47,20 @@ async function loadOrders() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (statusFilter.value.length) params.statuses = statusFilter.value.join(',')
-    if (paymentFilter.value) params.is_paid = paymentFilter.value === 'PAID'
-    if (search.value.trim()) params.search = search.value.trim()
-    if (dateFrom.value) params.date_from = dateFrom.value
-    if (dateTo.value) params.date_to = dateTo.value
+    if (statusFilter.value.length)
+      params.statuses = statusFilter.value.join(',')
+    if (paymentFilter.value)
+      params.is_paid = paymentFilter.value === 'PAID'
+    if (search.value.trim())
+      params.search = search.value.trim()
+    if (dateFrom.value)
+      params.date_from = dateFrom.value
+    if (dateTo.value)
+      params.date_to = dateTo.value
 
     const res = await axios.get('/orders', { params })
     const d = res.data?.data
+
     orders.value = d?.orders ?? []
     totalOrders.value = d?.pagination?.total_orders ?? orders.value.length
   }
@@ -69,6 +75,7 @@ async function loadOrders() {
 async function loadStats() {
   try {
     const res = await axios.get('/orders/stats')
+
     stats.value = res.data?.data ?? res.data
   }
   catch { /* ignore */ }
@@ -116,58 +123,134 @@ async function cancelOrder(order: any) {
   <div>
     <!-- Stats row -->
     <VRow class="mb-4">
-      <VCol cols="6" sm="3">
+      <VCol
+        cols="6"
+        sm="3"
+      >
         <VCard>
           <VCardText class="d-flex align-center gap-3">
-            <VAvatar color="primary" variant="tonal" size="40" rounded>
+            <VAvatar
+              color="primary"
+              variant="tonal"
+              size="40"
+              rounded
+            >
               <VIcon icon="bx-receipt" />
             </VAvatar>
             <div>
-              <div v-if="stats" class="text-h6">{{ stats.total_orders ?? '—' }}</div>
-              <div v-else class="sk-box mb-1" style="width:40px;height:20px;border-radius:4px;" />
-              <div class="text-sm">{{ t('Total') }}</div>
+              <div
+                v-if="stats"
+                class="text-h6"
+              >
+                {{ stats.total_orders ?? '—' }}
+              </div>
+              <div
+                v-else
+                class="sk-box mb-1"
+                style="width:40px;height:20px;border-radius:4px;"
+              />
+              <div class="text-sm">
+                {{ t('Total') }}
+              </div>
             </div>
           </VCardText>
         </VCard>
       </VCol>
-      <VCol cols="6" sm="3">
+      <VCol
+        cols="6"
+        sm="3"
+      >
         <VCard>
           <VCardText class="d-flex align-center gap-3">
-            <VAvatar color="warning" variant="tonal" size="40" rounded>
+            <VAvatar
+              color="warning"
+              variant="tonal"
+              size="40"
+              rounded
+            >
               <VIcon icon="bx-time" />
             </VAvatar>
             <div>
-              <div v-if="stats" class="text-h6">{{ stats.preparing_orders ?? '—' }}</div>
-              <div v-else class="sk-box mb-1" style="width:40px;height:20px;border-radius:4px;" />
-              <div class="text-sm">{{ t('Preparing') }}</div>
+              <div
+                v-if="stats"
+                class="text-h6"
+              >
+                {{ stats.preparing_orders ?? '—' }}
+              </div>
+              <div
+                v-else
+                class="sk-box mb-1"
+                style="width:40px;height:20px;border-radius:4px;"
+              />
+              <div class="text-sm">
+                {{ t('Preparing') }}
+              </div>
             </div>
           </VCardText>
         </VCard>
       </VCol>
-      <VCol cols="6" sm="3">
+      <VCol
+        cols="6"
+        sm="3"
+      >
         <VCard>
           <VCardText class="d-flex align-center gap-3">
-            <VAvatar color="success" variant="tonal" size="40" rounded>
+            <VAvatar
+              color="success"
+              variant="tonal"
+              size="40"
+              rounded
+            >
               <VIcon icon="bx-check-double" />
             </VAvatar>
             <div>
-              <div v-if="stats" class="text-h6">{{ stats.ready_orders ?? '—' }}</div>
-              <div v-else class="sk-box mb-1" style="width:40px;height:20px;border-radius:4px;" />
-              <div class="text-sm">{{ t('Ready') }}</div>
+              <div
+                v-if="stats"
+                class="text-h6"
+              >
+                {{ stats.ready_orders ?? '—' }}
+              </div>
+              <div
+                v-else
+                class="sk-box mb-1"
+                style="width:40px;height:20px;border-radius:4px;"
+              />
+              <div class="text-sm">
+                {{ t('Ready') }}
+              </div>
             </div>
           </VCardText>
         </VCard>
       </VCol>
-      <VCol cols="6" sm="3">
+      <VCol
+        cols="6"
+        sm="3"
+      >
         <VCard>
           <VCardText class="d-flex align-center gap-3">
-            <VAvatar color="info" variant="tonal" size="40" rounded>
+            <VAvatar
+              color="info"
+              variant="tonal"
+              size="40"
+              rounded
+            >
               <VIcon icon="bx-money" />
             </VAvatar>
             <div>
-              <div v-if="stats" class="text-h6">{{ formatCurrency(stats.total_revenue ?? 0) }}</div>
-              <div v-else class="sk-box mb-1" style="width:70px;height:20px;border-radius:4px;" />
-              <div class="text-sm">{{ t('Revenue') }}</div>
+              <div
+                v-if="stats"
+                class="text-h6"
+              >
+                {{ formatCurrency(stats.total_revenue ?? 0) }}
+              </div>
+              <div
+                v-else
+                class="sk-box mb-1"
+                style="width:70px;height:20px;border-radius:4px;"
+              />
+              <div class="text-sm">
+                {{ t('Revenue') }}
+              </div>
             </div>
           </VCardText>
         </VCard>
@@ -242,21 +325,82 @@ async function cancelOrder(order: any) {
           />
         </template>
 
-        <template v-if="loading && orders.length === 0" #body>
-          <tr v-for="n in itemsPerPage" :key="n" class="sk-row">
-            <td class="sk-cell"><div class="sk-box" style="width:20px;height:20px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:40px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:70px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:100px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:80px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:60px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:70px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:30px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:100px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell" style="text-align:end;">
+        <template
+          v-if="loading && orders.length === 0"
+          #body
+        >
+          <tr
+            v-for="n in itemsPerPage"
+            :key="n"
+            class="sk-row"
+          >
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:20px;height:20px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:40px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:70px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:100px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:80px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:70px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:30px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:100px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td
+              class="sk-cell"
+              style="text-align:end;"
+            >
               <div class="d-flex justify-end gap-1">
-                <div class="sk-box" style="width:50px;height:28px;border-radius:6px;" />
-                <div class="sk-box" style="width:60px;height:28px;border-radius:6px;" />
+                <div
+                  class="sk-box"
+                  style="width:50px;height:28px;border-radius:6px;"
+                />
+                <div
+                  class="sk-box"
+                  style="width:60px;height:28px;border-radius:6px;"
+                />
               </div>
             </td>
           </tr>
@@ -266,7 +410,13 @@ async function cancelOrder(order: any) {
           <span class="font-weight-medium">#{{ item.raw.display_id ?? item.raw.id }}</span>
         </template>
         <template #item.order_type="{ item }">
-          <VChip size="small" color="secondary" variant="tonal">{{ item.raw.order_type }}</VChip>
+          <VChip
+            size="small"
+            color="secondary"
+            variant="tonal"
+          >
+            {{ item.raw.order_type }}
+          </VChip>
         </template>
         <!-- phone for delivery, description for hall -->
         <template #item.info="{ item }">
@@ -275,12 +425,20 @@ async function cancelOrder(order: any) {
           </span>
         </template>
         <template #item.status="{ item }">
-          <VChip size="small" :color="statusColor[item.raw.status] ?? 'default'" variant="tonal">
+          <VChip
+            size="small"
+            :color="statusColor[item.raw.status] ?? 'default'"
+            variant="tonal"
+          >
             {{ item.raw.status }}
           </VChip>
         </template>
         <template #item.is_paid="{ item }">
-          <VChip size="small" :color="item.raw.is_paid ? 'success' : 'warning'" variant="tonal">
+          <VChip
+            size="small"
+            :color="item.raw.is_paid ? 'success' : 'warning'"
+            variant="tonal"
+          >
             {{ item.raw.is_paid ? t('PAID') : t('UNPAID') }}
           </VChip>
         </template>
@@ -294,28 +452,47 @@ async function cancelOrder(order: any) {
           {{ formatDate(item.raw.created_at) }}
         </template>
         <template #item.actions="{ item }">
-          <div class="d-flex justify-end" style="gap:2px;">
+          <div
+            class="d-flex justify-end"
+            style="gap:2px;"
+          >
             <VBtn
-              v-if="!item.raw.is_paid && item.raw.status !== 'CANCELED'"
+              v-if="!item.raw.is_paid && item.raw.status !== 'CANCELLED'"
               icon
               variant="text"
               size="small"
               color="success"
               @click.stop="markPaid(item.raw)"
             >
-              <VIcon icon="bx-dollar" size="18" />
-              <VTooltip activator="parent" location="top">{{ t('Pay') }}</VTooltip>
+              <VIcon
+                icon="bx-dollar"
+                size="18"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Pay') }}
+              </VTooltip>
             </VBtn>
             <VBtn
-              v-if="item.raw.status !== 'CANCELED' && item.raw.status !== 'COMPLETED'"
+              v-if="item.raw.status !== 'CANCELLED' && item.raw.status !== 'COMPLETED'"
               icon
               variant="text"
               size="small"
               color="error"
               @click.stop="cancelOrder(item.raw)"
             >
-              <VIcon icon="bx-x-circle" size="18" />
-              <VTooltip activator="parent" location="top">{{ t('Cancel') }}</VTooltip>
+              <VIcon
+                icon="bx-x-circle"
+                size="18"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Cancel') }}
+              </VTooltip>
             </VBtn>
           </div>
         </template>
@@ -325,7 +502,9 @@ async function cancelOrder(order: any) {
           <tr>
             <td :colspan="columns.length">
               <div class="pa-3">
-                <div class="text-body-2 font-weight-medium mb-2">{{ t('Order Items') }}</div>
+                <div class="text-body-2 font-weight-medium mb-2">
+                  {{ t('Order Items') }}
+                </div>
                 <VTable density="compact">
                   <thead>
                     <tr>
@@ -336,14 +515,22 @@ async function cancelOrder(order: any) {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="(orderItem, idx) in ((item.raw.items ?? []) as any[])" :key="idx">
-                      <td>{{ orderItem['product__name'] ?? '—' }}</td>
+                    <tr
+                      v-for="(orderItem, idx) in ((item.raw.items ?? []) as any[])"
+                      :key="idx"
+                    >
+                      <td>{{ orderItem.product__name ?? '—' }}</td>
                       <td>{{ orderItem.quantity ?? '—' }}</td>
                       <td>{{ formatCurrency(orderItem.price ?? 0) }}</td>
                       <td>{{ formatCurrency((Number(orderItem.price) || 0) * (orderItem.quantity ?? 1)) }}</td>
                     </tr>
                     <tr v-if="!(item.raw.items?.length)">
-                      <td colspan="4" class="text-center text-disabled">{{ t('No items') }}</td>
+                      <td
+                        colspan="4"
+                        class="text-center text-disabled"
+                      >
+                        {{ t('No items') }}
+                      </td>
                     </tr>
                   </tbody>
                 </VTable>
@@ -354,7 +541,11 @@ async function cancelOrder(order: any) {
       </VDataTableServer>
     </VCard>
 
-    <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">
+    <VSnackbar
+      v-model="snackbar"
+      :color="snackbarColor"
+      :timeout="3000"
+    >
       {{ snackbarMsg }}
     </VSnackbar>
   </div>

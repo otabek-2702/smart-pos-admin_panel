@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import axios from '@axios'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
 import RecipeDetailDialog from './RecipeDetailDialog.vue'
+import { stockApi as axios } from '@/plugins/axios'
+import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -65,11 +65,14 @@ async function loadRecipes() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value) params.search = search.value
-    if (typeFilter.value) params.recipe_type = typeFilter.value
+    if (search.value)
+      params.search = search.value
+    if (typeFilter.value)
+      params.recipe_type = typeFilter.value
 
     const res = await axios.get('/recipes/', { params })
-    const d = res.data
+    const d = res.data?.data ?? res.data
+
     recipes.value = d.recipes ?? []
     total.value = d.pagination?.total_items ?? recipes.value.length
   }
@@ -87,6 +90,7 @@ async function loadMeta() {
       axios.get('/items/', { params: { per_page: 300 } }),
       axios.get('/units/', { params: { per_page: 200 } }),
     ])
+
     itemsList.value = itemsRes.data.items ?? []
     unitsList.value = unitsRes.data.units ?? []
   }
@@ -133,11 +137,16 @@ async function save() {
   saving.value = true
   try {
     const payload: any = { ...form.value }
-    if (!payload.output_item_id) delete payload.output_item_id
-    if (!payload.output_unit_id) delete payload.output_unit_id
-    if (!payload.estimated_time_minutes) delete payload.estimated_time_minutes
-    if (!payload.notes) delete payload.notes
-    if (!payload.code) delete payload.code
+    if (!payload.output_item_id)
+      delete payload.output_item_id
+    if (!payload.output_unit_id)
+      delete payload.output_unit_id
+    if (!payload.estimated_time_minutes)
+      delete payload.estimated_time_minutes
+    if (!payload.notes)
+      delete payload.notes
+    if (!payload.code)
+      delete payload.code
 
     if (dialogMode.value === 'create')
       await axios.post('/recipes/', payload)
@@ -211,7 +220,12 @@ async function toggleActive(item: any) {
           clearable
         />
         <VSpacer />
-        <VBtn prepend-icon="bx-plus" @click="openCreate">{{ t('Add Recipe') }}</VBtn>
+        <VBtn
+          prepend-icon="bx-plus"
+          @click="openCreate"
+        >
+          {{ t('Add Recipe') }}
+        </VBtn>
       </VCardText>
 
       <VDataTableServer
@@ -230,16 +244,74 @@ async function toggleActive(item: any) {
           />
         </template>
 
-        <template v-if="loading && recipes.length === 0" #body>
-          <tr v-for="n in itemsPerPage" :key="n" class="sk-row">
-            <td class="sk-cell"><div class="sk-box" style="width:70px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:130px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:100px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:110px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:40px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:30px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:60px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell" style="text-align:end;"><div class="d-flex justify-end gap-1"><div class="sk-box" style="width:28px;height:28px;border-radius:6px;" /><div class="sk-box" style="width:28px;height:28px;border-radius:6px;" /><div class="sk-box" style="width:28px;height:28px;border-radius:6px;" /></div></td>
+        <template
+          v-if="loading && recipes.length === 0"
+          #body
+        >
+          <tr
+            v-for="n in itemsPerPage"
+            :key="n"
+            class="sk-row"
+          >
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:70px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:130px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:100px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:110px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:40px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:30px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td
+              class="sk-cell"
+              style="text-align:end;"
+            >
+              <div class="d-flex justify-end gap-1">
+                <div
+                  class="sk-box"
+                  style="width:28px;height:28px;border-radius:6px;"
+                /><div
+                  class="sk-box"
+                  style="width:28px;height:28px;border-radius:6px;"
+                /><div
+                  class="sk-box"
+                  style="width:28px;height:28px;border-radius:6px;"
+                />
+              </div>
+            </td>
           </tr>
         </template>
 
@@ -247,7 +319,13 @@ async function toggleActive(item: any) {
           <span class="font-weight-medium text-body-2">{{ item.raw.code ?? '—' }}</span>
         </template>
         <template #item.recipe_type="{ item }">
-          <VChip :color="typeColor[item.raw.recipe_type] ?? 'default'" size="small" variant="tonal">{{ item.raw.recipe_type }}</VChip>
+          <VChip
+            :color="typeColor[item.raw.recipe_type] ?? 'default'"
+            size="small"
+            variant="tonal"
+          >
+            {{ item.raw.recipe_type }}
+          </VChip>
         </template>
         <template #item.output="{ item }">
           {{ item.raw.output_item_name ?? '—' }}
@@ -256,88 +334,257 @@ async function toggleActive(item: any) {
           {{ item.raw.output_quantity }} {{ item.raw.output_unit ?? '' }}
         </template>
         <template #item.is_active="{ item }">
-          <VChip :color="item.raw.is_active ? 'success' : 'default'" size="small" variant="tonal">
+          <VChip
+            :color="item.raw.is_active ? 'success' : 'default'"
+            size="small"
+            variant="tonal"
+          >
             {{ item.raw.is_active ? t('Active') : t('Inactive') }}
           </VChip>
         </template>
         <template #item.actions="{ item }">
-          <div class="d-flex justify-end" style="gap:2px;">
-            <VBtn icon variant="text" size="small" @click="openDetail(item.raw)">
-              <VIcon size="18" icon="bx-show" />
-              <VTooltip activator="parent" location="top">{{ t('View Ingredients') }}</VTooltip>
+          <div
+            class="d-flex justify-end"
+            style="gap:2px;"
+          >
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              @click="openDetail(item.raw)"
+            >
+              <VIcon
+                size="18"
+                icon="bx-show"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('View Ingredients') }}
+              </VTooltip>
             </VBtn>
-            <VBtn icon variant="text" size="small" @click="openEdit(item.raw)">
-              <VIcon size="18" icon="bx-edit" />
-              <VTooltip activator="parent" location="top">{{ t('Edit') }}</VTooltip>
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              @click="openEdit(item.raw)"
+            >
+              <VIcon
+                size="18"
+                icon="bx-edit"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Edit') }}
+              </VTooltip>
             </VBtn>
-            <VBtn icon variant="text" size="small" :color="item.raw.is_active ? 'warning' : 'success'" @click="toggleActive(item.raw)">
-              <VIcon size="18" :icon="item.raw.is_active ? 'bx-pause' : 'bx-play'" />
-              <VTooltip activator="parent" location="top">{{ item.raw.is_active ? t('Deactivate') : t('Activate') }}</VTooltip>
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              :color="item.raw.is_active ? 'warning' : 'success'"
+              @click="toggleActive(item.raw)"
+            >
+              <VIcon
+                size="18"
+                :icon="item.raw.is_active ? 'bx-pause' : 'bx-play'"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ item.raw.is_active ? t('Deactivate') : t('Activate') }}
+              </VTooltip>
             </VBtn>
-            <VBtn icon variant="text" size="small" color="error" @click="confirmDelete(item.raw)">
-              <VIcon size="18" icon="bx-trash" />
-              <VTooltip activator="parent" location="top">{{ t('Delete') }}</VTooltip>
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              color="error"
+              @click="confirmDelete(item.raw)"
+            >
+              <VIcon
+                size="18"
+                icon="bx-trash"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Delete') }}
+              </VTooltip>
             </VBtn>
           </div>
         </template>
       </VDataTableServer>
     </VCard>
 
-    <RecipeDetailDialog v-model="detailDialog" :recipe="detailItem" />
+    <RecipeDetailDialog
+      v-model="detailDialog"
+      :recipe="detailItem"
+    />
     <!-- Create / Edit Dialog -->
-    <VDialog v-model="dialog" max-width="560" persistent>
+    <VDialog
+      v-model="dialog"
+      max-width="560"
+      persistent
+    >
       <VCard :title="dialogMode === 'create' ? t('Add Recipe') : t('Edit Recipe')">
         <VCardText>
           <VRow>
-            <VCol cols="12" sm="8">
-              <VTextField v-model="form.name" :label="t('Name')" required />
+            <VCol
+              cols="12"
+              sm="8"
+            >
+              <VTextField
+                v-model="form.name"
+                :label="t('Name')"
+                required
+              />
             </VCol>
-            <VCol cols="12" sm="4">
-              <VTextField v-model="form.code" :label="t('Code')" />
+            <VCol
+              cols="12"
+              sm="4"
+            >
+              <VTextField
+                v-model="form.code"
+                :label="t('Code')"
+              />
             </VCol>
-            <VCol cols="12" sm="6">
-              <VSelect v-model="form.recipe_type" :items="recipeTypes" :label="t('Type')" required />
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VSelect
+                v-model="form.recipe_type"
+                :items="recipeTypes"
+                :label="t('Type')"
+                required
+              />
             </VCol>
-            <VCol cols="12" sm="6">
-              <VSelect v-model="form.difficulty_level" :items="difficultyLevels" :label="t('Difficulty')" />
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VSelect
+                v-model="form.difficulty_level"
+                :items="difficultyLevels"
+                :label="t('Difficulty')"
+              />
             </VCol>
-            <VCol cols="12" sm="8">
-              <VSelect v-model="form.output_item_id" :items="itemOptions" :label="t('Output Item')" clearable />
+            <VCol
+              cols="12"
+              sm="8"
+            >
+              <VSelect
+                v-model="form.output_item_id"
+                :items="itemOptions"
+                :label="t('Output Item')"
+                clearable
+              />
             </VCol>
-            <VCol cols="12" sm="4">
-              <VTextField v-model.number="form.output_quantity" :label="t('Output Qty')" type="number" step="0.01" />
+            <VCol
+              cols="12"
+              sm="4"
+            >
+              <VTextField
+                v-model.number="form.output_quantity"
+                :label="t('Output Qty')"
+                type="number"
+                step="0.01"
+              />
             </VCol>
-            <VCol cols="12" sm="6">
-              <VSelect v-model="form.output_unit_id" :items="unitOptions" :label="t('Output Unit')" clearable />
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VSelect
+                v-model="form.output_unit_id"
+                :items="unitOptions"
+                :label="t('Output Unit')"
+                clearable
+              />
             </VCol>
-            <VCol cols="12" sm="6">
-              <VTextField v-model.number="form.estimated_time_minutes" :label="t('Est. Time (min)')" type="number" />
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VTextField
+                v-model.number="form.estimated_time_minutes"
+                :label="t('Est. Time (min)')"
+                type="number"
+              />
             </VCol>
             <VCol cols="12">
-              <VTextField v-model="form.notes" :label="t('Notes')" />
+              <VTextField
+                v-model="form.notes"
+                :label="t('Notes')"
+              />
             </VCol>
-            <VCol v-if="dialogMode === 'edit'" cols="12">
-              <VSwitch v-model="form.is_active" :label="t('Active')" color="success" />
+            <VCol
+              v-if="dialogMode === 'edit'"
+              cols="12"
+            >
+              <VSwitch
+                v-model="form.is_active"
+                :label="t('Active')"
+                color="success"
+              />
             </VCol>
           </VRow>
         </VCardText>
         <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn variant="tonal" color="default" @click="dialog = false">{{ t('Cancel') }}</VBtn>
-          <VBtn :loading="saving" @click="save">{{ t('Save') }}</VBtn>
+          <VBtn
+            variant="tonal"
+            color="default"
+            @click="dialog = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            :loading="saving"
+            @click="save"
+          >
+            {{ t('Save') }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
 
-    <VDialog v-model="deleteDialog" max-width="400">
+    <VDialog
+      v-model="deleteDialog"
+      max-width="400"
+    >
       <VCard :title="t('Delete Recipe')">
         <VCardText>{{ t('Are you sure you want to delete') }} <strong>{{ selectedItem?.name }}</strong>?</VCardText>
         <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn variant="tonal" color="default" @click="deleteDialog = false">{{ t('Cancel') }}</VBtn>
-          <VBtn color="error" :loading="deleting" @click="doDelete">{{ t('Delete') }}</VBtn>
+          <VBtn
+            variant="tonal"
+            color="default"
+            @click="deleteDialog = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            color="error"
+            :loading="deleting"
+            @click="doDelete"
+          >
+            {{ t('Delete') }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
-    <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">{{ snackbarMsg }}</VSnackbar>
+    <VSnackbar
+      v-model="snackbar"
+      :color="snackbarColor"
+      :timeout="3000"
+    >
+      {{ snackbarMsg }}
+    </VSnackbar>
   </div>
 </template>
 

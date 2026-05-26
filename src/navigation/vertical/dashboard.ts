@@ -3,8 +3,8 @@ export default [
     title: 'Dashboard',
     icon: { icon: 'bx-home' },
     to: 'index',
-    action: 'read',
-    subject: 'Dashboard',
+    action: 'manage',
+    subject: 'all',
   },
   {
     title: 'AI Assistant',

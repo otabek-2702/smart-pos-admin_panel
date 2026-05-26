@@ -4,13 +4,15 @@ export function useFormatters() {
   }
 
   function formatDate(val: string): string {
-    if (!val) return '\u2014'
+    if (!val)
+      return '\u2014'
 
     return new Date(val).toLocaleString()
   }
 
   function formatDateShort(val: string): string {
-    if (!val) return '\u2014'
+    if (!val)
+      return '\u2014'
 
     return new Date(val).toLocaleDateString()
   }

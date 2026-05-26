@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import axios from '@axios'
+import { stockApi as axios } from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -20,10 +20,20 @@ const { formatDate } = useFormatters()
 
 // Real movement types from the API
 const movementTypes = [
-  'PURCHASE_IN', 'SALE_OUT', 'TRANSFER_IN', 'TRANSFER_OUT',
-  'PRODUCTION_IN', 'PRODUCTION_OUT', 'ADJUSTMENT_PLUS', 'ADJUSTMENT_MINUS',
-  'WASTE', 'SPOILAGE', 'RETURN_FROM_CUSTOMER', 'RETURN_TO_SUPPLIER',
-  'COUNT_ADJUSTMENT', 'OPENING_BALANCE',
+  'PURCHASE_IN',
+  'SALE_OUT',
+  'TRANSFER_IN',
+  'TRANSFER_OUT',
+  'PRODUCTION_IN',
+  'PRODUCTION_OUT',
+  'ADJUSTMENT_PLUS',
+  'ADJUSTMENT_MINUS',
+  'WASTE',
+  'SPOILAGE',
+  'RETURN_FROM_CUSTOMER',
+  'RETURN_TO_SUPPLIER',
+  'COUNT_ADJUSTMENT',
+  'OPENING_BALANCE',
 ]
 
 const typeColor: Record<string, string> = {
@@ -72,8 +82,10 @@ const headers = [
 ]
 
 function formatQty(val: any) {
-  if (val === null || val === undefined) return '0'
+  if (val === null || val === undefined)
+    return '0'
   const n = Number(val)
+
   return Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/\.?0+$/, '')
 }
 
@@ -81,12 +93,16 @@ async function loadTransactions() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (typeFilter.value) params.movement_type = typeFilter.value
-    if (locationFilter.value) params.location_id = locationFilter.value
-    if (itemFilter.value) params.search = itemFilter.value
+    if (typeFilter.value)
+      params.movement_type = typeFilter.value
+    if (locationFilter.value)
+      params.location_id = locationFilter.value
+    if (itemFilter.value)
+      params.search = itemFilter.value
 
     const res = await axios.get('/transactions/', { params })
-    const d = res.data
+    const d = res.data?.data ?? res.data
+
     transactions.value = d.transactions ?? []
     total.value = d.pagination?.total_items ?? transactions.value.length
   }
@@ -101,6 +117,7 @@ async function loadTransactions() {
 async function loadLocations() {
   try {
     const res = await axios.get('/locations/', { params: { per_page: 200 } })
+
     locationsList.value = res.data.locations ?? []
   }
   catch { /* ignore */ }
@@ -145,7 +162,13 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
           clearable
         />
         <VSpacer />
-        <VBtn variant="tonal" prepend-icon="bx-refresh" @click="loadTransactions">{{ t('Refresh') }}</VBtn>
+        <VBtn
+          variant="tonal"
+          prepend-icon="bx-refresh"
+          @click="loadTransactions"
+        >
+          {{ t('Refresh') }}
+        </VBtn>
       </VCardText>
 
       <VDataTableServer
@@ -165,16 +188,63 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
           />
         </template>
 
-        <template v-if="loading && transactions.length === 0" #body>
-          <tr v-for="n in itemsPerPage" :key="n" class="sk-row">
-            <td class="sk-cell"><div class="sk-box" style="width:110px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:110px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:130px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:100px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:60px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:50px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:50px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:90px;height:13px;border-radius:4px;" /></td>
+        <template
+          v-if="loading && transactions.length === 0"
+          #body
+        >
+          <tr
+            v-for="n in itemsPerPage"
+            :key="n"
+            class="sk-row"
+          >
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:110px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:110px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:130px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:100px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:50px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:50px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:90px;height:13px;border-radius:4px;"
+              />
+            </td>
           </tr>
         </template>
 
@@ -182,8 +252,16 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
           <span class="text-body-2">{{ formatDate(item.raw.created_at) }}</span>
         </template>
         <template #item.movement_type="{ item }">
-          <VChip :color="typeColor[item.raw.movement_type] ?? 'default'" size="small" variant="tonal">
-            <VIcon start :icon="typeIcon[item.raw.movement_type] ?? 'bx-circle'" size="13" />
+          <VChip
+            :color="typeColor[item.raw.movement_type] ?? 'default'"
+            size="small"
+            variant="tonal"
+          >
+            <VIcon
+              start
+              :icon="typeIcon[item.raw.movement_type] ?? 'bx-circle'"
+              size="13"
+            />
             {{ item.raw.movement_type?.replace(/_/g, ' ') }}
           </VChip>
         </template>
@@ -194,7 +272,10 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
           {{ item.raw.location?.name ?? '—' }}
         </template>
         <template #item.quantity_change="{ item }">
-          <span :class="Number(item.raw.quantity_change) >= 0 ? 'text-success' : 'text-error'" class="font-weight-medium">
+          <span
+            :class="Number(item.raw.quantity_change) >= 0 ? 'text-success' : 'text-error'"
+            class="font-weight-medium"
+          >
             {{ Number(item.raw.quantity_change) >= 0 ? '+' : '' }}{{ formatQty(item.raw.quantity_change) }}
           </span>
         </template>
@@ -210,7 +291,13 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
       </VDataTableServer>
     </VCard>
 
-    <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">{{ snackbarMsg }}</VSnackbar>
+    <VSnackbar
+      v-model="snackbar"
+      :color="snackbarColor"
+      :timeout="3000"
+    >
+      {{ snackbarMsg }}
+    </VSnackbar>
   </div>
 </template>
 

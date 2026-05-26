@@ -6,8 +6,10 @@ import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
 import { themeConfig } from '@themeConfig'
 import axiosIns from '@/plugins/axios'
 import ability from '@/plugins/casl/ability'
+import { useApiError } from '@/composables/useApiError'
 
 const { t, locale } = useI18n({ useScope: 'global' })
+const { translate } = useApiError()
 const router = useRouter()
 const route = useRoute()
 
@@ -19,7 +21,7 @@ const errorMsg = ref('')
 const boyWithRocket = useGenerateImageVariant(boyWithRocketLight, boyWithRocketDark)
 
 const languages = [
-  { code: 'uz', label: "O'zbek" },
+  { code: 'uz', label: 'O\'zbek' },
   { code: 'ru', label: 'Русский' },
   { code: 'en', label: 'English' },
 ]
@@ -34,7 +36,7 @@ const login = async () => {
   errorMsg.value = ''
 
   try {
-    const { data } = await axiosIns.post('/admins-api/login', {
+    const { data } = await axiosIns.post('/auth-login', {
       email: form.value.email,
       password: form.value.password,
     })
@@ -44,16 +46,30 @@ const login = async () => {
     localStorage.setItem('accessToken', JSON.stringify(token))
     localStorage.setItem('userData', JSON.stringify(user))
 
-    const userAbilities = [{ action: 'manage', subject: 'all' }]
+    // Build CASL abilities from backend permissions list.
+    // ADMIN role gets ['*']; treat that as full manage-all.
+    const perms: string[] = Array.isArray(user?.permissions) ? user.permissions : []
+
+    const userAbilities = perms.includes('*')
+      ? [{ action: 'manage', subject: 'all' }]
+      : perms.map((p: string) => {
+        const [subject, action] = p.split('.')
+
+        return { action: action || 'read', subject: subject || 'all' }
+      })
+
+    if (userAbilities.length === 0)
+      userAbilities.push({ action: 'read', subject: 'all' })
+
     localStorage.setItem('userAbilities', JSON.stringify(userAbilities))
     ability.update(userAbilities)
 
     const redirectTo = route.query.to ? String(route.query.to) : '/'
+
     router.replace(redirectTo)
   }
   catch (err: any) {
-    const msg = err.response?.data?.message
-    errorMsg.value = msg || t('login_error')
+    errorMsg.value = translate(err) || t('login_error')
   }
   finally {
     isLoading.value = false
@@ -62,9 +78,15 @@ const login = async () => {
 </script>
 
 <template>
-  <VRow no-gutters class="auth-wrapper">
+  <VRow
+    no-gutters
+    class="auth-wrapper"
+  >
     <!-- Left illustration -->
-    <VCol md="8" class="d-none d-md-flex">
+    <VCol
+      md="8"
+      class="d-none d-md-flex"
+    >
       <div class="position-relative w-100 pa-8">
         <div class="d-flex align-center justify-center w-100 h-100">
           <VImg
@@ -83,7 +105,11 @@ const login = async () => {
       class="auth-card-v2 d-flex align-center justify-center"
       style="background-color: rgb(var(--v-theme-surface))"
     >
-      <VCard flat :max-width="500" class="mt-12 mt-sm-0 pa-6 w-100">
+      <VCard
+        flat
+        :max-width="500"
+        class="mt-12 mt-sm-0 pa-6 w-100"
+      >
         <!-- Language switcher -->
         <div class="d-flex justify-end mb-2">
           <VBtnToggle
@@ -169,7 +195,7 @@ const login = async () => {
                 >
                   {{ t('login_btn') }}
                 </VBtn>
-            </VCol>
+              </VCol>
             </VRow>
           </VForm>
         </VCardText>
@@ -179,7 +205,23 @@ const login = async () => {
 </template>
 
 <style lang="scss">
-// @use "@core/scss/template/pages/page-auth.scss";
+.layout-blank,
+.layout-wrapper.layout-blank {
+  min-block-size: 100vh;
+}
+
+.auth-wrapper {
+  min-block-size: 100vh;
+}
+
+.auth-illustration {
+  z-index: 1;
+}
+
+.auth-title {
+  font-size: 28px;
+  font-weight: 700;
+}
 </style>
 
 <route lang="yaml">

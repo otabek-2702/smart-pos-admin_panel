@@ -26,7 +26,7 @@ injectSkinClasses()
   </template>
   <template v-else>
     <!-- <DefaultLayoutWithHorizontalNav v-bind="layoutAttrs" /> -->
-     <RouterView></RouterView>
+    <RouterView />
   </template>
 </template>
 

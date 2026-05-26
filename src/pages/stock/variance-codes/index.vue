@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import axios from '@axios'
+import { stockApi as axios } from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -41,10 +41,12 @@ async function loadCodes() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value) params.search = search.value
+    if (search.value)
+      params.search = search.value
 
     const res = await axios.get('/variance-codes/', { params })
-    const d = res.data
+    const d = res.data?.data ?? res.data
+
     codes.value = d.codes ?? []
     total.value = d.count ?? codes.value.length
   }
@@ -135,7 +137,12 @@ async function doDelete() {
           clearable
         />
         <VSpacer />
-        <VBtn prepend-icon="bx-plus" @click="openCreate">{{ t('Add Variance Code') }}</VBtn>
+        <VBtn
+          prepend-icon="bx-plus"
+          @click="openCreate"
+        >
+          {{ t('Add Variance Code') }}
+        </VBtn>
       </VCardText>
 
       <VDataTableServer
@@ -154,81 +161,232 @@ async function doDelete() {
           />
         </template>
 
-        <template v-if="loading && codes.length === 0" #body>
-          <tr v-for="n in itemsPerPage" :key="n" class="sk-row">
-            <td class="sk-cell"><div class="sk-box" style="width:80px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:120px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:160px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:60px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:60px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell" style="text-align:end;"><div class="d-flex justify-end gap-1"><div class="sk-box" style="width:28px;height:28px;border-radius:6px;" /><div class="sk-box" style="width:28px;height:28px;border-radius:6px;" /></div></td>
+        <template
+          v-if="loading && codes.length === 0"
+          #body
+        >
+          <tr
+            v-for="n in itemsPerPage"
+            :key="n"
+            class="sk-row"
+          >
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:80px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:120px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:160px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td
+              class="sk-cell"
+              style="text-align:end;"
+            >
+              <div class="d-flex justify-end gap-1">
+                <div
+                  class="sk-box"
+                  style="width:28px;height:28px;border-radius:6px;"
+                /><div
+                  class="sk-box"
+                  style="width:28px;height:28px;border-radius:6px;"
+                />
+              </div>
+            </td>
           </tr>
         </template>
 
         <template #item.requires_approval="{ item }">
-          <VChip :color="item.raw.requires_approval ? 'warning' : 'default'" size="small" variant="tonal">
+          <VChip
+            :color="item.raw.requires_approval ? 'warning' : 'default'"
+            size="small"
+            variant="tonal"
+          >
             {{ item.raw.requires_approval ? t('Yes') : t('No') }}
           </VChip>
         </template>
         <template #item.is_active="{ item }">
-          <VChip :color="item.raw.is_active ? 'success' : 'default'" size="small" variant="tonal">
+          <VChip
+            :color="item.raw.is_active ? 'success' : 'default'"
+            size="small"
+            variant="tonal"
+          >
             {{ item.raw.is_active ? t('Active') : t('Inactive') }}
           </VChip>
         </template>
         <template #item.actions="{ item }">
-          <div class="d-flex justify-end" style="gap:2px;">
-            <VBtn icon variant="text" size="small" @click="openEdit(item.raw)">
-              <VIcon size="18" icon="bx-edit" />
-              <VTooltip activator="parent" location="top">{{ t('Edit') }}</VTooltip>
+          <div
+            class="d-flex justify-end"
+            style="gap:2px;"
+          >
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              @click="openEdit(item.raw)"
+            >
+              <VIcon
+                size="18"
+                icon="bx-edit"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Edit') }}
+              </VTooltip>
             </VBtn>
-            <VBtn icon variant="text" size="small" color="error" @click="confirmDelete(item.raw)">
-              <VIcon size="18" icon="bx-trash" />
-              <VTooltip activator="parent" location="top">{{ t('Delete') }}</VTooltip>
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              color="error"
+              @click="confirmDelete(item.raw)"
+            >
+              <VIcon
+                size="18"
+                icon="bx-trash"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Delete') }}
+              </VTooltip>
             </VBtn>
           </div>
         </template>
       </VDataTableServer>
     </VCard>
 
-    <VDialog v-model="dialog" max-width="480" persistent>
+    <VDialog
+      v-model="dialog"
+      max-width="480"
+      persistent
+    >
       <VCard :title="dialogMode === 'create' ? t('Add Variance Code') : t('Edit Variance Code')">
         <VCardText>
           <VRow>
-            <VCol cols="12" sm="6">
-              <VTextField v-model="form.code" :label="t('Code')" required />
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VTextField
+                v-model="form.code"
+                :label="t('Code')"
+                required
+              />
             </VCol>
-            <VCol cols="12" sm="6">
-              <VTextField v-model="form.name" :label="t('Name')" required />
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VTextField
+                v-model="form.name"
+                :label="t('Name')"
+                required
+              />
             </VCol>
             <VCol cols="12">
-              <VTextField v-model="form.description" :label="t('Description')" />
+              <VTextField
+                v-model="form.description"
+                :label="t('Description')"
+              />
             </VCol>
-            <VCol cols="12" sm="6">
-              <VSwitch v-model="form.requires_approval" :label="t('Requires Approval')" color="warning" />
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VSwitch
+                v-model="form.requires_approval"
+                :label="t('Requires Approval')"
+                color="warning"
+              />
             </VCol>
-            <VCol v-if="dialogMode === 'edit'" cols="12" sm="6">
-              <VSwitch v-model="form.is_active" :label="t('Active')" color="success" />
+            <VCol
+              v-if="dialogMode === 'edit'"
+              cols="12"
+              sm="6"
+            >
+              <VSwitch
+                v-model="form.is_active"
+                :label="t('Active')"
+                color="success"
+              />
             </VCol>
           </VRow>
         </VCardText>
         <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn variant="tonal" color="default" @click="dialog = false">{{ t('Cancel') }}</VBtn>
-          <VBtn :loading="saving" @click="save">{{ t('Save') }}</VBtn>
+          <VBtn
+            variant="tonal"
+            color="default"
+            @click="dialog = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            :loading="saving"
+            @click="save"
+          >
+            {{ t('Save') }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
 
-    <VDialog v-model="deleteDialog" max-width="400">
+    <VDialog
+      v-model="deleteDialog"
+      max-width="400"
+    >
       <VCard :title="t('Delete Variance Code')">
         <VCardText>{{ t('Are you sure you want to delete') }} <strong>{{ selectedItem?.name }}</strong>?</VCardText>
         <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn variant="tonal" color="default" @click="deleteDialog = false">{{ t('Cancel') }}</VBtn>
-          <VBtn color="error" :loading="deleting" @click="doDelete">{{ t('Delete') }}</VBtn>
+          <VBtn
+            variant="tonal"
+            color="default"
+            @click="deleteDialog = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            color="error"
+            :loading="deleting"
+            @click="doDelete"
+          >
+            {{ t('Delete') }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
 
-    <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">{{ snackbarMsg }}</VSnackbar>
+    <VSnackbar
+      v-model="snackbar"
+      :color="snackbarColor"
+      :timeout="3000"
+    >
+      {{ snackbarMsg }}
+    </VSnackbar>
   </div>
 </template>
 

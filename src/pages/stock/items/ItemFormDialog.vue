@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import axios from '@axios'
-
-const { t } = useI18n({ useScope: 'global' })
-const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
+import { stockApi as axios } from '@/plugins/axios'
 
 const props = defineProps<{
   modelValue: boolean
@@ -16,6 +13,9 @@ const emit = defineEmits<{
   (e: 'update:modelValue', val: boolean): void
   (e: 'saved'): void
 }>()
+
+const { t } = useI18n({ useScope: 'global' })
+const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 
 const dialog = computed({
   get: () => props.modelValue,
@@ -49,10 +49,12 @@ const defaultForm = () => ({
 
 const form = ref(defaultForm())
 
-watch(() => props.modelValue, (open) => {
-  if (!open) return
+watch(() => props.modelValue, open => {
+  if (!open)
+    return
   if (props.mode === 'edit' && props.item) {
     const it = props.item
+
     form.value = {
       name: it.name ?? '',
       sku: it.sku ?? '',
@@ -82,15 +84,20 @@ watch(() => props.modelValue, (open) => {
 async function save() {
   if (!form.value.base_unit_id) {
     notify(t('Base unit is required'), 'error')
+
     return
   }
   saving.value = true
   try {
     const payload: any = { ...form.value }
-    if (!payload.category_id) delete payload.category_id
-    if (!payload.default_expiry_days) delete payload.default_expiry_days
-    if (!payload.barcode) delete payload.barcode
-    if (!payload.storage_conditions) delete payload.storage_conditions
+    if (!payload.category_id)
+      delete payload.category_id
+    if (!payload.default_expiry_days)
+      delete payload.default_expiry_days
+    if (!payload.barcode)
+      delete payload.barcode
+    if (!payload.storage_conditions)
+      delete payload.storage_conditions
 
     if (props.mode === 'create')
       await axios.post('/items/', payload)
@@ -110,92 +117,255 @@ async function save() {
 </script>
 
 <template>
-  <VDialog v-model="dialog" max-width="720" persistent scrollable>
+  <VDialog
+    v-model="dialog"
+    max-width="720"
+    persistent
+    scrollable
+  >
     <VCard :title="mode === 'create' ? t('Add Stock Item') : t('Edit Stock Item')">
       <VCardText style="max-height:70vh;overflow-y:auto;">
         <VRow>
           <!-- Basic info -->
           <VCol cols="12">
-            <p class="text-overline text-disabled mb-1">{{ t('Basic Information') }}</p>
+            <p class="text-overline text-disabled mb-1">
+              {{ t('Basic Information') }}
+            </p>
           </VCol>
-          <VCol cols="12" sm="6">
-            <VTextField v-model="form.name" :label="t('Name')" required />
+          <VCol
+            cols="12"
+            sm="6"
+          >
+            <VTextField
+              v-model="form.name"
+              :label="t('Name')"
+              required
+            />
           </VCol>
-          <VCol cols="12" sm="3">
-            <VTextField v-model="form.sku" :label="t('SKU')" />
+          <VCol
+            cols="12"
+            sm="3"
+          >
+            <VTextField
+              v-model="form.sku"
+              :label="t('SKU')"
+            />
           </VCol>
-          <VCol cols="12" sm="3">
-            <VTextField v-model="form.barcode" :label="t('Barcode')" />
+          <VCol
+            cols="12"
+            sm="3"
+          >
+            <VTextField
+              v-model="form.barcode"
+              :label="t('Barcode')"
+            />
           </VCol>
-          <VCol cols="12" sm="4">
-            <VSelect v-model="form.item_type" :items="itemTypes" :label="t('Type')" required />
+          <VCol
+            cols="12"
+            sm="4"
+          >
+            <VSelect
+              v-model="form.item_type"
+              :items="itemTypes"
+              :label="t('Type')"
+              required
+            />
           </VCol>
-          <VCol cols="12" sm="4">
-            <VSelect v-model="form.category_id" :items="categoryOptions" :label="t('Category')" clearable />
+          <VCol
+            cols="12"
+            sm="4"
+          >
+            <VSelect
+              v-model="form.category_id"
+              :items="categoryOptions"
+              :label="t('Category')"
+              clearable
+            />
           </VCol>
-          <VCol cols="12" sm="4">
-            <VSelect v-model="form.base_unit_id" :items="unitOptions" :label="t('Base Unit *')" />
+          <VCol
+            cols="12"
+            sm="4"
+          >
+            <VSelect
+              v-model="form.base_unit_id"
+              :items="unitOptions"
+              :label="t('Base Unit *')"
+            />
           </VCol>
 
           <!-- Stock thresholds -->
-          <VCol cols="12" class="mt-2">
-            <p class="text-overline text-disabled mb-1">{{ t('Stock Levels') }}</p>
+          <VCol
+            cols="12"
+            class="mt-2"
+          >
+            <p class="text-overline text-disabled mb-1">
+              {{ t('Stock Levels') }}
+            </p>
           </VCol>
-          <VCol cols="12" sm="4">
-            <VTextField v-model.number="form.min_stock_level" :label="t('Min Level')" type="number" step="0.01" />
+          <VCol
+            cols="12"
+            sm="4"
+          >
+            <VTextField
+              v-model.number="form.min_stock_level"
+              :label="t('Min Level')"
+              type="number"
+              step="0.01"
+            />
           </VCol>
-          <VCol cols="12" sm="4">
-            <VTextField v-model.number="form.max_stock_level" :label="t('Max Level')" type="number" step="0.01" />
+          <VCol
+            cols="12"
+            sm="4"
+          >
+            <VTextField
+              v-model.number="form.max_stock_level"
+              :label="t('Max Level')"
+              type="number"
+              step="0.01"
+            />
           </VCol>
-          <VCol cols="12" sm="4">
-            <VTextField v-model.number="form.reorder_point" :label="t('Reorder Point')" type="number" step="0.01" />
+          <VCol
+            cols="12"
+            sm="4"
+          >
+            <VTextField
+              v-model.number="form.reorder_point"
+              :label="t('Reorder Point')"
+              type="number"
+              step="0.01"
+            />
           </VCol>
-          <VCol cols="12" sm="4">
-            <VTextField v-model.number="form.cost_price" :label="t('Cost Price')" type="number" step="1" />
+          <VCol
+            cols="12"
+            sm="4"
+          >
+            <VTextField
+              v-model.number="form.cost_price"
+              :label="t('Cost Price')"
+              type="number"
+              step="1"
+            />
           </VCol>
 
           <!-- Flags -->
-          <VCol cols="12" class="mt-2">
-            <p class="text-overline text-disabled mb-1">{{ t('Flags') }}</p>
+          <VCol
+            cols="12"
+            class="mt-2"
+          >
+            <p class="text-overline text-disabled mb-1">
+              {{ t('Flags') }}
+            </p>
           </VCol>
-          <VCol cols="6" sm="4">
-            <VSwitch v-model="form.is_purchasable" :label="t('Purchasable')" color="primary" density="compact" />
+          <VCol
+            cols="6"
+            sm="4"
+          >
+            <VSwitch
+              v-model="form.is_purchasable"
+              :label="t('Purchasable')"
+              color="primary"
+              density="compact"
+            />
           </VCol>
-          <VCol cols="6" sm="4">
-            <VSwitch v-model="form.is_sellable" :label="t('Sellable')" color="primary" density="compact" />
+          <VCol
+            cols="6"
+            sm="4"
+          >
+            <VSwitch
+              v-model="form.is_sellable"
+              :label="t('Sellable')"
+              color="primary"
+              density="compact"
+            />
           </VCol>
-          <VCol cols="6" sm="4">
-            <VSwitch v-model="form.is_producible" :label="t('Producible')" color="primary" density="compact" />
+          <VCol
+            cols="6"
+            sm="4"
+          >
+            <VSwitch
+              v-model="form.is_producible"
+              :label="t('Producible')"
+              color="primary"
+              density="compact"
+            />
           </VCol>
-          <VCol cols="6" sm="4">
-            <VSwitch v-model="form.track_batches" :label="t('Track Batches')" color="warning" density="compact" />
+          <VCol
+            cols="6"
+            sm="4"
+          >
+            <VSwitch
+              v-model="form.track_batches"
+              :label="t('Track Batches')"
+              color="warning"
+              density="compact"
+            />
           </VCol>
-          <VCol cols="6" sm="4">
-            <VSwitch v-model="form.track_expiry" :label="t('Track Expiry')" color="warning" density="compact" />
+          <VCol
+            cols="6"
+            sm="4"
+          >
+            <VSwitch
+              v-model="form.track_expiry"
+              :label="t('Track Expiry')"
+              color="warning"
+              density="compact"
+            />
           </VCol>
 
           <!-- Expiry / storage -->
           <template v-if="form.track_expiry">
-            <VCol cols="12" sm="4">
-              <VTextField v-model.number="form.default_expiry_days" :label="t('Default Expiry (days)')" type="number" :min="1" />
+            <VCol
+              cols="12"
+              sm="4"
+            >
+              <VTextField
+                v-model.number="form.default_expiry_days"
+                :label="t('Default Expiry (days)')"
+                type="number"
+                :min="1"
+              />
             </VCol>
           </template>
           <VCol cols="12">
-            <VTextField v-model="form.storage_conditions" :label="t('Storage Conditions')" />
+            <VTextField
+              v-model="form.storage_conditions"
+              :label="t('Storage Conditions')"
+            />
           </VCol>
           <VCol cols="12">
-            <VSwitch v-if="mode === 'edit'" v-model="form.is_active" :label="t('Active')" color="success" density="compact" />
+            <VSwitch
+              v-if="mode === 'edit'"
+              v-model="form.is_active"
+              :label="t('Active')"
+              color="success"
+              density="compact"
+            />
           </VCol>
         </VRow>
       </VCardText>
       <VCardActions class="justify-end gap-2 pa-4 pt-0">
-        <VBtn variant="tonal" color="default" @click="dialog = false">{{ t('Cancel') }}</VBtn>
-        <VBtn :loading="saving" @click="save">{{ t('Save') }}</VBtn>
+        <VBtn
+          variant="tonal"
+          color="default"
+          @click="dialog = false"
+        >
+          {{ t('Cancel') }}
+        </VBtn>
+        <VBtn
+          :loading="saving"
+          @click="save"
+        >
+          {{ t('Save') }}
+        </VBtn>
       </VCardActions>
     </VCard>
   </VDialog>
 
-  <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">
+  <VSnackbar
+    v-model="snackbar"
+    :color="snackbarColor"
+    :timeout="3000"
+  >
     {{ snackbarMsg }}
   </VSnackbar>
 </template>

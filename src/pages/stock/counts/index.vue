@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import axios from '@axios'
+import { stockApi as axios } from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 import { useStateAction } from '@/composables/useStateAction'
 import { COUNT_STATUS_COLOR as statusColor } from '@/constants/statusColors'
@@ -18,6 +18,7 @@ const locationsList = ref<any[]>([])
 
 const createDialog = ref(false)
 const saving = ref(false)
+
 const form = ref({
   location_id: null as number | null,
   count_type: 'FULL',
@@ -44,11 +45,14 @@ async function loadCounts() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (statusFilter.value) params.status = statusFilter.value
-    if (locationFilter.value) params.location_id = locationFilter.value
+    if (statusFilter.value)
+      params.status = statusFilter.value
+    if (locationFilter.value)
+      params.location_id = locationFilter.value
 
     const res = await axios.get('/counts/', { params })
-    const d = res.data
+    const d = res.data?.data ?? res.data
+
     counts.value = d.counts ?? []
     total.value = d.pagination?.total_items ?? counts.value.length
   }
@@ -63,6 +67,7 @@ async function loadCounts() {
 async function loadLocations() {
   try {
     const res = await axios.get('/locations/', { params: { per_page: 200 } })
+
     locationsList.value = res.data.locations ?? []
   }
   catch { /* ignore */ }
@@ -78,7 +83,8 @@ async function createCount() {
   saving.value = true
   try {
     const payload: any = { ...form.value }
-    if (!payload.notes) delete payload.notes
+    if (!payload.notes)
+      delete payload.notes
     await axios.post('/counts/', payload)
     notify(t('Stock count created'))
     createDialog.value = false
@@ -99,7 +105,7 @@ const actionLabels: Record<string, string> = {
   cancel: 'Cancel Count',
 }
 
-const { actionDialog, actionItem, actionType, actioning, openAction, doAction } = useStateAction('/counts/', loadCounts, notify, t)
+const { actionDialog, actionItem, actionType, actioning, openAction, doAction } = useStateAction('/counts/', loadCounts, notify, t, axios)
 
 function canStart(item: any) { return item.status === 'DRAFT' }
 function canComplete(item: any) { return item.status === 'IN_PROGRESS' }
@@ -130,7 +136,12 @@ function canCancel(item: any) { return !['APPROVED', 'CANCELLED'].includes(item.
           clearable
         />
         <VSpacer />
-        <VBtn prepend-icon="bx-plus" @click="createDialog = true">{{ t('New Count') }}</VBtn>
+        <VBtn
+          prepend-icon="bx-plus"
+          @click="createDialog = true"
+        >
+          {{ t('New Count') }}
+        </VBtn>
       </VCardText>
 
       <VDataTableServer
@@ -149,15 +160,65 @@ function canCancel(item: any) { return !['APPROVED', 'CANCELLED'].includes(item.
           />
         </template>
 
-        <template v-if="loading && counts.length === 0" #body>
-          <tr v-for="n in itemsPerPage" :key="n" class="sk-row">
-            <td class="sk-cell"><div class="sk-box" style="width:100px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:110px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:70px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:90px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:40px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:80px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell" style="text-align:end;"><div class="d-flex justify-end gap-1"><div class="sk-box" style="width:28px;height:28px;border-radius:6px;" /><div class="sk-box" style="width:28px;height:28px;border-radius:6px;" /></div></td>
+        <template
+          v-if="loading && counts.length === 0"
+          #body
+        >
+          <tr
+            v-for="n in itemsPerPage"
+            :key="n"
+            class="sk-row"
+          >
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:100px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:110px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:70px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:90px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:40px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:80px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td
+              class="sk-cell"
+              style="text-align:end;"
+            >
+              <div class="d-flex justify-end gap-1">
+                <div
+                  class="sk-box"
+                  style="width:28px;height:28px;border-radius:6px;"
+                /><div
+                  class="sk-box"
+                  style="width:28px;height:28px;border-radius:6px;"
+                />
+              </div>
+            </td>
           </tr>
         </template>
 
@@ -168,10 +229,22 @@ function canCancel(item: any) { return !['APPROVED', 'CANCELLED'].includes(item.
           {{ item.raw.location_name ?? item.raw.location?.name ?? '—' }}
         </template>
         <template #item.count_type="{ item }">
-          <VChip color="secondary" size="small" variant="tonal">{{ item.raw.count_type }}</VChip>
+          <VChip
+            color="secondary"
+            size="small"
+            variant="tonal"
+          >
+            {{ item.raw.count_type }}
+          </VChip>
         </template>
         <template #item.status="{ item }">
-          <VChip :color="statusColor[item.raw.status] ?? 'default'" size="small" variant="tonal">{{ item.raw.status }}</VChip>
+          <VChip
+            :color="statusColor[item.raw.status] ?? 'default'"
+            size="small"
+            variant="tonal"
+          >
+            {{ item.raw.status }}
+          </VChip>
         </template>
         <template #item.items_counted="{ item }">
           {{ item.raw.items_counted ?? item.raw.count_items?.length ?? '—' }}
@@ -180,22 +253,85 @@ function canCancel(item: any) { return !['APPROVED', 'CANCELLED'].includes(item.
           {{ formatDateShort(item.raw.created_at) }}
         </template>
         <template #item.actions="{ item }">
-          <div class="d-flex justify-end" style="gap:2px;">
-            <VBtn v-if="canStart(item.raw)" icon variant="text" size="small" color="warning" @click="openAction(item.raw, 'start')">
-              <VIcon size="18" icon="bx-play" />
-              <VTooltip activator="parent" location="top">{{ t('Start') }}</VTooltip>
+          <div
+            class="d-flex justify-end"
+            style="gap:2px;"
+          >
+            <VBtn
+              v-if="canStart(item.raw)"
+              icon
+              variant="text"
+              size="small"
+              color="warning"
+              @click="openAction(item.raw, 'start')"
+            >
+              <VIcon
+                size="18"
+                icon="bx-play"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Start') }}
+              </VTooltip>
             </VBtn>
-            <VBtn v-if="canComplete(item.raw)" icon variant="text" size="small" color="info" @click="openAction(item.raw, 'complete')">
-              <VIcon size="18" icon="bx-check" />
-              <VTooltip activator="parent" location="top">{{ t('Complete') }}</VTooltip>
+            <VBtn
+              v-if="canComplete(item.raw)"
+              icon
+              variant="text"
+              size="small"
+              color="info"
+              @click="openAction(item.raw, 'complete')"
+            >
+              <VIcon
+                size="18"
+                icon="bx-check"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Complete') }}
+              </VTooltip>
             </VBtn>
-            <VBtn v-if="canApprove(item.raw)" icon variant="text" size="small" color="success" @click="openAction(item.raw, 'approve')">
-              <VIcon size="18" icon="bx-check-double" />
-              <VTooltip activator="parent" location="top">{{ t('Approve') }}</VTooltip>
+            <VBtn
+              v-if="canApprove(item.raw)"
+              icon
+              variant="text"
+              size="small"
+              color="success"
+              @click="openAction(item.raw, 'approve')"
+            >
+              <VIcon
+                size="18"
+                icon="bx-check-double"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Approve') }}
+              </VTooltip>
             </VBtn>
-            <VBtn v-if="canCancel(item.raw)" icon variant="text" size="small" color="error" @click="openAction(item.raw, 'cancel')">
-              <VIcon size="18" icon="bx-x" />
-              <VTooltip activator="parent" location="top">{{ t('Cancel') }}</VTooltip>
+            <VBtn
+              v-if="canCancel(item.raw)"
+              icon
+              variant="text"
+              size="small"
+              color="error"
+              @click="openAction(item.raw, 'cancel')"
+            >
+              <VIcon
+                size="18"
+                icon="bx-x"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Cancel') }}
+              </VTooltip>
             </VBtn>
           </div>
         </template>
@@ -203,40 +339,88 @@ function canCancel(item: any) { return !['APPROVED', 'CANCELLED'].includes(item.
     </VCard>
 
     <!-- Create Dialog -->
-    <VDialog v-model="createDialog" max-width="400" persistent>
+    <VDialog
+      v-model="createDialog"
+      max-width="400"
+      persistent
+    >
       <VCard :title="t('New Stock Count')">
         <VCardText>
           <VRow>
             <VCol cols="12">
-              <VSelect v-model="form.location_id" :items="locationOptions" :label="t('Location')" required />
+              <VSelect
+                v-model="form.location_id"
+                :items="locationOptions"
+                :label="t('Location')"
+                required
+              />
             </VCol>
             <VCol cols="12">
-              <VSelect v-model="form.count_type" :items="countTypes" :label="t('Count Type')" />
+              <VSelect
+                v-model="form.count_type"
+                :items="countTypes"
+                :label="t('Count Type')"
+              />
             </VCol>
             <VCol cols="12">
-              <VTextField v-model="form.notes" :label="t('Notes')" />
+              <VTextField
+                v-model="form.notes"
+                :label="t('Notes')"
+              />
             </VCol>
           </VRow>
         </VCardText>
         <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn variant="tonal" color="default" @click="createDialog = false">{{ t('Cancel') }}</VBtn>
-          <VBtn :loading="saving" @click="createCount">{{ t('Create') }}</VBtn>
+          <VBtn
+            variant="tonal"
+            color="default"
+            @click="createDialog = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            :loading="saving"
+            @click="createCount"
+          >
+            {{ t('Create') }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
 
     <!-- Action Confirm -->
-    <VDialog v-model="actionDialog" max-width="400">
+    <VDialog
+      v-model="actionDialog"
+      max-width="400"
+    >
       <VCard :title="t(actionLabels[actionType] ?? actionType)">
         <VCardText>{{ t('Confirm action for count') }} <strong>{{ actionItem?.count_number }}</strong>?</VCardText>
         <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn variant="tonal" color="default" @click="actionDialog = false">{{ t('Cancel') }}</VBtn>
-          <VBtn :color="actionType === 'cancel' ? 'error' : 'primary'" :loading="actioning" @click="doAction">{{ t('Confirm') }}</VBtn>
+          <VBtn
+            variant="tonal"
+            color="default"
+            @click="actionDialog = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            :color="actionType === 'cancel' ? 'error' : 'primary'"
+            :loading="actioning"
+            @click="doAction"
+          >
+            {{ t('Confirm') }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
 
-    <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">{{ snackbarMsg }}</VSnackbar>
+    <VSnackbar
+      v-model="snackbar"
+      :color="snackbarColor"
+      :timeout="3000"
+    >
+      {{ snackbarMsg }}
+    </VSnackbar>
   </div>
 </template>
 

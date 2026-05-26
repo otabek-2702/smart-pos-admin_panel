@@ -7,7 +7,7 @@ const { isAppRtl } = useThemeConfig()
 
 const i18nCompLanguages: I18nLanguage[] = [
   {
-    label: "O'zbekcha",
+    label: 'O\'zbekcha',
     i18nLang: 'uz',
   },
   {

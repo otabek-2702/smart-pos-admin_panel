@@ -44,6 +44,7 @@ const intensityOptions = [
   { label: '35%', value: 0.35 },
   { label: '20%', value: 0.2 },
 ]
+
 const intensity = ref(0.7)
 
 // Base color (full saturation) — the raw picked color before intensity
@@ -53,15 +54,17 @@ function hexToRgb(hex: string) {
   const r = parseInt(hex.slice(1, 3), 16)
   const g = parseInt(hex.slice(3, 5), 16)
   const b = parseInt(hex.slice(5, 7), 16)
+
   return { r, g, b }
 }
 
 function rgbToHex(r: number, g: number, b: number) {
-  return '#' + [r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('')
+  return `#${[r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('')}`
 }
 
 function applyIntensity(hex: string, alpha: number) {
   const { r, g, b } = hexToRgb(hex)
+
   return rgbToHex(
     r + (255 - r) * (1 - alpha),
     g + (255 - g) * (1 - alpha),
@@ -108,9 +111,11 @@ async function loadCategories() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value) params.search = search.value
+    if (search.value)
+      params.search = search.value
     const res = await axios.get('/categories', { params })
     const d = res.data?.data
+
     categories.value = (d?.categories ?? []).sort((a: any, b: any) => a.sort_order - b.sort_order)
     totalCategories.value = d?.pagination?.total_categories ?? d?.pagination?.total ?? categories.value.length
   }
@@ -125,6 +130,7 @@ async function loadCategories() {
 async function loadStats() {
   try {
     const res = await axios.get('/categories/stats')
+
     stats.value = res.data?.data ?? res.data
   }
   catch { /* ignore */ }
@@ -141,12 +147,14 @@ watch([page, itemsPerPage], loadCategories)
 // ---- drag & drop ----
 function onDragStart(e: DragEvent, index: number) {
   draggedIndex.value = index
-  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+  if (e.dataTransfer)
+    e.dataTransfer.effectAllowed = 'move'
 }
 
 function onDragOver(e: DragEvent, index: number) {
   e.preventDefault()
-  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+  if (e.dataTransfer)
+    e.dataTransfer.dropEffect = 'move'
   dragOverIndex.value = index
 }
 
@@ -158,10 +166,12 @@ function onDrop(targetIndex: number) {
   if (draggedIndex.value === null || draggedIndex.value === targetIndex) {
     draggedIndex.value = null
     dragOverIndex.value = null
+
     return
   }
   const items = [...categories.value]
   const [dragged] = items.splice(draggedIndex.value, 1)
+
   items.splice(targetIndex, 0, dragged)
   categories.value = items
   draggedIndex.value = null
@@ -176,11 +186,9 @@ function onDragEnd() {
 
 async function saveOrder(items: any[]) {
   try {
-    await Promise.all(
-      items.map((cat, idx) =>
-        axios.put(`/categories/${cat.id}/update`, { ...cat, sort_order: idx })
-      )
-    )
+    await axios.post('/categories/reorder', {
+      orders: items.map((cat, idx) => ({ id: cat.id, sort_order: idx })),
+    })
   }
   catch { /* ignore */ }
 }
@@ -190,9 +198,11 @@ const initialForm = ref({ name: '', description: '', color: '' })
 const isDirty = computed(() => JSON.stringify(form.value) !== JSON.stringify(initialForm.value))
 
 function tryCloseDialog(val: boolean) {
-  if (val) return
+  if (val)
+    return
   if (isDirty.value) {
     notify(t('Unsaved changes! Use the close button to discard.'), 'warning')
+
     return
   }
   dialogOpen.value = false
@@ -211,7 +221,9 @@ function openCreate() {
 
 function openEdit(cat: any) {
   editingCategory.value = cat
+
   const existingColor = cat.colors?.[0] ?? ''
+
   baseColor.value = existingColor || '#e74c3c'
   intensity.value = 0.7
   colorMode.value = existingColor ? 'pick' : 'none'
@@ -233,12 +245,13 @@ async function saveCategory() {
       colors: [form.value.color],
       sort_order: editingCategory.value?.sort_order ?? categories.value.length,
     }
+
     if (editingCategory.value) {
-      await axios.put(`/categories/${editingCategory.value.id}/update`, payload)
+      await axios.patch(`/categories/${editingCategory.value.id}`, payload)
       notify(t('Category updated'))
     }
     else {
-      await axios.post('/categories/create', payload)
+      await axios.post('/categories', payload)
       notify(t('Category created'))
     }
     dialogOpen.value = false
@@ -259,9 +272,10 @@ function confirmDelete(cat: any) {
 }
 
 async function deleteCategory() {
-  if (!deletingCategory.value) return
+  if (!deletingCategory.value)
+    return
   try {
-    await axios.delete(`/categories/${deletingCategory.value.id}/delete`)
+    await axios.delete(`/categories/${deletingCategory.value.id}`)
     notify(t('Category deleted'))
     deleteDialog.value = false
     loadCategories()
@@ -280,13 +294,32 @@ async function deleteCategory() {
       <VCol cols="4">
         <VCard>
           <VCardText class="d-flex align-center gap-2 py-3">
-            <VAvatar color="primary" variant="tonal" size="32" rounded>
-              <VIcon icon="bx-category" size="16" />
+            <VAvatar
+              color="primary"
+              variant="tonal"
+              size="32"
+              rounded
+            >
+              <VIcon
+                icon="bx-category"
+                size="16"
+              />
             </VAvatar>
             <div>
-              <div v-if="stats" class="text-subtitle-1 font-weight-bold lh-1">{{ stats.total_categories ?? '—' }}</div>
-              <div v-else class="sk-box mb-1" style="width:36px;height:16px;border-radius:4px;" />
-              <div class="text-caption text-disabled">{{ t('Total') }}</div>
+              <div
+                v-if="stats"
+                class="text-subtitle-1 font-weight-bold lh-1"
+              >
+                {{ stats.total_categories ?? '—' }}
+              </div>
+              <div
+                v-else
+                class="sk-box mb-1"
+                style="width:36px;height:16px;border-radius:4px;"
+              />
+              <div class="text-caption text-disabled">
+                {{ t('Total') }}
+              </div>
             </div>
           </VCardText>
         </VCard>
@@ -294,13 +327,32 @@ async function deleteCategory() {
       <VCol cols="4">
         <VCard>
           <VCardText class="d-flex align-center gap-2 py-3">
-            <VAvatar color="success" variant="tonal" size="32" rounded>
-              <VIcon icon="bx-check-circle" size="16" />
+            <VAvatar
+              color="success"
+              variant="tonal"
+              size="32"
+              rounded
+            >
+              <VIcon
+                icon="bx-check-circle"
+                size="16"
+              />
             </VAvatar>
             <div>
-              <div v-if="stats" class="text-subtitle-1 font-weight-bold lh-1">{{ stats.active_categories ?? '—' }}</div>
-              <div v-else class="sk-box mb-1" style="width:36px;height:16px;border-radius:4px;" />
-              <div class="text-caption text-disabled">{{ t('Active') }}</div>
+              <div
+                v-if="stats"
+                class="text-subtitle-1 font-weight-bold lh-1"
+              >
+                {{ stats.active_categories ?? '—' }}
+              </div>
+              <div
+                v-else
+                class="sk-box mb-1"
+                style="width:36px;height:16px;border-radius:4px;"
+              />
+              <div class="text-caption text-disabled">
+                {{ t('Active') }}
+              </div>
             </div>
           </VCardText>
         </VCard>
@@ -308,13 +360,32 @@ async function deleteCategory() {
       <VCol cols="4">
         <VCard>
           <VCardText class="d-flex align-center gap-2 py-3">
-            <VAvatar color="warning" variant="tonal" size="32" rounded>
-              <VIcon icon="bx-minus-circle" size="16" />
+            <VAvatar
+              color="warning"
+              variant="tonal"
+              size="32"
+              rounded
+            >
+              <VIcon
+                icon="bx-minus-circle"
+                size="16"
+              />
             </VAvatar>
             <div>
-              <div v-if="stats" class="text-subtitle-1 font-weight-bold lh-1">{{ stats.inactive_categories ?? '—' }}</div>
-              <div v-else class="sk-box mb-1" style="width:36px;height:16px;border-radius:4px;" />
-              <div class="text-caption text-disabled">{{ t('Inactive') }}</div>
+              <div
+                v-if="stats"
+                class="text-subtitle-1 font-weight-bold lh-1"
+              >
+                {{ stats.inactive_categories ?? '—' }}
+              </div>
+              <div
+                v-else
+                class="sk-box mb-1"
+                style="width:36px;height:16px;border-radius:4px;"
+              />
+              <div class="text-caption text-disabled">
+                {{ t('Inactive') }}
+              </div>
             </div>
           </VCardText>
         </VCard>
@@ -333,7 +404,10 @@ async function deleteCategory() {
         clearable
       />
       <VSpacer />
-      <VBtn prepend-icon="bx-plus" @click="openCreate">
+      <VBtn
+        prepend-icon="bx-plus"
+        @click="openCreate"
+      >
         {{ t('Add Category') }}
       </VBtn>
     </div>
@@ -351,8 +425,14 @@ async function deleteCategory() {
           <div class="sk-box category-card__stripe" />
           <div class="category-card__body">
             <div class="sk-box category-card__icon" />
-            <div class="sk-box mt-2" style="width:80%;height:13px;border-radius:4px;" />
-            <div class="sk-box mt-2" style="width:52px;height:18px;border-radius:8px;" />
+            <div
+              class="sk-box mt-2"
+              style="width:80%;height:13px;border-radius:4px;"
+            />
+            <div
+              class="sk-box mt-2"
+              style="width:52px;height:18px;border-radius:8px;"
+            />
           </div>
         </div>
       </template>
@@ -386,7 +466,11 @@ async function deleteCategory() {
             />
             <div class="d-flex align-center justify-space-between mt-2 gap-1">
               <span class="category-card__name">{{ cat.name }}</span>
-              <VIcon icon="bx-grid-vertical" size="16" class="drag-hint" />
+              <VIcon
+                icon="bx-grid-vertical"
+                size="16"
+                class="drag-hint"
+              />
             </div>
             <VChip
               class="mt-2"
@@ -405,7 +489,11 @@ async function deleteCategory() {
           v-if="categories.length === 0"
           class="category-grid__empty"
         >
-          <VIcon icon="bx-category" size="56" color="disabled" />
+          <VIcon
+            icon="bx-category"
+            size="56"
+            color="disabled"
+          />
           <p class="text-disabled mt-3">
             {{ t('No categories found') }}
           </p>
@@ -449,17 +537,38 @@ async function deleteCategory() {
             </div>
 
             <div class="pos-preview__products mt-3">
-              <div class="pos-product-card" :style="{ backgroundColor: form.color || '#9e9e9e' }">
-                <div class="pos-product-card__name">{{ t('Product') }} 1</div>
-                <div class="pos-product-card__price">25 000 so'm</div>
+              <div
+                class="pos-product-card"
+                :style="{ backgroundColor: form.color || '#9e9e9e' }"
+              >
+                <div class="pos-product-card__name">
+                  {{ t('Product') }} 1
+                </div>
+                <div class="pos-product-card__price">
+                  25 000 so'm
+                </div>
               </div>
-              <div class="pos-product-card" :style="{ backgroundColor: form.color || '#9e9e9e' }">
-                <div class="pos-product-card__name">{{ t('Product') }} 2</div>
-                <div class="pos-product-card__price">18 000 so'm</div>
+              <div
+                class="pos-product-card"
+                :style="{ backgroundColor: form.color || '#9e9e9e' }"
+              >
+                <div class="pos-product-card__name">
+                  {{ t('Product') }} 2
+                </div>
+                <div class="pos-product-card__price">
+                  18 000 so'm
+                </div>
               </div>
-              <div class="pos-product-card" :style="{ backgroundColor: form.color || '#9e9e9e' }">
-                <div class="pos-product-card__name">{{ t('Product') }} 3</div>
-                <div class="pos-product-card__price">32 000 so'm</div>
+              <div
+                class="pos-product-card"
+                :style="{ backgroundColor: form.color || '#9e9e9e' }"
+              >
+                <div class="pos-product-card__name">
+                  {{ t('Product') }} 3
+                </div>
+                <div class="pos-product-card__price">
+                  32 000 so'm
+                </div>
               </div>
             </div>
           </div>
@@ -504,8 +613,14 @@ async function deleteCategory() {
                     elevation="0"
                   />
                 </VMenu>
-                <span v-if="form.color" class="text-body-2 text-medium-emphasis">{{ form.color.toUpperCase() }}</span>
-                <span v-else class="text-body-2 text-disabled">{{ t('No Color') }}</span>
+                <span
+                  v-if="form.color"
+                  class="text-body-2 text-medium-emphasis"
+                >{{ form.color.toUpperCase() }}</span>
+                <span
+                  v-else
+                  class="text-body-2 text-disabled"
+                >{{ t('No Color') }}</span>
                 <VSpacer />
                 <VBtn
                   v-if="form.color"
@@ -514,13 +629,19 @@ async function deleteCategory() {
                   size="x-small"
                   @click="form.color = ''; colorMode = 'none'"
                 >
-                  <VIcon icon="bx-x" size="18" />
+                  <VIcon
+                    icon="bx-x"
+                    size="18"
+                  />
                 </VBtn>
               </div>
             </VCol>
 
             <!-- Intensity -->
-            <VCol v-if="form.color" cols="12">
+            <VCol
+              v-if="form.color"
+              cols="12"
+            >
               <span class="text-caption text-disabled d-block mb-1">{{ t('Intensity') }}</span>
               <div class="d-flex gap-2">
                 <button
@@ -776,7 +897,6 @@ async function deleteCategory() {
   border-color: rgb(var(--v-theme-primary));
   box-shadow: 0 0 0 2px rgba(var(--v-theme-primary), 0.3);
 }
-
 </style>
 
 <route lang="yaml">

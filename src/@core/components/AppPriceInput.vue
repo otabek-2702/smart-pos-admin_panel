@@ -24,15 +24,19 @@ const emit = defineEmits<{
 
 // Format number with space as thousands separator: 1234567 → "1 234 567"
 function formatWithSpaces(val: number | null): string {
-  if (val === null || val === undefined) return ''
-  if (val === 0) return '0'
+  if (val === null || val === undefined)
+    return ''
+  if (val === 0)
+    return '0'
   const num = Math.trunc(val)
+
   return String(num).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 }
 
 // Parse formatted string back to number: "1 234 567" → 1234567
 function parseSpaces(val: string): number {
   const cleaned = val.replace(/\D/g, '')
+
   return Number(cleaned) || 0
 }
 
@@ -41,9 +45,8 @@ const isFocused = ref(false)
 
 // Sync from parent
 watch(() => props.modelValue, newVal => {
-  if (!isFocused.value) {
+  if (!isFocused.value)
     displayValue.value = formatWithSpaces(newVal)
-  }
 })
 
 function onInput(e: Event) {
@@ -66,21 +69,24 @@ function onInput(e: Event) {
   nextTick(() => {
     const newSpacesBefore = (formatted.slice(0, cursorPos).match(/\s/g) || []).length
     const adjustedPos = cursorPos + (newSpacesBefore - spacesBefore)
+
     input.setSelectionRange(adjustedPos, adjustedPos)
   })
 }
 
 function onFocus() {
   isFocused.value = true
+
   // If value is 0, clear input for easier typing
-  if (props.modelValue === 0) {
+  if (props.modelValue === 0)
     displayValue.value = ''
-  }
 }
 
 function onBlur() {
   isFocused.value = false
+
   const num = parseSpaces(displayValue.value)
+
   displayValue.value = formatWithSpaces(num)
   emit('update:modelValue', num)
 }
@@ -88,9 +94,11 @@ function onBlur() {
 // Handle paste — clean and format
 function onPaste(e: ClipboardEvent) {
   e.preventDefault()
+
   const pasted = e.clipboardData?.getData('text') ?? ''
   const cleaned = pasted.replace(/\D/g, '')
   const num = Number(cleaned) || 0
+
   displayValue.value = formatWithSpaces(num)
   emit('update:modelValue', num)
 }
@@ -98,11 +106,12 @@ function onPaste(e: ClipboardEvent) {
 // Prevent non-numeric keys (allow navigation, backspace, delete, dot)
 function onKeydown(e: KeyboardEvent) {
   const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Home', 'End']
-  if (allowed.includes(e.key)) return
-  if (e.ctrlKey || e.metaKey) return // allow Ctrl+A, Ctrl+C, etc.
-  if (!/^\d$/.test(e.key)) {
+  if (allowed.includes(e.key))
+    return
+  if (e.ctrlKey || e.metaKey)
+    return // allow Ctrl+A, Ctrl+C, etc.
+  if (!/^\d$/.test(e.key))
     e.preventDefault()
-  }
 }
 </script>
 

@@ -3,7 +3,7 @@ export const ORDER_STATUS_COLOR: Record<string, string> = {
   PREPARING: 'warning',
   READY: 'success',
   COMPLETED: 'secondary',
-  CANCELED: 'error',
+  CANCELLED: 'error',
 }
 
 export const TRANSFER_STATUS_COLOR: Record<string, string> = {

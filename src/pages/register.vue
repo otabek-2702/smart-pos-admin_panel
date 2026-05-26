@@ -5,7 +5,6 @@ import { themeConfig } from '@themeConfig'
 
 import { useAppAbility } from '@/plugins/casl/useAppAbility'
 import AuthProvider from '@/views/pages/authentication/AuthProvider.vue'
-import axios from '@axios'
 import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
 import { alphaDashValidator, emailValidator, requiredValidator } from '@validators'
 

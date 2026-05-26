@@ -1,6 +1,4 @@
 <script setup lang="ts">
-const { t } = useI18n({ useScope: 'global' })
-
 const props = withDefaults(defineProps<{
   page: number
   itemsPerPage: number
@@ -14,6 +12,8 @@ const emit = defineEmits<{
   (e: 'update:page', value: number): void
   (e: 'update:itemsPerPage', value: number): void
 }>()
+
+const { t } = useI18n({ useScope: 'global' })
 
 const localPage = computed({
   get: () => props.page,

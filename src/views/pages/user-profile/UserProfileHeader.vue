@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import axios from '@axios'
-
 const profileHeaderData = ref<any>()
 
 const fetchHeaderData = () => {

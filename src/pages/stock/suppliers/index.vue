@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import axios from '@axios'
+import { stockApi as axios } from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -54,11 +54,14 @@ async function loadSuppliers() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value) params.search = search.value
-    if (activeFilter.value !== undefined) params.is_active = activeFilter.value
+    if (search.value)
+      params.search = search.value
+    if (activeFilter.value !== undefined)
+      params.is_active = activeFilter.value
 
     const res = await axios.get('/suppliers/', { params })
-    const d = res.data
+    const d = res.data?.data ?? res.data
+
     suppliers.value = d.suppliers ?? []
     total.value = d.pagination?.total_items ?? suppliers.value.length
   }
@@ -80,6 +83,7 @@ async function openDetail(item: any) {
   detailLoading.value = true
   try {
     const res = await axios.get(`/suppliers/${item.id}/`)
+
     detailItem.value = res.data?.supplier ?? res.data?.data ?? item
   }
   catch { /* keep basic data */ }
@@ -97,9 +101,11 @@ function openCreate() {
 function openEdit(item: any) {
   dialogMode.value = 'edit'
   selectedItem.value = item
+
   // Load detail first to get all fields
   axios.get(`/suppliers/${item.id}/`).then(res => {
-    const d = res.data?.supplier ?? res.data?.data ?? item
+    const d = res.data?.data ?? res.data?.supplier ?? res.data?.data ?? item
+
     form.value = {
       name: d.name ?? '',
       contact_person: d.contact_person ?? '',
@@ -181,7 +187,12 @@ async function doDelete() {
           clearable
         />
         <VSpacer />
-        <VBtn prepend-icon="bx-plus" @click="openCreate">{{ t('Add Supplier') }}</VBtn>
+        <VBtn
+          prepend-icon="bx-plus"
+          @click="openCreate"
+        >
+          {{ t('Add Supplier') }}
+        </VBtn>
       </VCardText>
 
       <VDataTableServer
@@ -200,13 +211,56 @@ async function doDelete() {
           />
         </template>
 
-        <template v-if="loading && suppliers.length === 0" #body>
-          <tr v-for="n in itemsPerPage" :key="n" class="sk-row">
-            <td class="sk-cell"><div class="sk-box" style="width:140px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:90px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:60px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:60px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell" style="text-align:end;"><div class="d-flex justify-end gap-1"><div class="sk-box" style="width:28px;height:28px;border-radius:6px;" /><div class="sk-box" style="width:28px;height:28px;border-radius:6px;" /><div class="sk-box" style="width:28px;height:28px;border-radius:6px;" /></div></td>
+        <template
+          v-if="loading && suppliers.length === 0"
+          #body
+        >
+          <tr
+            v-for="n in itemsPerPage"
+            :key="n"
+            class="sk-row"
+          >
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:140px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:90px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td
+              class="sk-cell"
+              style="text-align:end;"
+            >
+              <div class="d-flex justify-end gap-1">
+                <div
+                  class="sk-box"
+                  style="width:28px;height:28px;border-radius:6px;"
+                /><div
+                  class="sk-box"
+                  style="width:28px;height:28px;border-radius:6px;"
+                /><div
+                  class="sk-box"
+                  style="width:28px;height:28px;border-radius:6px;"
+                />
+              </div>
+            </td>
           </tr>
         </template>
 
@@ -215,28 +269,79 @@ async function doDelete() {
         </template>
         <template #item.rating="{ item }">
           <div class="d-flex align-center gap-1">
-            <VIcon icon="bx-star" size="14" color="warning" />
+            <VIcon
+              icon="bx-star"
+              size="14"
+              color="warning"
+            />
             <span>{{ item.raw.rating ?? '—' }}</span>
           </div>
         </template>
         <template #item.is_active="{ item }">
-          <VChip :color="item.raw.is_active ? 'success' : 'default'" size="small" variant="tonal">
+          <VChip
+            :color="item.raw.is_active ? 'success' : 'default'"
+            size="small"
+            variant="tonal"
+          >
             {{ item.raw.is_active ? t('Active') : t('Inactive') }}
           </VChip>
         </template>
         <template #item.actions="{ item }">
-          <div class="d-flex justify-end" style="gap:2px;">
-            <VBtn icon variant="text" size="small" @click="openDetail(item.raw)">
-              <VIcon size="18" icon="bx-show" />
-              <VTooltip activator="parent" location="top">{{ t('View') }}</VTooltip>
+          <div
+            class="d-flex justify-end"
+            style="gap:2px;"
+          >
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              @click="openDetail(item.raw)"
+            >
+              <VIcon
+                size="18"
+                icon="bx-show"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('View') }}
+              </VTooltip>
             </VBtn>
-            <VBtn icon variant="text" size="small" @click="openEdit(item.raw)">
-              <VIcon size="18" icon="bx-edit" />
-              <VTooltip activator="parent" location="top">{{ t('Edit') }}</VTooltip>
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              @click="openEdit(item.raw)"
+            >
+              <VIcon
+                size="18"
+                icon="bx-edit"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Edit') }}
+              </VTooltip>
             </VBtn>
-            <VBtn icon variant="text" size="small" color="error" @click="confirmDelete(item.raw)">
-              <VIcon size="18" icon="bx-trash" />
-              <VTooltip activator="parent" location="top">{{ t('Delete') }}</VTooltip>
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              color="error"
+              @click="confirmDelete(item.raw)"
+            >
+              <VIcon
+                size="18"
+                icon="bx-trash"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Delete') }}
+              </VTooltip>
             </VBtn>
           </div>
         </template>
@@ -244,53 +349,91 @@ async function doDelete() {
     </VCard>
 
     <!-- Detail Dialog -->
-    <VDialog v-model="detailDialog" max-width="560">
-      <VCard v-if="detailItem" :title="detailItem.name">
+    <VDialog
+      v-model="detailDialog"
+      max-width="560"
+    >
+      <VCard
+        v-if="detailItem"
+        :title="detailItem.name"
+      >
         <VCardText>
-          <VProgressLinear v-if="detailLoading" indeterminate class="mb-3" />
+          <VProgressLinear
+            v-if="detailLoading"
+            indeterminate
+            class="mb-3"
+          />
           <VRow dense>
             <VCol cols="6">
-              <div class="text-caption text-disabled">{{ t('Contact') }}</div>
+              <div class="text-caption text-disabled">
+                {{ t('Contact') }}
+              </div>
               <div>{{ detailItem.contact_person || '—' }}</div>
             </VCol>
             <VCol cols="6">
-              <div class="text-caption text-disabled">{{ t('Phone') }}</div>
+              <div class="text-caption text-disabled">
+                {{ t('Phone') }}
+              </div>
               <div>{{ detailItem.phone || '—' }}</div>
             </VCol>
             <VCol cols="6">
-              <div class="text-caption text-disabled">{{ t('Email') }}</div>
+              <div class="text-caption text-disabled">
+                {{ t('Email') }}
+              </div>
               <div>{{ detailItem.email || '—' }}</div>
             </VCol>
             <VCol cols="6">
-              <div class="text-caption text-disabled">{{ t('City') }}</div>
+              <div class="text-caption text-disabled">
+                {{ t('City') }}
+              </div>
               <div>{{ detailItem.city || '—' }}</div>
             </VCol>
             <VCol cols="6">
-              <div class="text-caption text-disabled">{{ t('Payment Terms') }}</div>
+              <div class="text-caption text-disabled">
+                {{ t('Payment Terms') }}
+              </div>
               <div>{{ detailItem.payment_terms_days ? `${detailItem.payment_terms_days} ${t('days')}` : '—' }}</div>
             </VCol>
             <VCol cols="6">
-              <div class="text-caption text-disabled">{{ t('Lead Time') }}</div>
+              <div class="text-caption text-disabled">
+                {{ t('Lead Time') }}
+              </div>
               <div>{{ detailItem.lead_time_days ? `${detailItem.lead_time_days} ${t('days')}` : '—' }}</div>
             </VCol>
             <VCol cols="6">
-              <div class="text-caption text-disabled">{{ t('Balance') }}</div>
+              <div class="text-caption text-disabled">
+                {{ t('Balance') }}
+              </div>
               <div>{{ detailItem.current_balance ?? '—' }}</div>
             </VCol>
             <VCol cols="6">
-              <div class="text-caption text-disabled">{{ t('Rating') }}</div>
+              <div class="text-caption text-disabled">
+                {{ t('Rating') }}
+              </div>
               <div class="d-flex align-center gap-1">
-                <VIcon icon="bx-star" size="14" color="warning" />
+                <VIcon
+                  icon="bx-star"
+                  size="14"
+                  color="warning"
+                />
                 {{ detailItem.rating ?? '—' }}
               </div>
             </VCol>
             <template v-if="detailItem.items?.length">
-              <VCol cols="12" class="mt-2">
-                <div class="text-caption text-disabled mb-1">{{ t('Supplied Items') }} ({{ detailItem.item_count }})</div>
+              <VCol
+                cols="12"
+                class="mt-2"
+              >
+                <div class="text-caption text-disabled mb-1">
+                  {{ t('Supplied Items') }} ({{ detailItem.item_count }})
+                </div>
                 <VTable density="compact">
                   <thead><tr><th>{{ t('Item') }}</th><th>{{ t('Price') }}</th><th>{{ t('Unit') }}</th></tr></thead>
                   <tbody>
-                    <tr v-for="si in (detailItem.items as any[])" :key="si.id">
+                    <tr
+                      v-for="si in (detailItem.items as any[])"
+                      :key="si.id"
+                    >
                       <td>{{ si.stock_item_name }}</td>
                       <td>{{ si.price }}</td>
                       <td>{{ si.unit_short }}</td>
@@ -302,64 +445,162 @@ async function doDelete() {
           </VRow>
         </VCardText>
         <VCardActions class="justify-end pa-4 pt-0">
-          <VBtn variant="tonal" @click="detailDialog = false">{{ t('Close') }}</VBtn>
+          <VBtn
+            variant="tonal"
+            @click="detailDialog = false"
+          >
+            {{ t('Close') }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
 
     <!-- Create / Edit Dialog -->
-    <VDialog v-model="dialog" max-width="560" persistent>
+    <VDialog
+      v-model="dialog"
+      max-width="560"
+      persistent
+    >
       <VCard :title="dialogMode === 'create' ? t('Add Supplier') : t('Edit Supplier')">
         <VCardText>
           <VRow>
             <VCol cols="12">
-              <VTextField v-model="form.name" :label="t('Name')" required />
+              <VTextField
+                v-model="form.name"
+                :label="t('Name')"
+                required
+              />
             </VCol>
-            <VCol cols="12" sm="6">
-              <VTextField v-model="form.contact_person" :label="t('Contact Person')" />
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VTextField
+                v-model="form.contact_person"
+                :label="t('Contact Person')"
+              />
             </VCol>
-            <VCol cols="12" sm="6">
-              <VTextField v-model="form.phone" :label="t('Phone')" />
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VTextField
+                v-model="form.phone"
+                :label="t('Phone')"
+              />
             </VCol>
-            <VCol cols="12" sm="6">
-              <VTextField v-model="form.email" :label="t('Email')" type="email" />
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VTextField
+                v-model="form.email"
+                :label="t('Email')"
+                type="email"
+              />
             </VCol>
-            <VCol cols="12" sm="6">
-              <VTextField v-model="form.city" :label="t('City')" />
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VTextField
+                v-model="form.city"
+                :label="t('City')"
+              />
             </VCol>
             <VCol cols="12">
-              <VTextField v-model="form.address" :label="t('Address')" />
+              <VTextField
+                v-model="form.address"
+                :label="t('Address')"
+              />
             </VCol>
-            <VCol cols="12" sm="4">
-              <VTextField v-model.number="form.rating" :label="t('Rating (1-5)')" type="number" :min="1" :max="5" />
+            <VCol
+              cols="12"
+              sm="4"
+            >
+              <VTextField
+                v-model.number="form.rating"
+                :label="t('Rating (1-5)')"
+                type="number"
+                :min="1"
+                :max="5"
+              />
             </VCol>
-            <VCol cols="12" sm="4">
-              <VTextField v-model.number="form.payment_terms_days" :label="t('Payment Terms (days)')" type="number" :min="0" />
+            <VCol
+              cols="12"
+              sm="4"
+            >
+              <VTextField
+                v-model.number="form.payment_terms_days"
+                :label="t('Payment Terms (days)')"
+                type="number"
+                :min="0"
+              />
             </VCol>
-            <VCol cols="12" sm="4">
-              <VTextField v-model.number="form.lead_time_days" :label="t('Lead Time (days)')" type="number" :min="0" />
+            <VCol
+              cols="12"
+              sm="4"
+            >
+              <VTextField
+                v-model.number="form.lead_time_days"
+                :label="t('Lead Time (days)')"
+                type="number"
+                :min="0"
+              />
             </VCol>
           </VRow>
         </VCardText>
         <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn variant="tonal" color="default" @click="dialog = false">{{ t('Cancel') }}</VBtn>
-          <VBtn :loading="saving" @click="save">{{ t('Save') }}</VBtn>
+          <VBtn
+            variant="tonal"
+            color="default"
+            @click="dialog = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            :loading="saving"
+            @click="save"
+          >
+            {{ t('Save') }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
 
     <!-- Delete Confirm -->
-    <VDialog v-model="deleteDialog" max-width="400">
+    <VDialog
+      v-model="deleteDialog"
+      max-width="400"
+    >
       <VCard :title="t('Delete Supplier')">
         <VCardText>{{ t('Are you sure you want to delete') }} <strong>{{ selectedItem?.name }}</strong>?</VCardText>
         <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn variant="tonal" color="default" @click="deleteDialog = false">{{ t('Cancel') }}</VBtn>
-          <VBtn color="error" :loading="deleting" @click="doDelete">{{ t('Delete') }}</VBtn>
+          <VBtn
+            variant="tonal"
+            color="default"
+            @click="deleteDialog = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            color="error"
+            :loading="deleting"
+            @click="doDelete"
+          >
+            {{ t('Delete') }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
 
-    <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">{{ snackbarMsg }}</VSnackbar>
+    <VSnackbar
+      v-model="snackbar"
+      :color="snackbarColor"
+      :timeout="3000"
+    >
+      {{ snackbarMsg }}
+    </VSnackbar>
   </div>
 </template>
 

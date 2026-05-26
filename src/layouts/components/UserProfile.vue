@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import axios from '@axios'
 import { initialAbility } from '@/plugins/casl/ability'
 import { useAppAbility } from '@/plugins/casl/useAppAbility'
 
@@ -8,26 +9,32 @@ const ability = useAppAbility()
 const userData = JSON.parse(localStorage.getItem('userData') || 'null')
 
 const userFullName = computed(() => {
-  if (!userData) return ''
+  if (!userData)
+    return ''
   if (userData.first_name || userData.last_name)
     return `${userData.first_name || ''} ${userData.last_name || ''}`.trim()
+
   return userData.fullName || userData.username || userData.email || ''
 })
 
 const userRole = computed(() => {
-  if (!userData) return ''
+  if (!userData)
+    return ''
+
   return userData.role || ''
 })
 
-const logout = () => {
+const logout = async () => {
+  // Best-effort backend logout; ignore failures (token might already be expired)
+  try { await axios.post('/auth-logout') }
+  catch { /* noop */ }
+
   localStorage.removeItem('userData')
   localStorage.removeItem('accessToken')
+  localStorage.removeItem('userAbilities')
+  ability.update(initialAbility)
 
   router.push('/login')
-    .then(() => {
-      localStorage.removeItem('userAbilities')
-      ability.update(initialAbility)
-    })
 }
 </script>
 

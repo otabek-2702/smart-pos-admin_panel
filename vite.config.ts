@@ -23,7 +23,7 @@ export default defineConfig({
       },
     }),
     Pages({
-      dirs: ['./src/pages']
+      dirs: ['./src/pages'],
     }),
     Layouts({
       layoutsDirs: './src/layouts/',
@@ -63,6 +63,15 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 5000,
+  },
+  server: {
+    port: 5181,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+    },
   },
   optimizeDeps: {
     exclude: ['vuetify'],

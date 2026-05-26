@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import axios from '@axios'
+import { stockApi as axios } from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -30,8 +30,10 @@ const headers = [
 ]
 
 function formatQty(val: any) {
-  if (val === null || val === undefined) return '0'
+  if (val === null || val === undefined)
+    return '0'
   const n = Number(val)
+
   return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '')
 }
 
@@ -39,12 +41,16 @@ async function loadLevels() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value) params.search = search.value
-    if (locationFilter.value) params.location_id = locationFilter.value
-    if (lowStockOnly.value) params.low_stock = true
+    if (search.value)
+      params.search = search.value
+    if (locationFilter.value)
+      params.location_id = locationFilter.value
+    if (lowStockOnly.value)
+      params.low_stock = true
 
     const res = await axios.get('/levels/', { params })
-    const d = res.data
+    const d = res.data?.data ?? res.data
+
     levels.value = d.levels ?? []
     total.value = d.pagination?.total_items ?? levels.value.length
   }
@@ -59,6 +65,7 @@ async function loadLevels() {
 async function loadLocations() {
   try {
     const res = await axios.get('/locations/', { params: { per_page: 200 } })
+
     locationsList.value = res.data.locations ?? []
   }
   catch { /* ignore */ }
@@ -71,8 +78,11 @@ watch([search, locationFilter, lowStockOnly], () => { page.value = 1; loadLevels
 const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.name, value: l.id })))
 
 function qtyColor(qty: number) {
-  if (qty <= 0) return 'error'
-  if (qty < 5) return 'warning'
+  if (qty <= 0)
+    return 'error'
+  if (qty < 5)
+    return 'warning'
+
   return 'success'
 }
 </script>
@@ -107,7 +117,13 @@ function qtyColor(qty: number) {
           class="flex-grow-0"
         />
         <VSpacer />
-        <VBtn variant="tonal" prepend-icon="bx-refresh" @click="loadLevels">{{ t('Refresh') }}</VBtn>
+        <VBtn
+          variant="tonal"
+          prepend-icon="bx-refresh"
+          @click="loadLevels"
+        >
+          {{ t('Refresh') }}
+        </VBtn>
       </VCardText>
 
       <VDataTableServer
@@ -126,16 +142,63 @@ function qtyColor(qty: number) {
           />
         </template>
 
-        <template v-if="loading && levels.length === 0" #body>
-          <tr v-for="n in itemsPerPage" :key="n" class="sk-row">
-            <td class="sk-cell"><div class="sk-box" style="width:130px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:70px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:100px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:60px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:50px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:60px;height:22px;border-radius:12px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:50px;height:13px;border-radius:4px;" /></td>
-            <td class="sk-cell"><div class="sk-box" style="width:90px;height:13px;border-radius:4px;" /></td>
+        <template
+          v-if="loading && levels.length === 0"
+          #body
+        >
+          <tr
+            v-for="n in itemsPerPage"
+            :key="n"
+            class="sk-row"
+          >
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:130px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:70px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:100px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:50px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:50px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:90px;height:13px;border-radius:4px;"
+              />
+            </td>
           </tr>
         </template>
 
@@ -149,7 +212,11 @@ function qtyColor(qty: number) {
           {{ item.raw.location?.name ?? '—' }}
         </template>
         <template #item.quantity="{ item }">
-          <VChip :color="qtyColor(item.raw.quantity)" size="small" variant="tonal">
+          <VChip
+            :color="qtyColor(item.raw.quantity)"
+            size="small"
+            variant="tonal"
+          >
             {{ formatQty(item.raw.quantity) }} {{ item.raw.stock_item?.unit ?? '' }}
           </VChip>
         </template>
@@ -170,7 +237,13 @@ function qtyColor(qty: number) {
       </VDataTableServer>
     </VCard>
 
-    <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">{{ snackbarMsg }}</VSnackbar>
+    <VSnackbar
+      v-model="snackbar"
+      :color="snackbarColor"
+      :timeout="3000"
+    >
+      {{ snackbarMsg }}
+    </VSnackbar>
   </div>
 </template>
 

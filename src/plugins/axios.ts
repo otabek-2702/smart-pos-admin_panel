@@ -60,6 +60,18 @@ function attachInterceptors(instance: ReturnType<typeof axios.create>) {
           window.location.href = '/login'
       }
 
+      // License kill switch — backend returns 503 with a `code` like
+      // `license_unregistered` / `license_suspended` / `license_expired` on
+      // EVERY business endpoint until /api/licensing/setup runs. Route the
+      // user to the setup wizard so they can recover without bouncing
+      // through "something went wrong" toasts on every page.
+      const code: string | undefined = error.response?.data?.code
+      if (error.response?.status === 503 && code && code.startsWith('license_')) {
+        const onLicensingPage = window.location.pathname.startsWith('/licensing')
+        if (!onLicensingPage)
+          window.location.href = '/licensing/setup'
+      }
+
       return Promise.reject(error)
     },
   )
@@ -76,5 +88,10 @@ export const hrApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api
 export const discountsApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/discounts` }))
 
 export const notificationsApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/notifications` }))
+
+// Licensing endpoints are allowlisted past the kill switch and don't
+// require auth. No Bearer token, no idempotency. Plain axios so the
+// 503 redirect doesn't loop while on the licensing pages themselves.
+export const licensingApi = axios.create({ baseURL: `${API_HOST}/api/licensing` })
 
 export default axiosIns

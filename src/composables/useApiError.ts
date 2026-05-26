@@ -29,6 +29,16 @@ const KNOWN_ERRORS: Record<string, string> = {
   'Expected JSON object': 'err_invalid_json',
 }
 
+// Stable `code` field — backend's licensing endpoints ship this. Prefer
+// matching by code (stable) over message (fragile) when available.
+const KNOWN_CODES: Record<string, string> = {
+  license_unregistered: 'err_license_unregistered',
+  license_suspended: 'err_license_suspended',
+  license_expired: 'err_license_expired',
+  license_grace: 'err_license_grace',
+  already_registered: 'err_license_already_registered',
+}
+
 const RATE_LIMIT_PATTERN = /Too many .* attempts.* (?:Try again in (\d+) (?:minutes?|seconds?))?/i
 
 export function useApiError() {
@@ -38,6 +48,17 @@ export function useApiError() {
    * Convert any axios error / message string into a localized message.
    */
   function translate(input: unknown): string {
+    // Code-first lookup — stable across backend wording changes.
+    const code = (typeof input === 'object' && input !== null)
+      ? ((input as AxiosError<any>)?.response?.data?.code)
+      : undefined
+
+    if (code) {
+      const codeKey = KNOWN_CODES[code]
+      if (codeKey && te(codeKey))
+        return t(codeKey)
+    }
+
     const msg = typeof input === 'string'
       ? input
       : (input as AxiosError<any>)?.response?.data?.message

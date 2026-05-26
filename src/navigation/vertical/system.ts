@@ -16,4 +16,11 @@ export default [
     action: 'manage',
     subject: 'all',
   },
+  {
+    title: 'License',
+    icon: { icon: 'bx-shield' },
+    to: 'licensing-status',
+    action: 'manage',
+    subject: 'all',
+  },
 ]

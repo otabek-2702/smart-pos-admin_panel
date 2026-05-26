@@ -1,39 +1,35 @@
 <script setup lang="ts">
-import { useGenerateImageVariant } from '@/@core/composable/useGenerateImageVariant'
-import girlWithLaptopDark from '@images/illustrations/girl-with-laptop-dark.png'
-import girlWithLaptopLight from '@images/illustrations/girl-with-laptop-light.png'
-
-const girlWithLaptop = useGenerateImageVariant(girlWithLaptopLight, girlWithLaptopDark)
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
-  <div class="misc-wrapper">
-    <ErrorHeader
-      error-title="You are not authorized! 🔐"
-      error-description="You don't have permission to access this page. Go Home!"
+  <div
+    class="d-flex flex-column align-center justify-center text-center"
+    style="min-block-size:100vh;"
+  >
+    <VIcon
+      icon="bx-lock-alt"
+      size="96"
+      color="error"
+      class="mb-4"
     />
-
-    <!-- 👉 Image -->
-    <div class="misc-avatar w-100 text-center">
-      <VImg
-        :src="girlWithLaptop"
-        alt="Coming Soon"
-        :max-width="500"
-        class="mx-auto"
-      />
-      <VBtn
-        to="/"
-        class="mt-10"
-      >
-        Back to Home
-      </VBtn>
+    <div class="text-h3 mb-2">
+      401
     </div>
+    <div class="text-h6 mb-1">
+      {{ t('You are not authorized') }}
+    </div>
+    <div class="text-body-2 text-disabled mb-6">
+      {{ t("You don't have permission to access this page.") }}
+    </div>
+    <VBtn
+      to="/"
+      prepend-icon="bx-home"
+    >
+      {{ t('Back to Home') }}
+    </VBtn>
   </div>
 </template>
-
-<style lang="scss">
-@use "@core/scss/template/pages/misc.scss";
-</style>
 
 <route lang="yaml">
 meta:

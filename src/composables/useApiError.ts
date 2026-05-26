@@ -22,7 +22,7 @@ const KNOWN_ERRORS: Record<string, string> = {
   'Token expired': 'err_token_expired',
   'Invalid token': 'err_invalid_token',
   'Missing token': 'err_auth_required',
-  "You don't have permission to perform this action": 'err_no_permission',
+  'You don\'t have permission to perform this action': 'err_no_permission',
   'Current password is incorrect': 'err_wrong_password',
   'Validation failed': 'err_validation',
   'Invalid JSON': 'err_invalid_json',
@@ -44,15 +44,18 @@ export function useApiError() {
         ?? (input as Error)?.message
         ?? ''
 
-    if (!msg) return t('Error')
+    if (!msg)
+      return t('Error')
 
     // Known literal lookup
     const key = KNOWN_ERRORS[msg]
-    if (key && te(key)) return t(key)
+    if (key && te(key))
+      return t(key)
 
     // Rate-limit messages have a variable timeout — translate template
     const match = msg.match(RATE_LIMIT_PATTERN)
-    if (match) return te('err_rate_limit') ? t('err_rate_limit') : msg
+    if (match)
+      return te('err_rate_limit') ? t('err_rate_limit') : msg
 
     return msg
   }

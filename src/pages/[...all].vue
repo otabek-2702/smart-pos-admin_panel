@@ -1,39 +1,35 @@
 <script setup lang="ts">
-import pageMiscErrorDark from '@images/pages/page-misc-error-dark.png'
-import pageMiscErrorLight from '@images/pages/page-misc-error-light.png'
-import { useGenerateImageVariant } from '@/@core/composable/useGenerateImageVariant'
-
-const pageMiscError = useGenerateImageVariant(pageMiscErrorLight, pageMiscErrorDark)
+const { t } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
-  <div class="misc-wrapper">
-    <ErrorHeader
-      error-title="Page Not Found ⚠️"
-      error-description="Oops! 😖 The requested URL was not found on this server."
+  <div
+    class="d-flex flex-column align-center justify-center text-center"
+    style="min-block-size:100vh;"
+  >
+    <VIcon
+      icon="bx-error-circle"
+      size="96"
+      color="primary"
+      class="mb-4"
     />
-
-    <!-- 👉 Image -->
-    <div class="misc-avatar w-100 text-center">
-      <VImg
-        :src="pageMiscError"
-        alt="Coming Soon"
-        :max-width="500"
-        class="mx-auto"
-      />
-      <VBtn
-        to="/"
-        class="mt-10"
-      >
-        Back to Home
-      </VBtn>
+    <div class="text-h3 mb-2">
+      404
     </div>
+    <div class="text-h6 mb-1">
+      {{ t('Page Not Found') }}
+    </div>
+    <div class="text-body-2 text-disabled mb-6">
+      {{ t('The page you requested does not exist.') }}
+    </div>
+    <VBtn
+      to="/"
+      prepend-icon="bx-home"
+    >
+      {{ t('Back to Home') }}
+    </VBtn>
   </div>
 </template>
-
-<style lang="scss">
-@use "@core/scss/template/pages/misc.scss";
-</style>
 
 <route lang="yaml">
 meta:

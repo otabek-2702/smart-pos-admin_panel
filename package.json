@@ -1,6 +1,7 @@
 {
-  "name": "sneat-vuetify-vuejs-admin-template",
-  "version": "1.0.1",
+  "name": "smart-pos-admin-panel",
+  "version": "0.1.0",
+  "description": "Vue 3 + Vuetify admin panel for the Smart POS / alpha_pos system",
   "private": true,
   "scripts": {
     "dev": "vite --port 5181",

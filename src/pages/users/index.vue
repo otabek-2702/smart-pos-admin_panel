@@ -83,6 +83,7 @@ async function loadStats() {
   try {
     const res = await axios.get('/employees/stats/')
     const d = res.data?.data ?? res.data
+
     stats.value = d?.stats ?? d
   }
   catch { /* ignore */ }

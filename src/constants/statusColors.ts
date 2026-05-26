@@ -3,7 +3,7 @@ export const ORDER_STATUS_COLOR: Record<string, string> = {
   PREPARING: 'warning',
   READY: 'success',
   COMPLETED: 'secondary',
-  CANCELLED: 'error',
+  CANCELED: 'error',
 }
 
 export const TRANSFER_STATUS_COLOR: Record<string, string> = {
@@ -12,7 +12,7 @@ export const TRANSFER_STATUS_COLOR: Record<string, string> = {
   APPROVED: 'primary',
   IN_TRANSIT: 'warning',
   RECEIVED: 'success',
-  CANCELLED: 'error',
+  CANCELED: 'error',
 }
 
 export const PURCHASE_ORDER_STATUS_COLOR: Record<string, string> = {
@@ -21,7 +21,7 @@ export const PURCHASE_ORDER_STATUS_COLOR: Record<string, string> = {
   CONFIRMED: 'primary',
   PARTIAL: 'warning',
   RECEIVED: 'success',
-  CANCELLED: 'error',
+  CANCELED: 'error',
 }
 
 export const PAYMENT_STATUS_COLOR: Record<string, string> = {
@@ -35,7 +35,7 @@ export const PRODUCTION_ORDER_STATUS_COLOR: Record<string, string> = {
   PLANNED: 'info',
   IN_PROGRESS: 'warning',
   COMPLETED: 'success',
-  CANCELLED: 'error',
+  CANCELED: 'error',
   ON_HOLD: 'secondary',
 }
 
@@ -51,7 +51,7 @@ export const COUNT_STATUS_COLOR: Record<string, string> = {
   IN_PROGRESS: 'warning',
   PENDING_APPROVAL: 'info',
   APPROVED: 'success',
-  CANCELLED: 'error',
+  CANCELED: 'error',
 }
 
 export const ROLE_COLOR: Record<string, string> = {

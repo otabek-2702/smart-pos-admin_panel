@@ -1,4 +1,4 @@
-export type OrderStatus = 'OPEN' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED'
+export type OrderStatus = 'OPEN' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELED'
 
 export interface OrderItem {
   id: number

@@ -32,7 +32,7 @@ const form = ref({
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatDateShort } = useFormatters()
 
-const statuses = ['DRAFT', 'REQUESTED', 'APPROVED', 'IN_TRANSIT', 'RECEIVED', 'CANCELLED']
+const statuses = ['DRAFT', 'REQUESTED', 'APPROVED', 'IN_TRANSIT', 'RECEIVED', 'CANCELED']
 const transferTypes = ['INTERNAL', 'BRANCH_TO_BRANCH']
 
 const headers = [
@@ -154,7 +154,7 @@ function canRequest(item: any) { return item.status === 'DRAFT' }
 function canApprove(item: any) { return item.status === 'REQUESTED' }
 function canShip(item: any) { return item.status === 'APPROVED' }
 function canReceive(item: any) { return item.status === 'IN_TRANSIT' }
-function canCancel(item: any) { return !['RECEIVED', 'CANCELLED'].includes(item.status) }
+function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.status) }
 </script>
 
 <template>

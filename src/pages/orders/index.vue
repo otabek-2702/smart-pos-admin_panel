@@ -26,7 +26,7 @@ const debouncedSearch = useDebounceFn(() => {
   loadOrders()
 }, 400)
 
-const orderStatuses = ['OPEN', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED']
+const orderStatuses = ['OPEN', 'PREPARING', 'READY', 'COMPLETED', 'CANCELED']
 const paymentStatuses = ['PAID', 'UNPAID']
 
 const headers = [
@@ -115,6 +115,31 @@ async function cancelOrder(order: any) {
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error cancelling order'), 'error')
+  }
+}
+
+async function exportOneC() {
+  if (!dateFrom.value || !dateTo.value) {
+    notify(t('Pick a date range to export'), 'error')
+    return
+  }
+  try {
+    const res = await axios.get('/exports/1c', {
+      params: { from: dateFrom.value, to: dateTo.value },
+      responseType: 'blob',
+    })
+
+    const url = URL.createObjectURL(new Blob([res.data], { type: 'application/xml' }))
+    const a = document.createElement('a')
+
+    a.href = url
+    a.download = `orders-${dateFrom.value}-to-${dateTo.value}.xml`
+    a.click()
+    URL.revokeObjectURL(url)
+    notify(t('Export downloaded'))
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Export failed'), 'error')
   }
 }
 </script>
@@ -306,6 +331,16 @@ async function cancelOrder(order: any) {
           style="min-inline-size: 150px; max-inline-size: 170px;"
           clearable
         />
+        <VSpacer />
+        <VBtn
+          variant="tonal"
+          color="info"
+          prepend-icon="bx-export"
+          :disabled="!dateFrom || !dateTo"
+          @click="exportOneC"
+        >
+          {{ t('Export to 1C') }}
+        </VBtn>
       </VCardText>
 
       <VDataTableServer
@@ -457,7 +492,7 @@ async function cancelOrder(order: any) {
             style="gap:2px;"
           >
             <VBtn
-              v-if="!item.raw.is_paid && item.raw.status !== 'CANCELLED'"
+              v-if="!item.raw.is_paid && item.raw.status !== 'CANCELED'"
               icon
               variant="text"
               size="small"
@@ -476,7 +511,7 @@ async function cancelOrder(order: any) {
               </VTooltip>
             </VBtn>
             <VBtn
-              v-if="item.raw.status !== 'CANCELLED' && item.raw.status !== 'COMPLETED'"
+              v-if="item.raw.status !== 'CANCELED' && item.raw.status !== 'COMPLETED'"
               icon
               variant="text"
               size="small"

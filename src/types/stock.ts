@@ -174,7 +174,7 @@ export interface RecipesListResponse {
 }
 
 // ── Transfer ──
-export type TransferStatus = 'DRAFT' | 'REQUESTED' | 'APPROVED' | 'IN_TRANSIT' | 'RECEIVED' | 'CANCELLED'
+export type TransferStatus = 'DRAFT' | 'REQUESTED' | 'APPROVED' | 'IN_TRANSIT' | 'RECEIVED' | 'CANCELED'
 
 export interface TransferLineItem {
   stock_item_id: number
@@ -227,7 +227,7 @@ export interface TransactionsListResponse {
 }
 
 // ── Purchase Order ──
-export type PurchaseOrderStatus = 'DRAFT' | 'SENT' | 'CONFIRMED' | 'PARTIAL' | 'RECEIVED' | 'CANCELLED'
+export type PurchaseOrderStatus = 'DRAFT' | 'SENT' | 'CONFIRMED' | 'PARTIAL' | 'RECEIVED' | 'CANCELED'
 export type PaymentStatus = 'UNPAID' | 'PARTIAL' | 'PAID'
 
 export interface PurchaseOrderItem {
@@ -262,7 +262,7 @@ export interface PurchaseOrdersListResponse {
 }
 
 // ── Production Order ──
-export type ProductionOrderStatus = 'DRAFT' | 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'ON_HOLD'
+export type ProductionOrderStatus = 'DRAFT' | 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELED' | 'ON_HOLD'
 export type ProductionPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'
 
 export interface ProductionOrder {
@@ -291,7 +291,7 @@ export interface ProductionOrdersListResponse {
 
 // ── Stock Count ──
 export type CountType = 'FULL' | 'PARTIAL' | 'CYCLE' | 'SPOT'
-export type CountStatus = 'DRAFT' | 'IN_PROGRESS' | 'PENDING_APPROVAL' | 'APPROVED' | 'CANCELLED'
+export type CountStatus = 'DRAFT' | 'IN_PROGRESS' | 'PENDING_APPROVAL' | 'APPROVED' | 'CANCELED'
 
 export interface StockCount {
   id: number

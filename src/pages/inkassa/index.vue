@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { hrApi as axios } from '@/plugins/axios'
+import axios from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -7,6 +7,7 @@ const { formatCurrency, formatDate } = useFormatters()
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 
 const balance = ref<any>(null)
+const stats = ref<any>(null)
 const loading = ref(true)
 
 const historyItems = ref<any[]>([])
@@ -15,29 +16,30 @@ const historyLoading = ref(false)
 const historyPage = ref(1)
 const historyPerPage = ref(10)
 
-// Action dialog (deposit / withdraw)
-const actionDialog = ref(false)
-const actionLoading = ref(false)
-const actionMode = ref<'deposit' | 'withdraw'>('deposit')
-const actionAmount = ref<number | null>(null)
-const actionNotes = ref('')
+const performDialog = ref(false)
+const performLoading = ref(false)
+const performAmount = ref<number | null>(null)
+const performNotes = ref('')
 
 const historyHeaders = [
   { title: t('Date'), key: 'created_at', sortable: false },
-  { title: t('Type'), key: 'transaction_type', sortable: false },
+  { title: t('Cashier'), key: 'cashier', sortable: false },
   { title: t('Amount'), key: 'amount', sortable: false },
-  { title: t('Notes'), key: 'description', sortable: false },
+  { title: t('Notes'), key: 'notes', sortable: false },
 ]
 
 async function loadBalance() {
   loading.value = true
   try {
-    const res = await axios.get('/cash/balance/')
+    const [bal, st] = await Promise.allSettled([
+      axios.get('/inkassa/balance'),
+      axios.get('/inkassa/stats'),
+    ])
 
-    balance.value = res.data?.data ?? res.data
-  }
-  catch {
-    /* tolerate missing endpoint */
+    if (bal.status === 'fulfilled')
+      balance.value = bal.value.data?.data ?? bal.value.data
+    if (st.status === 'fulfilled')
+      stats.value = (st.value.data?.data ?? st.value.data)?.stats ?? null
   }
   finally {
     loading.value = false
@@ -47,12 +49,11 @@ async function loadBalance() {
 async function loadHistory() {
   historyLoading.value = true
   try {
-    const params: any = { page: historyPage.value, per_page: historyPerPage.value }
-    const res = await axios.get('/cash/', { params })
+    const res = await axios.get('/inkassa/history', { params: { page: historyPage.value, per_page: historyPerPage.value } })
     const d = res.data?.data ?? res.data
 
-    historyItems.value = d.transactions ?? d.items ?? []
-    historyTotal.value = d.pagination?.total_items ?? d.pagination?.total ?? historyItems.value.length
+    historyItems.value = d?.inkassas ?? []
+    historyTotal.value = d?.pagination?.total_inkassas ?? d?.pagination?.total ?? historyItems.value.length
   }
   catch {
     notify(t('Failed to load history'), 'error')
@@ -62,27 +63,25 @@ async function loadHistory() {
   }
 }
 
-function openDialog(mode: 'deposit' | 'withdraw') {
-  actionMode.value = mode
-  actionAmount.value = null
-  actionNotes.value = ''
-  actionDialog.value = true
+function openPerform() {
+  performAmount.value = null
+  performNotes.value = ''
+  performDialog.value = true
 }
 
-async function submitAction() {
-  if (!actionAmount.value || actionAmount.value <= 0) {
+async function performInkassa() {
+  if (!performAmount.value || performAmount.value <= 0) {
     notify(t('Amount is required'), 'error')
-
     return
   }
-  actionLoading.value = true
+  performLoading.value = true
   try {
-    await axios.post(`/cash/${actionMode.value}/`, {
-      amount: actionAmount.value,
-      description: actionNotes.value,
+    await axios.post('/inkassa/perform', {
+      amount: performAmount.value,
+      notes: performNotes.value,
     })
-    notify(t(actionMode.value === 'deposit' ? 'Deposit successful' : 'Withdraw successful'))
-    actionDialog.value = false
+    notify(t('Inkassa performed successfully'))
+    performDialog.value = false
     loadBalance()
     loadHistory()
   }
@@ -90,7 +89,7 @@ async function submitAction() {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
   }
   finally {
-    actionLoading.value = false
+    performLoading.value = false
   }
 }
 
@@ -103,7 +102,8 @@ watch([historyPage, historyPerPage], loadHistory)
     <VRow class="mb-4">
       <VCol
         cols="12"
-        sm="4"
+        sm="6"
+        lg="4"
       >
         <VCard>
           <VCardText class="d-flex align-center gap-4">
@@ -123,7 +123,7 @@ watch([historyPage, historyPerPage], loadHistory)
                 v-if="balance"
                 class="text-h5 font-weight-bold"
               >
-                {{ formatCurrency(balance.current_balance ?? balance.balance ?? 0) }}
+                {{ formatCurrency(balance.balance ?? 0) }}
               </div>
               <div
                 v-else
@@ -140,7 +140,46 @@ watch([historyPage, historyPerPage], loadHistory)
 
       <VCol
         cols="12"
-        sm="4"
+        sm="6"
+        lg="4"
+      >
+        <VCard>
+          <VCardText class="d-flex align-center gap-4">
+            <VAvatar
+              color="primary"
+              variant="tonal"
+              size="56"
+              rounded
+            >
+              <VIcon
+                icon="bx-trending-up"
+                size="32"
+              />
+            </VAvatar>
+            <div>
+              <div
+                v-if="stats"
+                class="text-h5 font-weight-bold"
+              >
+                {{ formatCurrency(stats.today?.total_revenue ?? 0) }}
+              </div>
+              <div
+                v-else
+                class="sk-box mb-1"
+                style="width:120px;height:24px;border-radius:4px;"
+              />
+              <div class="text-body-2 text-disabled">
+                {{ t("Today's Revenue") }}
+              </div>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+
+      <VCol
+        cols="12"
+        sm="6"
+        lg="4"
       >
         <VCard>
           <VCardText class="d-flex align-center gap-4">
@@ -151,62 +190,62 @@ watch([historyPage, historyPerPage], loadHistory)
               rounded
             >
               <VIcon
-                icon="bx-down-arrow-circle"
+                icon="bx-receipt"
                 size="32"
               />
             </VAvatar>
             <div>
               <div
-                v-if="balance"
+                v-if="stats"
                 class="text-h5 font-weight-bold"
               >
-                {{ formatCurrency(balance.totals_by_type?.DEPOSIT ?? balance.total_deposits ?? 0) }}
+                {{ stats.today?.order_count ?? 0 }}
               </div>
               <div
                 v-else
                 class="sk-box mb-1"
-                style="width:120px;height:24px;border-radius:4px;"
+                style="width:60px;height:24px;border-radius:4px;"
               />
               <div class="text-body-2 text-disabled">
-                {{ t('Total Deposits') }}
+                {{ t("Today's Orders") }}
               </div>
             </div>
           </VCardText>
         </VCard>
       </VCol>
+    </VRow>
 
-      <VCol
-        cols="12"
-        sm="4"
-      >
-        <VCard>
-          <VCardText class="d-flex align-center gap-4">
-            <VAvatar
-              color="warning"
-              variant="tonal"
-              size="56"
-              rounded
+    <VRow
+      v-if="stats?.cashier_performance?.length"
+      class="mb-4"
+    >
+      <VCol cols="12">
+        <VCard :title="t('Cashier Performance (today)')">
+          <VCardText>
+            <div
+              v-for="c in stats.cashier_performance"
+              :key="c.cashier_id"
+              class="d-flex align-center justify-space-between py-2"
+              style="border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);"
             >
-              <VIcon
-                icon="bx-up-arrow-circle"
-                size="32"
-              />
-            </VAvatar>
-            <div>
-              <div
-                v-if="balance"
-                class="text-h5 font-weight-bold"
-              >
-                {{ formatCurrency(balance.totals_by_type?.WITHDRAW ?? balance.total_withdrawals ?? 0) }}
+              <div class="d-flex align-center gap-2">
+                <VAvatar
+                  size="28"
+                  color="primary"
+                  variant="tonal"
+                >
+                  <span class="text-caption">{{ (c.cashier_name ?? '?')[0] }}</span>
+                </VAvatar>
+                <div>
+                  <div class="text-body-2 font-weight-medium">
+                    {{ c.cashier_name }}
+                  </div>
+                  <div class="text-caption text-disabled">
+                    {{ c.order_count }} {{ t('Orders').toLowerCase() }}
+                  </div>
+                </div>
               </div>
-              <div
-                v-else
-                class="sk-box mb-1"
-                style="width:120px;height:24px;border-radius:4px;"
-              />
-              <div class="text-body-2 text-disabled">
-                {{ t('Total Withdrawals') }}
-              </div>
+              <span class="text-body-2 font-weight-medium text-success">{{ formatCurrency(c.total_revenue) }}</span>
             </div>
           </VCardText>
         </VCard>
@@ -215,21 +254,14 @@ watch([historyPage, historyPerPage], loadHistory)
 
     <VCard>
       <VCardText class="d-flex flex-wrap gap-3 align-center">
-        <span class="text-h6">{{ t('Cash History') }}</span>
+        <span class="text-h6">{{ t('Inkassa History') }}</span>
         <VSpacer />
         <VBtn
-          color="success"
+          color="primary"
           prepend-icon="bx-plus"
-          @click="openDialog('deposit')"
+          @click="openPerform"
         >
-          {{ t('Deposit') }}
-        </VBtn>
-        <VBtn
-          color="warning"
-          prepend-icon="bx-minus"
-          @click="openDialog('withdraw')"
-        >
-          {{ t('Withdraw') }}
+          {{ t('Perform Inkassa') }}
         </VBtn>
         <VBtn
           variant="tonal"
@@ -274,7 +306,7 @@ watch([historyPage, historyPerPage], loadHistory)
             <td class="sk-cell">
               <div
                 class="sk-box"
-                style="width:80px;height:22px;border-radius:12px;"
+                style="width:120px;height:13px;border-radius:4px;"
               />
             </td>
             <td class="sk-cell">
@@ -293,42 +325,36 @@ watch([historyPage, historyPerPage], loadHistory)
         </template>
 
         <template #item.created_at="{ item }">
-          <span class="text-body-2">{{ formatDate(item.raw.created_at) }}</span>
+          {{ formatDate(item.raw.created_at) }}
         </template>
-        <template #item.transaction_type="{ item }">
-          <VChip
-            size="small"
-            :color="item.raw.transaction_type === 'DEPOSIT' || item.raw.amount > 0 ? 'success' : 'warning'"
-            variant="tonal"
-          >
-            {{ item.raw.transaction_type ?? (item.raw.amount > 0 ? 'DEPOSIT' : 'WITHDRAW') }}
-          </VChip>
+        <template #item.cashier="{ item }">
+          {{ item.raw.cashier?.name ?? item.raw.cashier_name ?? '—' }}
         </template>
         <template #item.amount="{ item }">
-          <span class="font-weight-medium">{{ formatCurrency(Math.abs(item.raw.amount)) }}</span>
+          <span class="font-weight-medium">{{ formatCurrency(item.raw.amount) }}</span>
         </template>
-        <template #item.description="{ item }">
-          <span class="text-body-2 text-disabled">{{ item.raw.description || item.raw.notes || '—' }}</span>
+        <template #item.notes="{ item }">
+          <span class="text-body-2 text-disabled">{{ item.raw.notes || '—' }}</span>
         </template>
       </VDataTableServer>
     </VCard>
 
     <VDialog
-      v-model="actionDialog"
+      v-model="performDialog"
       max-width="480"
       persistent
     >
-      <VCard :title="actionMode === 'deposit' ? t('Deposit') : t('Withdraw')">
+      <VCard :title="t('Perform Inkassa')">
         <VCardText>
           <VTextField
-            v-model.number="actionAmount"
+            v-model.number="performAmount"
             :label="t('Amount')"
             type="number"
             class="mb-4"
             autofocus
           />
           <VTextarea
-            v-model="actionNotes"
+            v-model="performNotes"
             :label="t('Notes')"
             rows="3"
           />
@@ -337,14 +363,14 @@ watch([historyPage, historyPerPage], loadHistory)
           <VSpacer />
           <VBtn
             variant="text"
-            @click="actionDialog = false"
+            @click="performDialog = false"
           >
             {{ t('Cancel') }}
           </VBtn>
           <VBtn
-            :color="actionMode === 'deposit' ? 'success' : 'warning'"
-            :loading="actionLoading"
-            @click="submitAction"
+            color="primary"
+            :loading="performLoading"
+            @click="performInkassa"
           >
             {{ t('Confirm') }}
           </VBtn>

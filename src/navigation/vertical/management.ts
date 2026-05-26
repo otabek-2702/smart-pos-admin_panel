@@ -3,6 +3,13 @@ export default [
     heading: 'Management',
   },
   {
+    title: 'Users',
+    icon: { icon: 'bx-group' },
+    to: 'users',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
     title: 'Categories',
     icon: { icon: 'bx-category' },
     to: 'categories',

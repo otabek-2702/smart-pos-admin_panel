@@ -39,6 +39,37 @@ const reconcileShift = ref<any>(null)
 const reconcileCash = ref<number | null>(null)
 const reconcileNotes = ref('')
 
+// Shift performance scorecard dialog
+const perfDialog = ref(false)
+const perfLoading = ref(false)
+const perfData = ref<any>(null)
+
+async function showPerformance(shift: any) {
+  perfDialog.value = true
+  perfLoading.value = true
+  perfData.value = null
+  try {
+    const res = await axios.get(`/analytics/shifts/${shift.id}`)
+
+    perfData.value = res.data?.data ?? res.data
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Failed to load'), 'error')
+    perfDialog.value = false
+  }
+  finally {
+    perfLoading.value = false
+  }
+}
+
+function formatPrep(seconds: number | null) {
+  if (!seconds)
+    return '—'
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}m ${s}s`
+}
+
 const headers = [
   { title: '#', key: 'id', sortable: false, width: '60px' },
   { title: t('User'), key: 'user', sortable: false },
@@ -370,15 +401,35 @@ async function deleteTpl(tpl: any) {
               {{ formatCurrency(item.raw.expected_cash ?? 0) }}
             </template>
             <template #item.actions="{ item }">
-              <VBtn
-                v-if="item.raw.status === 'ENDED'"
-                size="small"
-                variant="tonal"
-                color="info"
-                @click="openReconcile(item.raw)"
-              >
-                {{ t('Reconcile') }}
-              </VBtn>
+              <div class="d-flex justify-end gap-1">
+                <VBtn
+                  icon
+                  variant="text"
+                  size="small"
+                  color="primary"
+                  @click="showPerformance(item.raw)"
+                >
+                  <VIcon
+                    icon="bx-line-chart"
+                    size="18"
+                  />
+                  <VTooltip
+                    activator="parent"
+                    location="top"
+                  >
+                    {{ t('Performance') }}
+                  </VTooltip>
+                </VBtn>
+                <VBtn
+                  v-if="item.raw.status === 'ENDED'"
+                  size="small"
+                  variant="tonal"
+                  color="info"
+                  @click="openReconcile(item.raw)"
+                >
+                  {{ t('Reconcile') }}
+                </VBtn>
+              </div>
             </template>
           </VDataTableServer>
         </VWindowItem>
@@ -552,6 +603,149 @@ async function deleteTpl(tpl: any) {
             @click="saveTpl"
           >
             {{ t('Save') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Shift performance scorecard -->
+    <VDialog
+      v-model="perfDialog"
+      max-width="720"
+      scrollable
+    >
+      <VCard :title="t('Shift Performance')">
+        <VCardText>
+          <div v-if="perfLoading">
+            <div
+              v-for="n in 4"
+              :key="n"
+              class="sk-box mb-3"
+              style="width:100%;height:60px;border-radius:8px;"
+            />
+          </div>
+          <template v-else-if="perfData">
+            <div class="d-flex align-center gap-3 mb-4">
+              <VAvatar
+                size="48"
+                color="primary"
+                variant="tonal"
+              >
+                <VIcon icon="bx-user" />
+              </VAvatar>
+              <div>
+                <div class="text-h6 font-weight-bold">
+                  {{ perfData.user_name }}
+                </div>
+                <div class="text-caption text-disabled">
+                  {{ perfData.status }} · {{ perfData.duration_minutes }} {{ t('min') }}
+                </div>
+              </div>
+            </div>
+
+            <VRow>
+              <VCol
+                cols="6"
+                sm="3"
+              >
+                <VCard
+                  variant="tonal"
+                  color="success"
+                >
+                  <VCardText class="text-center pa-2">
+                    <div class="text-h6 font-weight-bold">
+                      {{ formatCurrency(perfData.revenue) }}
+                    </div>
+                    <div class="text-caption">
+                      {{ t('Revenue') }}
+                    </div>
+                  </VCardText>
+                </VCard>
+              </VCol>
+              <VCol
+                cols="6"
+                sm="3"
+              >
+                <VCard
+                  variant="tonal"
+                  color="primary"
+                >
+                  <VCardText class="text-center pa-2">
+                    <div class="text-h6 font-weight-bold">
+                      {{ perfData.orders_total }}
+                    </div>
+                    <div class="text-caption">
+                      {{ t('Orders') }}
+                    </div>
+                  </VCardText>
+                </VCard>
+              </VCol>
+              <VCol
+                cols="6"
+                sm="3"
+              >
+                <VCard
+                  variant="tonal"
+                  color="info"
+                >
+                  <VCardText class="text-center pa-2">
+                    <div class="text-h6 font-weight-bold">
+                      {{ perfData.orders_per_hour }}
+                    </div>
+                    <div class="text-caption">
+                      {{ t('Orders/hour') }}
+                    </div>
+                  </VCardText>
+                </VCard>
+              </VCol>
+              <VCol
+                cols="6"
+                sm="3"
+              >
+                <VCard
+                  variant="tonal"
+                  :color="perfData.cancel_rate_pct > 10 ? 'error' : 'default'"
+                >
+                  <VCardText class="text-center pa-2">
+                    <div class="text-h6 font-weight-bold">
+                      {{ perfData.cancel_rate_pct }}%
+                    </div>
+                    <div class="text-caption">
+                      {{ t('Cancel rate') }}
+                    </div>
+                  </VCardText>
+                </VCard>
+              </VCol>
+            </VRow>
+
+            <VDivider class="my-4" />
+
+            <div class="d-flex justify-space-between py-1">
+              <span class="text-body-2 text-disabled">{{ t('Completed') }}</span>
+              <span class="font-weight-medium">{{ perfData.orders_completed }}</span>
+            </div>
+            <div class="d-flex justify-space-between py-1">
+              <span class="text-body-2 text-disabled">{{ t('Cancelled') }}</span>
+              <span class="font-weight-medium">{{ perfData.orders_cancelled }}</span>
+            </div>
+            <div class="d-flex justify-space-between py-1">
+              <span class="text-body-2 text-disabled">{{ t('Paid') }}</span>
+              <span class="font-weight-medium">{{ perfData.orders_paid }}</span>
+            </div>
+            <div class="d-flex justify-space-between py-1">
+              <span class="text-body-2 text-disabled">{{ t('Avg Prep Time') }}</span>
+              <span class="font-weight-medium">{{ formatPrep(perfData.avg_prep_seconds) }}</span>
+            </div>
+            <div class="d-flex justify-space-between py-1">
+              <span class="text-body-2 text-disabled">{{ t('Revenue/hour') }}</span>
+              <span class="font-weight-medium">{{ formatCurrency(perfData.revenue_per_hour) }}</span>
+            </div>
+          </template>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn @click="perfDialog = false">
+            {{ t('Close') }}
           </VBtn>
         </VCardActions>
       </VCard>

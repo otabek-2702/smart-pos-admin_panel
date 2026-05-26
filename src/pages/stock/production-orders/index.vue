@@ -34,7 +34,7 @@ const form = ref({
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatDateShort } = useFormatters()
 
-const statuses = ['DRAFT', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ON_HOLD']
+const statuses = ['DRAFT', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELED', 'ON_HOLD']
 const priorities = ['LOW', 'NORMAL', 'HIGH', 'URGENT']
 
 const headers = [
@@ -143,7 +143,7 @@ function canStart(item: any) { return item.status === 'PLANNED' }
 function canComplete(item: any) { return item.status === 'IN_PROGRESS' }
 function canHold(item: any) { return item.status === 'IN_PROGRESS' }
 function canResume(item: any) { return item.status === 'ON_HOLD' }
-function canCancel(item: any) { return !['COMPLETED', 'CANCELLED'].includes(item.status) }
+function canCancel(item: any) { return !['COMPLETED', 'CANCELED'].includes(item.status) }
 </script>
 
 <template>

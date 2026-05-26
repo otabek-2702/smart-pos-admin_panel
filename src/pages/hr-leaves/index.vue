@@ -27,7 +27,7 @@ const statusColor: Record<string, string> = {
   PENDING: 'warning',
   APPROVED: 'success',
   REJECTED: 'error',
-  CANCELLED: 'default',
+  CANCELED: 'default',
 }
 
 async function load() {
@@ -87,7 +87,7 @@ async function reject(l: any) {
         <VSpacer />
         <VSelect
           v-model="statusFilter"
-          :items="['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']"
+          :items="['PENDING', 'APPROVED', 'REJECTED', 'CANCELED']"
           :placeholder="t('Status')"
           density="compact"
           style="min-inline-size:160px;"

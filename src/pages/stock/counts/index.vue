@@ -28,7 +28,7 @@ const form = ref({
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatDateShort } = useFormatters()
 
-const statuses = ['DRAFT', 'IN_PROGRESS', 'PENDING_APPROVAL', 'APPROVED', 'CANCELLED']
+const statuses = ['DRAFT', 'IN_PROGRESS', 'PENDING_APPROVAL', 'APPROVED', 'CANCELED']
 const countTypes = ['FULL', 'PARTIAL', 'CYCLE', 'SPOT']
 
 const headers = [
@@ -110,7 +110,7 @@ const { actionDialog, actionItem, actionType, actioning, openAction, doAction } 
 function canStart(item: any) { return item.status === 'DRAFT' }
 function canComplete(item: any) { return item.status === 'IN_PROGRESS' }
 function canApprove(item: any) { return item.status === 'PENDING_APPROVAL' }
-function canCancel(item: any) { return !['APPROVED', 'CANCELLED'].includes(item.status) }
+function canCancel(item: any) { return !['APPROVED', 'CANCELED'].includes(item.status) }
 </script>
 
 <template>

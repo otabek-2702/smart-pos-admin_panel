@@ -26,7 +26,7 @@ const { t } = useI18n({ useScope: 'global' })
           <div>
             <div class="text-subtitle-1 font-weight-bold lh-1 mb-1">
               <template v-if="stats">
-                {{ stats.total ?? stats.total_employees ?? stats.total_users ?? '—' }}
+                {{ stats.total_users ?? stats.total ?? stats.total_employees ?? '—' }}
               </template>
               <span
                 v-else
@@ -62,7 +62,7 @@ const { t } = useI18n({ useScope: 'global' })
           <div>
             <div class="text-subtitle-1 font-weight-bold lh-1 mb-1">
               <template v-if="stats">
-                {{ stats.active ?? stats.active_employees ?? stats.active_users ?? '—' }}
+                {{ stats.active_users ?? stats.active ?? stats.active_employees ?? '—' }}
               </template>
               <span
                 v-else

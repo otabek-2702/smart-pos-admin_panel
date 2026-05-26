@@ -35,7 +35,7 @@ const form = ref({
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDateShort } = useFormatters()
 
-const statuses = ['DRAFT', 'SENT', 'CONFIRMED', 'PARTIAL', 'RECEIVED', 'CANCELLED']
+const statuses = ['DRAFT', 'SENT', 'CONFIRMED', 'PARTIAL', 'RECEIVED', 'CANCELED']
 const paymentStatuses = ['UNPAID', 'PARTIAL', 'PAID']
 
 const headers = [
@@ -142,7 +142,7 @@ const { actionDialog, actionItem, actionType, actioning, openAction, doAction } 
 function canSend(item: any) { return item.status === 'DRAFT' }
 function canConfirm(item: any) { return item.status === 'SENT' }
 function canReceive(item: any) { return ['CONFIRMED', 'PARTIAL'].includes(item.status) }
-function canCancel(item: any) { return !['RECEIVED', 'CANCELLED'].includes(item.status) }
+function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.status) }
 </script>
 
 <template>

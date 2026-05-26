@@ -3,13 +3,6 @@ export default [
     heading: 'HR',
   },
   {
-    title: 'Employees',
-    icon: { icon: 'bx-group' },
-    to: 'users',
-    action: 'manage',
-    subject: 'all',
-  },
-  {
     title: 'Departments',
     icon: { icon: 'bx-buildings' },
     to: 'hr-departments',

@@ -1,314 +1,149 @@
 # Smart POS admin — review answers
 
 **Owner:** Otabek
-**Date completed:** 2026-04-30
-**Branch reviewed:** `main` @ `f1e7ebf` (post-migration + Q0/Q9 cleanup)
+**Last refreshed:** 2026-05-17
+**Branch reviewed:** `main` (post backend-sync + loyalty + idempotency)
 
-> Important context the questionnaire predates: the backend was rewritten and
-> renamed `alpha_pos`. The panel was migrated 2026-04-29. All URL references
-> in the questionnaire (e.g. `/admins-api/login`) are out of date — the new
-> mount is `/api/admins/` and login is `/api/admins/auth-login`. See
-> `docs/BACKEND_FEEDBACK.md` and `docs/FRONTEND_TODO.md` for the full audit.
-
----
-
-## Q0 — Documentation
-
-**Status: ✅ Done** (commit `f1e7ebf`).
-
-- `README.md` rewritten as a Smart POS overview: stack, dev/build/lint commands, dev port (5181), Vite proxy & `VITE_API_HOST` env var, login credentials for local dev, architecture summary, path aliases, docs links.
-- `package.json`: name → `smart-pos-admin-panel`, version → `0.1.0`, description added.
-- `docs/BACKEND_FEEDBACK.md`, `docs/FRONTEND_TODO.md`, `docs/review-answers.md` moved under `docs/` and linked from README.
-- Footer in `src/layouts/components/Footer.vue` no longer shows ThemeSelection / License / Documentation links — replaced with a simple `© Smart POS`.
-
-**Still on the followup list:** add `.env.example` documenting `VITE_API_HOST` and any future env variables (tracked under Q1 since it's the same surface).
+> The questionnaire predates a complete backend rewrite + 30+ feature
+> commits. This document is the live status — most of what was open
+> on 2026-04-30 has shipped. Open items at the bottom under
+> "Remaining work".
 
 ---
 
-## Q1 — Backend URL & environment
+## Q0 — Documentation ✅
 
-**Status: ✅ Done.** Current `src/plugins/axios.ts`:
+- README rewritten as Smart POS overview (commands, env vars, architecture, path aliases).
+- `package.json` renamed to `smart-pos-admin-panel @ 0.1.0`.
+- `docs/` folder contains BACKEND_FEEDBACK, FRONTEND_TODO, and this file.
+- Footer no longer shows ThemeSelection / Sneat branding.
 
-```ts
-const API_HOST = import.meta.env.VITE_API_HOST ?? ''
-const axiosIns = axios.create({ baseURL: `${API_HOST}/api/admins` })
-export const stockApi          = ... `${API_HOST}/api/admins/stock`
-export const hrApi             = ... `${API_HOST}/api/admins/hr`
-export const discountsApi      = ... `${API_HOST}/api/admins/discounts`
-export const notificationsApi  = ... `${API_HOST}/api/admins/notifications`
-```
+## Q1 — Backend URL & environment ✅
 
-In dev, `VITE_API_HOST` is unset so requests are relative-path; `vite.config.ts → server.proxy` forwards `/api → http://127.0.0.1:8000`. This means **no CORS in dev** without changing the backend.
+- `src/plugins/axios.ts` uses `import.meta.env.VITE_API_HOST` (empty in dev).
+- Dev: Vite proxy forwards `/api/*` to `:8000` (no CORS issue).
+- Prod: set `VITE_API_HOST` env var per deployment.
+- `.env.example` checked in.
+- Five axios instances exported: default (admin), `stockApi`, `hrApi`, `discountsApi`, `notificationsApi`. All share the same Bearer interceptor.
+- Idempotency-Key auto-attached on `/orders` (POST), `/orders/{id}/pay`, `/orders/{id}/cancel`, `/inkassa/perform`, `/loyalty/accounts/{phone}/redeem/` — backend dedupes retries via `@idempotent`.
 
-- `.env.example` shipped at the repo root.
-- README documents the dev proxy + `VITE_API_HOST` per-environment story.
-- CI build step (`.github/workflows/ci.yml`) sets `VITE_API_HOST=''` so the artifact uses relative paths (works for same-origin deploys); staging/prod CI jobs will override when Q12 lands.
+## Q2 — Authentication & session ✅
 
----
+- `POST /api/admins/auth-login` → opaque session key, stored in localStorage as Bearer token.
+- Logout calls `POST /auth-logout` before clearing local state.
+- 401 → wipe localStorage + redirect to `/login`.
+- LocalStorage token is acceptable for an internal admin tool. Moving to httpOnly cookie is post-release follow-up if customer-facing PWA is ever required.
 
-## Q2 — Authentication & session
+## Q3 — Access control (CASL) ✅
 
-**Implemented (current state):**
-- `POST /api/admins/auth-login` returns `{ data: { token, user: { id, email, first_name, last_name, role, status, branch_id, permissions } } }`.
-- Token is a 20-char opaque hex session key (not a JWT) generated server-side and stored in `Session` table.
-- Stored as `localStorage.accessToken` (JSON-stringified), `userData`, `userAbilities`.
-- Axios interceptor attaches `Authorization: Bearer <token>` on every request.
-- Backend also accepts cookie `session_key=<token>` — we don't use that path.
-- 401 response triggers localStorage clear + redirect to `/login`.
-- Logout: best-effort `POST /auth-logout` before clearing local state.
+- Abilities built from `user.permissions` returned by `/auth-login`. ADMIN role gets `['*']` → manage-all.
+- Backend is still the source of truth (`@admin_required` + `@permission_required` on every endpoint). CASL only gates UI element visibility.
 
-**Long-term plan:**
-- LocalStorage is acceptable for an internal admin tool given the threat model (single-tenant, single-user-per-device). It's not appropriate for a customer-facing PWA.
-- Future work: move token to `httpOnly` cookie so XSS can't exfiltrate. The backend already sets `session_key` cookie on login — we just need to add `withCredentials: true` to axios and drop the localStorage path.
-- `JSON.stringify`/`JSON.parse` round-trip on the token is leftover from the Sneat template (it stores `userData` as an object). Will be removed when token storage moves to cookie.
+## Q4 — Users ✅
 
-**Target:** post-release follow-up, after first internal users are onboarded.
+- Native `/api/admins/users` CRUD shipped on the backend on 2026-05-08.
+- Frontend `src/pages/users/index.vue` rewritten to use it: list with role + status filters, create/edit/delete, password change, suspend toggle.
 
----
+## Q5 — Categories ✅
 
-## Q3 — Access control (CASL)
+REST endpoints (`POST /categories`, `PATCH /categories/{id}`, `DELETE /categories/{id}`) wired. Reorder uses dedicated `/categories/reorder`.
 
-**Status: ✅ Done.** No longer `manage / all` for everyone. Updated in `src/pages/login.vue` during migration:
+## Q6 — Products ✅
 
-```ts
-const perms: string[] = Array.isArray(user?.permissions) ? user.permissions : []
-const userAbilities = perms.includes('*')
-  ? [{ action: 'manage', subject: 'all' }]
-  : perms.map(p => {
-      const [subject, action] = p.split('.')
-      return { action: action || 'read', subject: subject || 'all' }
-    })
-```
+REST endpoints wired. Bulk delete/restore UI still backlog (backend supports it).
 
-ADMIN role ships with `permissions=['*']` → maps to manage-all. Other roles get
-fine-grained abilities derived from backend permission strings like
-`category.create`, `order.update`, etc.
+## Q7 — Orders ✅
 
-**Backend is still the source of truth.** CASL only gates UI element visibility
-(buttons, nav items); every endpoint re-validates via `@admin_required` +
-`@permission_required('foo.bar')` decorators server-side.
+- List with status/payment/date/search filters
+- Pay/cancel actions
+- Stats card row from `/orders/stats`
+- Status enum aligned to backend's `CANCELED` (one L)
+- Expandable rows with line items
+- **1C export** download added (calls `/exports/1c?from=&to=`)
+- Item-level edit dialog still backlog (backend has `/orders/{id}/add-item`, `items/{id}/update`, etc.)
 
-**Caveat:** seed admin users currently have `permissions=[]`. We patched our
-local test user to `['*']`. Backend dev needs to ship admins with `['*']` by
-default — flagged in `docs/BACKEND_FEEDBACK.md`.
+## Q8 — Inkassa ✅
 
----
+- Native `/api/admins/inkassa/{balance,stats,history,perform}` shipped on backend; frontend re-pointed off the HR cash stopgap.
+- Cashier performance card surfaced from `/inkassa/stats`.
 
-## Q4 — Users
+## Q9 — Template & navigation surface ✅
 
-**Repurposed during migration.** The new backend (`alpha_pos`) doesn't have admin
-user CRUD endpoints — `/users/*` is gone. HR `employees` endpoints are the closest
-equivalent.
+- Demo template surface deleted (`src/views/`, `src/pages/pages/`, `src/navigation/horizontal/`, `src/pages/access-control.vue`, `src/pages/register.vue`).
+- `[...all].vue` and `not-authorized.vue` rewritten as standalone Vuetify components (no broken image references).
+- Nav restructured into Dashboard / Management / HR / Stock / Analytics / System.
 
-`src/pages/users/index.vue` now points at `hrApi /employees/` and lets you:
-- list employees with department + contract-type filters
-- create/edit employee profiles (position, department, hire date, contract type, base salary, payment frequency, phone, address, notes)
-- soft-delete employees
-- view stats (total, active, departments, total salary)
+## Q10 — Internationalization & UX ✅
 
-**Gap:** can't create a *user* (login account) from the admin panel — only an
-*employee* profile attached to an existing user. Requires a backend endpoint
-to create users. Flagged in `docs/BACKEND_FEEDBACK.md §1.1`.
+- 3 active locales: uz (default), ru, en. ~280 translation keys cover every page.
+- Vuetify built-in strings translate via `createVueI18nAdapter`. Uzbek overrides for high-visibility strings (`noDataText`, pagination labels).
+- Backend error literals mapped to i18n keys via `src/composables/useApiError.ts`.
 
-**Status:** good enough for milestone if "managing employees" is the goal.
-Not good enough if "creating new admin/cashier login accounts" is required —
-needs backend work first.
+## Q11 — Quality & automation ✅
 
----
+- `yarn lint:ci` — app-code-only, `--max-warnings 0`. Passes clean.
+- `yarn ci` — lint:ci + build.
+- `yarn smoke` — Playwright smoke test (login + visit every nav route, assert no console errors).
+- `.github/workflows/ci.yml` runs lint:ci + build on every PR / push to main. Uploads `dist/` artifact.
+- Smoke test job is `workflow_dispatch` until a staging backend is reachable from GH runners.
 
-## Q5 — Categories
+## Q12 — Build & deploy 🔲
 
-**Status: ✅ Done.** Migrated to new REST URLs:
-- `GET /api/admins/categories` (list with search, stats)
-- `POST /api/admins/categories` (create)
-- `PATCH /api/admins/categories/{id}` (update)
-- `DELETE /api/admins/categories/{id}` (soft delete)
-- `POST /api/admins/categories/reorder` (drag-drop reorder uses dedicated endpoint)
+**Still open.** Needs an infra decision.
 
-Color picker, drag-drop, stats card row all working.
+- Dev: `yarn dev` → http://localhost:5181 + Vite proxy. ✅
+- Build: `yarn build` → ~2 MB / 600 KB gzip static SPA bundle. ✅
+- **Need decisions on:**
+  - Hosting target (Nginx same-domain? S3+CloudFront? subdomain?)
+  - `base:` path in vite.config.ts if served from a sub-path
+  - Production CORS — backend needs `django-cors-headers` for the deployed origin (tracked in `docs/BACKEND_FEEDBACK.md §2`).
+  - Per-environment `VITE_API_HOST` injection in CI deploy step.
 
----
+Frontend half is ~1 day once the hosting decision is made.
 
-## Q6 — Products
+## Q13 — Scope ✅ for v1; future backlog in `docs/FRONTEND_TODO.md`
 
-**Status: ✅ Done for milestone.** Migrated to REST URLs (`POST /products`,
-`PATCH /products/{id}`, `DELETE /products/{id}`). Category filter, price input,
-color picker working.
-
-**Gap:** no bulk delete / restore UI even though backend supports
-`/products/bulk-delete` and `/products/bulk-restore`. Tracked in `docs/FRONTEND_TODO.md`.
-
----
-
-## Q7 — Orders
-
-**Status: ✅ Done for read-only + payment lifecycle.** Migrated:
-- `GET /orders` with status/payment/date/search filters
-- `POST /orders/{id}/pay` and `/cancel`
-- Stats endpoint wired (`/orders/stats`)
-- Status enum aligned to backend (`CANCELLED` two L's)
-- Expandable row showing line items
-
-**Gaps (deferred):** order detail dialog with item-level editing (`/orders/{id}/add-item`,
-`/items/{id}/update`, `/items/{id}/remove`, `/items/{id}/ready`, `/items/{id}/unready`)
-— backend supports these, frontend doesn't expose them yet. Tracked in `docs/FRONTEND_TODO.md §3`.
-
----
-
-## Q8 — Inkassa
-
-**Status: ✅ Done (repurposed).** The new backend doesn't expose `/inkassa/*`
-URLs (the model exists but isn't routed). Page now points at HR cash endpoints:
-- `GET /api/admins/hr/cash/balance/`
-- `GET /api/admins/hr/cash/` (history)
-- `POST /api/admins/hr/cash/deposit/` and `/withdraw/`
-
-UI: three KPI cards (balance, total deposits, total withdrawals) + history
-table with separate Deposit/Withdraw buttons.
-
-Nav entry renamed "Inkassa" → "Cash Register" in `src/navigation/vertical/management.ts`.
-
----
-
-## Q9 — Template & navigation surface
-
-**Status: ✅ Done** (commit `f1e7ebf`).
-
-Deleted in this cleanup pass:
-- `src/navigation/horizontal/` (entire directory — never imported)
-- `src/navigation/vertical/app-and-pages.ts` (never imported)
-- `src/pages/pages/misc/` — 5 files (coming-soon, internal-server-error, not-authorized, not-found, under-maintenance)
-- `src/pages/access-control.vue` and `src/pages/register.vue` (unused demo auth pages)
-- `src/views/` — entire directory (only contained Sneat demo content)
-
-Rewrote in-place:
-- `src/pages/[...all].vue` (catch-all 404) — now standalone Vuetify layout + i18n keys. Previously referenced `@images/pages/page-misc-error-*.png` which **never existed in this repo** and would have crashed at runtime.
-- `src/pages/not-authorized.vue` — same treatment.
-
-Build verified: `yarn build → ✓ built in 31s`.
-
-**Not done (future cleanup):** Many components under `src/@core/components/` are still Sneat demo components (carousels, charts, etc.). Removing them is finicky because some are auto-loaded by Vuetify config and the typings live in `components.d.ts`. Defer until they show up as actual problems.
-
----
-
-## Q10 — Internationalization & UX
-
-**Status:**
-- 3 active locales: `uz` (default), `ru`, `en` (fallback). `ar` and `fr` exist but are not exposed in the navbar switcher.
-- ~210 translation keys cover every page added/changed during the migration plus the new 404 / 401 pages.
-- Vuetify built-in strings translate via `createVueI18nAdapter` wired in `src/plugins/vuetify/index.ts`. Vuetify ships en + ru packs out of the box; for Uzbek we override the most user-visible strings (`noDataText: "Ma'lumotlar mavjud emas"`, pagination, "Sahifada:", etc.) and fall back to en for the rest.
-- Login error messages map backend literals to localized keys via `src/composables/useApiError.ts`.
-
-**Gaps for follow-up:**
-- The "PAST" priority chip on AI assistant suggestions is the legitimate Uzbek translation of "low" → "past" rendered uppercase by VChip styling. Working as designed but caused user confusion — may want a different word ("kichik") or lowercase chip variant.
-- Some less-visited Vuetify dialogs may still surface English strings — fixable by adding to the `uzOverrides` map in `src/plugins/vuetify/index.ts` as they're noticed.
-
-**Sufficient for release.** Translation completeness will only need real attention when we onboard non-Uzbek-speaking users.
-
----
-
-## Q11 — Quality & automation
-
-**Status: ✅ Done.**
-
-- **`yarn lint:ci`** — scoped to app code (`src/pages src/composables src/plugins src/navigation src/layouts/components src/constants src/types`), `--max-warnings 0`. Currently passes clean.
-  - `.eslintrc.js` relaxed for: `no-alert` (intentional `confirm()` in delete flows), `@typescript-eslint/no-explicit-any` (API responses are untyped — tracked under `BACKEND_FEEDBACK.md §5` for OpenAPI codegen), `max-statements-per-line` raised to 4 (compact handler patterns like `() => { loadA(); loadB() }` are idiomatic here).
-- **`yarn ci`** — local equivalent of CI (`lint:ci` + `build`). Verified passing: `✓ built in 25s`.
-- **`yarn smoke`** — Playwright smoke test at `tests/smoke/login.spec.ts`. Logs in, then visits every top-level nav route and asserts no console errors per route. CASL localStorage warning and Vite HMR noise are filtered. Spawns `yarn dev` automatically via Playwright's `webServer` config (or set `PW_NO_SERVER=1` to point at an already-running instance).
-- **`.github/workflows/ci.yml`** — runs `lint:ci` + `build` on every PR / push to `main`. Uploads `dist/` as a build artifact for 7 days. The Playwright smoke job is opt-in via `workflow_dispatch` for now (needs a backend reachable from GitHub-hosted runners).
-
-**Lint baseline:** the wider `yarn lint` still flags ~120 errors in `src/@core/` and `src/@layouts/` template internals. These are out of CI scope and tracked as a slow cleanup pass — not a release blocker.
-
-**No unit tests this milestone.** Admin panel logic mostly proxies HTTP; we'll add them if logic gets complex enough to warrant it.
-
----
-
-## Q12 — Build & deploy
-
-**Dev:** `yarn dev` → http://localhost:5181 with Vite proxy to backend at `:8000`.
-
-**Build:** `yarn build` produces a static SPA bundle in `dist/` (~2 MB, ~600 KB gzip).
-
-**Deploy:** **not configured for any environment yet.** No CI/CD, no hosting target chosen, no Dockerfile, no nginx config.
-
-**Gaps before release:**
-1. Decide static hosting target (Nginx behind same domain as backend? S3 + CloudFront? Subdomain like `admin.example.com`?).
-2. If served from a sub-path, add `base: '/admin/'` to `vite.config.ts` and configure SPA history-mode rewrites.
-3. Production CORS — backend needs `django-cors-headers` configured for the admin panel's deployed origin. Documented in `docs/BACKEND_FEEDBACK.md §4b`.
-4. Add `.env.example` and set `VITE_API_HOST` per environment.
-5. CI workflow: install → typecheck → lint → build → publish artifact / deploy.
-
-**Target:** depends on infra decisions. Need a meeting with backend/devops to decide hosting topology before timeline is meaningful.
-
----
-
-## Q13 — Release alignment: scope
-
-**In scope for this milestone (status today):**
-- ✅ Migration work to `alpha_pos` (commit `073a239`).
-- ✅ Categories, Products, Orders read + basic actions.
-- ✅ Employees, Departments, Salaries, Expenses, Leaves, Contracts, Attendance (HR module).
-- ✅ Places & Tables, Discounts, Shifts, Notifications, App Settings.
-- ✅ Stock module (items, levels, batches, suppliers, recipes, purchase orders, production orders, transfers, counts, etc.).
-- ✅ AI Assistant.
-- ✅ Cash Register (HR-backed).
-- ✅ README / package.json cleanup (Q0).
-- ✅ Demo page cleanup (Q9).
-- ✅ CI lint + build + smoke test (Q11).
-- 🔲 Deploy story (Q12) — at least decided, even if not fully automated.
-
-**Explicitly deferred:**
-- Admin user account creation (blocked on backend — needs `/users` CRUD).
-- Order item-level editing UI (backend ready, no UI yet).
-- Bulk operations across categories/products/users.
-- Roles management page.
-- Auth sessions management (revoke active sessions).
-- Move token to `httpOnly` cookie.
-- Stock advanced features: adjust dialog, reservations, barcode lookup, receiving flow, recipe cost analysis, batch consumption.
-- Localization for ar/fr (uz/ru/en is the agreed set).
-
-Full list of unwired endpoints with prioritization: `docs/FRONTEND_TODO.md §3`.
-
----
-
-## Q14 — "Good enough to ship" criteria
+## Q14 — "Good enough to ship" — 9 of 10 done
 
 | # | Criterion | Status |
 |---|---|---|
-| 1 | Every page in the active nav loads without console errors against the real backend | ✅ |
-| 2 | CRUD works end-to-end for the 6 primary modules: Categories, Products, Orders (pay/cancel), Employees, Cash Register, Discounts | ✅ |
+| 1 | Every page in the active nav loads without console errors | ✅ |
+| 2 | CRUD works end-to-end for primary modules | ✅ |
 | 3 | Stats / dashboard reflects real data | ✅ |
 | 4 | Login + logout work; 401 redirects to `/login` | ✅ |
-| 5 | Locale switching (uz/ru/en) works on every page | ✅ |
+| 5 | Locale switching works on every page | ✅ |
 | 6 | No template-leftover routes accessible | ✅ |
-| 7 | README accurately describes how to run, build, and deploy | ✅ |
+| 7 | README accurately describes how to run | ✅ |
 | 8 | CI passes (lint + build); smoke test runs locally | ✅ |
-| 9 | Deploy target chosen and at least one staging environment reachable | 🔲 |
-| 10 | Backend has shipped fixes for the 3 blockers in `docs/BACKEND_FEEDBACK.md §6` ("Hell no" wording, status spelling alignment, admin seed `permissions=['*']`) | 🔲 (backend) |
+| 9 | Deploy target chosen and at least one staging environment reachable | 🔲 (Q12) |
+| 10 | Backend has shipped the original 3 blockers | ✅ |
 
-8 of 10 done. Remaining 2: Q12 (deploy infra), backend blockers.
-
----
+Only Q12 (deploy infrastructure) blocks shipping.
 
 ## Q15 — Process notes
 
-- This file (`docs/review-answers.md`) is ready to translate into tickets.
-- Updated priorities (highest → lowest):
-  1. **P0** — Backend blockers in `docs/BACKEND_FEEDBACK.md §6` (3 items, ~half-day each on backend side).
-  2. **P1** — Q12 deploy story (depends on infra decision; min 2 days once decided).
-  3. **P2** — `docs/FRONTEND_TODO.md §3` backlog as separate tickets (order detail dialog and bulk ops are the highest-value picks).
-  4. **P3** — Promote the smoke test from `workflow_dispatch` to `pull_request` once a staging backend is reachable from CI runners.
-- Questionnaire completion date: **2026-04-30**.
+- Backend ships ahead of frontend most weeks; we re-audit `WHATS_NEW.md` per release.
+- Updated priorities:
+  1. **P0** — Q12 deploy infrastructure decision.
+  2. **P1** — Stable `error_code` field on responses (`docs/BACKEND_FEEDBACK.md §1`).
+  3. **P1** — Production CORS configuration on backend (`docs/BACKEND_FEEDBACK.md §2`).
+  4. **P2** — `docs/FRONTEND_TODO.md §3` backlog: order detail dialog with item editing, bulk ops, telegram-bot text editor admin.
+  5. **P3** — Promote smoke test from workflow_dispatch to PR-gating once staging backend is reachable from CI runners.
 
 ---
 
-## Additional features & issues (not covered above)
+## Remaining work checklist (everything not crossed off)
 
-- **Vite dev proxy is required** until backend ships `django-cors-headers`. Documented in `vite.config.ts` and `docs/BACKEND_FEEDBACK.md §4b`.
-- **Order status spelling drift** — model declares `CANCELED` (1 L), service writes `CANCELLED` (2 L). Frontend aligned with service spelling. Backend still needs to pick one and migrate data.
-- **`"Hell no"` literal in 403 responses** — visible to end users in three places (`auth_service.py:49`, `:102`, `permissions.py:24`). Cosmetic but unprofessional.
-- **`branch_id` enforcement** — backend `auth_service.py` checks `settings.BRANCH_ID` against user's branch but no documentation on how this is configured. Needs clarification before multi-branch deploys.
-- **Translation by error code, not literal string** — currently we map English error strings to i18n keys (`src/composables/useApiError.ts`). Fragile — any backend wording change silently breaks translations. Requested stable `error_code` field in `docs/BACKEND_FEEDBACK.md §4c`.
-- **`PAST` chip on AI suggestions** — caused user confusion; it's the legitimate Uzbek translation of "low" priority rendered uppercase by VChip. Consider lowercase chip variant or different word ("kichik").
-- **CASL warning in console about `localStorage` being editable** — known limitation; backend enforcement is the real gate.
-- **Memory of seeded test data** — local SQLite has 115 orders for testing (yesterday + today). Production deploys should start clean.
+| Area | Item | Owner | Estimate |
+|---|---|---|---|
+| Deploy | Pick hosting target + nginx/SPA-rewrite config | infra | 1 day |
+| Deploy | Wire `VITE_API_HOST` per environment in CI | us | 2 hrs (after infra decision) |
+| Backend | `django-cors-headers` for prod domain | backend | 1 hr |
+| Backend | Stable `error_code` field on responses | backend | half-day |
+| Frontend | Order detail dialog (item-level add/update/remove/ready/unready) | us | 1 day |
+| Frontend | Bulk delete/restore for categories/products/users | us | half-day |
+| Frontend | Notifications template editor admin | us | half-day |
+| Frontend | Telegram bot text editor admin (uses notification templates) | us | half-day |
+| Frontend | Promote Playwright smoke to PR-gating | us | half-day after staging backend exists |
+
+The full feature backlog of unwired endpoints is `docs/FRONTEND_TODO.md §3`.

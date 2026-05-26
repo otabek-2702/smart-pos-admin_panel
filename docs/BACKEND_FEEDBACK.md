@@ -1,226 +1,65 @@
 # Backend Feedback — Smart POS / alpha_pos
 
-Date: 2026-04-29
-New backend: `C:/Users/Jason/Desktop/Projects/alpha_pos/`
-Frontend: `c:/Users/Jason/Desktop/Projects/smart-pos-admin_panel/`
+Last reviewed: 2026-05-17 against backend commit `b72eab0`
+Frontend: `c:/Users/Jason/Desktop/Projects/smart-pos-admin_panel/` @ `main`
+Backend: `C:/Users/Jason/Desktop/Projects/alpha_pos/`
 
-This is a **near-total rewrite** of the backend, not a renewal. The base
-path, the URL conventions, the auth token, and several endpoint sets all
-changed. This document captures the things the **backend** team needs to
-know about — gaps, bugs, and inconsistencies the admin panel ran into
-while trying to talk to it.
+This doc tracks open requests we have for the backend team. Items get
+crossed off as they ship; new ones get appended at the bottom.
 
 ---
 
-## 1. Endpoints the admin panel needs but the new backend does NOT expose
+## ✅ Resolved since the 2026-04-29 audit
 
-These exist in the frontend today and the backend has **no equivalent at
-all**. The relevant pages cannot work until these are provided.
+The backend team has shipped most of the original blockers. For the
+record:
 
-### 1.1 User (admin) CRUD — completely missing
+- **Admin user CRUD** — `/api/admins/users` GET/POST + `/users/{id}` GET/PATCH/DELETE shipped. Frontend re-pointed.
+- **Native Inkassa endpoints** — `/api/admins/inkassa/{balance,stats,history,perform,{id}}` shipped. Frontend re-pointed off the HR cash stopgap.
+- **Order status spelling** — normalized to `CANCELED` (one L) across stock + hr + orders. Frontend aligned.
+- **Idempotency** — `@idempotent` decorator added on order create/pay/cancel and inkassa/perform and loyalty/redeem. Frontend axios interceptor now auto-attaches `Idempotency-Key`.
+- **Audit log** — `GET /api/admins/audit-log` shipped. Frontend page wired.
+- **1C export** — `GET /api/admins/exports/1c?from=&to=` shipped. Frontend download button wired.
+- **Owner dashboard snapshot** — `GET /api/admins/dashboard/today`. Frontend home page rewritten.
+- **Menu engineering analytics** — `GET /api/admins/analytics/menu-engineering`. Frontend page wired.
+- **Shift performance scorecard** — `GET /api/admins/analytics/shifts/{id}`. Frontend dialog wired.
+- **Demand forecast** — `GET /api/admins/forecast/tomorrow`. Frontend page wired.
+- **Loyalty program** — `/notifications/loyalty/{settings,accounts,redeem}` shipped. Frontend page wired.
+- **CORS** — backend now gates credentials and is reachable from the panel in dev via the Vite proxy. Production CORS config still TBD per deployment.
 
-The old backend had `/users` + create/update/delete/status/role. The new
-admin-side has **no users endpoints**. HR has `employees`, but those are
-not the same concept (employee != login user; HR has no role/password
-fields).
-
-Frontend impact: `src/pages/users/index.vue` is dead.
-
-**Requested:**
-- `GET    /api/admins/users` (list with `page`, `per_page`, `search`, `role`, `status`)
-- `GET    /api/admins/users/{id}`
-- `POST   /api/admins/users` (create — `first_name`, `last_name`, `email?`, `password`, `role`, `status`)
-- `PATCH  /api/admins/users/{id}` (update profile, role, status, password)
-- `DELETE /api/admins/users/{id}` (soft delete)
-- `POST   /api/admins/users/{id}/restore`
-- `GET    /api/admins/users/stats` (totals by role/status)
-
-### 1.2 Inkassa endpoints — model exists, no URLs
-
-The `Inkassa` model and `InkassaService` exist in
-`base/services/inkassa_service.py` and the order service writes to it on
-pay/unpay, but no public URL surfaces them.
-
-Frontend impact: `src/pages/inkassa/index.vue` is dead. The dashboard's
-"balance" and "today's collection" cards are also dead.
-
-**Requested:**
-- `GET  /api/admins/inkassa/balance` → `{ balance, last_collected_at }`
-- `GET  /api/admins/inkassa/stats` → `{ today_total, week_total, month_total }` (accept `date_from`/`date_to`)
-- `GET  /api/admins/inkassa/history` → paginated list of inkassa records
-- `POST /api/admins/inkassa/perform` → `{ amount, notes }` to record a collection / withdrawal
-- `GET  /api/admins/inkassa/{id}` → single record detail
-
-If this is intentionally moving into HR cash (`hr/cash/...`), please
-confirm — we'll re-point the inkassa page at `cash/balance/`,
-`cash/deposit/`, `cash/withdraw/` instead and drop the request above.
-
-### 1.3 Roles management — gone
-
-Old backend had `/roles`, `/roles/{code}/permissions`, etc. The frontend
-users page reads `/roles` to populate the role dropdown.
-
-**Requested:** at minimum a `GET /api/admins/roles` returning `[{code, name, permissions[]}]`. Even a hard-coded list works for now. Without it the user dialog has no way to pick a role.
-
-### 1.4 Order create endpoint on the admin side
-
-Admin order URLs accept `POST /api/admins/orders` (the
-`require_http_methods(["GET","POST"])` on `orders` view supports it),
-but the `create_order_request` validator requires a `user_id` that the
-admin panel doesn't know about. Either:
-- Document what `user_id` should be (the customer? the cashier?), **or**
-- Provide a parallel endpoint that takes `cashier_id` and works without a customer.
-
-Right now we can't build "create order from admin panel" because the
-contract is unclear.
+Many quiet wins too: drf-spectacular-style typing, audit trail on sensitive mutations, idempotency, cache-on-singleton-load, prefetch fixes, the Telegram bot, QR self-order, licensing kill-switch.
 
 ---
 
-## 2. Bugs / inconsistencies in the new backend
+## 🟡 Still open
 
-### 2.1 Order status spelling — backend internal mismatch (still present)
+### 1. Stable `error_code` on every error response
 
-- Model: `base/models.py` declares the order status enum.
-- Service: `admins/services/order_service.py:10` →
-  `ALLOWED_STATUSES = ['PREPARING', 'READY', 'CANCELLED', 'COMPLETED']` (two Ls).
-- View: `admins/views/order_views.py:225` →
-  `AdminOrderService.update_order_status(order_id, 'CANCELLED')`.
+Today error payloads look like:
 
-Please confirm the model's `Order.Status` choices use `'CANCELLED'` (two Ls)
-to match the service. If the model still uses `'CANCELED'` (one L) like
-the previous backend, this will silently store an unknown enum value.
-Frontend will follow whichever spelling lands.
-
-### 2.2 `Hell no` is shipping in production responses
-
-- `admins/services/auth_service.py:49` → `ServiceResponse.forbidden("Hell no")`
-- `base/security/permissions.py:24` → same string
-- `admins/services/auth_service.py:102` → same string
-
-This message is rendered to end users when a non-admin tries to log in.
-Recommend `"Admin access required"` or similar.
-
-### 2.3 `branch_id` enforcement is not documented
-
-`auth_service.py:54-56`:
-```python
-branch_id = getattr(settings, 'BRANCH_ID', '')
-if branch_id and user.branch_id and user.branch_id != branch_id:
-    return ServiceResponse.forbidden("You are not authorized for this branch")
-```
-
-Please document:
-- How `settings.BRANCH_ID` is configured per deployment.
-- What the user-facing error should look like (currently lumped under "forbidden").
-- Whether the admin panel needs to send a branch header on every request.
-
-### 2.4 Session token vs old JWT — opaque tokens
-
-Login now returns `secrets.token_hex(10)` (a 20-char opaque string) rather
-than a JWT. Confirm this is final — frontend currently stores it in
-`localStorage.accessToken` and sends `Authorization: Bearer <token>`. Both
-the cookie path (`session_key`) and the header path are supported, so we
-should be fine, but please flag if the cookie path is preferred.
-
----
-
-## 3. Response-shape contracts the admin panel reads
-
-The frontend only consumes a small slice of each endpoint's response.
-These keys are load-bearing — please don't rename them without telling us:
-
-| Endpoint | Shape relied on |
-|---|---|
-| `POST /api/admins/auth-login` | `data.token`, `data.user.{id, email, first_name, last_name, role, status}` |
-| `GET /api/admins/categories` | `data.categories[]`, `pagination.{total_categories, total_pages, page}` |
-| `GET /api/admins/categories/stats` | top-level fields like `total_categories`, `active_categories` |
-| `GET /api/admins/products` | `data.products[]`, `pagination.total_products` |
-| `GET /api/admins/products/stats` | dashboard cards |
-| `GET /api/admins/orders` | `data.orders[]`, `pagination.total_orders` |
-| `GET /api/admins/orders/stats` | `total_orders`, `paid_orders`, `preparing_orders`, `ready_orders`, `total_revenue` |
-| `GET /api/admins/orders/stats/dashboard` | currently unused, but we'd like to switch the dashboard to it |
-| `GET /api/admins/stock/items/` | `data.items[]`, `pagination.total_items` |
-| `GET /api/admins/stock/recipes/` | `data.recipes[]`, pagination |
-| (etc. for every stock list endpoint) | |
-
-Pagination total keys are currently inconsistent across endpoints
-(`total_orders`, `total_users`, `total_products`, etc.). A single
-`pagination.total` would simplify the client. Not blocking, just noting.
-
----
-
-## 4. Conventions worth aligning
-
-The new backend uses two URL conventions side by side:
-
-- **REST-style** in stock / hr / discounts / notifications: trailing slash,
-  HTTP method does the work.
-  - `GET/POST /api/admins/stock/items/`
-  - `GET/PUT/PATCH/DELETE /api/admins/stock/items/{id}/`
-- **Verb-suffix-style** in admins: no trailing slash, `/foo`, `/foo/{id}`,
-  custom action paths.
-  - `GET/POST /api/admins/categories`
-  - `GET/PUT/PATCH/DELETE /api/admins/categories/{id}`
-  - `POST /api/admins/categories/{id}/toggle`
-
-Inside `admins/` itself the convention is consistent. The mismatch with
-`stock/` is awkward but not a blocker.
-
----
-
-## 4b. CORS — required for production
-
-Currently the backend ships **no CORS headers**, so the browser blocks every cross-origin request from the admin panel. In dev we work around it via a Vite proxy (`vite.config.ts → server.proxy`) that makes requests look same-origin. **In production this won't apply** and the panel will fail to reach the API.
-
-Please install and configure `django-cors-headers`:
-
-```bash
-pip install django-cors-headers
-```
-
-In `alpha_pos/settings.py`:
-
-```python
-INSTALLED_APPS = [..., 'corsheaders', ...]
-
-MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # ↑ before CommonMiddleware
-    'django.middleware.security.SecurityMiddleware',
-    ...
-]
-
-# In dev: allow the local admin panel
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5181',
-    'http://127.0.0.1:5181',
-]
-CORS_ALLOW_CREDENTIALS = True  # required since the panel can authenticate via session_key cookie
-```
-
-For production, replace `CORS_ALLOWED_ORIGINS` with the deployed admin panel URL.
-
-## 4c. Error responses — please return a stable `error_code`
-
-Right now error responses look like this:
 ```json
 { "success": false, "message": "Invalid credentials" }
 ```
 
-The frontend wants to translate that message to Uzbek / Russian / English so the user sees their language. Today we do this by matching the **English literal** of `message` against a hard-coded map in [src/composables/useApiError.ts](src/composables/useApiError.ts). That works but is fragile — if you change the wording from `"Invalid credentials"` to `"Login failed"`, every translation breaks silently.
+The frontend translates `message` to the user's locale by matching the
+English literal against a hard-coded map in
+`src/composables/useApiError.ts`. That works but is fragile — changing
+the wording from `"Invalid credentials"` to `"Login failed"` silently
+breaks every translation.
 
-**Please add a stable `error_code` field on every error response:**
+**Request:** add a stable `code` field on every error response:
 
 ```json
 { "success": false, "code": "INVALID_CREDENTIALS", "message": "Invalid credentials" }
 ```
 
-Suggested codes (existing literals → codes):
+Suggested codes (current literals → codes):
 
 | Current `message` | Suggested `code` |
 |---|---|
 | Invalid credentials | `INVALID_CREDENTIALS` |
 | Account is suspended | `ACCOUNT_SUSPENDED` |
-| Hell no / Admin access required | `ADMIN_REQUIRED` |
+| Admin access required | `ADMIN_REQUIRED` |
 | You are not authorized for this branch | `WRONG_BRANCH` |
 | Authentication required / Missing token | `AUTH_REQUIRED` |
 | Invalid or expired session / Token expired | `SESSION_EXPIRED` |
@@ -228,14 +67,16 @@ Suggested codes (existing literals → codes):
 | You don't have permission to perform this action | `NO_PERMISSION` |
 | Current password is incorrect | `WRONG_PASSWORD` |
 | Validation failed | `VALIDATION_FAILED` |
-| Invalid JSON / Expected JSON object | `INVALID_JSON` |
-| Too many login attempts. Try again in 15 minutes | `RATE_LIMITED` |
-| (record not found, e.g. category/product/user) | `NOT_FOUND` |
+| Too many … attempts | `RATE_LIMITED` |
+| (record not found) | `NOT_FOUND` |
 | (duplicate name/code/slug) | `DUPLICATE` |
 
-Implementation hint: most of these flow through `ServiceResponse.error(...)` / `ServiceResponse.unauthorized(...)` / `ServiceResponse.forbidden(...)` / `ServiceResponse.validation_error(...)` in [base/helpers/response.py](C:/Users/Jason/Desktop/Projects/alpha_pos/base/helpers/response.py). Adding a `code` parameter to those helpers and threading it through the call sites would centralise the change.
+Implementation hint: most of these flow through
+`ServiceResponse.error / unauthorized / forbidden / validation_error`
+in `base/helpers/response.py`. Adding a `code` parameter to those
+helpers and threading it through the call sites centralises the change.
 
-For validation errors specifically, also include the per-field error map you already have:
+For validation errors specifically, please keep the per-field error map:
 
 ```json
 {
@@ -246,36 +87,73 @@ For validation errors specifically, also include the per-field error map you alr
 }
 ```
 
-Once the codes ship, we'll switch the frontend map from "literal → key" to "code → key" — won't need to redeploy the panel for backend wording changes.
+### 2. Production CORS configuration
 
-## 5. Endpoints we'd like added (nice-to-have)
+In dev we proxy `/api/*` through Vite, so no CORS issue. In staging /
+production the panel will be on a different origin from the API. Please
+configure `django-cors-headers` with the deployed admin panel origin(s):
 
-These would unlock features without us reinventing them client-side:
+```python
+INSTALLED_APPS += ['corsheaders']
+MIDDLEWARE = ['corsheaders.middleware.CorsMiddleware', ...]
+CORS_ALLOWED_ORIGINS = [
+    'https://admin.example.com',
+]
+CORS_ALLOW_CREDENTIALS = True  # needed because the panel can authenticate via session_key cookie
+```
 
-- `GET /api/admins/auth-permissions` (or have `/auth-me` return the full
-  permission catalogue, not just the user's own permissions). This would
-  let us build CASL abilities from real backend data instead of hardcoding
-  `[{action: 'manage', subject: 'all'}]`.
-- `GET /api/admins/orders/{id}/timeline` — single endpoint that returns
-  status changes + payment events for the order detail dialog.
-- `OPTIONS` / OpenAPI schema — old backend had `drf-spectacular` at
-  `/api/docs/`. The new backend has `postman_collection.json` — useful
-  but static. A live `/api/schema/` would let us auto-generate types.
+This unblocks Q12 (deploy) on our side.
+
+### 3. OpenAPI / typed schema
+
+`postman_collection.json` is a great manual reference. A live OpenAPI
+endpoint (e.g. `drf-spectacular`) would let us generate TypeScript
+types for every endpoint instead of hand-typing them as `any`. Would
+let us turn `@typescript-eslint/no-explicit-any` back on in
+`lint:ci`. Nice-to-have, not urgent.
+
+### 4. `branch_id` enforcement documentation
+
+`auth_service.py:54-56` enforces `settings.BRANCH_ID` against the
+user's `branch_id`. Please document:
+- How `BRANCH_ID` is configured per deployment (env var? settings file?)
+- What the user-facing error looks like (currently lumped under "forbidden")
+- Whether the admin panel needs to send a branch header on every request
+
+This becomes important when multi-branch deploys land.
+
+### 5. Pagination key consistency (nice to have)
+
+Different endpoints expose pagination totals under different keys:
+
+- `pagination.total_orders` (orders)
+- `pagination.total_users` (users)
+- `pagination.total_products` (products)
+- `pagination.total_items` (most stock + hr)
+- `pagination.total` (some HR endpoints)
+
+The frontend handles all of them, but a single `pagination.total`
+across the board would simplify generated client code if/when the
+OpenAPI schema lands.
 
 ---
 
-## 6. Summary of what we're asking for
+## 6. Confirmed working — please don't change unannounced
 
-| # | Severity | Ask |
-|---|---|---|
-| 1.1 | **Blocker** | Provide admin user CRUD endpoints (`/api/admins/users`) |
-| 1.2 | **Blocker** | Expose Inkassa endpoints (`/api/admins/inkassa/...`) — or confirm we should pivot to `hr/cash/*` |
-| 1.3 | **Blocker** | Provide a roles list endpoint (even hard-coded) |
-| 1.4 | High | Document or simplify the admin `POST /orders` contract |
-| 2.1 | High | Confirm model status spelling matches `'CANCELLED'` |
-| 2.2 | Low | Replace `"Hell no"` with a professional error message |
-| 2.3 | Low | Document `BRANCH_ID` setup |
-| 2.4 | Low | Confirm Bearer header is officially supported (not just cookie) |
+Frontend code depends on these response shapes. Renames are fine but
+please mention them in `WHATS_NEW.md` so we can sync.
 
-Once the three blockers in §1 land, every page in the admin panel can be
-re-pointed at the new backend. Everything else is polish.
+| Endpoint | Key fields the frontend reads |
+|---|---|
+| `POST /api/admins/auth-login` | `data.token`, `data.user.{id, email, first_name, last_name, role, status, branch_id, permissions}` |
+| `GET /api/admins/dashboard/today` | `data.today.{revenue, orders, paid_orders, cancelled, open}`, `data.top_products_today[]`, `data.low_stock_count`, `data.clocked_in[]` |
+| `GET /api/admins/orders/stats` | `data.total_orders`, `paid_orders`, `preparing_orders`, `ready_orders`, `total_revenue` |
+| `GET /api/admins/inkassa/{balance,stats,history}` | `data.balance`, `data.stats.{today,cashier_performance,top_products}`, `data.inkassas[]` |
+| `GET /api/admins/users` | `data.users[]`, `data.pagination.total_users` |
+| `GET /api/admins/analytics/menu-engineering` | `data.items[].{class, qty_sold, revenue, margin_per_unit, margin_pct, profit}`, `data.summary.{stars, plowhorses, puzzles, dogs, avg_qty, window_days}` |
+| `GET /api/admins/analytics/shifts/{id}` | `data.{user_name, status, duration_minutes, orders_total, orders_completed, orders_cancelled, orders_paid, cancel_rate_pct, revenue, avg_prep_seconds, orders_per_hour, revenue_per_hour}` |
+| `GET /api/admins/forecast/tomorrow` | `data.predictions[].{product_id, product_name, predicted_quantity, confidence?}`, `data.reason?` |
+| `GET /api/admins/audit-log` | `data.logs[].{created_at, actor, action, target_type, target_id, metadata}` |
+| `GET /api/admins/exports/1c` | binary XML stream (already correct) |
+| `GET /api/admins/notifications/loyalty/settings/` | `data.{is_enabled, stamps_per_completed_order, stamps_per_reward, reward_description}` |
+| `GET /api/admins/notifications/loyalty/accounts/` | `data[].{phone_number, stamps_balance, stamps_earned_total, stamps_redeemed_total, updated_at}` |

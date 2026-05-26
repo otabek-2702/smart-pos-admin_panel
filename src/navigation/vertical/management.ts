@@ -58,4 +58,11 @@ export default [
     action: 'manage',
     subject: 'all',
   },
+  {
+    title: 'Loyalty',
+    icon: { icon: 'bx-medal' },
+    to: 'loyalty',
+    action: 'manage',
+    subject: 'all',
+  },
 ]

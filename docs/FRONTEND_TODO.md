@@ -1,200 +1,112 @@
 # Frontend TODO — Smart POS Admin
 
-Date: 2026-04-29
-New backend: `C:/Users/Jason/Desktop/Projects/alpha_pos/`
+Last refreshed: 2026-05-17
 
-The new backend (`alpha_pos`) is structurally a different project from the
-old one (`smart_pos-main`), not a refactor. **Almost every URL in the
-admin panel needs updating.** This file is the migration plan.
+This file used to be the migration plan from `smart_pos-main` → `alpha_pos`.
+That migration is done. What's left is the feature backlog: backend
+endpoints that exist but the panel doesn't surface yet, plus polish work.
+
+For status of the questionnaire questions (Q0–Q15), see
+`docs/review-answers.md`.
 
 ---
 
-## 1. The blast radius (read this first)
+## 1. What's wired and working
 
-| Change | Frontend files affected |
+Every page in the active nav loads against the alpha_pos backend.
+`yarn ci` (lint:ci + build) passes clean.
+
+**Modules covered end-to-end:**
+
+| Section | Pages |
 |---|---|
-| All admin endpoints moved from `/` to `/api/admins/` | `src/plugins/axios.ts` (baseURL or interceptor) + every page that uses an admin URL |
-| Login moved from `/admins-api/login` → `/api/admins/auth-login` | `src/pages/login.vue` |
-| Stock endpoints moved from `/items/`, `/recipes/`, … → `/api/admins/stock/items/`, `/api/admins/stock/recipes/`, … | every page under `src/pages/stock/**` |
-| URL convention changed: old verbs `/users/create`, `/users/{id}/update`, `/users/{id}/delete` no longer exist — new pattern is `POST /resource`, `PATCH /resource/{id}`, `DELETE /resource/{id}` | categories, products, orders pages |
-| Order status spelling: backend now uses `'CANCELLED'` (two Ls); frontend uses `'CANCELED'` (one L) | `src/pages/orders/index.vue:29,299,310`, `src/types/order.ts:1`, `src/constants/statusColors.ts:6` |
-| Token type: backend now returns an opaque random hex string instead of a JWT — Bearer flow still works, but anything that decodes the JWT will break | check `src/router/utils.ts`, `src/plugins/casl/*` |
-| Removed entirely from backend: `/users/*`, `/roles/*`, `/inkassa/*` | `src/pages/users/index.vue`, `src/pages/inkassa/index.vue`, role dropdown — see `BACKEND_FEEDBACK.md` §1 for what we asked for |
+| Dashboard | Today snapshot (`/dashboard/today`), AI Assistant |
+| Management | Users, Categories, Products, Orders, Places & Tables, Discounts, Shifts, Cash Register, Loyalty |
+| HR | Departments, Salaries, Expenses, Attendance, Leaves, Contracts |
+| Stock | Items, Levels, Batches, Categories, Units, Locations, Suppliers, Purchase Orders, Recipes, Production Orders, Transfers, Stock Counts, Transactions, Product Links, Variance Codes, Settings |
+| Analytics | Menu Engineering, Demand Forecast, Audit Log |
+| System | Notifications, App Settings |
+
+**Cross-cutting features:**
+
+- CASL abilities built from `user.permissions`.
+- 3 locales (uz/ru/en) with ~280 keys.
+- `Idempotency-Key` auto-attached on order create/pay/cancel, inkassa/perform, loyalty/redeem.
+- 1C export download from the orders page.
+- Shift performance scorecard dialog from the shifts page.
+- Backend-error translation via `src/composables/useApiError.ts`.
 
 ---
 
-## 2. Migration plan (do these in order)
+## 2. P1 — Backend-blocked
 
-### Step 1 — change baseURL (single edit, unblocks most pages)
-
-`src/plugins/axios.ts`: change
-```ts
-baseURL: 'http://127.0.0.1:8000'
-```
-to
-```ts
-baseURL: 'http://127.0.0.1:8000/api/admins'
-```
-
-Then, only stock pages need a `/stock/...` prefix. Every other page
-already uses paths that align with the new layout once the baseURL changes
-— for example `/categories` becomes `/api/admins/categories`, `/orders`
-becomes `/api/admins/orders`.
-
-### Step 2 — fix login
-
-`src/pages/login.vue:37`: change
-```ts
-axiosIns.post('/admins-api/login', {...})
-```
-to (with the new baseURL above)
-```ts
-axiosIns.post('/auth-login', {...})
-```
-
-Response shape is unchanged (`data.token`, `data.user`).
-
-### Step 3 — fix CRUD URL pattern (categories, products, orders)
-
-The new backend uses REST-style on the same URL with different methods.
-Replace these:
-
-**Categories:**
-| Old | New |
-|---|---|
-| `POST /categories/create` | `POST /categories` |
-| `PUT  /categories/{id}/update` | `PATCH /categories/{id}` |
-| `DELETE /categories/{id}/delete` | `DELETE /categories/{id}` |
-
-Files: `src/pages/categories/index.vue:237, 241, 264`.
-
-**Products:**
-| Old | New |
-|---|---|
-| `POST /products/create` | `POST /products` |
-| `PUT  /products/{id}/update` | `PATCH /products/{id}` |
-| `DELETE /products/{id}/delete` | `DELETE /products/{id}` |
-
-Files: `src/pages/products/index.vue:177, 181, 203`.
-
-**Orders:** the old `update`/`delete` paths weren't used. Pay/cancel still
-work — verify URL paths only:
-| Old | New |
-|---|---|
-| `POST /orders/{id}/pay` | `POST /orders/{id}/pay` (unchanged) |
-| `POST /orders/{id}/cancel` | `POST /orders/{id}/cancel` (unchanged) |
-
-Files: `src/pages/orders/index.vue:92, 104` — only need the baseURL change.
-
-### Step 4 — fix order status spelling
-
-Backend now standardises on `'CANCELLED'` (two Ls). Replace `'CANCELED'`
-in three places:
-- `src/pages/orders/index.vue:29` — `orderStatuses` array
-- `src/pages/orders/index.vue:299` — `v-if="!item.raw.is_paid && item.raw.status !== 'CANCELED'"`
-- `src/pages/orders/index.vue:310` — `v-if="item.raw.status !== 'CANCELED' && ..."`
-- `src/types/order.ts:1` — type union
-- `src/constants/statusColors.ts:6` — `CANCELED` key (and remove the duplicate `CANCELLED` key already there)
-
-### Step 5 — re-prefix stock pages
-
-For every page under `src/pages/stock/**` that uses `/items/`, `/units/`,
-`/locations/`, `/categories/`, `/suppliers/`, `/recipes/`,
-`/production-orders/`, `/purchase-orders/`, `/transfers/`,
-`/transactions/`, `/batches/`, `/levels/`, `/counts/`, `/variance-codes/`,
-`/product-links/`, `/settings/`, `/ai/...`, change the path to add a
-`/stock/` prefix.
-
-Cleanest approach: introduce a helper composable (or a second axios
-instance with `baseURL: '/api/admins/stock'`) so every stock page imports
-it instead of editing 17 files. Recommended:
-
-```ts
-// src/plugins/axios.ts
-export const stockApi = axios.create({ baseURL: 'http://127.0.0.1:8000/api/admins/stock' })
-// (mount the same request/response interceptors)
-```
-
-Then in stock pages:
-```ts
-import { stockApi } from '@/plugins/axios'
-stockApi.get('/items/', { params })
-```
-
-This way the URLs inside the page files don't need to change at all — they
-already match the new backend's stock layout, just with an extra prefix
-that `stockApi` injects.
-
-### Step 6 — disable/remove broken pages until backend ships them
-
-Pages with no backend equivalent (see `BACKEND_FEEDBACK.md` §1):
-
-- `src/pages/users/index.vue` — admin user CRUD endpoints don't exist in alpha_pos. Options: hide the nav entry (`src/navigation/vertical/management.ts`), or repoint it at `/api/admins/hr/employees/`.
-- `src/pages/inkassa/index.vue` — inkassa URLs don't exist. Either wait for backend or repoint to `/api/admins/hr/cash/{balance,deposit,withdraw}` and the cash list. The HR cash module looks like a viable replacement.
-- The `loadRoles()` call on the users page reads `/roles` which no longer exists. Until a roles endpoint lands, hard-code the role list from the User model (`ADMIN`, `CASHIER`, `WAITER`, etc.) on the client.
-
-### Step 7 — verify response shapes
-
-After the URL fixes, the data the pages already render (`data.items[]`,
-`pagination.total_items`, etc.) should still work because the new backend
-uses the same `ServiceResponse.success(data=...)` envelope. But spot-check
-each page in the browser before claiming it's done.
+| Item | Backend ask | Tracked in |
+|---|---|---|
+| Localized error messages remain stable as backend wording changes | Stable `code` field on every error response | `docs/BACKEND_FEEDBACK.md §1` |
+| Production deploy | `django-cors-headers` for the deployed admin origin | `docs/BACKEND_FEEDBACK.md §2` |
+| Generated TS types instead of hand-typed `any` | OpenAPI / drf-spectacular endpoint | `docs/BACKEND_FEEDBACK.md §3` |
+| Multi-branch deployment story | Document `BRANCH_ID` enforcement contract | `docs/BACKEND_FEEDBACK.md §4` |
 
 ---
 
-## 3. New backend modules worth adopting (after step 6)
+## 3. P2 — Frontend backlog (backend ready)
 
-The new backend ships with a lot of features the old one didn't. These
-are real new pages we can build:
+The backend already exposes these; we just haven't wired the UI yet.
+Ordered by user-visible impact.
 
-### High-value
+### Order item-level editing dialog
+Backend ready: `/orders/{id}/add-item`, `PATCH /orders/{id}/items/{item_id}`,
+`DELETE /orders/{id}/items/{item_id}/remove`,
+`/orders/{id}/items/{item_id}/{ready,unready}`.
+Today the orders page is list + pay/cancel only.
 
-- **HR module** (`/api/admins/hr/...`) — employees, departments, salaries, expenses, contracts, attendance, leaves, documents, reviews, goals, events. Probably its own top-level navigation section.
-- **Discounts** (`/api/admins/discounts/...`) — discount types, discount validation, apply/remove, secret-word validation. Add to the order page; new "Discounts" page for management.
-- **Notifications** (`/api/admins/notifications/...`) — settings, types, templates, queue, logs. New "Notifications" page.
-- **Places & tables** (`/api/admins/places`, `/api/admins/tables`) — needed for HALL orders. New "Floor plan" page.
-- **Shifts** (`/api/admins/shifts`, `/api/admins/shift-templates`) — cashier shift management.
-- **Order stats expansion** — `/orders/stats/{daily,monthly,yearly,cashiers,statuses,order-types,top-products,least-sold,categories,hourly,dashboard}`. The dashboard page should switch from cobbling stats together to using `orders/stats/dashboard` directly.
-- **App settings** — `/api/admins/app-settings`. Settings page.
+### Bulk ops UI
+Backend has `/categories/bulk-{delete,restore}`,
+`/products/bulk-{delete,restore}`. No frontend yet.
 
-### Medium
+### Notifications template editor
+Backend ready: `GET/PUT /api/admins/notifications/templates/{id}` plus
+the sandboxed template formatter. We list templates but don't edit them.
 
-- **Sync system** (`/api/sync/...`) — for offline / multi-branch sync. Probably a maintenance page.
-- **Auth sessions** (`/api/admins/auth-sessions`) — list active sessions, revoke. Profile page.
-- **Auth change password** (`/api/admins/auth-change-password`) — Profile page.
+### Telegram bot text editor
+Same data path as the notifications template editor — every message the
+customer bot sends is a notification template under the same admin API.
+Once the template editor lands this is a free win.
 
-### Skip for the admin panel
+### Stock advanced features
+- Item barcode lookup (`/items/barcode/{barcode}`)
+- Adjust dialog (`/levels/adjust`)
+- Reservations (`/levels/reserve`, `/levels/release-reservation`)
+- Batch consumption (`/batches/{id}/consume`, `/batches/auto-consume`)
+- Recipe cost analysis (`/recipes/{id}/cost`)
+- Purchase order receiving flow (`/purchase-orders/{id}/receive`)
+- Low-stock view (currently just a count on the dashboard — make a dedicated page)
 
-- `/api/waiters/...` — waiter role uses a different client (the desktop POS).
-- `/` (customers app) — for customer-facing display app, not the admin panel.
+### Roles management page
+Backend has `User.RoleChoices` but no roles-CRUD endpoint. List is
+hard-coded today (`ADMIN`, `CASHIER`, `WAITER`, `USER`). Acceptable for
+v1; build a real page only if roles become dynamic.
+
+### Auth sessions management
+`GET /auth-sessions`, revoke session, `POST /auth-logout-all`. No UI.
+Profile page would be the right home.
+
+### Licensing setup wizard
+Backend has `/api/licensing/setup` (one-time invite → license exchange)
+and kill-switch middleware. Today operators run this from CLI. Worth a
+dedicated bootstrap page if non-technical operators self-serve.
+
+### Move auth token to httpOnly cookie
+Backend already sets `session_key` cookie on login. Frontend uses the
+Bearer header / localStorage path. Switching is `withCredentials: true`
++ drop localStorage. Defer until first customer-facing PWA.
 
 ---
 
-## 4. Permissions (CASL)
+## 4. P3 — Polish
 
-The new backend ships a per-permission system. `/auth-me` and login both
-return `user.permissions: string[]`. For ADMIN role this is `['*']`.
-
-Currently the frontend hard-codes
-`localStorage.userAbilities = [{action: 'manage', subject: 'all'}]`. This
-keeps working for ADMIN users. When we start onboarding non-ADMIN roles,
-build the abilities from `user.permissions` instead — each permission
-string is `<resource>.<action>` (e.g. `category.create`, `order.update`).
-
-Update site: `src/pages/login.vue:47-49`.
-
----
-
-## 5. Suggested order of work
-
-1. (10 min) Step 1 — change baseURL.
-2. (10 min) Step 2 — login URL.
-3. (30 min) Steps 3 & 4 — categories/products/orders URL pattern + status spelling.
-4. (1 hr) Step 5 — stock pages get a `stockApi` instance.
-5. (30 min) Step 6 — hide users/inkassa nav entries until backend ships them. Update memory.
-6. (variable) Step 7 — smoke-test every page in browser.
-7. After core flows work: pick from §3 to add new pages.
-
-Each step is independently shippable. Step 1 unblocks visual debugging on
-every other page (you'll see 404s for the URL patterns that still need
-updating).
+- Confirm dialogs everywhere instead of `confirm()` / `prompt()`.
+- Replace remaining `any` types once OpenAPI lands.
+- Promote `yarn smoke` (Playwright) from `workflow_dispatch` to PR-gating once staging backend is reachable from CI runners.
+- Per-page accessibility pass (keyboard nav, focus management on dialogs).
+- Bundle-size pass (current dist is ~2 MB / 640 KB gzip — biggest wins are dropping unused Vuetify components and code-splitting heavy stock pages).

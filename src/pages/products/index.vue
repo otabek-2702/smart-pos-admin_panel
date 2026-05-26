@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AppPriceInput from '@core/components/AppPriceInput.vue'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
-import axios from '@axios'
+import axios from '@/plugins/axios'
 
 const { t } = useI18n({ useScope: 'global' })
 

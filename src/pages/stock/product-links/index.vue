@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import adminApi, { stockApi as axios } from '@axios'
+import adminApi, { stockApi as axios } from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })

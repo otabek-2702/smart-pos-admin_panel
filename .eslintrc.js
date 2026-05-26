@@ -240,10 +240,11 @@ module.exports = {
         },
         {
           regex: 'import axios from \'axios\'',
-          replacement: 'import axios from \'@axios\'',
-          message: 'Use axios instances created in \'src/plugin/axios.ts\' instead of unconfigured axios',
+          replacement: 'import axios from \'@/plugins/axios\'',
+          message: 'Use the configured axios instance from \'@/plugins/axios\' instead of the bare npm package',
           files: {
-            ignore: '^.*plugins/axios.ts.*',
+            // Skip this file itself — pattern is OS-agnostic (matches `/` or `\`).
+            ignore: 'plugins[\\\\/]axios\\.ts',
           },
         },
       ],

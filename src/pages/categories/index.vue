@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import DataTableFooter from '@core/components/DataTableFooter.vue'
-import axios from '@axios'
+import axios from '@/plugins/axios'
 
 const { t } = useI18n({ useScope: 'global' })
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ORDER_STATUS_COLOR as statusColor } from '@/constants/statusColors'
-import axios from '@axios'
+import axios from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })

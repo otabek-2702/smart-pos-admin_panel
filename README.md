@@ -109,7 +109,6 @@ See [`CLAUDE.md`](CLAUDE.md) for developer notes and patterns
 | `@layouts` | `src/@layouts/` |
 | `@images` | `src/assets/images/` |
 | `@styles` | `src/styles/` |
-| `@axios` | `src/plugins/axios.ts` |
 | `@validators` | `src/@core/utils/validators.ts` |
 | `@themeConfig` | `themeConfig.ts` (root) |
 

@@ -29,13 +29,18 @@ test.describe('smoke', () => {
   test('login + every top-level nav loads without console errors', async ({ page }) => {
     // Collect console errors across the whole run; assert at the end.
     const consoleErrors: string[] = []
+
     page.on('console', msg => {
       if (msg.type() === 'error') {
         const text = msg.text()
+
         // Filter out the noisy CASL localStorage warning — known + intentional.
-        if (text.includes('localStorage')) return
+        if (text.includes('localStorage'))
+          return
+
         // Filter Vue HMR / Vite messages.
-        if (text.includes('[vite]') || text.includes('[hmr]')) return
+        if (text.includes('[vite]') || text.includes('[hmr]'))
+          return
         consoleErrors.push(text)
       }
     })
@@ -57,12 +62,16 @@ test.describe('smoke', () => {
     // 4. Visit every top-level route and verify no console error fires per route.
     for (const route of NAV_ROUTES) {
       const before = consoleErrors.length
+
       await page.goto(route)
+
       // Wait for the page to settle — `networkidle` is flaky in Vue 3 dev mode,
       // so just wait for either a card to appear or 1.5s, whichever comes first.
       await page.waitForLoadState('domcontentloaded')
       await page.waitForTimeout(1500)
+
       const errsForRoute = consoleErrors.slice(before)
+
       expect(errsForRoute, `console errors on ${route}: ${errsForRoute.join(' | ')}`).toHaveLength(0)
     }
   })

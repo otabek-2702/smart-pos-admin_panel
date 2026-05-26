@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import axios from '@axios'
+import axios from '@/plugins/axios'
 import { initialAbility } from '@/plugins/casl/ability'
 import { useAppAbility } from '@/plugins/casl/useAppAbility'
 

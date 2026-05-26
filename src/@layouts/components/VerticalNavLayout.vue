@@ -126,7 +126,7 @@ export default defineComponent({
         'div',
         { class: ['layout-wrapper', ...layoutClasses.value(windowWidth.value, windowScrollY.value)] },
         [
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
           verticalNavWrapper ? h(verticalNavWrapper as any, verticalNavWrapperProps, { default: () => verticalNav }) : verticalNav,
           h(
             'div',

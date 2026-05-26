@@ -1,4 +1,4 @@
-import axios from '@axios'
+import axios from 'axios'
 
 // In dev, use relative paths so the Vite proxy (vite.config.ts) forwards to the backend
 // without triggering CORS. In production, set VITE_API_HOST to the backend URL.

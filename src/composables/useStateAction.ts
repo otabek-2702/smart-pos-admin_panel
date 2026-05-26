@@ -1,5 +1,5 @@
 import type { AxiosInstance } from 'axios'
-import defaultAxios from '@axios'
+import defaultAxios from '@/plugins/axios'
 
 export function useStateAction(
   baseUrl: string,

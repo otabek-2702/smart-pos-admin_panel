@@ -38,9 +38,6 @@
       "@styles/*": [
         "src/styles/*"
       ],
-      "@axios": [
-        "src/plugins/axios"
-      ],
       "@validators": [
         "src/@core/utils/validators"
       ]

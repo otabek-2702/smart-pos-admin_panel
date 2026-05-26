@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import axios from '@axios'
+import axios from '@/plugins/axios'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()

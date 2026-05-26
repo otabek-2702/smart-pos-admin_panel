@@ -16,7 +16,7 @@ import { useThemeConfig } from '@core/composable/useThemeConfig'
 const props = defineProps({
   autofocus: Boolean,
   counter: [Boolean, Number, String] as PropType<true | number | string>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   counterValue: Function as PropType<(value: any) => number>,
   prefix: String,
   placeholder: String,
@@ -57,7 +57,6 @@ const attrs = useAttrs()
 
 const [rootAttrs, compAttrs] = filterInputAttrs(attrs)
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const [{ modelValue: _, ...inputProps }] = VInput.filterProps(props)
 const [fieldProps] = filterFieldProps(props)
 

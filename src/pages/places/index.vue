@@ -82,9 +82,9 @@ async function savePlace() {
       await axios.put(`/places/${placeEdit.value.id}`, placeForm.value)
     else
       await axios.post('/places', placeForm.value)
-    notify(t(placeEdit.value ? 'Place updated' : 'Place created'))
+    notify(placeEdit.value ? t('Place updated') : t('Place created'))
     placeDialog.value = false
-    loadPlaces()
+    await Promise.all([loadPlaces(), loadTables()])
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -97,8 +97,7 @@ async function deletePlace(p: any) {
   try {
     await axios.delete(`/places/${p.id}`)
     notify(t('Place deleted'))
-    loadPlaces()
-    loadTables()
+    await Promise.all([loadPlaces(), loadTables()])
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -119,9 +118,9 @@ async function saveTable() {
       await axios.put(`/tables/${tableEdit.value.id}`, tableForm.value)
     else
       await axios.post('/tables', tableForm.value)
-    notify(t(tableEdit.value ? 'Table updated' : 'Table created'))
+    notify(tableEdit.value ? t('Table updated') : t('Table created'))
     tableDialog.value = false
-    loadTables()
+    await loadTables()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -134,7 +133,7 @@ async function deleteTable(tbl: any) {
   try {
     await axios.delete(`/tables/${tbl.id}`)
     notify(t('Table deleted'))
-    loadTables()
+    await loadTables()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -145,7 +144,7 @@ async function changeTableStatus(tbl: any, status: string) {
   try {
     await axios.patch(`/tables/${tbl.id}/status`, { status })
     notify(t('Status updated'))
-    loadTables()
+    await loadTables()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -203,7 +202,7 @@ async function changeTableStatus(tbl: any, status: string) {
               @click="selectedPlaceId = p.id"
             >
               <VListItemTitle>{{ p.name }}</VListItemTitle>
-              <VListItemSubtitle>{{ p.place_type }} · {{ t('Capacity') }}: {{ p.capacity }}</VListItemSubtitle>
+              <VListItemSubtitle>{{ t(`place_type_${p.place_type}`) }} · {{ t('Capacity') }}: {{ p.capacity }}</VListItemSubtitle>
               <template #append>
                 <div
                   class="d-flex"
@@ -291,7 +290,7 @@ async function changeTableStatus(tbl: any, status: string) {
                     variant="tonal"
                     class="mt-1"
                   >
-                    {{ (tbl as any).status }}
+                    {{ t(`status_${(tbl as any).status}`) }}
                   </VChip>
                   <VMenu>
                     <template #activator="{ props: menuProps }">
@@ -311,7 +310,7 @@ async function changeTableStatus(tbl: any, status: string) {
                         :key="s"
                         @click="changeTableStatus(tbl, s)"
                       >
-                        <VListItemTitle>{{ s }}</VListItemTitle>
+                        <VListItemTitle>{{ t(`status_${s}`) }}</VListItemTitle>
                       </VListItem>
                     </VList>
                   </VMenu>
@@ -382,7 +381,7 @@ async function changeTableStatus(tbl: any, status: string) {
           />
           <VSelect
             v-model="placeForm.place_type"
-            :items="placeTypes"
+            :items="placeTypes.map(p => ({ title: t(`place_type_${p}`), value: p }))"
             :label="t('Type')"
             class="mb-3"
           />

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { stockApi as axios } from '@/plugins/axios'
+import { getStoredUserData } from '@/utils/storage'
 
 const { t, te } = useI18n({ useScope: 'global' })
 
@@ -33,12 +34,7 @@ const suggestions = ref<Suggestion[]>([])
 const quickActions = ref<QuickAction[]>([])
 const loadingMeta = ref(false)
 const logRef = ref<HTMLElement | null>(null)
-const userData = ref<any>({})
-
-try {
-  userData.value = JSON.parse(localStorage.getItem('userData') || '{}')
-}
-catch {}
+const userData = ref<any>(getStoredUserData())
 
 const userInitial = computed(() => {
   const name = userData.value?.first_name || userData.value?.email || 'U'
@@ -123,10 +119,15 @@ async function send(text?: string) {
     })
   }
   catch (e: any) {
+    const code = e?.response?.data?.error
+    const friendly = (code === 'llm_sdk_missing' || code === 'llm_key_missing')
+      ? t('AI service unavailable')
+      : (e?.response?.data?.message || code || t('Request failed. Please try again.'))
+
     messages.value.push({
       id: Date.now() + 1,
       role: 'bot',
-      text: e?.response?.data?.error || t('Request failed. Please try again.'),
+      text: friendly,
       timestamp: Date.now(),
     })
   }

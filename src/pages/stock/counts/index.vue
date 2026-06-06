@@ -53,7 +53,7 @@ async function loadCounts() {
     const res = await axios.get('/counts/', { params })
     const d = res.data?.data ?? res.data
 
-    counts.value = d.counts ?? []
+    counts.value = d?.counts ?? []
     total.value = d.pagination?.total_items ?? counts.value.length
   }
   catch {
@@ -67,8 +67,9 @@ async function loadCounts() {
 async function loadLocations() {
   try {
     const res = await axios.get('/locations/', { params: { per_page: 200 } })
+    const d = res.data?.data ?? res.data
 
-    locationsList.value = res.data.locations ?? []
+    locationsList.value = d?.locations ?? []
   }
   catch { /* ignore */ }
 }
@@ -88,7 +89,7 @@ async function createCount() {
     await axios.post('/counts/', payload)
     notify(t('Stock count created'))
     createDialog.value = false
-    loadCounts()
+    await loadCounts()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error creating count'), 'error')
@@ -119,7 +120,7 @@ function canCancel(item: any) { return !['APPROVED', 'CANCELED'].includes(item.s
       <VCardText class="d-flex flex-wrap gap-3 align-center">
         <VSelect
           v-model="statusFilter"
-          :items="statuses"
+          :items="statuses.map(s => ({ title: t(`count_status_${s}`), value: s }))"
           :placeholder="t('All Statuses')"
           density="compact"
           style="min-inline-size: 200px;"
@@ -234,7 +235,7 @@ function canCancel(item: any) { return !['APPROVED', 'CANCELED'].includes(item.s
             size="small"
             variant="tonal"
           >
-            {{ item.raw.count_type }}
+            {{ t(`count_type_${item.raw.count_type}`) }}
           </VChip>
         </template>
         <template #item.status="{ item }">
@@ -243,7 +244,7 @@ function canCancel(item: any) { return !['APPROVED', 'CANCELED'].includes(item.s
             size="small"
             variant="tonal"
           >
-            {{ item.raw.status }}
+            {{ t(`count_status_${item.raw.status}`) }}
           </VChip>
         </template>
         <template #item.items_counted="{ item }">
@@ -358,7 +359,7 @@ function canCancel(item: any) { return !['APPROVED', 'CANCELED'].includes(item.s
             <VCol cols="12">
               <VSelect
                 v-model="form.count_type"
-                :items="countTypes"
+                :items="countTypes.map(c => ({ title: t(`count_type_${c}`), value: c }))"
                 :label="t('Count Type')"
               />
             </VCol>

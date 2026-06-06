@@ -39,7 +39,7 @@ const typeColor: Record<string, string> = {
             size="small"
             variant="tonal"
           >
-            {{ recipe.recipe_type }}
+            {{ t(`recipe_type_${recipe.recipe_type}`) }}
           </VChip>
           <VChip
             v-if="recipe.version"

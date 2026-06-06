@@ -61,13 +61,26 @@ async function loadSummary() {
 onMounted(() => { load(); loadSummary() })
 watch([page, itemsPerPage], load)
 
+const approveAllDialog = ref(false)
+const approveAllPeriod = ref('')
+
+function openApproveAll() {
+  const now = new Date()
+
+  approveAllPeriod.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  approveAllDialog.value = true
+}
+
 async function approveAll() {
-  if (!confirm(t('Approve all pending salaries?')))
+  if (!approveAllPeriod.value)
     return
   try {
-    await axios.post('/salaries/approve-all/')
+    const [y, m] = approveAllPeriod.value.split('-')
+
+    await axios.post('/salaries/approve-all/', { year: Number(y), month: Number(m) })
     notify(t('All pending salaries approved'))
-    load(); loadSummary()
+    approveAllDialog.value = false
+    await Promise.all([load(), loadSummary()])
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -78,7 +91,7 @@ async function approveOne(s: any) {
   try {
     await axios.post(`/salaries/${s.id}/approve/`)
     notify(t('Approved'))
-    load()
+    await load()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -89,7 +102,7 @@ async function payOne(s: any) {
   try {
     await axios.post(`/salaries/${s.id}/pay/`)
     notify(t('Paid'))
-    load(); loadSummary()
+    await Promise.all([load(), loadSummary()])
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -108,10 +121,11 @@ async function generate() {
     return
   generating.value = true
   try {
-    await axios.post('/salaries/generate/', { period: generatePeriod.value })
+    const [y, m] = generatePeriod.value.split('-')
+    await axios.post('/salaries/generate/', { year: Number(y), month: Number(m) })
     notify(t('Salaries generated'))
     generateDialog.value = false
-    load(); loadSummary()
+    await Promise.all([load(), loadSummary()])
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -281,7 +295,7 @@ async function generate() {
         <VBtn
           color="success"
           prepend-icon="bx-check-double"
-          @click="approveAll"
+          @click="openApproveAll"
         >
           {{ t('Approve All') }}
         </VBtn>
@@ -306,13 +320,13 @@ async function generate() {
           {{ item.raw.employee?.user?.first_name }} {{ item.raw.employee?.user?.last_name }}
         </template>
         <template #item.period="{ item }">
-          {{ item.raw.period ?? `${item.raw.year}-${String(item.raw.month).padStart(2, '0')}` }}
+          {{ item.raw.period_year }}-{{ String(item.raw.period_month).padStart(2, '0') }}
         </template>
         <template #item.base_salary="{ item }">
-          {{ formatCurrency(item.raw.base_salary ?? 0) }}
+          {{ formatCurrency(item.raw.base_amount ?? 0) }}
         </template>
         <template #item.net_salary="{ item }">
-          <span class="font-weight-medium">{{ formatCurrency(item.raw.net_salary ?? 0) }}</span>
+          <span class="font-weight-medium">{{ formatCurrency(item.raw.net_amount ?? 0) }}</span>
         </template>
         <template #item.status="{ item }">
           <VChip
@@ -399,6 +413,38 @@ async function generate() {
             @click="generate"
           >
             {{ t('Generate') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <VDialog
+      v-model="approveAllDialog"
+      max-width="480"
+      persistent
+    >
+      <VCard :title="t('Approve All Pending Salaries')">
+        <VCardText>
+          <VTextField
+            v-model="approveAllPeriod"
+            type="month"
+            :label="t('Period')"
+            autofocus
+          />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn
+            variant="text"
+            @click="approveAllDialog = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            color="success"
+            @click="approveAll"
+          >
+            {{ t('Approve All') }}
           </VBtn>
         </VCardActions>
       </VCard>

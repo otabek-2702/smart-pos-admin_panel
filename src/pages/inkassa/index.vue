@@ -18,8 +18,12 @@ const historyPerPage = ref(10)
 
 const performDialog = ref(false)
 const performLoading = ref(false)
-const performAmount = ref<number | null>(null)
+const performAmounts = ref({ cash: 0, uzcard: 0, humo: 0, payme: 0 })
 const performNotes = ref('')
+
+const totalRemoved = computed(() =>
+  Object.values(performAmounts.value).reduce((acc, v) => acc + (Number(v) || 0), 0),
+)
 
 const historyHeaders = [
   { title: t('Date'), key: 'created_at', sortable: false },
@@ -64,26 +68,30 @@ async function loadHistory() {
 }
 
 function openPerform() {
-  performAmount.value = null
+  performAmounts.value = { cash: 0, uzcard: 0, humo: 0, payme: 0 }
   performNotes.value = ''
   performDialog.value = true
 }
 
 async function performInkassa() {
-  if (!performAmount.value || performAmount.value <= 0) {
+  if (totalRemoved.value <= 0) {
     notify(t('Amount is required'), 'error')
+
     return
   }
   performLoading.value = true
   try {
+    // BE reads body directly as amounts dict + a `notes` key — NOT nested.
     await axios.post('/inkassa/perform', {
-      amount: performAmount.value,
+      cash: performAmounts.value.cash,
+      uzcard: performAmounts.value.uzcard,
+      humo: performAmounts.value.humo,
+      payme: performAmounts.value.payme,
       notes: performNotes.value,
     })
     notify(t('Inkassa performed successfully'))
     performDialog.value = false
-    loadBalance()
-    loadHistory()
+    await Promise.all([loadBalance(), loadHistory()])
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -346,13 +354,57 @@ watch([historyPage, historyPerPage], loadHistory)
     >
       <VCard :title="t('Perform Inkassa')">
         <VCardText>
-          <VTextField
-            v-model.number="performAmount"
-            :label="t('Amount')"
-            type="number"
-            class="mb-4"
-            autofocus
-          />
+          <VRow>
+            <VCol
+              cols="6"
+              sm="6"
+            >
+              <VTextField
+                v-model.number="performAmounts.cash"
+                :label="t('Cash')"
+                type="number"
+                min="0"
+                autofocus
+              />
+            </VCol>
+            <VCol
+              cols="6"
+              sm="6"
+            >
+              <VTextField
+                v-model.number="performAmounts.uzcard"
+                :label="t('Uzcard')"
+                type="number"
+                min="0"
+              />
+            </VCol>
+            <VCol
+              cols="6"
+              sm="6"
+            >
+              <VTextField
+                v-model.number="performAmounts.humo"
+                :label="t('Humo')"
+                type="number"
+                min="0"
+              />
+            </VCol>
+            <VCol
+              cols="6"
+              sm="6"
+            >
+              <VTextField
+                v-model.number="performAmounts.payme"
+                :label="t('Payme')"
+                type="number"
+                min="0"
+              />
+            </VCol>
+          </VRow>
+          <div class="d-flex justify-space-between mt-2 mb-3">
+            <span class="text-body-2 text-disabled">{{ t('Total') }}</span>
+            <span class="text-body-1 font-weight-bold">{{ formatCurrency(totalRemoved) }}</span>
+          </div>
           <VTextarea
             v-model="performNotes"
             :label="t('Notes')"

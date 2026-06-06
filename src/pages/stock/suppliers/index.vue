@@ -62,8 +62,8 @@ async function loadSuppliers() {
     const res = await axios.get('/suppliers/', { params })
     const d = res.data?.data ?? res.data
 
-    suppliers.value = d.suppliers ?? []
-    total.value = d.pagination?.total_items ?? suppliers.value.length
+    suppliers.value = d?.suppliers ?? []
+    total.value = d?.pagination?.total_items ?? suppliers.value.length
   }
   catch {
     notify(t('Failed to load suppliers'), 'error')
@@ -132,7 +132,7 @@ async function save() {
       await axios.patch(`/suppliers/${selectedItem.value.id}/`, form.value)
     notify(dialogMode.value === 'create' ? t('Supplier created') : t('Supplier updated'))
     dialog.value = false
-    loadSuppliers()
+    await loadSuppliers()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error saving supplier'), 'error')
@@ -153,7 +153,7 @@ async function doDelete() {
     await axios.delete(`/suppliers/${selectedItem.value.id}/`)
     notify(t('Supplier deleted'))
     deleteDialog.value = false
-    loadSuppliers()
+    await loadSuppliers()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting supplier'), 'error')

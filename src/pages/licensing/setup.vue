@@ -10,12 +10,29 @@ const loadingState = ref(true)
 
 const form = ref({
   email: '',
-  org_name: '',
-  invite_code: '',
+  plan_id: null as number | null,
 })
 
+const plans = ref<any[]>([])
+const loadingPlans = ref(false)
 const submitting = ref(false)
 const error = ref('')
+
+async function loadPlans() {
+  loadingPlans.value = true
+  try {
+    const res = await licensingApi.get('/plans')
+    const d = res.data?.data ?? res.data
+
+    plans.value = Array.isArray(d) ? d : (d?.plans ?? d?.items ?? [])
+  }
+  catch {
+    plans.value = []
+  }
+  finally {
+    loadingPlans.value = false
+  }
+}
 
 async function loadState() {
   loadingState.value = true
@@ -39,13 +56,16 @@ async function loadState() {
 
 async function submit() {
   error.value = ''
-  if (!form.value.email || !form.value.org_name || !form.value.invite_code) {
-    error.value = t('All fields are required')
+  if (!form.value.email) {
+    error.value = t('Email is required')
     return
   }
   submitting.value = true
   try {
-    await licensingApi.post('/setup', form.value)
+    const payload: any = { email: form.value.email }
+    if (form.value.plan_id)
+      payload.plan_id = form.value.plan_id
+    await licensingApi.post('/setup', payload)
     notify(t('Setup complete — redirecting to login'))
 
     // Give the kill-switch state a moment to flip to ACTIVE before we
@@ -60,7 +80,7 @@ async function submit() {
   }
 }
 
-onMounted(loadState)
+onMounted(() => { loadState(); loadPlans() })
 </script>
 
 <template>
@@ -126,17 +146,14 @@ onMounted(loadState)
             class="mb-3"
             :disabled="submitting"
           />
-          <VTextField
-            v-model="form.org_name"
-            :label="t('Organization name')"
-            class="mb-3"
-            :disabled="submitting"
-          />
-          <VTextField
-            v-model="form.invite_code"
-            :label="t('Invite code')"
-            :hint="t('Provided by your POS vendor')"
+          <VSelect
+            v-if="plans.length"
+            v-model="form.plan_id"
+            :items="plans.map((p: any) => ({ title: p.name ?? `Plan #${p.id}`, value: p.id, props: { subtitle: p.price ? `${p.price}` : undefined } }))"
+            :label="t('Plan')"
+            :hint="t('Optional — vendor sets default when omitted')"
             persistent-hint
+            clearable
             :disabled="submitting"
             class="mb-4"
           />

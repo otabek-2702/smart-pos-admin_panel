@@ -21,14 +21,14 @@ const form = ref({
   category_id: null as number | null,
   amount: 0,
   description: '',
-  date: new Date().toISOString().slice(0, 10),
-  reference_number: '',
+  expense_date: new Date().toISOString().slice(0, 10),
+  receipt_number: '',
 })
 
 const categories = ref<any[]>([])
 
 const headers = [
-  { title: t('Date'), key: 'date', sortable: false },
+  { title: t('Date'), key: 'expense_date', sortable: false },
   { title: t('Category'), key: 'category', sortable: false },
   { title: t('Description'), key: 'description', sortable: false },
   { title: t('Amount'), key: 'amount', sortable: false },
@@ -88,8 +88,8 @@ function openCreate() {
     category_id: categories.value[0]?.id ?? null,
     amount: 0,
     description: '',
-    date: new Date().toISOString().slice(0, 10),
-    reference_number: '',
+    expense_date: new Date().toISOString().slice(0, 10),
+    receipt_number: '',
   }
   dialog.value = true
 }
@@ -100,7 +100,7 @@ async function save() {
     await axios.post('/expenses/', form.value)
     notify(t('Expense created'))
     dialog.value = false
-    load(); loadStats()
+    await Promise.all([load(), loadStats()])
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -114,7 +114,7 @@ async function approve(e: any) {
   try {
     await axios.post(`/expenses/${e.id}/approve/`)
     notify(t('Approved'))
-    load(); loadStats()
+    await Promise.all([load(), loadStats()])
   }
   catch (err: any) {
     notify(err?.response?.data?.message ?? t('Error'), 'error')
@@ -126,9 +126,9 @@ async function reject(e: any) {
   if (!reason)
     return
   try {
-    await axios.post(`/expenses/${e.id}/reject/`, { reason })
+    await axios.post(`/expenses/${e.id}/reject/`, { notes: reason })
     notify(t('Rejected'))
-    load(); loadStats()
+    await Promise.all([load(), loadStats()])
   }
   catch (err: any) {
     notify(err?.response?.data?.message ?? t('Error'), 'error')
@@ -139,10 +139,69 @@ async function pay(e: any) {
   try {
     await axios.post(`/expenses/${e.id}/pay/`)
     notify(t('Paid'))
-    load(); loadStats()
+    await Promise.all([load(), loadStats()])
   }
   catch (err: any) {
     notify(err?.response?.data?.message ?? t('Error'), 'error')
+  }
+}
+
+// ---------- Category manager ----------
+const catDialog = ref(false)
+const catSaving = ref(false)
+const catEditing = ref<any>(null)
+const catForm = ref({ name: '', description: '' })
+
+function openCatManager() {
+  catEditing.value = null
+  catForm.value = { name: '', description: '' }
+  catDialog.value = true
+}
+
+function pickCat(c: any) {
+  catEditing.value = c
+  catForm.value = { name: c.name ?? '', description: c.description ?? '' }
+}
+
+async function saveCat() {
+  if (!catForm.value.name.trim()) {
+    notify(t('Name is required'), 'error')
+
+    return
+  }
+  catSaving.value = true
+  try {
+    if (catEditing.value)
+      await axios.put(`/expense-categories/${catEditing.value.id}/`, catForm.value)
+    else
+      await axios.post('/expense-categories/', catForm.value)
+    notify(catEditing.value ? t('Category updated') : t('Category created'))
+    catEditing.value = null
+    catForm.value = { name: '', description: '' }
+    await loadCategories()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+  finally {
+    catSaving.value = false
+  }
+}
+
+async function deleteCat(c: any) {
+  if (!confirm(t('Delete this category?')))
+    return
+  try {
+    await axios.delete(`/expense-categories/${c.id}/`)
+    notify(t('Deleted'))
+    if (catEditing.value?.id === c.id) {
+      catEditing.value = null
+      catForm.value = { name: '', description: '' }
+    }
+    await loadCategories()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
   }
 }
 </script>
@@ -241,15 +300,24 @@ async function pay(e: any) {
     </VRow>
 
     <VCard>
-      <VCardText class="d-flex align-center justify-space-between py-3">
+      <VCardText class="d-flex align-center justify-space-between py-3 flex-wrap gap-2">
         <span class="text-h6">{{ t('Expenses') }}</span>
-        <VBtn
-          color="primary"
-          prepend-icon="bx-plus"
-          @click="openCreate"
-        >
-          {{ t('New Expense') }}
-        </VBtn>
+        <div class="d-flex gap-2">
+          <VBtn
+            variant="tonal"
+            prepend-icon="bx-folder"
+            @click="openCatManager"
+          >
+            {{ t('Categories') }}
+          </VBtn>
+          <VBtn
+            color="primary"
+            prepend-icon="bx-plus"
+            @click="openCreate"
+          >
+            {{ t('New Expense') }}
+          </VBtn>
+        </div>
       </VCardText>
 
       <VDataTableServer
@@ -267,8 +335,8 @@ async function pay(e: any) {
             :total-items="total"
           />
         </template>
-        <template #item.date="{ item }">
-          {{ formatDate(item.raw.date) }}
+        <template #item.expense_date="{ item }">
+          {{ formatDate(item.raw.expense_date) }}
         </template>
         <template #item.category="{ item }">
           {{ item.raw.category?.name ?? '—' }}
@@ -382,14 +450,14 @@ async function pay(e: any) {
               sm="6"
             >
               <VTextField
-                v-model="form.date"
+                v-model="form.expense_date"
                 type="date"
                 :label="t('Date')"
               />
             </VCol>
             <VCol cols="12">
               <VTextField
-                v-model="form.reference_number"
+                v-model="form.receipt_number"
                 :label="t('Reference Number')"
               />
             </VCol>
@@ -416,6 +484,111 @@ async function pay(e: any) {
             @click="save"
           >
             {{ t('Save') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <VDialog
+      v-model="catDialog"
+      max-width="720"
+      scrollable
+    >
+      <VCard :title="t('Expense Categories')">
+        <VCardText style="max-height:70vh;overflow-y:auto;">
+          <VRow>
+            <VCol
+              cols="12"
+              md="5"
+            >
+              <div class="text-subtitle-2 mb-2">
+                {{ catEditing ? t('Edit Category') : t('New Category') }}
+              </div>
+              <VTextField
+                v-model="catForm.name"
+                :label="t('Name')"
+                class="mb-2"
+                density="compact"
+              />
+              <VTextarea
+                v-model="catForm.description"
+                :label="t('Description')"
+                rows="3"
+                density="compact"
+                class="mb-2"
+              />
+              <div class="d-flex gap-2">
+                <VBtn
+                  color="primary"
+                  size="small"
+                  :loading="catSaving"
+                  @click="saveCat"
+                >
+                  {{ catEditing ? t('Save') : t('Add') }}
+                </VBtn>
+                <VBtn
+                  v-if="catEditing"
+                  variant="tonal"
+                  size="small"
+                  @click="catEditing = null; catForm = { name: '', description: '' }"
+                >
+                  {{ t('Cancel') }}
+                </VBtn>
+              </div>
+            </VCol>
+            <VCol
+              cols="12"
+              md="7"
+            >
+              <div class="text-subtitle-2 mb-2">
+                {{ t('Existing') }} ({{ categories.length }})
+              </div>
+              <VList
+                density="compact"
+                class="pa-0"
+                style="border:1px solid rgba(var(--v-theme-on-surface),0.08);border-radius:6px;max-height:340px;overflow-y:auto;"
+              >
+                <VListItem
+                  v-for="c in categories"
+                  :key="c.id"
+                  :active="catEditing?.id === c.id"
+                  @click="pickCat(c)"
+                >
+                  <VListItemTitle>{{ c.name }}</VListItemTitle>
+                  <VListItemSubtitle v-if="c.description">
+                    {{ c.description }}
+                  </VListItemSubtitle>
+                  <template #append>
+                    <VBtn
+                      icon
+                      variant="text"
+                      size="x-small"
+                      color="error"
+                      @click.stop="deleteCat(c)"
+                    >
+                      <VIcon
+                        icon="bx-trash"
+                        size="16"
+                      />
+                    </VBtn>
+                  </template>
+                </VListItem>
+                <VListItem v-if="!categories.length">
+                  <VListItemTitle class="text-disabled">
+                    {{ t('No categories yet') }}
+                  </VListItemTitle>
+                </VListItem>
+              </VList>
+            </VCol>
+          </VRow>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn
+            variant="text"
+            @click="catDialog = false"
+          >
+            {{ t('Close') }}
           </VBtn>
         </VCardActions>
       </VCard>

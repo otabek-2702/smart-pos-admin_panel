@@ -50,7 +50,7 @@ async function loadOrders() {
     if (statusFilter.value.length)
       params.statuses = statusFilter.value.join(',')
     if (paymentFilter.value)
-      params.is_paid = paymentFilter.value === 'PAID'
+      params.payment_status = paymentFilter.value
     if (search.value.trim())
       params.search = search.value.trim()
     if (dateFrom.value)
@@ -98,8 +98,7 @@ async function markPaid(order: any) {
   try {
     await axios.post(`/orders/${order.id}/pay`)
     notify(t('Order marked as paid'))
-    loadOrders()
-    loadStats()
+    await Promise.all([loadOrders(), loadStats()])
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error updating order'), 'error')
@@ -110,8 +109,7 @@ async function cancelOrder(order: any) {
   try {
     await axios.post(`/orders/${order.id}/cancel`)
     notify(t('Order cancelled'))
-    loadOrders()
-    loadStats()
+    await Promise.all([loadOrders(), loadStats()])
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error cancelling order'), 'error')

@@ -59,6 +59,13 @@ export default [
     subject: 'all',
   },
   {
+    title: 'Treasury',
+    icon: { icon: 'bx-shield' },
+    to: 'treasury',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
     title: 'Loyalty',
     icon: { icon: 'bx-medal' },
     to: 'loyalty',

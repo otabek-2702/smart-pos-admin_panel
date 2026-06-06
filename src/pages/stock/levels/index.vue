@@ -51,7 +51,7 @@ async function loadLevels() {
     const res = await axios.get('/levels/', { params })
     const d = res.data?.data ?? res.data
 
-    levels.value = d.levels ?? []
+    levels.value = d?.levels ?? []
     total.value = d.pagination?.total_items ?? levels.value.length
   }
   catch {
@@ -65,8 +65,9 @@ async function loadLevels() {
 async function loadLocations() {
   try {
     const res = await axios.get('/locations/', { params: { per_page: 200 } })
+    const d = res.data?.data ?? res.data
 
-    locationsList.value = res.data.locations ?? []
+    locationsList.value = d?.locations ?? []
   }
   catch { /* ignore */ }
 }

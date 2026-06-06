@@ -103,7 +103,7 @@ async function loadTransactions() {
     const res = await axios.get('/transactions/', { params })
     const d = res.data?.data ?? res.data
 
-    transactions.value = d.transactions ?? []
+    transactions.value = d?.transactions ?? []
     total.value = d.pagination?.total_items ?? transactions.value.length
   }
   catch {
@@ -117,8 +117,9 @@ async function loadTransactions() {
 async function loadLocations() {
   try {
     const res = await axios.get('/locations/', { params: { per_page: 200 } })
+    const d = res.data?.data ?? res.data
 
-    locationsList.value = res.data.locations ?? []
+    locationsList.value = d?.locations ?? []
   }
   catch { /* ignore */ }
 }
@@ -262,7 +263,7 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
               :icon="typeIcon[item.raw.movement_type] ?? 'bx-circle'"
               size="13"
             />
-            {{ item.raw.movement_type?.replace(/_/g, ' ') }}
+            {{ t(`movement_${item.raw.movement_type}`) }}
           </VChip>
         </template>
         <template #item.item="{ item }">

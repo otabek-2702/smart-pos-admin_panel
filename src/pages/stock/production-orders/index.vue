@@ -3,6 +3,7 @@ import { stockApi as axios } from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 import { useStateAction } from '@/composables/useStateAction'
 import { PRODUCTION_PRIORITY_COLOR as priorityColor, PRODUCTION_ORDER_STATUS_COLOR as statusColor } from '@/constants/statusColors'
+import { getStoredUserData } from '@/utils/storage'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -62,7 +63,7 @@ async function loadOrders() {
     const res = await axios.get('/production-orders/', { params })
     const d = res.data?.data ?? res.data
 
-    orders.value = d.orders ?? []
+    orders.value = d?.orders ?? []
     total.value = d.pagination?.total_items ?? orders.value.length
   }
   catch {
@@ -80,8 +81,11 @@ async function loadMeta() {
       axios.get('/locations/', { params: { per_page: 200 } }),
     ])
 
-    recipesList.value = recRes.data.recipes ?? []
-    locationsList.value = locRes.data.locations ?? []
+    const recD = recRes.data?.data ?? recRes.data
+    const locD = locRes.data?.data ?? locRes.data
+
+    recipesList.value = recD?.recipes ?? []
+    locationsList.value = locD?.locations ?? []
   }
   catch { /* ignore */ }
 }
@@ -108,7 +112,7 @@ async function createOrder() {
   }
   saving.value = true
   try {
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}')
+    const userData = getStoredUserData()
     const payload: any = { ...form.value, created_by_id: userData.id }
     if (!payload.planned_start_date)
       delete payload.planned_start_date
@@ -117,7 +121,7 @@ async function createOrder() {
     await axios.post('/production-orders/', payload)
     notify(t('Production order created'))
     createDialog.value = false
-    loadOrders()
+    await loadOrders()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error creating order'), 'error')
@@ -161,7 +165,7 @@ function canCancel(item: any) { return !['COMPLETED', 'CANCELED'].includes(item.
         />
         <VSelect
           v-model="statusFilter"
-          :items="statuses"
+          :items="statuses.map(s => ({ title: t(`production_status_${s}`), value: s }))"
           :placeholder="t('All Statuses')"
           density="compact"
           style="min-inline-size: 180px;"
@@ -170,7 +174,7 @@ function canCancel(item: any) { return !['COMPLETED', 'CANCELED'].includes(item.
         />
         <VSelect
           v-model="priorityFilter"
-          :items="priorities"
+          :items="priorities.map(p => ({ title: t(`priority_${p}`), value: p }))"
           :placeholder="t('All Priorities')"
           density="compact"
           style="min-inline-size: 160px;"
@@ -283,7 +287,7 @@ function canCancel(item: any) { return !['COMPLETED', 'CANCELED'].includes(item.
             size="small"
             variant="tonal"
           >
-            {{ item.raw.status }}
+            {{ t(`production_status_${item.raw.status}`) }}
           </VChip>
         </template>
         <template #item.priority="{ item }">
@@ -292,7 +296,7 @@ function canCancel(item: any) { return !['COMPLETED', 'CANCELED'].includes(item.
             size="small"
             variant="tonal"
           >
-            {{ item.raw.priority }}
+            {{ t(`priority_${item.raw.priority}`) }}
           </VChip>
         </template>
         <template #item.output="{ item }">
@@ -480,7 +484,7 @@ function canCancel(item: any) { return !['COMPLETED', 'CANCELED'].includes(item.
             >
               <VSelect
                 v-model="form.priority"
-                :items="priorities"
+                :items="priorities.map(p => ({ title: t(`priority_${p}`), value: p }))"
                 :label="t('Priority')"
               />
             </VCol>

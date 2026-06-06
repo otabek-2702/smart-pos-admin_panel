@@ -2,7 +2,7 @@
 import { notificationsApi as axios } from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, te } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatDate } = useFormatters()
 
@@ -54,7 +54,15 @@ async function loadSettings() {
 async function saveSettings() {
   settingsSaving.value = true
   try {
-    await axios.put('/settings/', settings.value)
+    const payload: any = {
+      brand_name: settings.value.brand_name,
+      is_enabled: settings.value.is_enabled,
+      timeout: settings.value.timeout,
+      chat_ids: Array.isArray(settings.value.chat_ids) ? settings.value.chat_ids : [],
+    }
+    if (settings.value.bot_token)
+      payload.bot_token = settings.value.bot_token
+    await axios.put('/settings/', payload)
     notify(t('Settings saved'))
     loadSettings()
   }
@@ -96,7 +104,7 @@ async function toggleTemplate(tpl: any) {
   try {
     await axios.put(`/types/${tpl.notification_type}/`, { is_enabled: !tpl.is_enabled })
     notify(t('Updated'))
-    loadTemplates()
+    await loadTemplates()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -107,10 +115,11 @@ async function loadLogs() {
   logsLoading.value = true
   try {
     const res = await axios.get('/logs/', { params: { page: logsPage.value, per_page: logsPerPage.value } })
-    const d = res.data?.data ?? res.data
+    const d = res.data?.data
 
-    logs.value = d?.logs ?? d?.items ?? []
-    logsTotal.value = d?.pagination?.total_items ?? d?.pagination?.total ?? logs.value.length
+    logs.value = Array.isArray(d) ? d : (d?.logs ?? d?.items ?? [])
+    const pag = res.data?.pagination
+    logsTotal.value = pag?.total_items ?? pag?.total ?? logs.value.length
   }
   catch {
     notify(t('Failed to load logs'), 'error')
@@ -124,7 +133,7 @@ async function processQueue() {
   try {
     await axios.post('/queue/process/')
     notify(t('Queue processed'))
-    loadLogs()
+    await loadLogs()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -223,6 +232,7 @@ const statusColor: Record<string, string> = {
                     v-model="settings.bot_token"
                     :label="t('Bot Token')"
                     type="password"
+                    :placeholder="settings.bot_configured ? t('(configured — enter to replace)') : ''"
                   />
                 </VCol>
                 <VCol
@@ -230,18 +240,20 @@ const statusColor: Record<string, string> = {
                   sm="6"
                 >
                   <VTextField
-                    v-model="settings.chat_id"
-                    :label="t('Chat ID')"
+                    v-model.number="settings.timeout"
+                    :label="t('Timeout (sec)')"
+                    type="number"
+                    min="1"
                   />
                 </VCol>
-                <VCol
-                  cols="12"
-                  sm="6"
-                >
-                  <VSelect
-                    v-model="settings.provider"
-                    :items="['TELEGRAM', 'EMAIL', 'SMS']"
-                    :label="t('Provider')"
+                <VCol cols="12">
+                  <VCombobox
+                    v-model="settings.chat_ids"
+                    :label="t('Chat IDs')"
+                    :placeholder="t('Type a chat ID and press Enter')"
+                    multiple
+                    chips
+                    closable-chips
                   />
                 </VCol>
                 <VCol cols="12">
@@ -291,7 +303,7 @@ const statusColor: Record<string, string> = {
               >
                 <VListItemTitle>{{ tpl.name }}</VListItemTitle>
                 <VListItemSubtitle class="text-caption">
-                  {{ tpl.notification_type }} · {{ tpl.language }}
+                  {{ te(`notif_type_${tpl.notification_type}`) ? t(`notif_type_${tpl.notification_type}`) : tpl.notification_type }} · {{ tpl.language }}
                 </VListItemSubtitle>
                 <template #append>
                   <VSwitch
@@ -348,7 +360,7 @@ const statusColor: Record<string, string> = {
                   :color="statusColor[item.raw.status] ?? 'default'"
                   variant="tonal"
                 >
-                  {{ item.raw.status }}
+                  {{ te(`notif_log_status_${item.raw.status}`) ? t(`notif_log_status_${item.raw.status}`) : item.raw.status }}
                 </VChip>
               </template>
               <template #item.message="{ item }">

@@ -173,7 +173,7 @@ const headers = computed(() => [
           closable
           @click:close="classFilter = undefined"
         >
-          {{ t('Class') }}: {{ classFilter }}
+          {{ t('Class') }}: {{ t(classFilter as string) }}
         </VChip>
         <span
           v-if="summary"
@@ -205,7 +205,7 @@ const headers = computed(() => [
             variant="tonal"
             :prepend-icon="classIcon[item.raw.class]"
           >
-            {{ item.raw.class }}
+            {{ t(item.raw.class) }}
           </VChip>
         </template>
         <template #item.price="{ item }">

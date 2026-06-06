@@ -63,8 +63,8 @@ async function loadLocations() {
     const res = await axios.get('/locations/', { params })
     const d = res.data?.data ?? res.data
 
-    locations.value = d.locations ?? []
-    total.value = d.count ?? locations.value.length
+    locations.value = d?.locations ?? []
+    total.value = d?.count ?? locations.value.length
   }
   catch {
     notify(t('Failed to load locations'), 'error')
@@ -111,7 +111,7 @@ async function save() {
       await axios.patch(`/locations/${selectedItem.value.id}/`, payload)
     notify(dialogMode.value === 'create' ? t('Location created') : t('Location updated'))
     dialog.value = false
-    loadLocations()
+    await loadLocations()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error saving location'), 'error')
@@ -132,7 +132,7 @@ async function doDelete() {
     await axios.delete(`/locations/${selectedItem.value.id}/`)
     notify(t('Location deleted'))
     deleteDialog.value = false
-    loadLocations()
+    await loadLocations()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting location'), 'error')
@@ -146,7 +146,7 @@ async function toggleActive(item: any) {
   try {
     await axios.patch(`/locations/${item.id}/`, { is_active: !item.is_active })
     notify(item.is_active ? t('Location deactivated') : t('Location activated'))
-    loadLocations()
+    await loadLocations()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error updating location'), 'error')

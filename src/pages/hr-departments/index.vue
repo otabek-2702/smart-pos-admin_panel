@@ -73,7 +73,7 @@ async function save() {
       await axios.post('/departments/', form.value)
     notify(t('Saved'))
     dialog.value = false
-    load()
+    await load()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -89,7 +89,7 @@ async function remove(d: any) {
   try {
     await axios.delete(`/departments/${d.id}/`)
     notify(t('Deleted'))
-    load()
+    await load()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')

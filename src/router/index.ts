@@ -12,10 +12,7 @@ const router = createRouter({
     {
       path: '/',
       redirect: to => {
-        const userData = JSON.parse(localStorage.getItem('userData') || '{}')
-        const isLoggedIn = !!(localStorage.getItem('userData') && localStorage.getItem('accessToken'))
-
-        if (isLoggedIn)
+        if (isUserLoggedIn())
           return { name: 'index', query: to.query }
 
         return { name: 'login', query: to.query }

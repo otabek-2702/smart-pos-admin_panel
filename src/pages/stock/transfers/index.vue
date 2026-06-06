@@ -58,7 +58,7 @@ async function loadTransfers() {
     const res = await axios.get('/transfers/', { params })
     const d = res.data?.data ?? res.data
 
-    transfers.value = d.transfers ?? []
+    transfers.value = d?.transfers ?? []
     total.value = d.pagination?.total_items ?? transfers.value.length
   }
   catch {
@@ -77,9 +77,13 @@ async function loadMeta() {
       axios.get('/units/', { params: { per_page: 200 } }),
     ])
 
-    locationsList.value = locRes.data.locations ?? []
-    itemsList.value = itemsRes.data.items ?? []
-    unitsList.value = unitsRes.data.units ?? []
+    const locD = locRes.data?.data ?? locRes.data
+    const itemD = itemsRes.data?.data ?? itemsRes.data
+    const unitD = unitsRes.data?.data ?? unitsRes.data
+
+    locationsList.value = locD?.locations ?? []
+    itemsList.value = itemD?.items ?? []
+    unitsList.value = unitD?.units ?? []
   }
   catch { /* ignore */ }
 }
@@ -130,7 +134,7 @@ async function createTransfer() {
     await axios.post('/transfers/', payload)
     notify(t('Transfer created'))
     createDialog.value = false
-    loadTransfers()
+    await loadTransfers()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error creating transfer'), 'error')
@@ -288,7 +292,7 @@ function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.s
             size="small"
             variant="tonal"
           >
-            {{ item.raw.transfer_type }}
+            {{ t(`transfer_type_${item.raw.transfer_type}`) }}
           </VChip>
         </template>
         <template #item.status="{ item }">
@@ -297,7 +301,7 @@ function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.s
             size="small"
             variant="tonal"
           >
-            {{ item.raw.status }}
+            {{ t(`transfer_status_${item.raw.status}`) }}
           </VChip>
         </template>
         <template #item.created_at="{ item }">

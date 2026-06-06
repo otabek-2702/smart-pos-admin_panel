@@ -62,7 +62,7 @@ async function loadLinks() {
     const res = await axios.get('/product-links/', { params })
     const d = res.data?.data ?? res.data
 
-    links.value = d.links ?? []
+    links.value = d?.links ?? []
     total.value = d.pagination?.total_items ?? d.count ?? links.value.length
     if (d.link_types)
       linkTypes.value = d.link_types
@@ -86,10 +86,15 @@ async function loadOptions() {
       axios.get('/units/', { params: { per_page: 200 } }),
     ])
 
-    products.value = (prodRes.data.products ?? prodRes.data.results ?? []).map((p: any) => ({ title: p.name, value: p.id }))
-    recipes.value = (recRes.data.recipes ?? recRes.data.results ?? []).map((r: any) => ({ title: r.name, value: r.id }))
-    stockItems.value = (itemRes.data.items ?? itemRes.data.results ?? []).map((i: any) => ({ title: i.name, value: i.id }))
-    units.value = (unitRes.data.units ?? unitRes.data.results ?? []).map((u: any) => ({ title: `${u.name} (${u.short_name})`, value: u.id }))
+    const prodD = prodRes.data?.data ?? prodRes.data
+    const recD = recRes.data?.data ?? recRes.data
+    const itemD = itemRes.data?.data ?? itemRes.data
+    const unitD = unitRes.data?.data ?? unitRes.data
+
+    products.value = (prodD?.products ?? prodD?.results ?? []).map((p: any) => ({ title: p.name, value: p.id }))
+    recipes.value = (recD?.recipes ?? recD?.results ?? []).map((r: any) => ({ title: r.name, value: r.id }))
+    stockItems.value = (itemD?.items ?? itemD?.results ?? []).map((i: any) => ({ title: i.name, value: i.id }))
+    units.value = (unitD?.units ?? unitD?.results ?? []).map((u: any) => ({ title: `${u.name} (${u.short_name})`, value: u.id }))
   }
   catch {
     // silent — options will be empty
@@ -132,7 +137,7 @@ async function save() {
     }
     notify(t('Product linked'))
     dialog.value = false
-    loadLinks()
+    await loadLinks()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error linking product'), 'error')
@@ -153,7 +158,7 @@ async function doUnlink() {
     await axios.delete(`/products/${selectedItem.value.product_id ?? selectedItem.value.product?.id}/unlink/`)
     notify(t('Product unlinked'))
     unlinkDialog.value = false
-    loadLinks()
+    await loadLinks()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error unlinking product'), 'error')

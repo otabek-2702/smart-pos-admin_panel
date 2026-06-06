@@ -65,8 +65,8 @@ async function loadUnits() {
     const res = await axios.get('/units/', { params })
     const d = res.data?.data ?? res.data
 
-    units.value = d.units ?? []
-    total.value = d.count ?? units.value.length
+    units.value = d?.units ?? []
+    total.value = d?.count ?? units.value.length
   }
   catch {
     notify(t('Failed to load units'), 'error')
@@ -116,7 +116,7 @@ async function save() {
       await axios.patch(`/units/${selectedItem.value.id}/`, payload)
     notify(dialogMode.value === 'create' ? t('Unit created') : t('Unit updated'))
     dialog.value = false
-    loadUnits()
+    await loadUnits()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error saving unit'), 'error')
@@ -137,7 +137,7 @@ async function doDelete() {
     await axios.delete(`/units/${selectedItem.value.id}/`)
     notify(t('Unit deleted'))
     deleteDialog.value = false
-    loadUnits()
+    await loadUnits()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting unit'), 'error')

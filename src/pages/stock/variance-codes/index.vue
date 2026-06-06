@@ -47,8 +47,8 @@ async function loadCodes() {
     const res = await axios.get('/variance-codes/', { params })
     const d = res.data?.data ?? res.data
 
-    codes.value = d.codes ?? []
-    total.value = d.count ?? codes.value.length
+    codes.value = d?.codes ?? []
+    total.value = d?.count ?? codes.value.length
   }
   catch {
     notify(t('Failed to load variance codes'), 'error')
@@ -91,7 +91,7 @@ async function save() {
       await axios.put(`/variance-codes/${selectedItem.value.id}/`, payload)
     notify(dialogMode.value === 'create' ? t('Variance code created') : t('Variance code updated'))
     dialog.value = false
-    loadCodes()
+    await loadCodes()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error saving variance code'), 'error')
@@ -112,7 +112,7 @@ async function doDelete() {
     await axios.delete(`/variance-codes/${selectedItem.value.id}/`)
     notify(t('Variance code deleted'))
     deleteDialog.value = false
-    loadCodes()
+    await loadCodes()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting variance code'), 'error')

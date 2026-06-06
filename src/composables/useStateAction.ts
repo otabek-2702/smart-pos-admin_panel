@@ -3,7 +3,7 @@ import defaultAxios from '@/plugins/axios'
 
 export function useStateAction(
   baseUrl: string,
-  onSuccess: () => void,
+  onSuccess: () => void | Promise<void>,
   notify: (msg: string, color?: string) => void,
   t: (key: string) => string,
   api: AxiosInstance = defaultAxios,
@@ -25,7 +25,7 @@ export function useStateAction(
       await api.post(`${baseUrl}${actionItem.value.id}/${actionType.value}/`)
       notify(successMsg ?? t('Updated'))
       actionDialog.value = false
-      onSuccess()
+      await onSuccess()
     }
     catch (e: any) {
       notify(e?.response?.data?.message ?? errorMsg ?? t('Error'), 'error')

@@ -2,14 +2,16 @@
 import axios from '@/plugins/axios'
 import { initialAbility } from '@/plugins/casl/ability'
 import { useAppAbility } from '@/plugins/casl/useAppAbility'
+import { getStoredUserData } from '@/utils/storage'
 
 const { t } = useI18n({ useScope: 'global' })
 const router = useRouter()
 const ability = useAppAbility()
-const userData = JSON.parse(localStorage.getItem('userData') || 'null')
+const userData = getStoredUserData()
+const hasUserData = Boolean(Object.keys(userData).length)
 
 const userFullName = computed(() => {
-  if (!userData)
+  if (!hasUserData)
     return ''
   if (userData.first_name || userData.last_name)
     return `${userData.first_name || ''} ${userData.last_name || ''}`.trim()

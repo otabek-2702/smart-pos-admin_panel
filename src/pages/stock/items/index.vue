@@ -62,7 +62,7 @@ async function loadItems() {
     const res = await axios.get('/items/', { params })
     const d = res.data?.data ?? res.data
 
-    items.value = d.items ?? []
+    items.value = d?.items ?? []
     total.value = d.pagination?.total_items ?? items.value.length
   }
   catch {
@@ -80,8 +80,11 @@ async function loadMeta() {
       axios.get('/units/', { params: { per_page: 200 } }),
     ])
 
-    categoriesList.value = catRes.data.categories ?? []
-    unitsList.value = unitRes.data.units ?? []
+    const catD = catRes.data?.data ?? catRes.data
+    const unitD = unitRes.data?.data ?? unitRes.data
+
+    categoriesList.value = catD?.categories ?? []
+    unitsList.value = unitD?.units ?? []
   }
   catch { /* ignore */ }
 }
@@ -116,7 +119,7 @@ async function doDelete() {
     await axios.delete(`/items/${selectedItem.value.id}/`)
     notify(t('Item deleted'))
     deleteDialog.value = false
-    loadItems()
+    await loadItems()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting item'), 'error')
@@ -130,7 +133,7 @@ async function toggleActive(item: any) {
   try {
     await axios.patch(`/items/${item.id}/`, { is_active: !item.is_active })
     notify(item.is_active ? t('Item deactivated') : t('Item activated'))
-    loadItems()
+    await loadItems()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error updating item'), 'error')

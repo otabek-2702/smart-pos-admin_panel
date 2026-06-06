@@ -2,7 +2,7 @@
 import { hrApi as axios } from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, te } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatDate } = useFormatters()
 
@@ -115,7 +115,7 @@ watch([page, itemsPerPage, dateFrom, dateTo], load)
             :color="statusColor[item.raw.status] ?? 'default'"
             variant="tonal"
           >
-            {{ item.raw.status }}
+            {{ te(`attendance_status_${item.raw.status}`) ? t(`attendance_status_${item.raw.status}`) : item.raw.status }}
           </VChip>
         </template>
         <template #item.hours_worked="{ item }">

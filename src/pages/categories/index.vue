@@ -255,8 +255,7 @@ async function saveCategory() {
       notify(t('Category created'))
     }
     dialogOpen.value = false
-    loadCategories()
-    loadStats()
+    await Promise.all([loadCategories(), loadStats()])
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error saving category'), 'error')
@@ -278,8 +277,7 @@ async function deleteCategory() {
     await axios.delete(`/categories/${deletingCategory.value.id}`)
     notify(t('Category deleted'))
     deleteDialog.value = false
-    loadCategories()
-    loadStats()
+    await Promise.all([loadCategories(), loadStats()])
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting category'), 'error')

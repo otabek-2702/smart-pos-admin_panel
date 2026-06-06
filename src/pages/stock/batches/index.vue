@@ -72,7 +72,7 @@ async function loadBatches() {
     const res = await axios.get('/batches/', { params })
     const d = res.data?.data ?? res.data
 
-    batches.value = d.batches ?? []
+    batches.value = d?.batches ?? []
     total.value = d.pagination?.total_items ?? batches.value.length
 
     if (d.statuses && statusOptions.value.length === 0)
@@ -89,8 +89,9 @@ async function loadBatches() {
 async function loadLocations() {
   try {
     const res = await axios.get('/locations/', { params: { per_page: 200 } })
+    const d = res.data?.data ?? res.data
 
-    locationsList.value = res.data.locations ?? []
+    locationsList.value = d?.locations ?? []
   }
   catch { /* ignore */ }
 }
@@ -272,7 +273,7 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
             size="small"
             variant="tonal"
           >
-            {{ item.raw.quality_status?.replace(/_/g, ' ') ?? '—' }}
+            {{ item.raw.quality_status ? t(`quality_status_${item.raw.quality_status}`) : '—' }}
           </VChip>
         </template>
       </VDataTableServer>

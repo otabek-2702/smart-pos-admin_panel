@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getStoredToken } from '@/utils/storage'
 
 // In dev, use relative paths so the Vite proxy (vite.config.ts) forwards to the backend
 // without triggering CORS. In production, set VITE_API_HOST to the backend URL.
@@ -32,10 +33,10 @@ function newIdempotencyKey(): string {
 
 function attachInterceptors(instance: ReturnType<typeof axios.create>) {
   instance.interceptors.request.use(config => {
-    const token = localStorage.getItem('accessToken')
+    const token = getStoredToken()
     if (token) {
       config.headers = config.headers || {}
-      config.headers.Authorization = `Bearer ${JSON.parse(token)}`
+      config.headers.Authorization = `Bearer ${token}`
     }
 
     // Auto-attach Idempotency-Key on the four admin endpoints that honor it.

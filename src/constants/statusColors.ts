@@ -56,7 +56,9 @@ export const COUNT_STATUS_COLOR: Record<string, string> = {
 
 export const ROLE_COLOR: Record<string, string> = {
   ADMIN: 'error',
+  MANAGER: 'primary',
   CASHIER: 'warning',
+  WAITER: 'info',
   RESELLER: 'info',
   USER: 'secondary',
 }

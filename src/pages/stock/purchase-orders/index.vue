@@ -3,6 +3,7 @@ import { stockApi as axios } from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 import { useStateAction } from '@/composables/useStateAction'
 import { PAYMENT_STATUS_COLOR as paymentColor, PURCHASE_ORDER_STATUS_COLOR as statusColor } from '@/constants/statusColors'
+import { getStoredUserData } from '@/utils/storage'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -65,7 +66,7 @@ async function loadOrders() {
     const res = await axios.get('/purchase-orders/', { params })
     const d = res.data?.data ?? res.data
 
-    orders.value = d.orders ?? []
+    orders.value = d?.orders ?? []
     total.value = d.pagination?.total_items ?? orders.value.length
   }
   catch {
@@ -83,8 +84,11 @@ async function loadMeta() {
       axios.get('/locations/', { params: { per_page: 200 } }),
     ])
 
-    suppliersList.value = suppRes.data.suppliers ?? []
-    locationsList.value = locRes.data.locations ?? []
+    const suppD = suppRes.data?.data ?? suppRes.data
+    const locD = locRes.data?.data ?? locRes.data
+
+    suppliersList.value = suppD?.suppliers ?? []
+    locationsList.value = locD?.locations ?? []
   }
   catch { /* ignore */ }
 }
@@ -111,7 +115,7 @@ async function createOrder() {
   }
   saving.value = true
   try {
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}')
+    const userData = getStoredUserData()
     const payload: any = { ...form.value, created_by_id: userData.id }
     if (!payload.expected_date)
       delete payload.expected_date
@@ -120,7 +124,7 @@ async function createOrder() {
     await axios.post('/purchase-orders/', payload)
     notify(t('Purchase order created'))
     createDialog.value = false
-    loadOrders()
+    await loadOrders()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error creating order'), 'error')
@@ -291,7 +295,7 @@ function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.s
             size="small"
             variant="tonal"
           >
-            {{ item.raw.status }}
+            {{ t(`po_status_${item.raw.status}`) }}
           </VChip>
         </template>
         <template #item.payment_status="{ item }">
@@ -301,7 +305,7 @@ function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.s
             size="small"
             variant="tonal"
           >
-            {{ item.raw.payment_status }}
+            {{ t(`po_payment_${item.raw.payment_status}`) }}
           </VChip>
           <span
             v-else

@@ -73,16 +73,17 @@ function formatPrep(seconds: number | null) {
 const headers = [
   { title: '#', key: 'id', sortable: false, width: '60px' },
   { title: t('User'), key: 'user', sortable: false },
-  { title: t('Started'), key: 'started_at', sortable: false },
-  { title: t('Ended'), key: 'ended_at', sortable: false },
+  { title: t('Started'), key: 'start_time', sortable: false },
+  { title: t('Ended'), key: 'end_time', sortable: false },
   { title: t('Status'), key: 'status', sortable: false },
-  { title: t('Cash'), key: 'expected_cash', sortable: false },
+  { title: t('Cash'), key: 'cash_collected', sortable: false },
   { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
 ]
 
 const statusColor: Record<string, string> = {
   ACTIVE: 'success',
-  ENDED: 'secondary',
+  COMPLETED: 'secondary',
+  ABANDONED: 'error',
   RECONCILED: 'info',
 }
 
@@ -92,7 +93,7 @@ async function loadActiveShifts() {
     const res = await axios.get('/shifts/active')
     const d = res.data?.data ?? res.data
 
-    activeShifts.value = d?.shifts ?? d?.items ?? []
+    activeShifts.value = Array.isArray(d) ? d : (d?.shifts ?? d?.items ?? [])
   }
   catch {
     notify(t('Failed to load shifts'), 'error')
@@ -132,7 +133,7 @@ async function loadTemplates() {
     const res = await axios.get('/shift-templates')
     const d = res.data?.data ?? res.data
 
-    templates.value = d?.templates ?? d?.shift_templates ?? d?.items ?? []
+    templates.value = Array.isArray(d) ? d : (d?.templates ?? d?.shift_templates ?? d?.items ?? [])
   }
   catch {
     notify(t('Failed to load templates'), 'error')
@@ -165,8 +166,7 @@ async function endShiftConfirm() {
     await axios.post(`/shifts/${endShift.value.id}/end`, { notes: endNotes.value })
     notify(t('Shift ended'))
     endDialog.value = false
-    loadActiveShifts()
-    loadShifts()
+    await Promise.all([loadActiveShifts(), loadShifts()])
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -193,7 +193,7 @@ async function reconcileConfirm() {
     })
     notify(t('Shift reconciled'))
     reconcileDialog.value = false
-    loadShifts()
+    await loadShifts()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -216,7 +216,7 @@ async function saveTpl() {
       await axios.post('/shift-templates', tplForm.value)
     notify(t('Template saved'))
     tplDialog.value = false
-    loadTemplates()
+    await loadTemplates()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -224,15 +224,15 @@ async function saveTpl() {
 }
 
 async function deleteTpl(tpl: any) {
-  if (!confirm('Delete this template?'))
+  if (!confirm(t('Delete this template?')))
     return
   try {
     await axios.delete(`/shift-templates/${tpl.id}`)
-    notify('Template deleted')
-    loadTemplates()
+    notify(t('Template deleted'))
+    await loadTemplates()
   }
   catch (e: any) {
-    notify(e?.response?.data?.message ?? 'Error', 'error')
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
   }
 }
 </script>
@@ -291,16 +291,20 @@ async function deleteTpl(tpl: any) {
                       </VAvatar>
                       <div>
                         <div class="text-body-1 font-weight-medium">
-                          {{ (s as any).user?.first_name }} {{ (s as any).user?.last_name }}
+                          {{ (s as any).user?.name ?? '—' }}
                         </div>
                         <div class="text-caption text-disabled">
-                          {{ t('Started') }}: {{ formatDate((s as any).started_at) }}
+                          {{ t('Started') }}: {{ formatDate((s as any).start_time) }}
                         </div>
                       </div>
                     </div>
+                    <div class="d-flex justify-space-between text-body-2 mb-1">
+                      <span class="text-disabled">{{ t('Orders') }}</span>
+                      <span class="font-weight-medium">{{ (s as any).total_orders ?? 0 }}</span>
+                    </div>
                     <div class="d-flex justify-space-between text-body-2 mb-2">
-                      <span class="text-disabled">{{ t('Expected Cash') }}</span>
-                      <span class="font-weight-medium">{{ formatCurrency((s as any).expected_cash ?? 0) }}</span>
+                      <span class="text-disabled">{{ t('Cash Collected') }}</span>
+                      <span class="font-weight-medium">{{ formatCurrency((s as any).cash_collected ?? 0) }}</span>
                     </div>
                     <VBtn
                       block
@@ -355,7 +359,7 @@ async function deleteTpl(tpl: any) {
             />
             <VSelect
               v-model="statusFilter"
-              :items="['ACTIVE', 'ENDED', 'RECONCILED']"
+              :items="['ACTIVE', 'COMPLETED', 'ABANDONED'].map(s => ({ title: t(`shift_status_${s}`), value: s }))"
               :placeholder="t('Status')"
               density="compact"
               style="min-inline-size:160px;"
@@ -380,13 +384,13 @@ async function deleteTpl(tpl: any) {
               />
             </template>
             <template #item.user="{ item }">
-              {{ item.raw.user?.first_name }} {{ item.raw.user?.last_name }}
+              {{ item.raw.user?.name ?? '—' }}
             </template>
-            <template #item.started_at="{ item }">
-              {{ formatDate(item.raw.started_at) }}
+            <template #item.start_time="{ item }">
+              {{ formatDate(item.raw.start_time) }}
             </template>
-            <template #item.ended_at="{ item }">
-              {{ item.raw.ended_at ? formatDate(item.raw.ended_at) : '—' }}
+            <template #item.end_time="{ item }">
+              {{ item.raw.end_time ? formatDate(item.raw.end_time) : '—' }}
             </template>
             <template #item.status="{ item }">
               <VChip
@@ -394,11 +398,11 @@ async function deleteTpl(tpl: any) {
                 :color="statusColor[item.raw.status] ?? 'default'"
                 variant="tonal"
               >
-                {{ item.raw.status }}
+                {{ t(`shift_status_${item.raw.status}`) }}
               </VChip>
             </template>
-            <template #item.expected_cash="{ item }">
-              {{ formatCurrency(item.raw.expected_cash ?? 0) }}
+            <template #item.cash_collected="{ item }">
+              {{ formatCurrency(item.raw.cash_collected ?? 0) }}
             </template>
             <template #item.actions="{ item }">
               <div class="d-flex justify-end gap-1">
@@ -421,7 +425,7 @@ async function deleteTpl(tpl: any) {
                   </VTooltip>
                 </VBtn>
                 <VBtn
-                  v-if="item.raw.status === 'ENDED'"
+                  v-if="item.raw.status === 'COMPLETED' && !item.raw.reconciliation"
                   size="small"
                   variant="tonal"
                   color="info"
@@ -638,7 +642,7 @@ async function deleteTpl(tpl: any) {
                   {{ perfData.user_name }}
                 </div>
                 <div class="text-caption text-disabled">
-                  {{ perfData.status }} · {{ perfData.duration_minutes }} {{ t('min') }}
+                  {{ t(`shift_status_${perfData.status}`) }} · {{ perfData.duration_minutes }} {{ t('min') }}
                 </div>
               </div>
             </div>

@@ -196,7 +196,7 @@ async function saveProduct() {
       notify(t('Product created'))
     }
     dialogOpen.value = false
-    loadProducts()
+    await loadProducts()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error saving product'), 'error')
@@ -218,7 +218,7 @@ async function deleteProduct() {
     await axios.delete(`/products/${deletingProduct.value.id}`)
     notify(t('Product deleted'))
     deleteDialog.value = false
-    loadProducts()
+    await loadProducts()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting product'), 'error')

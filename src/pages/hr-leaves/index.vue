@@ -57,7 +57,7 @@ async function approve(l: any) {
   try {
     await axios.post(`/leaves/${l.id}/approve/`)
     notify(t('Approved'))
-    load()
+    await load()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -69,9 +69,9 @@ async function reject(l: any) {
   if (!reason)
     return
   try {
-    await axios.post(`/leaves/${l.id}/reject/`, { reason })
+    await axios.post(`/leaves/${l.id}/reject/`, { notes: reason })
     notify(t('Rejected'))
-    load()
+    await load()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -124,7 +124,7 @@ async function reject(l: any) {
           {{ formatDate(item.raw.end_date) }}
         </template>
         <template #item.days="{ item }">
-          {{ item.raw.days ?? item.raw.duration ?? '—' }}
+          {{ item.raw.days_count ?? item.raw.duration ?? '—' }}
         </template>
         <template #item.status="{ item }">
           <VChip

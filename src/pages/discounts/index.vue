@@ -24,12 +24,11 @@ const form = ref({
   name: '',
   code: '',
   discount_type_id: null as number | null,
-  discount_method: 'PERCENTAGE',
   value: 0,
   min_order_amount: 0,
   is_active: true,
-  starts_at: '',
-  ends_at: '',
+  start_date: '',
+  end_date: '',
   secret_word: '',
 })
 
@@ -42,7 +41,6 @@ const headers = [
   { title: t('Name'), key: 'name', sortable: false },
   { title: t('Code'), key: 'code', sortable: false },
   { title: t('Type'), key: 'discount_type', sortable: false },
-  { title: t('Method'), key: 'discount_method', sortable: false },
   { title: t('Value'), key: 'value', sortable: false },
   { title: t('Status'), key: 'is_active', sortable: false },
   { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
@@ -94,12 +92,11 @@ function openCreate() {
     name: '',
     code: '',
     discount_type_id: types.value[0]?.id ?? null,
-    discount_method: 'PERCENTAGE',
     value: 0,
     min_order_amount: 0,
     is_active: true,
-    starts_at: '',
-    ends_at: '',
+    start_date: '',
+    end_date: '',
     secret_word: '',
   }
   dialog.value = true
@@ -111,12 +108,11 @@ function openEdit(d: any) {
     name: d.name ?? '',
     code: d.code ?? '',
     discount_type_id: d.discount_type?.id ?? d.discount_type_id ?? null,
-    discount_method: d.discount_method ?? 'PERCENTAGE',
     value: Number(d.value ?? 0),
     min_order_amount: Number(d.min_order_amount ?? 0),
     is_active: d.is_active ?? true,
-    starts_at: d.starts_at ?? '',
-    ends_at: d.ends_at ?? '',
+    start_date: d.start_date ?? '',
+    end_date: d.end_date ?? '',
     secret_word: d.secret_word ?? '',
   }
   dialog.value = true
@@ -131,7 +127,7 @@ async function save() {
       await axios.post('/discounts/', form.value)
     notify(t(editing.value ? 'Discount updated' : 'Discount created'))
     dialog.value = false
-    loadDiscounts()
+    await loadDiscounts()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -145,7 +141,7 @@ async function toggleActive(d: any) {
   try {
     await axios.post(`/discounts/${d.id}/toggle/`)
     notify(t('Status updated'))
-    loadDiscounts()
+    await loadDiscounts()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -158,7 +154,7 @@ async function remove(d: any) {
   try {
     await axios.delete(`/discounts/${d.id}/`)
     notify(t('Discount deleted'))
-    loadDiscounts()
+    await loadDiscounts()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -278,19 +274,20 @@ async function remove(d: any) {
         </template>
 
         <template #item.discount_type="{ item }">
-          {{ item.raw.discount_type?.name ?? '—' }}
-        </template>
-        <template #item.discount_method="{ item }">
-          <VChip
-            size="small"
-            :color="methodColor[item.raw.discount_method] ?? 'default'"
-            variant="tonal"
-          >
-            {{ item.raw.discount_method }}
-          </VChip>
+          <div class="d-flex align-center gap-2">
+            <span>{{ item.raw.discount_type?.name ?? '—' }}</span>
+            <VChip
+              v-if="item.raw.discount_type?.discount_method"
+              size="x-small"
+              :color="methodColor[item.raw.discount_type.discount_method] ?? 'default'"
+              variant="tonal"
+            >
+              {{ item.raw.discount_type.discount_method }}
+            </VChip>
+          </div>
         </template>
         <template #item.value="{ item }">
-          {{ item.raw.discount_method === 'PERCENTAGE' ? `${item.raw.value}%` : formatCurrency(item.raw.value ?? 0) }}
+          {{ item.raw.discount_type?.discount_method === 'PERCENTAGE' ? `${item.raw.value}%` : formatCurrency(item.raw.value ?? 0) }}
         </template>
         <template #item.is_active="{ item }">
           <VChip
@@ -404,16 +401,6 @@ async function remove(d: any) {
               cols="12"
               sm="6"
             >
-              <VSelect
-                v-model="form.discount_method"
-                :items="['PERCENTAGE', 'FIXED']"
-                :label="t('Method')"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
               <VTextField
                 v-model.number="form.value"
                 :label="t('Value')"
@@ -435,7 +422,7 @@ async function remove(d: any) {
               sm="6"
             >
               <VTextField
-                v-model="form.starts_at"
+                v-model="form.start_date"
                 type="datetime-local"
                 :label="t('Starts At')"
               />
@@ -445,7 +432,7 @@ async function remove(d: any) {
               sm="6"
             >
               <VTextField
-                v-model="form.ends_at"
+                v-model="form.end_date"
                 type="datetime-local"
                 :label="t('Ends At')"
               />

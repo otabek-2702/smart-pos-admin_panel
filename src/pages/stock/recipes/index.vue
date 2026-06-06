@@ -73,8 +73,8 @@ async function loadRecipes() {
     const res = await axios.get('/recipes/', { params })
     const d = res.data?.data ?? res.data
 
-    recipes.value = d.recipes ?? []
-    total.value = d.pagination?.total_items ?? recipes.value.length
+    recipes.value = d?.recipes ?? []
+    total.value = d?.pagination?.total_items ?? recipes.value.length
   }
   catch {
     notify(t('Failed to load recipes'), 'error')
@@ -154,7 +154,7 @@ async function save() {
       await axios.patch(`/recipes/${selectedItem.value.id}/`, payload)
     notify(dialogMode.value === 'create' ? t('Recipe created') : t('Recipe updated'))
     dialog.value = false
-    loadRecipes()
+    await loadRecipes()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error saving recipe'), 'error')
@@ -175,7 +175,7 @@ async function doDelete() {
     await axios.delete(`/recipes/${selectedItem.value.id}/`)
     notify(t('Recipe deleted'))
     deleteDialog.value = false
-    loadRecipes()
+    await loadRecipes()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting recipe'), 'error')
@@ -189,7 +189,7 @@ async function toggleActive(item: any) {
   try {
     await axios.patch(`/recipes/${item.id}/`, { is_active: !item.is_active })
     notify(item.is_active ? t('Recipe deactivated') : t('Recipe activated'))
-    loadRecipes()
+    await loadRecipes()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error updating recipe'), 'error')
@@ -324,7 +324,7 @@ async function toggleActive(item: any) {
             size="small"
             variant="tonal"
           >
-            {{ item.raw.recipe_type }}
+            {{ t(`recipe_type_${item.raw.recipe_type}`) }}
           </VChip>
         </template>
         <template #item.output="{ item }">

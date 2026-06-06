@@ -8,11 +8,6 @@ const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const state = ref<any>(null)
 const loading = ref(true)
 
-const unlockDialog = ref(false)
-const unlockFile = ref('')
-const unlocking = ref(false)
-const unlockError = ref('')
-
 async function load() {
   loading.value = true
   try {
@@ -33,7 +28,6 @@ const statusColor: Record<string, string> = {
   SUSPENDED: 'error',
   EXPIRED: 'error',
   GRACE: 'warning',
-  PERPETUAL_UNLOCK: 'info',
 }
 
 const statusDescription: Record<string, string> = {
@@ -42,29 +36,6 @@ const statusDescription: Record<string, string> = {
   SUSPENDED: 'License has been suspended by the vendor. Contact your POS vendor to restore service.',
   EXPIRED: 'Subscription has expired. Contact your POS vendor to renew.',
   GRACE: 'License is in a grace period after a failed heartbeat. Will reactivate on next successful check-in.',
-  PERPETUAL_UNLOCK: 'This install is permanently unlocked via a vendor-signed perpetual-unlock file.',
-}
-
-async function submitUnlock() {
-  unlockError.value = ''
-  if (!unlockFile.value.trim()) {
-    unlockError.value = t('Paste the perpetual-unlock file content')
-    return
-  }
-  unlocking.value = true
-  try {
-    await licensingApi.post('/unlock', { unlock_file: unlockFile.value.trim() })
-    notify(t('Perpetual unlock accepted'))
-    unlockDialog.value = false
-    unlockFile.value = ''
-    load()
-  }
-  catch (e: any) {
-    unlockError.value = e?.response?.data?.message ?? t('Unlock failed')
-  }
-  finally {
-    unlocking.value = false
-  }
 }
 </script>
 
@@ -232,71 +203,8 @@ async function submitUnlock() {
           {{ t('Run setup') }}
         </VBtn>
         <VSpacer />
-        <VBtn
-          v-if="state.status !== 'PERPETUAL_UNLOCK'"
-          variant="tonal"
-          prepend-icon="bx-shield"
-          @click="unlockDialog = true"
-        >
-          {{ t('Apply perpetual unlock') }}
-        </VBtn>
       </VCardActions>
     </VCard>
-
-    <VDialog
-      v-model="unlockDialog"
-      max-width="640"
-      scrollable
-    >
-      <VCard :title="t('Apply perpetual-unlock file')">
-        <VCardText>
-          <VAlert
-            type="info"
-            variant="tonal"
-            class="mb-3"
-          >
-            {{ t('Use this only if your POS vendor has shut down and published a perpetual-unlock signature. After verification, the kill switch is permanently disabled.') }}
-          </VAlert>
-
-          <VAlert
-            v-if="unlockError"
-            type="error"
-            variant="tonal"
-            class="mb-3"
-            closable
-            @click:close="unlockError = ''"
-          >
-            {{ unlockError }}
-          </VAlert>
-
-          <VTextarea
-            v-model="unlockFile"
-            :label="t('Unlock file content (base64)')"
-            rows="8"
-            :disabled="unlocking"
-            :placeholder="t('Paste the base64-encoded unlock file here')"
-            autofocus
-          />
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn
-            variant="text"
-            :disabled="unlocking"
-            @click="unlockDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="warning"
-            :loading="unlocking"
-            @click="submitUnlock"
-          >
-            {{ t('Apply unlock') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
 
     <VSnackbar
       v-model="snackbar"

@@ -191,7 +191,7 @@ const avgOrderValue = computed(() => {
       >
         <VCard
           :class="{ 'cursor-pointer': lowStock && lowStock > 0 }"
-          @click="lowStock && lowStock > 0 && router.push('/stock-items')"
+          @click="lowStock && lowStock > 0 && router.push('/stock/items')"
         >
           <VCardText class="d-flex align-center gap-3">
             <VAvatar

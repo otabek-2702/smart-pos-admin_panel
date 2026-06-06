@@ -80,14 +80,12 @@ export default defineComponent({
       // 👉 Content area
       let mainChildren = slots.default?.()
 
-      // 💡 Only show loading and attach `beforeEach` & `afterEach` hooks if `content-loading` slot is used
+      // Only show loading and attach `beforeEach` & `afterEach` hooks if `content-loading` slot is used
       if (slots['content-loading']) {
         router.beforeEach(() => {
-          console.info('setting to true')
           shallShowPageLoading.value = true
         })
         router.afterEach(() => {
-          console.info('setting to false')
           shallShowPageLoading.value = false
         })
 

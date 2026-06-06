@@ -53,8 +53,9 @@ async function loadAccounts() {
   accountsLoading.value = true
   try {
     const res = await axios.get('/loyalty/accounts/')
+    const d = res.data?.data ?? res.data
 
-    accounts.value = res.data?.data ?? []
+    accounts.value = Array.isArray(d) ? d : (d?.accounts ?? d?.items ?? [])
   }
   catch {
     notify(t('Failed to load accounts'), 'error')
@@ -75,7 +76,7 @@ async function doRedeem() {
     await axios.post(`/loyalty/accounts/${encodeURIComponent(redeemPhone.value)}/redeem/`)
     notify(t('Reward redeemed'))
     redeemDialog.value = false
-    loadAccounts()
+    await loadAccounts()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Redeem failed'), 'error')

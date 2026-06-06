@@ -59,8 +59,8 @@ async function loadCategories() {
     const res = await axios.get('/categories/', { params })
     const d = res.data?.data ?? res.data
 
-    categories.value = d.categories ?? []
-    total.value = d.pagination?.total_items ?? d.count ?? categories.value.length
+    categories.value = d?.categories ?? []
+    total.value = d?.pagination?.total_items ?? d?.count ?? categories.value.length
   }
   catch {
     notify(t('Failed to load categories'), 'error')
@@ -105,7 +105,7 @@ async function save() {
       await axios.patch(`/categories/${selectedItem.value.id}/`, payload)
     notify(dialogMode.value === 'create' ? t('Category created') : t('Category updated'))
     dialog.value = false
-    loadCategories()
+    await loadCategories()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error saving category'), 'error')
@@ -126,7 +126,7 @@ async function doDelete() {
     await axios.delete(`/categories/${selectedItem.value.id}/`)
     notify(t('Category deleted'))
     deleteDialog.value = false
-    loadCategories()
+    await loadCategories()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting category'), 'error')
@@ -140,7 +140,7 @@ async function toggleActive(item: any) {
   try {
     await axios.patch(`/categories/${item.id}/`, { is_active: !item.is_active })
     notify(item.is_active ? t('Category deactivated') : t('Category activated'))
-    loadCategories()
+    await loadCategories()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error updating category'), 'error')

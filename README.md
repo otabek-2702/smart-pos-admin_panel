@@ -14,10 +14,41 @@ expenses, attendance, leaves, contracts).
 
 ```bash
 yarn install
-yarn dev          # http://localhost:5181
+yarn dev          # http://localhost:5181 (also reachable at http://<lan-ip>:5181)
 ```
 
 Login at `/login` with `admin@gmail.com` / `123` (local dev seed user).
+
+### LAN access (phone / tablet / other PC)
+
+`yarn dev` now binds `0.0.0.0:5181` by default, so other devices on the same
+Wi-Fi / LAN can hit the panel at `http://<dev-machine-ip>:5181`.
+
+1. Find your LAN IP — `ipconfig` on Windows, `ip addr` on Linux/macOS. Vite
+   also prints `Network: http://<ip>:5181` on startup.
+2. On the phone / other machine, open `http://<that-ip>:5181`.
+3. Make sure the **Django backend** also binds all interfaces:
+
+   ```bash
+   cd ../alpha_pos
+   python manage.py runserver 0.0.0.0:8000
+   ```
+
+   In `DEBUG=True` mode Django sets `ALLOWED_HOSTS=['*']` + opens CORS, so
+   no extra config is needed. For non-DEBUG dev, add your LAN IPs to
+   `ALLOWED_HOSTS` env (e.g. `ALLOWED_HOSTS=localhost,127.0.0.1,192.168.1.50`).
+4. Open Windows Defender Firewall and **allow inbound TCP on 5181 + 8000**
+   for the Private network, or LAN clients will time out.
+
+Want localhost-only? `yarn dev:local` binds `127.0.0.1` only.
+
+If the backend runs on a different machine than the panel:
+
+```bash
+VITE_BACKEND_HOST=http://192.168.1.20:8000 yarn dev
+```
+
+The Vite proxy will forward `/api/*` to that host.
 
 ---
 

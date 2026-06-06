@@ -68,10 +68,18 @@ export default defineConfig({
     chunkSizeWarningLimit: 5000,
   },
   server: {
+    // 0.0.0.0 binds every interface so phones / tablets / other PCs on the
+    // LAN can hit the dev panel at http://<dev-machine-LAN-IP>:5181. Override
+    // with VITE_HOST=127.0.0.1 if you want localhost-only.
+    host: process.env.VITE_HOST ?? '0.0.0.0',
     port: 5181,
+    strictPort: true,
     proxy: {
+      // VITE_BACKEND_HOST lets you point at a different machine when the
+      // backend doesn't run on the same box as the dev server (e.g. backend
+      // on Docker host, panel on workstation). Defaults to local backend.
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: process.env.VITE_BACKEND_HOST ?? 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
     },

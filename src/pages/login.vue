@@ -46,20 +46,25 @@ const login = async () => {
     localStorage.setItem('accessToken', JSON.stringify(token))
     localStorage.setItem('userData', JSON.stringify(user))
 
-    // Build CASL abilities from backend permissions list.
-    // ADMIN role gets ['*']; treat that as full manage-all.
+    // Build CASL abilities. ADMIN + MANAGER roles always get manage-all
+    // regardless of the fine-grained `permissions` JSON field (which may
+    // be empty for those roles). Other roles take whatever is in the list.
     const perms: string[] = Array.isArray(user?.permissions) ? user.permissions : []
+    const role = user?.role
 
-    const userAbilities = perms.includes('*')
-      ? [{ action: 'manage', subject: 'all' }]
-      : perms.map((p: string) => {
+    let userAbilities: { action: string; subject: string }[]
+    if (role === 'ADMIN' || role === 'MANAGER' || perms.includes('*')) {
+      userAbilities = [{ action: 'manage', subject: 'all' }]
+    }
+    else {
+      userAbilities = perms.map((p: string) => {
         const [subject, action] = p.split('.')
 
         return { action: action || 'read', subject: subject || 'all' }
       })
-
-    if (userAbilities.length === 0)
-      userAbilities.push({ action: 'read', subject: 'all' })
+      if (userAbilities.length === 0)
+        userAbilities.push({ action: 'read', subject: 'all' })
+    }
 
     localStorage.setItem('userAbilities', JSON.stringify(userAbilities))
     ability.update(userAbilities)

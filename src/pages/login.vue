@@ -46,25 +46,11 @@ const login = async () => {
     localStorage.setItem('accessToken', JSON.stringify(token))
     localStorage.setItem('userData', JSON.stringify(user))
 
-    // Build CASL abilities. ADMIN + MANAGER roles always get manage-all
-    // regardless of the fine-grained `permissions` JSON field (which may
-    // be empty for those roles). Other roles take whatever is in the list.
-    const perms: string[] = Array.isArray(user?.permissions) ? user.permissions : []
-    const role = user?.role
-
-    let userAbilities: { action: string; subject: string }[]
-    if (role === 'ADMIN' || role === 'MANAGER' || perms.includes('*')) {
-      userAbilities = [{ action: 'manage', subject: 'all' }]
-    }
-    else {
-      userAbilities = perms.map((p: string) => {
-        const [subject, action] = p.split('.')
-
-        return { action: action || 'read', subject: subject || 'all' }
-      })
-      if (userAbilities.length === 0)
-        userAbilities.push({ action: 'read', subject: 'all' })
-    }
+    // Temporary: grant manage-all to every authenticated user. Backend still
+    // enforces per-endpoint via @admin_required / @permission_required, so
+    // this is a UI gate only. Restore role-based CASL once finer-grained
+    // routing is needed.
+    const userAbilities = [{ action: 'manage', subject: 'all' }]
 
     localStorage.setItem('userAbilities', JSON.stringify(userAbilities))
     ability.update(userAbilities)

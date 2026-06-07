@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// import axios from '@/plugins/axios'
+import axios from '@/plugins/axios'
 import VueApexCharts from 'vue3-apexcharts'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -21,13 +21,9 @@ async function load() {
   }
   loading.value = true
   try {
-    // TODO BE: wire when ready
-    // const res = await axios.get(`/analytics/shifts/${shiftIdInput.value}/report`)
-    // data.value = res.data?.data ?? res.data
+    const res = await axios.get(`/analytics/shifts/${shiftIdInput.value}/report`)
 
-    data.value = mockResponse(shiftIdInput.value)
-
-    // Reflect in URL for shareable deep link.
+    data.value = res.data?.data ?? res.data
     router.replace({ query: { ...route.query, shift: String(shiftIdInput.value) } })
   }
   catch (e: any) {
@@ -41,65 +37,6 @@ async function load() {
 
 onMounted(load)
 watch(shiftIdInput, load)
-
-function mockResponse(shiftId: number) {
-  return {
-    cashier: { id: 12, name: 'Ali Karimov' },
-    shift: {
-      shift_id: shiftId, user_id: 12, user_name: 'Ali Karimov', status: 'COMPLETED',
-      start_time: '2026-06-06T09:00:00', end_time: '2026-06-06T17:30:00', duration_minutes: 510,
-      orders: { total: 84, completed: 80, cancelled: 2, open: 0, preparing: 0, ready: 2, paid: 80, cancel_rate_pct: 2.38, by_type: { hall: 60, delivery: 18, pickup: 6 } },
-      items: { units_sold: 198, line_items: 240 },
-      money: {
-        revenue: '12400000.00', cash: '8200000.00', card: '4200000.00', avg_order_value: '155000.00',
-        payment_mix: { CASH: '8200000.00', UZCARD: '2800000.00', HUMO: '900000.00', PAYME: '450000.00', MIXED: '50000.00' },
-      },
-      discounts: { total_given: '320000.00', discounted_orders: 8, discount_rate_pct: 9.5, avg_discount_pct: 12.0 },
-      speed: { avg_prep_seconds: 540, orders_per_hour: 9.9, revenue_per_hour: '1458823.00' },
-      punctuality: {
-        actual_start: '2026-06-06T09:00:00', scheduled_start: '2026-06-06T09:00:00',
-        late_minutes: 0, is_late: false,
-        attendance: { status: 'PRESENT', check_in: '2026-06-06T09:00:00', check_out: '2026-06-06T17:30:00', work_hours: 8.5, overtime_hours: 0.5 },
-      },
-      reconciliation: {
-        expected_cash: '8200000.00', actual_cash: '8195000.00', difference: '-5000.00',
-        is_short: true, is_over: false, notes: 'Small change shortage',
-        reconciled_by: 'Manager Aziz', reconciled_at: '2026-06-06T17:35:00',
-      },
-    },
-    receipt_count: 84,
-    receipts: Array.from({ length: 12 }, (_, i) => ({
-      order_id: 501 + i, display_id: 14 + i,
-      status: ['COMPLETED', 'COMPLETED', 'CANCELED'][i % 3] ?? 'COMPLETED',
-      order_type: ['HALL', 'DELIVERY', 'PICKUP'][i % 3],
-      is_paid: true, payment_method: ['CASH', 'UZCARD', 'HUMO', 'PAYME'][i % 4],
-      total_amount: String(120000 + i * 5000), discount_amount: i === 2 ? '15000.00' : '0.00',
-      discount_percent: i === 2 ? '10' : '0', line_items: 2 + (i % 3), units: 3 + (i % 4),
-      created_at: `2026-06-06T${String(9 + i).padStart(2, '0')}:30:00`,
-      paid_at: `2026-06-06T${String(9 + i).padStart(2, '0')}:42:00`,
-    })),
-    products: [
-      { product_id: 7, name: 'Lavash', units_sold: 40, times_sold: 31, revenue: '1600000.00' },
-      { product_id: 12, name: 'Plov', units_sold: 28, times_sold: 26, revenue: '2240000.00' },
-      { product_id: 3, name: 'Manti', units_sold: 22, times_sold: 18, revenue: '1320000.00' },
-      { product_id: 18, name: 'Shashlik', units_sold: 18, times_sold: 17, revenue: '1620000.00' },
-      { product_id: 9, name: 'Salat', units_sold: 16, times_sold: 14, revenue: '480000.00' },
-    ],
-    best_seller: { product_id: 7, name: 'Lavash', units_sold: 40, times_sold: 31, revenue: '1600000.00' },
-    distribution: {
-      by_hour: Array.from({ length: 24 }, (_, h) => {
-        if (h < 9 || h > 17) return { hour: h, orders: 0, revenue: '0' }
-        const peak = [12, 13]
-        const orders = peak.includes(h) ? 18 + Math.round(Math.random() * 8) : 6 + Math.round(Math.random() * 6)
-
-        return { hour: h, orders, revenue: String(orders * 155000) }
-      }),
-      by_date: [{ date: '2026-06-06', orders: 84, revenue: '12400000.00' }],
-      peak_hour: 13,
-    },
-    peak_hour: 13,
-  }
-}
 
 const shift = computed<any>(() => data.value?.shift)
 const receipts = computed<any[]>(() => data.value?.receipts ?? [])

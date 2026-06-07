@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// import axios from '@/plugins/axios'
+import axios from '@/plugins/axios'
 import VueApexCharts from 'vue3-apexcharts'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -18,92 +18,43 @@ const staff = ref<any[]>([])
 const data = ref<any>(null)
 const loading = ref(false)
 
+async function loadStaff() {
+  try {
+    const res = await axios.get('/users', { params: { role: roleFilter.value, per_page: 200 } })
+    const d = res.data?.data ?? res.data
+
+    staff.value = d?.users ?? d?.items ?? []
+  }
+  catch {
+    staff.value = []
+  }
+}
+
 async function load() {
   loading.value = true
   try {
-    // TODO BE: wire when ready
-    // const params: any = {
-    //   from: dateFrom.value, to: dateTo.value, role: roleFilter.value,
-    //   target_prep_minutes: targetPrepMinutes.value,
-    // }
-    // if (userIdFilter.value) params.user_id = userIdFilter.value
-    // const res = await axios.get('/analytics/shifts/kitchen', { params })
-    // data.value = res.data?.data ?? res.data
+    const params: any = {
+      from: dateFrom.value, to: dateTo.value, role: roleFilter.value,
+      target_prep_minutes: targetPrepMinutes.value,
+    }
+    if (userIdFilter.value)
+      params.user_id = userIdFilter.value
+    const res = await axios.get('/analytics/shifts/kitchen', { params })
 
-    data.value = mockResponse()
+    data.value = res.data?.data ?? res.data
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Failed to load'), 'error')
+    data.value = null
   }
   finally {
     loading.value = false
   }
 }
 
-onMounted(load)
-watch([dateFrom, dateTo, userIdFilter, roleFilter, targetPrepMinutes], load)
-
-function mockResponse() {
-  return {
-    scope: 'kitchen',
-    date_from: dateFrom.value, date_to: dateTo.value, filtered_user_id: null,
-    summary: {
-      shift_count: 20, distinct_staff: 3, role: roleFilter.value,
-      by_status: { ACTIVE: 0, COMPLETED: 19, ABANDONED: 1 },
-      total_hours: 150.0, avg_shift_minutes: 450.0,
-      orders_in_window: 880, orders_readied: 860, orders_pending: 20,
-      completion_rate_pct: 97.7,
-      items_prepared: 2600, items_per_hour: 17.3,
-      prep_time: {
-        avg_seconds: 520, best_shift_avg_seconds: 300,
-        worst_shift_avg_seconds: 1100, slow_orders: 64,
-        slow_rate_pct: 7.4, target_seconds: targetPrepMinutes.value * 60,
-      },
-      punctuality: {
-        on_time_shifts: 17, late_shifts: 3, punctuality_rate_pct: 85.0,
-        avg_late_minutes: 8.6, max_late_minutes: 22,
-        late_arrivals: [
-          { shift_id: 91, user_id: 22, user_name: 'Jasur K.', late_minutes: 22, start_time: '2026-06-05T09:22:00' },
-          { shift_id: 73, user_id: 14, user_name: 'Diyor R.', late_minutes: 12, start_time: '2026-06-02T09:12:00' },
-        ],
-      },
-    },
-    distribution: {
-      by_hour: Array.from({ length: 24 }, (_, h) => {
-        const peak = [12, 13, 19, 20]
-        const orders = peak.includes(h) ? Math.round(60 + Math.random() * 30) : Math.round(Math.random() * 15)
-
-        return { hour: h, orders, revenue: '0' }
-      }),
-      by_date: Array.from({ length: 30 }, (_, i) => ({
-        date: new Date(Date.now() - (29 - i) * 86400_000).toISOString().slice(0, 10),
-        orders: Math.round(20 + Math.random() * 20),
-        revenue: '0',
-      })),
-      peak_hour: 13,
-    },
-    shifts: [
-      {
-        shift_id: 91, user_id: 22, user_name: 'Jasur K.', status: 'COMPLETED',
-        start_time: '2026-06-05T09:22:00', end_time: '2026-06-05T17:30:00', duration_minutes: 488,
-        orders_in_window: 92, orders_readied: 88, orders_pending: 4, completion_rate_pct: 95.6,
-        items_prepared: { units: 220, line_items: 92 },
-        prep_time: { avg_seconds: 480, median_seconds: 460, fastest_seconds: 180, slowest_seconds: 1320, slow_orders: 5, slow_rate_pct: 5.4, target_seconds: targetPrepMinutes.value * 60 },
-        throughput: { orders_per_hour: 11.3, items_per_hour: 27.0 },
-        punctuality: { actual_start: '2026-06-05T09:22:00', scheduled_start: '2026-06-05T09:00:00', late_minutes: 22, is_late: true },
-      },
-      {
-        shift_id: 73, user_id: 14, user_name: 'Diyor R.', status: 'COMPLETED',
-        start_time: '2026-06-02T09:12:00', end_time: '2026-06-02T17:00:00', duration_minutes: 468,
-        orders_in_window: 84, orders_readied: 84, orders_pending: 0, completion_rate_pct: 100,
-        items_prepared: { units: 196, line_items: 84 },
-        prep_time: { avg_seconds: 410, median_seconds: 390, fastest_seconds: 160, slowest_seconds: 1020, slow_orders: 2, slow_rate_pct: 2.4, target_seconds: targetPrepMinutes.value * 60 },
-        throughput: { orders_per_hour: 10.8, items_per_hour: 25.1 },
-        punctuality: { actual_start: '2026-06-02T09:12:00', scheduled_start: '2026-06-02T09:00:00', late_minutes: 12, is_late: true },
-      },
-    ],
-  }
-}
+onMounted(() => { loadStaff(); load() })
+watch([dateFrom, dateTo, userIdFilter, targetPrepMinutes], load)
+watch(roleFilter, () => { loadStaff(); load() })
 
 const summary = computed<any>(() => data.value?.summary)
 const distribution = computed<any>(() => data.value?.distribution)
@@ -147,6 +98,15 @@ const byHourOptions = computed(() => ({
           density="compact"
           hide-details
           style="min-inline-size:140px;"
+        />
+        <VSelect
+          v-model="userIdFilter"
+          :items="staff.map((s: any) => ({ title: `${s.first_name} ${s.last_name}`, value: s.id }))"
+          :label="t('Staff')"
+          density="compact"
+          hide-details
+          style="min-inline-size:180px;"
+          clearable
         />
         <VTextField
           v-model.number="targetPrepMinutes"

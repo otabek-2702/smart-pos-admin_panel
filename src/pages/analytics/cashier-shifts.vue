@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// import axios from '@/plugins/axios'
+import axios from '@/plugins/axios'
 import VueApexCharts from 'vue3-apexcharts'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -17,23 +17,30 @@ const data = ref<any>(null)
 const loading = ref(false)
 
 async function loadCashiers() {
-  // TODO BE: GET /api/admins/users?role=CASHIER
-  cashiers.value = []
+  try {
+    const res = await axios.get('/users', { params: { role: 'CASHIER', per_page: 200 } })
+    const d = res.data?.data ?? res.data
+
+    cashiers.value = d?.users ?? d?.items ?? []
+  }
+  catch {
+    cashiers.value = []
+  }
 }
 
 async function load() {
   loading.value = true
   try {
-    // TODO BE: wire when ready
-    // const params: any = { from: dateFrom.value, to: dateTo.value }
-    // if (userIdFilter.value) params.user_id = userIdFilter.value
-    // const res = await axios.get('/analytics/shifts/cashiers', { params })
-    // data.value = res.data?.data ?? res.data
+    const params: any = { from: dateFrom.value, to: dateTo.value }
+    if (userIdFilter.value)
+      params.user_id = userIdFilter.value
+    const res = await axios.get('/analytics/shifts/cashiers', { params })
 
-    data.value = mockResponse()
+    data.value = res.data?.data ?? res.data
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Failed to load'), 'error')
+    data.value = null
   }
   finally {
     loading.value = false
@@ -42,62 +49,6 @@ async function load() {
 
 onMounted(() => { loadCashiers(); load() })
 watch([dateFrom, dateTo, userIdFilter], load)
-
-// -------- mock data (delete when BE wired) --------
-function mockResponse() {
-  return {
-    scope: 'cashier',
-    date_from: dateFrom.value, date_to: dateTo.value, filtered_user_id: null,
-    summary: {
-      shift_count: 42, distinct_cashiers: 5,
-      by_status: { ACTIVE: 1, COMPLETED: 40, ABANDONED: 1 },
-      total_hours: 318.5, avg_shift_minutes: 455.0,
-      orders: { total: 1290, paid: 1250, cancelled: 22, cancel_rate_pct: 1.71, avg_per_shift: 30.71, units_sold: 4310 },
-      money: {
-        revenue: '184500000.00', cash: '120300000.00', card: '64200000.00',
-        avg_per_shift: '4392857.14', avg_order_value: '147600.00', revenue_per_hour: '579277.00',
-        payment_mix: { CASH: '120300000.00', UZCARD: '37100000.00', HUMO: '14760000.00', PAYME: '9225000.00', MIXED: '3138000.00' },
-        payment_mix_pct: { CASH: 65.2, UZCARD: 20.1, HUMO: 8.0, PAYME: 5.0, MIXED: 1.7 },
-      },
-      discounts: { total_given: '4800000.00', discounted_orders: 80, discount_rate_pct: 6.2, avg_discount_pct: 8.5 },
-      speed: { avg_prep_seconds: 540, fastest_shift_avg_seconds: 300, slowest_shift_avg_seconds: 900 },
-      punctuality: {
-        on_time_shifts: 35, late_shifts: 5, punctuality_rate_pct: 87.5,
-        avg_late_minutes: 12.4, max_late_minutes: 41,
-        late_arrivals: [
-          { shift_id: 88, user_id: 12, user_name: 'Ali Karimov', late_minutes: 41, start_time: '2026-06-04T09:41:00' },
-          { shift_id: 64, user_id: 7, user_name: 'Aziza N.', late_minutes: 24, start_time: '2026-06-03T09:24:00' },
-        ],
-      },
-      cash_accuracy: {
-        shifts_reconciled: 38, shifts_unreconciled: 4,
-        short_count: 6, over_count: 3, exact_count: 29,
-        net_variance: '-42000.00', total_abs_variance: '180000.00', avg_abs_variance: '4736.84',
-        worst_shortage: { shift_id: 71, user_name: 'Bekzod S.', difference: '-50000.00' },
-        biggest_overage: { shift_id: 64, user_name: 'Aziza N.', difference: '30000.00' },
-      },
-    },
-    leaderboard: [
-      { user_id: 12, user_name: 'Ali Karimov', shifts: 10, orders: 320, revenue: '52000000.00', cash: '34000000.00', avg_order_value: '162500.00', cancelled: 4, cancel_rate_pct: 1.25, late_shifts: 2, late_minutes_total: 53, cash_variance: '-12000.00', avg_prep_seconds: 512, revenue_rank: 1 },
-      { user_id: 7, user_name: 'Aziza N.', shifts: 9, orders: 280, revenue: '41200000.00', cash: '28000000.00', avg_order_value: '147142.85', cancelled: 5, cancel_rate_pct: 1.78, late_shifts: 1, late_minutes_total: 24, cash_variance: '30000.00', avg_prep_seconds: 540, revenue_rank: 2 },
-      { user_id: 15, user_name: 'Sardor M.', shifts: 8, orders: 250, revenue: '36500000.00', cash: '24500000.00', avg_order_value: '146000.00', cancelled: 4, cancel_rate_pct: 1.6, late_shifts: 1, late_minutes_total: 18, cash_variance: '0.00', avg_prep_seconds: 530, revenue_rank: 3 },
-    ],
-    distribution: {
-      by_hour: Array.from({ length: 24 }, (_, h) => {
-        const peak = [11, 12, 13, 14, 18, 19, 20]
-        const orders = peak.includes(h) ? Math.round(80 + Math.random() * 40) : Math.round(Math.random() * 20)
-        return { hour: h, orders, revenue: String(orders * 147600) }
-      }),
-      by_date: Array.from({ length: 30 }, (_, i) => ({
-        date: new Date(Date.now() - (29 - i) * 86400_000).toISOString().slice(0, 10),
-        orders: Math.round(30 + Math.random() * 30),
-        revenue: String(Math.round((30 + Math.random() * 30) * 147600)),
-      })),
-      peak_hour: 13,
-    },
-    shifts: [],
-  }
-}
 
 // -------- derived --------
 const summary = computed<any>(() => data.value?.summary)

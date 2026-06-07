@@ -7,7 +7,10 @@ const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 
 const KIND_LABELS: Record<string, string> = { SAFE: 'Safe (cash)', BANK: 'Bank (cards)' }
-const TXN_TYPES = ['INKASSA', 'TRANSFER_IN', 'TRANSFER_OUT', 'FEE', 'EXPENSE', 'ADJUSTMENT']
+const TXN_TYPES = [
+  'INKASSA', 'TRANSFER_IN', 'TRANSFER_OUT', 'FEE', 'EXPENSE', 'ADJUSTMENT',
+  'SUPPLIER_PAYMENT', 'SALARY_PAYMENT', 'SHIFT_DEPOSIT',
+]
 
 const txnTypeColor: Record<string, string> = {
   INKASSA: 'success',
@@ -16,6 +19,9 @@ const txnTypeColor: Record<string, string> = {
   FEE: 'secondary',
   EXPENSE: 'error',
   ADJUSTMENT: 'default',
+  SUPPLIER_PAYMENT: 'warning',
+  SALARY_PAYMENT: 'warning',
+  SHIFT_DEPOSIT: 'success',
 }
 
 // -------- accounts --------
@@ -127,10 +133,10 @@ async function doTransfer() {
 // -------- expense dialog --------
 const expenseDialog = ref(false)
 const expenseSaving = ref(false)
-const expenseForm = ref({ account: 'SAFE', amount: 0, category: '', description: '' })
+const expenseForm = ref({ account: 'SAFE', amount: 0, fee: 0, category: '', description: '' })
 
 function openExpense() {
-  expenseForm.value = { account: 'SAFE', amount: 0, category: '', description: '' }
+  expenseForm.value = { account: 'SAFE', amount: 0, fee: 0, category: '', description: '' }
   expenseDialog.value = true
 }
 
@@ -507,6 +513,16 @@ function deltaDisplay(t: any) {
                 type="number"
                 min="0"
                 autofocus
+              />
+            </VCol>
+            <VCol cols="12">
+              <VTextField
+                v-model.number="expenseForm.fee"
+                :label="t('Fee / commission (optional)')"
+                type="number"
+                min="0"
+                :hint="t('Bank/processor charge — debits the same account')"
+                persistent-hint
               />
             </VCol>
             <VCol cols="12">

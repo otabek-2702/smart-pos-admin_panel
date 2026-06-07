@@ -12,6 +12,7 @@
   "place_type_OUTDOOR": "Outdoor",
   "place_type_PRIVATE_ROOM": "Private Room",
   "shift_status_ACTIVE": "Active",
+  "shift_status_ENDED": "Ended (awaiting reconcile)",
   "shift_status_COMPLETED": "Completed",
   "shift_status_ABANDONED": "Abandoned",
   "shift_status_RECONCILED": "Reconciled",

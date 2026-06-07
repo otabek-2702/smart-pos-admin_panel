@@ -42,6 +42,17 @@ const shift = computed<any>(() => data.value?.shift)
 const receipts = computed<any[]>(() => data.value?.receipts ?? [])
 const products = computed<any[]>(() => data.value?.products ?? [])
 const distribution = computed<any>(() => data.value?.distribution)
+const settlement = computed<any[]>(() => data.value?.settlement ?? [])
+const cashExpenses = computed<any[]>(() => data.value?.cash_expenses ?? [])
+const cashExpensesTotal = computed(() =>
+  cashExpenses.value.reduce((acc, e: any) => acc + Number(e.total || 0), 0),
+)
+function settlementDiffColor(diff: string | number) {
+  const n = Number(diff)
+  if (Math.abs(n) < 0.01) return 'success'
+
+  return n < 0 ? 'error' : 'warning'
+}
 
 // -------- charts --------
 const paymentMixSeries = computed(() => {
@@ -278,6 +289,83 @@ function fmtSec(s: number | null | undefined) {
           <div v-if="shift.reconciliation.notes" class="mt-2 text-body-2 text-disabled">
             {{ shift.reconciliation.notes }}
           </div>
+        </VCardText>
+      </VCard>
+
+      <!-- Per-tender settlement (P2) -->
+      <VCard v-if="settlement.length" class="mb-4">
+        <VCardText>
+          <div class="text-subtitle-1 font-weight-medium mb-3 d-flex align-center gap-2">
+            <VIcon icon="bx-list-check" size="20" />
+            {{ t('Per-tender Settlement') }}
+          </div>
+          <VTable density="compact">
+            <thead>
+              <tr>
+                <th>{{ t('Method') }}</th>
+                <th class="text-end">{{ t('Expected (system)') }}</th>
+                <th class="text-end">{{ t('Cashier counted') }}</th>
+                <th class="text-end">{{ t('Manager confirmed') }}</th>
+                <th class="text-end">{{ t('Difference') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in settlement" :key="row.method">
+                <td>
+                  <VChip
+                    size="small"
+                    :color="paymentMethodColor[row.method] ?? 'default'"
+                    variant="tonal"
+                  >
+                    {{ row.method }}
+                  </VChip>
+                </td>
+                <td class="text-end">{{ formatCurrency(row.expected) }}</td>
+                <td class="text-end">{{ formatCurrency(row.counted) }}</td>
+                <td class="text-end font-weight-medium">{{ formatCurrency(row.confirmed) }}</td>
+                <td class="text-end">
+                  <VChip
+                    size="small"
+                    :color="settlementDiffColor(row.difference)"
+                    variant="tonal"
+                  >
+                    {{ formatCurrency(row.difference) }}
+                  </VChip>
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
+        </VCardText>
+      </VCard>
+
+      <!-- Cash expenses out of the drawer (P4) -->
+      <VCard v-if="cashExpenses.length" class="mb-4">
+        <VCardText>
+          <div class="text-subtitle-1 font-weight-medium mb-3 d-flex align-center justify-space-between">
+            <span class="d-flex align-center gap-2">
+              <VIcon icon="bx-minus-circle" size="20" />
+              {{ t('Cash drawer expenses') }}
+            </span>
+            <span class="text-error font-weight-bold">
+              −{{ formatCurrency(cashExpensesTotal) }}
+            </span>
+          </div>
+          <VTable density="compact">
+            <thead>
+              <tr>
+                <th>{{ t('Category') }}</th>
+                <th class="text-end">{{ t('Count') }}</th>
+                <th class="text-end">{{ t('Total') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="e in cashExpenses" :key="e.category">
+                <td>{{ e.category }}</td>
+                <td class="text-end">{{ e.count }}</td>
+                <td class="text-end font-weight-medium text-error">−{{ formatCurrency(e.total) }}</td>
+              </tr>
+            </tbody>
+          </VTable>
         </VCardText>
       </VCard>
 

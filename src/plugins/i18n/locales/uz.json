@@ -12,6 +12,7 @@
   "place_type_OUTDOOR": "Ko'cha",
   "place_type_PRIVATE_ROOM": "Xususiy xona",
   "shift_status_ACTIVE": "Faol",
+  "shift_status_ENDED": "Yakunlangan (yakunlash kerak)",
   "shift_status_COMPLETED": "Tugagan",
   "shift_status_ABANDONED": "Tashlangan",
   "shift_status_RECONCILED": "Yakunlangan",

@@ -50,6 +50,7 @@ const form = ref({
   price: 0,
   category_id: null as number | null,
   color: '',
+  is_instant: false,
 })
 
 // Color picker
@@ -158,7 +159,7 @@ function tryCloseDialog(val: boolean) {
 // ---- CRUD ----
 function openCreate() {
   editingProduct.value = null
-  form.value = { name: '', description: '', price: 0, category_id: null, color: '' }
+  form.value = { name: '', description: '', price: 0, category_id: null, color: '', is_instant: false }
   initialForm.value = { ...form.value }
   dialogOpen.value = true
 }
@@ -171,6 +172,7 @@ function openEdit(product: any) {
     price: product.price ?? 0,
     category_id: product.category?.id ?? product.category_id ?? null,
     color: product.colors?.[0] ?? '',
+    is_instant: product.is_instant ?? false,
   }
   initialForm.value = { ...form.value }
   dialogOpen.value = true
@@ -185,6 +187,7 @@ async function saveProduct() {
       price: form.value.price,
       category_id: form.value.category_id,
       colors: form.value.color ? [form.value.color] : [],
+      is_instant: form.value.is_instant,
     }
 
     if (editingProduct.value) {
@@ -356,6 +359,15 @@ async function deleteProduct() {
               style="width:10px;height:10px;border-radius:3px;flex-shrink:0;"
             />
             <span class="font-weight-medium">{{ item.raw.name }}</span>
+            <VChip
+              v-if="item.raw.is_instant"
+              size="x-small"
+              color="warning"
+              variant="tonal"
+              prepend-icon="bx-bolt-circle"
+            >
+              {{ t('Instant') }}
+            </VChip>
           </div>
         </template>
 
@@ -474,6 +486,16 @@ async function deleteProduct() {
                 v-model="form.description"
                 :label="t('Description')"
                 density="compact"
+              />
+            </VCol>
+            <VCol cols="12">
+              <VSwitch
+                v-model="form.is_instant"
+                :label="t('Instant — skip the kitchen / KDS')"
+                :hint="t('Cold drinks, packaged items, etc. Skips PREPARING; never appears on chef display.')"
+                persistent-hint
+                density="compact"
+                color="warning"
               />
             </VCol>
             <VCol cols="6">

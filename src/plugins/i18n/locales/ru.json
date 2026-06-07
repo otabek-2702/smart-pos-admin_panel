@@ -12,6 +12,7 @@
   "place_type_OUTDOOR": "Улица",
   "place_type_PRIVATE_ROOM": "Кабинет",
   "shift_status_ACTIVE": "Активна",
+  "shift_status_ENDED": "Закрыта (требует сверки)",
   "shift_status_COMPLETED": "Завершена",
   "shift_status_ABANDONED": "Заброшена",
   "shift_status_RECONCILED": "Сверена",

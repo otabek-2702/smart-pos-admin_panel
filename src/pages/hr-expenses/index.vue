@@ -135,10 +135,23 @@ async function reject(e: any) {
   }
 }
 
-async function pay(e: any) {
+const payDialog = ref(false)
+const paying = ref<any>(null)
+const payMethod = ref<'CASH' | 'UZCARD' | 'HUMO' | 'PAYME'>('CASH')
+
+function openPay(e: any) {
+  paying.value = e
+  payMethod.value = 'CASH'
+  payDialog.value = true
+}
+
+async function pay() {
+  if (!paying.value)
+    return
   try {
-    await axios.post(`/expenses/${e.id}/pay/`)
+    await axios.post(`/expenses/${paying.value.id}/pay/`, { payment_method: payMethod.value })
     notify(t('Paid'))
+    payDialog.value = false
     await Promise.all([load(), loadStats()])
   }
   catch (err: any) {
@@ -402,7 +415,7 @@ async function deleteCat(c: any) {
               variant="text"
               size="small"
               color="success"
-              @click="pay(item.raw)"
+              @click="openPay(item.raw)"
             >
               <VIcon
                 icon="bx-dollar"
@@ -484,6 +497,49 @@ async function deleteCat(c: any) {
             @click="save"
           >
             {{ t('Save') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <VDialog
+      v-model="payDialog"
+      max-width="420"
+      persistent
+    >
+      <VCard :title="t('Pay Expense')">
+        <VCardText>
+          <div class="text-body-2 mb-3">
+            {{ t('Amount') }}: <strong>{{ formatCurrency(paying?.amount ?? 0) }}</strong>
+          </div>
+          <VSelect
+            v-model="payMethod"
+            :items="[
+              { title: t('Cash'), value: 'CASH' },
+              { title: 'Uzcard', value: 'UZCARD' },
+              { title: 'Humo', value: 'HUMO' },
+              { title: 'Payme', value: 'PAYME' },
+            ]"
+            :label="t('Payment Method')"
+            autofocus
+          />
+          <div class="text-caption text-disabled mt-2">
+            {{ t('CASH debits the drawer; cards settle externally') }}
+          </div>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn
+            variant="text"
+            @click="payDialog = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            color="success"
+            @click="pay"
+          >
+            {{ t('Pay') }}
           </VBtn>
         </VCardActions>
       </VCard>

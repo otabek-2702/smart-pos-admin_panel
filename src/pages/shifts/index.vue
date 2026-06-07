@@ -82,6 +82,7 @@ const headers = [
 
 const statusColor: Record<string, string> = {
   ACTIVE: 'success',
+  ENDED: 'warning',
   COMPLETED: 'secondary',
   ABANDONED: 'error',
   RECONCILED: 'info',
@@ -359,7 +360,7 @@ async function deleteTpl(tpl: any) {
             />
             <VSelect
               v-model="statusFilter"
-              :items="['ACTIVE', 'COMPLETED', 'ABANDONED'].map(s => ({ title: t(`shift_status_${s}`), value: s }))"
+              :items="['ACTIVE', 'ENDED', 'COMPLETED', 'ABANDONED'].map(s => ({ title: t(`shift_status_${s}`), value: s }))"
               :placeholder="t('Status')"
               density="compact"
               style="min-inline-size:160px;"
@@ -425,7 +426,7 @@ async function deleteTpl(tpl: any) {
                   </VTooltip>
                 </VBtn>
                 <VBtn
-                  v-if="item.raw.status === 'COMPLETED' && !item.raw.reconciliation"
+                  v-if="item.raw.status === 'ENDED'"
                   size="small"
                   variant="tonal"
                   color="info"

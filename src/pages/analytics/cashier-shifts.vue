@@ -55,6 +55,12 @@ const summary = computed<any>(() => data.value?.summary)
 const leaderboard = computed<any[]>(() => data.value?.leaderboard ?? [])
 const distribution = computed<any>(() => data.value?.distribution)
 const lateArrivals = computed<any[]>(() => summary.value?.punctuality?.late_arrivals ?? [])
+const perShift = computed<any[]>(() => data.value?.shifts ?? [])
+const router = useRouter()
+
+function openHandover(shiftId: number) {
+  router.push({ path: '/analytics/shift-handover', query: { shift: String(shiftId) } })
+}
 
 // -------- charts --------
 const paymentMixSeries = computed(() => {
@@ -454,6 +460,80 @@ function varianceColor(v: string | number) {
                   </VChip>
                 </td>
                 <td class="text-end">{{ Math.round(row.avg_prep_seconds / 60) }}m</td>
+              </tr>
+            </tbody>
+          </VTable>
+        </VCardText>
+      </VCard>
+
+      <!-- Per-shift breakdown -->
+      <VCard v-if="perShift.length" class="mb-4">
+        <VCardText>
+          <div class="text-subtitle-1 font-weight-medium mb-2">
+            {{ t('Per-shift breakdown') }} ({{ perShift.length }})
+          </div>
+          <VTable density="compact">
+            <thead>
+              <tr>
+                <th>{{ t('Cashier') }}</th>
+                <th>{{ t('Status') }}</th>
+                <th>{{ t('Date') }}</th>
+                <th class="text-end">{{ t('Duration') }}</th>
+                <th class="text-end">{{ t('Orders') }}</th>
+                <th class="text-end">{{ t('Revenue') }}</th>
+                <th class="text-end">{{ t('Cash') }}</th>
+                <th class="text-end">{{ t('Card') }}</th>
+                <th class="text-end">{{ t('AOV') }}</th>
+                <th class="text-end">{{ t('Prep') }}</th>
+                <th class="text-end">{{ t('Late') }}</th>
+                <th class="text-end">{{ t('Variance') }}</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="s in perShift" :key="s.shift_id">
+                <td class="font-weight-medium">{{ s.user_name }}</td>
+                <td>
+                  <VChip size="x-small" :color="s.status === 'COMPLETED' ? 'success' : (s.status === 'ENDED' ? 'warning' : 'default')" variant="tonal">
+                    {{ t(`shift_status_${s.status}`) }}
+                  </VChip>
+                </td>
+                <td>{{ formatDate(s.start_time) }}</td>
+                <td class="text-end">{{ Math.round((s.duration_minutes ?? 0) / 60) }}h</td>
+                <td class="text-end">{{ s.orders?.total ?? 0 }}</td>
+                <td class="text-end font-weight-medium">{{ formatCurrency(s.money?.revenue ?? 0) }}</td>
+                <td class="text-end">{{ formatCurrency(s.money?.cash ?? 0) }}</td>
+                <td class="text-end">{{ formatCurrency(s.money?.card ?? 0) }}</td>
+                <td class="text-end">{{ formatCurrency(s.money?.avg_order_value ?? 0) }}</td>
+                <td class="text-end">{{ Math.round((s.speed?.avg_prep_seconds ?? 0) / 60) }}m</td>
+                <td class="text-end">
+                  <span v-if="s.punctuality?.is_late" class="text-warning">+{{ s.punctuality.late_minutes }}m</span>
+                  <span v-else class="text-success">✓</span>
+                </td>
+                <td class="text-end">
+                  <VChip
+                    v-if="s.reconciliation"
+                    size="x-small"
+                    :color="varianceColor(s.reconciliation.difference)"
+                    variant="tonal"
+                  >
+                    {{ formatCurrency(s.reconciliation.difference) }}
+                  </VChip>
+                  <span v-else class="text-disabled">—</span>
+                </td>
+                <td class="text-end">
+                  <VBtn
+                    icon
+                    variant="text"
+                    size="x-small"
+                    @click="openHandover(s.shift_id)"
+                  >
+                    <VIcon icon="bx-link-external" size="16" />
+                    <VTooltip activator="parent" location="top">
+                      {{ t('Open handover') }}
+                    </VTooltip>
+                  </VBtn>
+                </td>
               </tr>
             </tbody>
           </VTable>

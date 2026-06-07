@@ -14,6 +14,9 @@ const IDEMPOTENT_POST_PATTERNS: RegExp[] = [
   /^\/orders\/\d+\/pay$/, // POST /orders/{id}/pay
   /^\/orders\/\d+\/cancel$/, // POST /orders/{id}/cancel
   /^\/inkassa\/perform$/, // POST /inkassa/perform
+  /^\/treasury\/transfer$/, // POST /treasury/transfer
+  /^\/treasury\/expense$/, // POST /treasury/expense
+  /^\/suppliers\/\d+\/pay\/?$/, // POST /suppliers/{id}/pay/ (stockApi)
   /^\/loyalty\/accounts\/[^/]+\/redeem\/?$/, // POST /loyalty/accounts/{phone}/redeem/ (notificationsApi)
 ]
 
@@ -89,6 +92,8 @@ export const hrApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api
 export const discountsApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/discounts` }))
 
 export const notificationsApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/notifications` }))
+
+export const cashboxApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/cashbox` }))
 
 // Licensing endpoints are allowlisted past the kill switch and don't
 // require auth. No Bearer token, no idempotency. Plain axios so the

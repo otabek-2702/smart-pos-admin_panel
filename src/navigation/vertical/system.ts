@@ -17,6 +17,20 @@ export default [
     subject: 'all',
   },
   {
+    title: 'Roles & Permissions',
+    icon: { icon: 'bx-shield-quarter' },
+    to: 'settings-roles',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
+    title: 'Cashbox Categories',
+    icon: { icon: 'bx-folder-open' },
+    to: 'cashbox-categories',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
     title: 'License',
     icon: { icon: 'bx-shield' },
     to: 'licensing-status',

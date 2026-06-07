@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import axios from '@/plugins/axios'
+import axios, { cashboxApi } from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -162,6 +162,116 @@ function openEndDialog(s: any) {
   endDialog.value = true
 }
 
+// -------- cashbox drawer expenses (P4) --------
+const expDialog = ref(false)
+const expShift = ref<any>(null)
+const expLoading = ref(false)
+const expRows = ref<any[]>([])
+const expCategories = ref<any[]>([])
+const expForm = ref({ amount: 0, category_id: null as number | null, comment: '', recipient_user_id: null as number | null, recipient_supplier_id: null as number | null })
+const recipientResults = ref<{ users: any[]; suppliers: any[] }>({ users: [], suppliers: [] })
+
+const expTotal = computed(() =>
+  expRows.value.reduce((acc, r: any) => acc + Number(r.amount ?? 0), 0),
+)
+
+async function openExpenses(s: any) {
+  expShift.value = s
+  expForm.value = { amount: 0, category_id: null, comment: '', recipient_user_id: null, recipient_supplier_id: null }
+  expDialog.value = true
+  expLoading.value = true
+  try {
+    const [rRes, cRes] = await Promise.all([
+      cashboxApi.get(`/shifts/${s.id}/expenses/`),
+      cashboxApi.get('/categories/'),
+    ])
+    const rd = rRes.data?.data ?? rRes.data
+    const cd = cRes.data?.data ?? cRes.data
+
+    expRows.value = rd?.expenses ?? rd?.items ?? []
+    expCategories.value = cd?.categories ?? cd?.items ?? []
+    if (!expForm.value.category_id && expCategories.value.length)
+      expForm.value.category_id = expCategories.value[0].id
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Failed to load'), 'error')
+  }
+  finally {
+    expLoading.value = false
+  }
+}
+
+async function searchRecipient(q: string) {
+  if (!q || q.length < 2) {
+    recipientResults.value = { users: [], suppliers: [] }
+
+    return
+  }
+  try {
+    const res = await cashboxApi.get('/recipients/search/', { params: { q } })
+    const d = res.data?.data ?? res.data
+
+    recipientResults.value = { users: d?.users ?? [], suppliers: d?.suppliers ?? [] }
+  }
+  catch {
+    recipientResults.value = { users: [], suppliers: [] }
+  }
+}
+
+const recipientQuery = ref('')
+const debouncedSearch = useDebounceFn(() => searchRecipient(recipientQuery.value), 300)
+watch(recipientQuery, debouncedSearch)
+
+function pickRecipient(kind: 'user' | 'supplier', id: number) {
+  if (kind === 'user') {
+    expForm.value.recipient_user_id = id
+    expForm.value.recipient_supplier_id = null
+  }
+  else {
+    expForm.value.recipient_supplier_id = id
+    expForm.value.recipient_user_id = null
+  }
+}
+
+const selectedRecipientLabel = computed(() => {
+  if (expForm.value.recipient_user_id) {
+    const u = recipientResults.value.users.find(x => x.id === expForm.value.recipient_user_id)
+
+    return u ? `${u.name} (${u.role})` : `User #${expForm.value.recipient_user_id}`
+  }
+  if (expForm.value.recipient_supplier_id) {
+    const s = recipientResults.value.suppliers.find(x => x.id === expForm.value.recipient_supplier_id)
+
+    return s ? s.name : `Supplier #${expForm.value.recipient_supplier_id}`
+  }
+
+  return ''
+})
+
+async function addExpense() {
+  if (!expShift.value || expForm.value.amount <= 0 || !expForm.value.category_id) {
+    notify(t('Amount + category required'), 'error')
+
+    return
+  }
+  try {
+    await cashboxApi.post(`/shifts/${expShift.value.id}/expenses/`, expForm.value)
+    notify(t('Expense recorded'))
+    expForm.value = { amount: 0, category_id: expForm.value.category_id, comment: '', recipient_user_id: null, recipient_supplier_id: null }
+    recipientQuery.value = ''
+    recipientResults.value = { users: [], suppliers: [] }
+    // reload list
+    const res = await cashboxApi.get(`/shifts/${expShift.value.id}/expenses/`)
+    const d = res.data?.data ?? res.data
+
+    expRows.value = d?.expenses ?? d?.items ?? []
+    await loadActiveShifts()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+}
+
 async function endShiftConfirm() {
   try {
     await axios.post(`/shifts/${endShift.value.id}/end`, { notes: endNotes.value })
@@ -298,6 +408,16 @@ async function deleteTpl(tpl: any) {
                           {{ t('Started') }}: {{ formatDate((s as any).start_time) }}
                         </div>
                       </div>
+                      <VSpacer />
+                      <VChip
+                        v-if="(s as any).is_live_stats"
+                        size="x-small"
+                        color="success"
+                        variant="tonal"
+                        prepend-icon="bx-pulse"
+                      >
+                        {{ t('Live') }}
+                      </VChip>
                     </div>
                     <div class="d-flex justify-space-between text-body-2 mb-1">
                       <span class="text-disabled">{{ t('Orders') }}</span>
@@ -307,14 +427,26 @@ async function deleteTpl(tpl: any) {
                       <span class="text-disabled">{{ t('Cash Collected') }}</span>
                       <span class="font-weight-medium">{{ formatCurrency((s as any).cash_collected ?? 0) }}</span>
                     </div>
-                    <VBtn
-                      block
-                      color="warning"
-                      prepend-icon="bx-stop-circle"
-                      @click="openEndDialog(s)"
-                    >
-                      {{ t('End Shift') }}
-                    </VBtn>
+                    <div class="d-flex gap-2">
+                      <VBtn
+                        color="info"
+                        variant="tonal"
+                        size="small"
+                        prepend-icon="bx-minus-circle"
+                        @click="openExpenses(s)"
+                      >
+                        {{ t('Drawer Expense') }}
+                      </VBtn>
+                      <VBtn
+                        color="warning"
+                        size="small"
+                        prepend-icon="bx-stop-circle"
+                        class="flex-grow-1"
+                        @click="openEndDialog(s)"
+                      >
+                        {{ t('End Shift') }}
+                      </VBtn>
+                    </div>
                   </VCardText>
                 </VCard>
                 <div
@@ -498,6 +630,167 @@ async function deleteTpl(tpl: any) {
         </VWindowItem>
       </VWindow>
     </VCard>
+
+    <!-- Cashbox drawer expense dialog -->
+    <VDialog
+      v-model="expDialog"
+      max-width="720"
+      scrollable
+    >
+      <VCard>
+        <VCardText class="py-3">
+          <div class="text-h6">
+            {{ t('Cash drawer expenses') }}
+          </div>
+          <div
+            v-if="expShift"
+            class="text-caption text-disabled"
+          >
+            {{ expShift.user?.name }} · {{ formatDate(expShift.start_time) }}
+          </div>
+        </VCardText>
+        <VDivider />
+        <VCardText style="max-height:70vh;overflow-y:auto;">
+          <!-- Add form -->
+          <VCard variant="outlined" class="mb-4">
+            <VCardText>
+              <div class="text-subtitle-2 mb-2">
+                {{ t('Add expense') }}
+              </div>
+              <VRow>
+                <VCol cols="6" sm="3">
+                  <VTextField
+                    v-model.number="expForm.amount"
+                    :label="t('Amount')"
+                    type="number"
+                    min="0"
+                    density="compact"
+                    hide-details
+                  />
+                </VCol>
+                <VCol cols="6" sm="3">
+                  <VSelect
+                    v-model="expForm.category_id"
+                    :items="expCategories.map((c: any) => ({ title: c.name, value: c.id }))"
+                    :label="t('Category')"
+                    density="compact"
+                    hide-details
+                  />
+                </VCol>
+                <VCol cols="12" sm="6">
+                  <VTextField
+                    v-model="recipientQuery"
+                    :label="t('Recipient search')"
+                    :placeholder="t('Type a name…')"
+                    density="compact"
+                    hide-details
+                    clearable
+                    :hint="selectedRecipientLabel || ''"
+                    :persistent-hint="!!selectedRecipientLabel"
+                  />
+                </VCol>
+                <VCol
+                  v-if="recipientResults.users.length || recipientResults.suppliers.length"
+                  cols="12"
+                >
+                  <div class="d-flex flex-wrap gap-2">
+                    <VChip
+                      v-for="u in recipientResults.users"
+                      :key="`u${u.id}`"
+                      size="small"
+                      :color="expForm.recipient_user_id === u.id ? 'primary' : 'default'"
+                      :variant="expForm.recipient_user_id === u.id ? 'flat' : 'tonal'"
+                      @click="pickRecipient('user', u.id)"
+                    >
+                      <VIcon icon="bx-user" size="14" start />
+                      {{ u.name }} ({{ u.role }})
+                    </VChip>
+                    <VChip
+                      v-for="s in recipientResults.suppliers"
+                      :key="`s${s.id}`"
+                      size="small"
+                      :color="expForm.recipient_supplier_id === s.id ? 'warning' : 'default'"
+                      :variant="expForm.recipient_supplier_id === s.id ? 'flat' : 'tonal'"
+                      @click="pickRecipient('supplier', s.id)"
+                    >
+                      <VIcon icon="bx-store" size="14" start />
+                      {{ s.name }}
+                    </VChip>
+                  </div>
+                </VCol>
+                <VCol cols="12">
+                  <VTextField
+                    v-model="expForm.comment"
+                    :label="t('Comment')"
+                    density="compact"
+                    hide-details
+                  />
+                </VCol>
+              </VRow>
+              <div class="d-flex justify-end mt-3">
+                <VBtn
+                  color="error"
+                  prepend-icon="bx-minus-circle"
+                  :disabled="!expForm.amount || !expForm.category_id"
+                  @click="addExpense"
+                >
+                  {{ t('Record expense') }}
+                </VBtn>
+              </div>
+            </VCardText>
+          </VCard>
+
+          <!-- List -->
+          <div class="text-subtitle-2 mb-2 d-flex align-center justify-space-between">
+            <span>{{ t('This shift') }} ({{ expRows.length }})</span>
+            <span class="text-error font-weight-bold">−{{ formatCurrency(expTotal) }}</span>
+          </div>
+          <VProgressLinear
+            v-if="expLoading"
+            indeterminate
+            class="mb-2"
+          />
+          <VTable density="compact">
+            <thead>
+              <tr>
+                <th>{{ t('Time') }}</th>
+                <th>{{ t('Category') }}</th>
+                <th class="text-end">{{ t('Amount') }}</th>
+                <th>{{ t('Recipient') }}</th>
+                <th>{{ t('Comment') }}</th>
+                <th>{{ t('By') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in expRows" :key="r.id">
+                <td class="text-caption">{{ formatDate(r.created_at) }}</td>
+                <td>{{ r.category?.name ?? r.category_name ?? '—' }}</td>
+                <td class="text-end text-error font-weight-medium">−{{ formatCurrency(r.amount) }}</td>
+                <td>
+                  <span v-if="r.recipient_user">{{ r.recipient_user.name }}</span>
+                  <span v-else-if="r.recipient_supplier">{{ r.recipient_supplier.name }}</span>
+                  <span v-else class="text-disabled">—</span>
+                </td>
+                <td class="text-body-2">{{ r.comment || '—' }}</td>
+                <td class="text-body-2">{{ r.created_by?.name ?? r.created_by_name ?? '—' }}</td>
+              </tr>
+              <tr v-if="!expRows.length && !expLoading">
+                <td colspan="6" class="text-center text-disabled py-4">
+                  {{ t('No drawer expenses for this shift yet') }}
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
+        </VCardText>
+        <VDivider />
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="text" @click="expDialog = false">
+            {{ t('Close') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
 
     <!-- End shift dialog -->
     <VDialog

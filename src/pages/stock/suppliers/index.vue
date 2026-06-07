@@ -162,6 +162,90 @@ async function doDelete() {
     deleting.value = false
   }
 }
+
+// -------- pay supplier --------
+const payDialog = ref(false)
+const paying = ref<any>(null)
+const paySaving = ref(false)
+const payForm = ref({ amount: 0, source_account: 'BANK', commission: 0, note: '' })
+const { formatCurrency, formatDate } = useFormatters()
+
+function openPay(s: any) {
+  paying.value = s
+  payForm.value = { amount: 0, source_account: 'BANK', commission: 0, note: '' }
+  payDialog.value = true
+}
+
+async function doPay() {
+  if (!paying.value || payForm.value.amount <= 0) {
+    notify(t('Amount must be greater than 0'), 'error')
+
+    return
+  }
+  paySaving.value = true
+  try {
+    await axios.post(`/suppliers/${paying.value.id}/pay/`, payForm.value)
+    notify(t('Payment recorded'))
+    payDialog.value = false
+    await loadSuppliers()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+  finally {
+    paySaving.value = false
+  }
+}
+
+// -------- ledger drawer --------
+const ledgerDialog = ref(false)
+const ledgerSupplier = ref<any>(null)
+const ledgerLoading = ref(false)
+const ledgerRows = ref<any[]>([])
+const ledgerPage = ref(1)
+const ledgerPerPage = ref(20)
+const ledgerTotal = ref(0)
+const ledgerBalance = ref<string | null>(null)
+
+async function openLedger(s: any) {
+  ledgerSupplier.value = s
+  ledgerPage.value = 1
+  ledgerRows.value = []
+  ledgerBalance.value = null
+  ledgerDialog.value = true
+  await loadLedger()
+}
+
+async function loadLedger() {
+  if (!ledgerSupplier.value)
+    return
+  ledgerLoading.value = true
+  try {
+    const res = await axios.get(`/suppliers/${ledgerSupplier.value.id}/ledger/`, {
+      params: { page: ledgerPage.value, per_page: ledgerPerPage.value },
+    })
+    const d = res.data?.data ?? res.data
+
+    ledgerRows.value = d?.transactions ?? d?.entries ?? d?.items ?? []
+    ledgerTotal.value = d?.pagination?.total ?? ledgerRows.value.length
+    ledgerBalance.value = d?.current_balance ?? d?.balance ?? null
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Failed to load'), 'error')
+  }
+  finally {
+    ledgerLoading.value = false
+  }
+}
+
+watch(ledgerPage, loadLedger)
+
+const ledgerTypeColor: Record<string, string> = {
+  PURCHASE: 'warning',
+  PAYMENT: 'success',
+  RETURN: 'info',
+  ADJUSTMENT: 'secondary',
+}
 </script>
 
 <template>
@@ -291,6 +375,41 @@ async function doDelete() {
             class="d-flex justify-end"
             style="gap:2px;"
           >
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              color="success"
+              @click="openPay(item.raw)"
+            >
+              <VIcon
+                size="18"
+                icon="bx-dollar-circle"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Pay supplier') }}
+              </VTooltip>
+            </VBtn>
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              @click="openLedger(item.raw)"
+            >
+              <VIcon
+                size="18"
+                icon="bx-receipt"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Ledger') }}
+              </VTooltip>
+            </VBtn>
             <VBtn
               icon
               variant="text"
@@ -589,6 +708,184 @@ async function doDelete() {
             @click="doDelete"
           >
             {{ t('Delete') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Pay dialog -->
+    <VDialog
+      v-model="payDialog"
+      max-width="520"
+      persistent
+    >
+      <VCard :title="t('Pay supplier')">
+        <VCardText>
+          <div
+            v-if="paying"
+            class="text-body-2 mb-3"
+          >
+            {{ paying.name }}<span v-if="paying.current_balance"> · {{ t('Owed') }}: <strong class="text-warning">{{ formatCurrency(paying.current_balance) }}</strong></span>
+          </div>
+          <VRow>
+            <VCol cols="12" sm="6">
+              <VTextField
+                v-model.number="payForm.amount"
+                :label="t('Amount')"
+                type="number"
+                min="0"
+                autofocus
+              />
+            </VCol>
+            <VCol cols="12" sm="6">
+              <VSelect
+                v-model="payForm.source_account"
+                :items="[
+                  { title: t('Bank (cards)'), value: 'BANK' },
+                  { title: t('Safe (cash)'), value: 'SAFE' },
+                ]"
+                :label="t('Source account')"
+              />
+            </VCol>
+            <VCol cols="12">
+              <VTextField
+                v-model.number="payForm.commission"
+                :label="t('Commission / fee (optional)')"
+                type="number"
+                min="0"
+                :hint="t('Bank charge — debits same account')"
+                persistent-hint
+              />
+            </VCol>
+            <VCol cols="12">
+              <VTextField
+                v-model="payForm.note"
+                :label="t('Note')"
+              />
+            </VCol>
+          </VRow>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn
+            variant="text"
+            @click="payDialog = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            color="success"
+            :loading="paySaving"
+            @click="doPay"
+          >
+            {{ t('Pay') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Ledger drawer -->
+    <VDialog
+      v-model="ledgerDialog"
+      max-width="900"
+      scrollable
+    >
+      <VCard>
+        <VCardText class="d-flex align-center justify-space-between py-3">
+          <div>
+            <div class="text-h6">
+              {{ ledgerSupplier?.name }} · {{ t('Ledger') }}
+            </div>
+            <div
+              v-if="ledgerBalance !== null"
+              class="text-caption"
+            >
+              {{ t('Current balance') }}: <strong :class="Number(ledgerBalance) > 0 ? 'text-warning' : 'text-success'">{{ formatCurrency(ledgerBalance) }}</strong>
+            </div>
+          </div>
+          <VBtn
+            icon
+            variant="text"
+            @click="loadLedger"
+          >
+            <VIcon icon="bx-refresh" />
+          </VBtn>
+        </VCardText>
+        <VDivider />
+        <VCardText style="max-height:70vh;overflow-y:auto;">
+          <VProgressLinear
+            v-if="ledgerLoading"
+            indeterminate
+            class="mb-3"
+          />
+          <VTable density="compact">
+            <thead>
+              <tr>
+                <th>{{ t('Date') }}</th>
+                <th>{{ t('Type') }}</th>
+                <th class="text-end">{{ t('Amount') }}</th>
+                <th class="text-end">{{ t('Balance after') }}</th>
+                <th>{{ t('Reference') }}</th>
+                <th>{{ t('Note') }}</th>
+                <th>{{ t('By') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="r in ledgerRows"
+                :key="r.id"
+              >
+                <td>{{ formatDate(r.created_at) }}</td>
+                <td>
+                  <VChip
+                    size="x-small"
+                    :color="ledgerTypeColor[r.type] ?? 'default'"
+                    variant="tonal"
+                  >
+                    {{ r.type }}
+                  </VChip>
+                </td>
+                <td
+                  class="text-end font-weight-medium"
+                  :class="Number(r.amount ?? r.delta) > 0 ? 'text-warning' : 'text-success'"
+                >
+                  {{ formatCurrency(r.amount ?? r.delta ?? 0) }}
+                </td>
+                <td class="text-end">{{ formatCurrency(r.balance_after ?? 0) }}</td>
+                <td>
+                  <span
+                    v-if="r.reference_type"
+                    class="text-caption text-disabled"
+                  >{{ r.reference_type }} #{{ r.reference_id }}</span>
+                  <span
+                    v-else
+                    class="text-disabled"
+                  >—</span>
+                </td>
+                <td class="text-body-2">{{ r.note || r.description || '—' }}</td>
+                <td class="text-body-2">{{ r.performed_by || '—' }}</td>
+              </tr>
+              <tr v-if="!ledgerRows.length && !ledgerLoading">
+                <td colspan="7" class="text-center text-disabled py-4">
+                  {{ t('No ledger entries') }}
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
+        </VCardText>
+        <VDivider />
+        <VCardActions>
+          <DataTableFooter
+            v-model:page="ledgerPage"
+            v-model:items-per-page="ledgerPerPage"
+            :total-items="ledgerTotal"
+          />
+          <VSpacer />
+          <VBtn
+            variant="text"
+            @click="ledgerDialog = false"
+          >
+            {{ t('Close') }}
           </VBtn>
         </VCardActions>
       </VCard>

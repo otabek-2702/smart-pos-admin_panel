@@ -109,6 +109,115 @@ async function payOne(s: any) {
   }
 }
 
+// ---------- itemization dialog ----------
+const itemDialog = ref(false)
+const itemSalary = ref<any>(null)
+const itemLoading = ref(false)
+const baseInput = ref<number>(0)
+const bonuses = ref<any[]>([])
+const deductions = ref<any[]>([])
+const newBonus = ref({ amount: 0, reason: '' })
+const newDeduction = ref({ amount: 0, reason: '' })
+
+const isPaid = computed(() => itemSalary.value?.status === 'PAID')
+
+const calcBonusTotal = computed(() => bonuses.value.reduce((a, b: any) => a + Number(b.amount || 0), 0))
+const calcDeductionTotal = computed(() => deductions.value.reduce((a, d: any) => a + Number(d.amount || 0), 0))
+const calcNet = computed(() => Number(baseInput.value || 0) + calcBonusTotal.value - calcDeductionTotal.value)
+
+async function openItems(s: any) {
+  itemSalary.value = s
+  baseInput.value = Number(s.base_amount ?? 0)
+  bonuses.value = []
+  deductions.value = []
+  itemDialog.value = true
+  itemLoading.value = true
+  try {
+    const res = await axios.get(`/salaries/${s.id}/bonuses/`)
+    const d = res.data?.data ?? res.data
+
+    bonuses.value = d?.bonuses ?? []
+    deductions.value = d?.deductions ?? []
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Failed to load'), 'error')
+  }
+  finally {
+    itemLoading.value = false
+  }
+}
+
+async function saveBase() {
+  if (!itemSalary.value)
+    return
+  try {
+    await axios.post(`/salaries/${itemSalary.value.id}/base/`, { amount: baseInput.value })
+    notify(t('Base updated'))
+    await load()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+}
+
+async function addBonus() {
+  if (!itemSalary.value || newBonus.value.amount <= 0)
+    return
+  try {
+    await axios.post(`/salaries/${itemSalary.value.id}/bonuses/`, newBonus.value)
+    notify(t('Bonus added'))
+    newBonus.value = { amount: 0, reason: '' }
+    await openItems(itemSalary.value) // reload list
+    await load()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+}
+
+async function addDeduction() {
+  if (!itemSalary.value || newDeduction.value.amount <= 0)
+    return
+  try {
+    await axios.post(`/salaries/${itemSalary.value.id}/deductions/`, newDeduction.value)
+    notify(t('Deduction added'))
+    newDeduction.value = { amount: 0, reason: '' }
+    await openItems(itemSalary.value)
+    await load()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+}
+
+async function deleteBonus(b: any) {
+  if (!itemSalary.value)
+    return
+  try {
+    await axios.delete(`/salaries/${itemSalary.value.id}/bonuses/${b.id}/`)
+    notify(t('Removed'))
+    await openItems(itemSalary.value)
+    await load()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+}
+
+async function deleteDeduction(d: any) {
+  if (!itemSalary.value)
+    return
+  try {
+    await axios.delete(`/salaries/${itemSalary.value.id}/deductions/${d.id}/`)
+    notify(t('Removed'))
+    await openItems(itemSalary.value)
+    await load()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+}
+
 function openGenerate() {
   const now = new Date()
 
@@ -343,6 +452,23 @@ async function generate() {
             style="gap:2px;"
           >
             <VBtn
+              icon
+              variant="text"
+              size="small"
+              @click="openItems(item.raw)"
+            >
+              <VIcon
+                icon="bx-list-ul"
+                size="18"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Edit items (base / bonus / deduction)') }}
+              </VTooltip>
+            </VBtn>
+            <VBtn
               v-if="item.raw.status === 'PENDING'"
               icon
               variant="text"
@@ -413,6 +539,244 @@ async function generate() {
             @click="generate"
           >
             {{ t('Generate') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <VDialog
+      v-model="itemDialog"
+      max-width="780"
+      scrollable
+    >
+      <VCard :title="t('Salary itemization')">
+        <VCardText style="max-height:75vh;overflow-y:auto;">
+          <div
+            v-if="itemSalary"
+            class="d-flex align-center gap-2 mb-4"
+          >
+            <VAvatar size="36" color="primary" variant="tonal">
+              <span class="text-caption">{{ (itemSalary.employee?.user?.first_name ?? '?')[0] }}</span>
+            </VAvatar>
+            <div>
+              <div class="text-body-1 font-weight-medium">
+                {{ itemSalary.employee?.user?.first_name }} {{ itemSalary.employee?.user?.last_name }}
+              </div>
+              <div class="text-caption text-disabled">
+                {{ itemSalary.period_year }}-{{ String(itemSalary.period_month).padStart(2, '0') }}
+              </div>
+            </div>
+            <VSpacer />
+            <VChip
+              size="small"
+              :color="statusColor[itemSalary.status] ?? 'default'"
+              variant="tonal"
+            >
+              {{ itemSalary.status }}
+            </VChip>
+          </div>
+
+          <VAlert
+            v-if="isPaid"
+            type="warning"
+            variant="tonal"
+            class="mb-3"
+          >
+            {{ t('This salary is PAID — items are locked. Backend rejects edits.') }}
+          </VAlert>
+
+          <!-- Base -->
+          <VCard
+            variant="outlined"
+            class="mb-4"
+          >
+            <VCardText>
+              <div class="text-subtitle-2 mb-2">
+                {{ t('Base salary (this month)') }}
+              </div>
+              <div class="d-flex align-center gap-2">
+                <VTextField
+                  v-model.number="baseInput"
+                  type="number"
+                  min="0"
+                  density="compact"
+                  hide-details
+                  :disabled="isPaid"
+                />
+                <VBtn
+                  color="primary"
+                  :disabled="isPaid"
+                  @click="saveBase"
+                >
+                  {{ t('Save base') }}
+                </VBtn>
+              </div>
+            </VCardText>
+          </VCard>
+
+          <!-- Bonuses -->
+          <VCard
+            variant="outlined"
+            class="mb-4"
+          >
+            <VCardText>
+              <div class="text-subtitle-2 mb-2 d-flex align-center justify-space-between">
+                <span>
+                  <VIcon icon="bx-plus-circle" size="16" color="success" class="me-1" />
+                  {{ t('Bonuses') }}
+                </span>
+                <span class="text-success font-weight-bold">+{{ formatCurrency(calcBonusTotal) }}</span>
+              </div>
+              <VList density="compact" class="pa-0 mb-2">
+                <VListItem
+                  v-for="b in bonuses"
+                  :key="b.id"
+                >
+                  <VListItemTitle class="text-success">
+                    +{{ formatCurrency(b.amount) }}
+                  </VListItemTitle>
+                  <VListItemSubtitle v-if="b.reason">
+                    {{ b.reason }}
+                  </VListItemSubtitle>
+                  <template #append>
+                    <VBtn
+                      icon
+                      variant="text"
+                      size="x-small"
+                      color="error"
+                      :disabled="isPaid"
+                      @click="deleteBonus(b)"
+                    >
+                      <VIcon icon="bx-trash" size="16" />
+                    </VBtn>
+                  </template>
+                </VListItem>
+                <VListItem v-if="!bonuses.length && !itemLoading">
+                  <VListItemTitle class="text-disabled text-caption">
+                    {{ t('No bonuses') }}
+                  </VListItemTitle>
+                </VListItem>
+              </VList>
+              <div class="d-flex gap-2">
+                <VTextField
+                  v-model.number="newBonus.amount"
+                  :label="t('Amount')"
+                  type="number"
+                  min="0"
+                  density="compact"
+                  hide-details
+                  style="max-inline-size:140px;"
+                  :disabled="isPaid"
+                />
+                <VTextField
+                  v-model="newBonus.reason"
+                  :label="t('Reason')"
+                  density="compact"
+                  hide-details
+                  :disabled="isPaid"
+                />
+                <VBtn
+                  color="success"
+                  variant="tonal"
+                  prepend-icon="bx-plus"
+                  :disabled="isPaid || !newBonus.amount"
+                  @click="addBonus"
+                >
+                  {{ t('Add') }}
+                </VBtn>
+              </div>
+            </VCardText>
+          </VCard>
+
+          <!-- Deductions -->
+          <VCard
+            variant="outlined"
+            class="mb-4"
+          >
+            <VCardText>
+              <div class="text-subtitle-2 mb-2 d-flex align-center justify-space-between">
+                <span>
+                  <VIcon icon="bx-minus-circle" size="16" color="error" class="me-1" />
+                  {{ t('Deductions') }}
+                </span>
+                <span class="text-error font-weight-bold">−{{ formatCurrency(calcDeductionTotal) }}</span>
+              </div>
+              <VList density="compact" class="pa-0 mb-2">
+                <VListItem
+                  v-for="d in deductions"
+                  :key="d.id"
+                >
+                  <VListItemTitle class="text-error">
+                    −{{ formatCurrency(d.amount) }}
+                  </VListItemTitle>
+                  <VListItemSubtitle v-if="d.reason">
+                    {{ d.reason }}
+                  </VListItemSubtitle>
+                  <template #append>
+                    <VBtn
+                      icon
+                      variant="text"
+                      size="x-small"
+                      color="error"
+                      :disabled="isPaid"
+                      @click="deleteDeduction(d)"
+                    >
+                      <VIcon icon="bx-trash" size="16" />
+                    </VBtn>
+                  </template>
+                </VListItem>
+                <VListItem v-if="!deductions.length && !itemLoading">
+                  <VListItemTitle class="text-disabled text-caption">
+                    {{ t('No deductions') }}
+                  </VListItemTitle>
+                </VListItem>
+              </VList>
+              <div class="d-flex gap-2">
+                <VTextField
+                  v-model.number="newDeduction.amount"
+                  :label="t('Amount')"
+                  type="number"
+                  min="0"
+                  density="compact"
+                  hide-details
+                  style="max-inline-size:140px;"
+                  :disabled="isPaid"
+                />
+                <VTextField
+                  v-model="newDeduction.reason"
+                  :label="t('Reason')"
+                  density="compact"
+                  hide-details
+                  :disabled="isPaid"
+                />
+                <VBtn
+                  color="error"
+                  variant="tonal"
+                  prepend-icon="bx-minus"
+                  :disabled="isPaid || !newDeduction.amount"
+                  @click="addDeduction"
+                >
+                  {{ t('Add') }}
+                </VBtn>
+              </div>
+            </VCardText>
+          </VCard>
+
+          <!-- Net preview -->
+          <VCard color="primary" variant="tonal">
+            <VCardText class="d-flex align-center justify-space-between">
+              <span class="text-subtitle-1 font-weight-medium">{{ t('Net (preview)') }}</span>
+              <span class="text-h5 font-weight-bold">{{ formatCurrency(calcNet) }}</span>
+            </VCardText>
+          </VCard>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn
+            variant="text"
+            @click="itemDialog = false"
+          >
+            {{ t('Close') }}
           </VBtn>
         </VCardActions>
       </VCard>

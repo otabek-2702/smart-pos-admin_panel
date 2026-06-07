@@ -5,13 +5,20 @@ import vueJsx from '@vitejs/plugin-vue-jsx'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import DefineOptions from 'unplugin-vue-define-options/vite'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import Pages from 'vite-plugin-pages'
 import Layouts from 'vite-plugin-vue-layouts'
 import vuetify from 'vite-plugin-vuetify'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Loads VITE_BACKEND_HOST (and any other VITE_* / non-VITE vars matched by
+  // the third arg) from .env / .env.local at config time. Used only for the
+  // dev-server proxy target — never reaches the browser bundle.
+  const env = loadEnv(mode, process.cwd(), ['VITE_', ''])
+  const backendHost = env.VITE_BACKEND_HOST || 'http://127.0.0.1:8000'
+
+  return {
   plugins: [
     vue(),
     vueJsx(),
@@ -68,18 +75,10 @@ export default defineConfig({
     chunkSizeWarningLimit: 5000,
   },
   server: {
-    // 0.0.0.0 binds every interface so phones / tablets / other PCs on the
-    // LAN can hit the dev panel at http://<dev-machine-LAN-IP>:5181. Override
-    // with VITE_HOST=127.0.0.1 if you want localhost-only.
-    host: process.env.VITE_HOST ?? '0.0.0.0',
     port: 5181,
-    strictPort: true,
     proxy: {
-      // VITE_BACKEND_HOST lets you point at a different machine when the
-      // backend doesn't run on the same box as the dev server (e.g. backend
-      // on Docker host, panel on workstation). Defaults to local backend.
       '/api': {
-        target: process.env.VITE_BACKEND_HOST ?? 'http://127.0.0.1:8000',
+        target: backendHost,
         changeOrigin: true,
       },
     },
@@ -90,4 +89,5 @@ export default defineConfig({
       './src/**/*.vue',
     ],
   },
+  }
 })

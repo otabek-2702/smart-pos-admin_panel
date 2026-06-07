@@ -10,6 +10,27 @@ export default [
     subject: 'all',
   },
   {
+    title: 'Cashier Shifts',
+    icon: { icon: 'bx-user-check' },
+    to: 'analytics-cashier-shifts',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
+    title: 'Kitchen Shifts',
+    icon: { icon: 'bx-restaurant' },
+    to: 'analytics-kitchen-shifts',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
+    title: 'Shift Handover',
+    icon: { icon: 'bx-transfer-alt' },
+    to: 'analytics-shift-handover',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
     title: 'Menu Engineering',
     icon: { icon: 'bx-pie-chart-alt-2' },
     to: 'analytics-menu-engineering',

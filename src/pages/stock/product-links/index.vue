@@ -63,7 +63,7 @@ async function loadLinks() {
     const d = res.data?.data ?? res.data
 
     links.value = d?.links ?? []
-    total.value = d.pagination?.total_items ?? d.count ?? links.value.length
+    total.value = d.pagination?.total_items ?? d.pagination?.total ?? d.count ?? links.value.length
     if (d.link_types)
       linkTypes.value = d.link_types
     if (d.deduct_statuses)

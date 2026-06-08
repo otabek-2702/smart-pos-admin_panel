@@ -73,7 +73,7 @@ async function loadBatches() {
     const d = res.data?.data ?? res.data
 
     batches.value = d?.batches ?? []
-    total.value = d.pagination?.total_items ?? batches.value.length
+    total.value = d.pagination?.total_items ?? d.pagination?.total ?? batches.value.length
 
     if (d.statuses && statusOptions.value.length === 0)
       statusOptions.value = d.statuses.map((s: any) => ({ title: s.label, value: s.value }))

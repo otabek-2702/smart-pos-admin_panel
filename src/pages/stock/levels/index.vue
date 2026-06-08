@@ -52,7 +52,7 @@ async function loadLevels() {
     const d = res.data?.data ?? res.data
 
     levels.value = d?.levels ?? []
-    total.value = d.pagination?.total_items ?? levels.value.length
+    total.value = d.pagination?.total_items ?? d.pagination?.total ?? levels.value.length
   }
   catch {
     notify(t('Failed to load stock levels'), 'error')

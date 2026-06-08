@@ -31,6 +31,13 @@ export default [
     subject: 'all',
   },
   {
+    title: 'Fiscalization',
+    icon: { icon: 'bx-receipt' },
+    to: 'fiscalization',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
     title: 'License',
     icon: { icon: 'bx-shield' },
     to: 'licensing-status',

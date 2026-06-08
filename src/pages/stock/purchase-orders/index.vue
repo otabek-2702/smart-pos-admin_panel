@@ -67,7 +67,7 @@ async function loadOrders() {
     const d = res.data?.data ?? res.data
 
     orders.value = d?.orders ?? []
-    total.value = d.pagination?.total_items ?? orders.value.length
+    total.value = d.pagination?.total_items ?? d.pagination?.total ?? orders.value.length
   }
   catch {
     notify(t('Failed to load purchase orders'), 'error')

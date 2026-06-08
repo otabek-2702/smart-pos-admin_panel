@@ -59,7 +59,7 @@ async function loadTransfers() {
     const d = res.data?.data ?? res.data
 
     transfers.value = d?.transfers ?? []
-    total.value = d.pagination?.total_items ?? transfers.value.length
+    total.value = d.pagination?.total_items ?? d.pagination?.total ?? transfers.value.length
   }
   catch {
     notify(t('Failed to load transfers'), 'error')

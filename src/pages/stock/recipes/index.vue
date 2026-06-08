@@ -74,7 +74,7 @@ async function loadRecipes() {
     const d = res.data?.data ?? res.data
 
     recipes.value = d?.recipes ?? []
-    total.value = d?.pagination?.total_items ?? recipes.value.length
+    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? recipes.value.length
   }
   catch {
     notify(t('Failed to load recipes'), 'error')

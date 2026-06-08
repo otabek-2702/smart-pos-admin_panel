@@ -63,7 +63,7 @@ async function loadItems() {
     const d = res.data?.data ?? res.data
 
     items.value = d?.items ?? []
-    total.value = d.pagination?.total_items ?? items.value.length
+    total.value = d.pagination?.total_items ?? d.pagination?.total ?? items.value.length
   }
   catch {
     notify(t('Failed to load items'), 'error')

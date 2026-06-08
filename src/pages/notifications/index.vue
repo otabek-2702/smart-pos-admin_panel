@@ -100,6 +100,78 @@ async function loadTemplates() {
   }
 }
 
+// -------- template editor + preview --------
+const tplDialog = ref(false)
+const tplEditing = ref<any>(null)
+const tplForm = ref({ name: '', template_text: '', description: '', language: 'uz', is_enabled: true })
+const tplSaving = ref(false)
+const tplPreviewContext = ref('{}')
+const tplPreviewResult = ref<string>('')
+const tplPreviewLoading = ref(false)
+
+function openTemplateEditor(tpl: any) {
+  tplEditing.value = tpl
+  tplForm.value = {
+    name: tpl.name ?? '',
+    template_text: tpl.template_text ?? '',
+    description: tpl.description ?? '',
+    language: tpl.language ?? 'uz',
+    is_enabled: tpl.is_enabled ?? true,
+  }
+  tplPreviewContext.value = '{}'
+  tplPreviewResult.value = ''
+  tplDialog.value = true
+}
+
+async function saveTemplate() {
+  if (!tplEditing.value)
+    return
+  tplSaving.value = true
+  try {
+    await axios.put(`/templates/${tplEditing.value.id}/`, tplForm.value)
+    notify(t('Template saved'))
+    tplDialog.value = false
+    await loadTemplates()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+  finally {
+    tplSaving.value = false
+  }
+}
+
+async function previewTemplate() {
+  if (!tplEditing.value)
+    return
+  let ctx: any = {}
+  try {
+    ctx = JSON.parse(tplPreviewContext.value || '{}')
+  }
+  catch {
+    notify(t('Context must be valid JSON'), 'error')
+
+    return
+  }
+  tplPreviewLoading.value = true
+  try {
+    const res = await axios.post(`/templates/${tplEditing.value.id}/preview/`, {
+      context: ctx,
+      template_text: tplForm.value.template_text,
+    })
+    const d = res.data?.data ?? res.data
+
+    tplPreviewResult.value = d?.rendered ?? d?.text ?? d?.result ?? JSON.stringify(d)
+  }
+  catch (e: any) {
+    tplPreviewResult.value = ''
+    notify(e?.response?.data?.message ?? t('Preview failed'), 'error')
+  }
+  finally {
+    tplPreviewLoading.value = false
+  }
+}
+
 async function toggleTemplate(tpl: any) {
   try {
     await axios.put(`/types/${tpl.notification_type}/`, { is_enabled: !tpl.is_enabled })
@@ -306,6 +378,15 @@ const statusColor: Record<string, string> = {
                   {{ te(`notif_type_${tpl.notification_type}`) ? t(`notif_type_${tpl.notification_type}`) : tpl.notification_type }} · {{ tpl.language }}
                 </VListItemSubtitle>
                 <template #append>
+                  <VBtn
+                    icon
+                    variant="text"
+                    size="small"
+                    @click="openTemplateEditor(tpl)"
+                  >
+                    <VIcon icon="bx-edit-alt" size="18" />
+                    <VTooltip activator="parent" location="top">{{ t('Edit') }}</VTooltip>
+                  </VBtn>
                   <VSwitch
                     :model-value="tpl.is_enabled"
                     color="primary"
@@ -371,6 +452,86 @@ const statusColor: Record<string, string> = {
         </VWindow>
       </VCardText>
     </VCard>
+
+    <!-- Template editor + preview -->
+    <VDialog v-model="tplDialog" max-width="980" scrollable>
+      <VCard :title="t('Edit notification template')">
+        <VCardText style="max-height:75vh;overflow-y:auto;">
+          <div
+            v-if="tplEditing"
+            class="text-caption text-disabled mb-3"
+          >
+            {{ tplEditing.notification_type }} · {{ tplEditing.language }}
+          </div>
+          <VRow>
+            <VCol cols="12" md="6">
+              <VTextField v-model="tplForm.name" :label="t('Name')" density="compact" />
+              <VTextField v-model="tplForm.description" :label="t('Description')" density="compact" class="mt-2" />
+              <VTextarea
+                v-model="tplForm.template_text"
+                :label="t('Body (supports {variable} placeholders)')"
+                rows="10"
+                class="mt-2"
+                :hint="t('Use {first_name}, {order_id}, etc. Variables are namespaced — no dots / brackets allowed.')"
+                persistent-hint
+              />
+              <VRow class="mt-2">
+                <VCol cols="6">
+                  <VSelect
+                    v-model="tplForm.language"
+                    :items="['uz', 'ru', 'en']"
+                    :label="t('Language')"
+                    density="compact"
+                  />
+                </VCol>
+                <VCol cols="6">
+                  <VSwitch
+                    v-model="tplForm.is_enabled"
+                    :label="t('Enabled')"
+                    color="primary"
+                    density="compact"
+                    hide-details
+                  />
+                </VCol>
+              </VRow>
+            </VCol>
+            <VCol cols="12" md="6">
+              <div class="text-subtitle-2 mb-2">{{ t('Preview') }}</div>
+              <VTextarea
+                v-model="tplPreviewContext"
+                :label="t('Sample context (JSON)')"
+                rows="6"
+                placeholder='{"first_name":"Ali","order_id":"123"}'
+              />
+              <VBtn
+                color="primary"
+                :loading="tplPreviewLoading"
+                prepend-icon="bx-play"
+                class="mt-2"
+                @click="previewTemplate"
+              >
+                {{ t('Render preview') }}
+              </VBtn>
+              <VCard
+                v-if="tplPreviewResult"
+                class="mt-3"
+                variant="outlined"
+              >
+                <VCardText>
+                  <div class="text-caption text-disabled mb-1">{{ t('Rendered output') }}</div>
+                  <pre class="text-body-2" style="white-space:pre-wrap;">{{ tplPreviewResult }}</pre>
+                </VCardText>
+              </VCard>
+            </VCol>
+          </VRow>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="text" @click="tplDialog = false">{{ t('Cancel') }}</VBtn>
+          <VBtn color="primary" :loading="tplSaving" @click="saveTemplate">{{ t('Save') }}</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
 
     <VSnackbar
       v-model="snackbar"

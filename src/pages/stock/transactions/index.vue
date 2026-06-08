@@ -104,7 +104,7 @@ async function loadTransactions() {
     const d = res.data?.data ?? res.data
 
     transactions.value = d?.transactions ?? []
-    total.value = d.pagination?.total_items ?? transactions.value.length
+    total.value = d.pagination?.total_items ?? d.pagination?.total ?? transactions.value.length
   }
   catch {
     notify(t('Failed to load transactions'), 'error')

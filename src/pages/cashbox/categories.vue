@@ -15,7 +15,7 @@ async function load() {
     const res = await axios.get('/categories/')
     const d = res.data?.data ?? res.data
 
-    categories.value = d?.categories ?? d?.items ?? []
+    categories.value = Array.isArray(d) ? d : (d?.categories ?? d?.items ?? [])
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Failed to load'), 'error')

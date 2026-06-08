@@ -63,7 +63,7 @@ async function loadSuppliers() {
     const d = res.data?.data ?? res.data
 
     suppliers.value = d?.suppliers ?? []
-    total.value = d?.pagination?.total_items ?? suppliers.value.length
+    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? d?.pagination?.total_suppliers ?? suppliers.value.length
   }
   catch {
     notify(t('Failed to load suppliers'), 'error')

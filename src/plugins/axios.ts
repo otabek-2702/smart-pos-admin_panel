@@ -95,6 +95,8 @@ export const notificationsApi = attachInterceptors(axios.create({ baseURL: `${AP
 
 export const cashboxApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/cashbox` }))
 
+export const fiscalApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/fiscalization` }))
+
 // Licensing endpoints are allowlisted past the kill switch and don't
 // require auth. No Bearer token, no idempotency. Plain axios so the
 // 503 redirect doesn't loop while on the licensing pages themselves.

@@ -54,7 +54,7 @@ async function loadCounts() {
     const d = res.data?.data ?? res.data
 
     counts.value = d?.counts ?? []
-    total.value = d.pagination?.total_items ?? counts.value.length
+    total.value = d.pagination?.total_items ?? d.pagination?.total ?? counts.value.length
   }
   catch {
     notify(t('Failed to load stock counts'), 'error')
@@ -112,6 +112,105 @@ function canStart(item: any) { return item.status === 'DRAFT' }
 function canComplete(item: any) { return item.status === 'IN_PROGRESS' }
 function canApprove(item: any) { return item.status === 'PENDING_APPROVAL' }
 function canCancel(item: any) { return !['APPROVED', 'CANCELED'].includes(item.status) }
+
+// -------- Count detail + record_count UI --------
+const detailDialog = ref(false)
+const detailCount = ref<any>(null)
+const detailLoading = ref(false)
+const detailItems = ref<any[]>([])
+const detailSummary = ref<any>(null)
+const varianceCodes = ref<any[]>([])
+const itemFilter = ref<'all' | 'pending' | 'counted' | 'variance'>('all')
+const recordingItemId = ref<number | null>(null)
+
+async function openDetail(count: any) {
+  detailCount.value = count
+  detailItems.value = []
+  detailSummary.value = null
+  itemFilter.value = 'all'
+  detailDialog.value = true
+  detailLoading.value = true
+  try {
+    const [dRes, vRes] = await Promise.all([
+      axios.get(`/counts/${count.id}/`),
+      axios.get('/variance-codes/'),
+    ])
+    const dd = dRes.data?.data ?? dRes.data
+    const vd = vRes.data?.data ?? vRes.data
+
+    detailCount.value = dd?.count ?? dd
+    detailItems.value = (dd?.count?.items ?? dd?.items ?? []).map((i: any) => ({
+      ...i,
+      _input: i.counted_quantity ?? null,
+      _reason_code_id: i.reason_code?.id ?? null,
+      _notes: i.notes ?? '',
+    }))
+    detailSummary.value = dd?.count?.summary ?? dd?.summary ?? null
+    varianceCodes.value = vd?.codes ?? vd?.items ?? []
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Failed to load count'), 'error')
+  }
+  finally {
+    detailLoading.value = false
+  }
+}
+
+const filteredItems = computed(() => {
+  if (itemFilter.value === 'pending')
+    return detailItems.value.filter((i: any) => i.counted_quantity == null)
+  if (itemFilter.value === 'counted')
+    return detailItems.value.filter((i: any) => i.counted_quantity != null)
+  if (itemFilter.value === 'variance')
+    return detailItems.value.filter((i: any) => i.counted_quantity != null && Number(i.variance ?? 0) !== 0)
+
+  return detailItems.value
+})
+
+async function recordItem(item: any) {
+  if (!detailCount.value)
+    return
+  if (item._input == null || item._input === '') {
+    notify(t('Enter a counted quantity'), 'error')
+
+    return
+  }
+  recordingItemId.value = item.id
+  try {
+    const payload: any = {
+      item_id: item.id,
+      counted_quantity: item._input,
+    }
+    if (item._reason_code_id)
+      payload.reason_code_id = item._reason_code_id
+    if (item._notes)
+      payload.notes = item._notes
+    const res = await axios.post(`/counts/${detailCount.value.id}/record/`, payload)
+    const d = res.data?.data ?? res.data
+    const updated = d?.item ?? d
+
+    if (updated) {
+      const idx = detailItems.value.findIndex((i: any) => i.id === item.id)
+      if (idx !== -1) {
+        detailItems.value[idx] = {
+          ...updated,
+          _input: updated.counted_quantity,
+          _reason_code_id: updated.reason_code?.id ?? null,
+          _notes: updated.notes ?? '',
+        }
+      }
+    }
+    notify(t('Count recorded'))
+    // refresh top-level list to update items_counted
+    await loadCounts()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+  finally {
+    recordingItemId.value = null
+  }
+}
 </script>
 
 <template>
@@ -258,6 +357,23 @@ function canCancel(item: any) { return !['APPROVED', 'CANCELED'].includes(item.s
             class="d-flex justify-end"
             style="gap:2px;"
           >
+            <VBtn
+              icon
+              variant="text"
+              size="small"
+              @click="openDetail(item.raw)"
+            >
+              <VIcon
+                size="18"
+                icon="bx-list-ul"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Open / record') }}
+              </VTooltip>
+            </VBtn>
             <VBtn
               v-if="canStart(item.raw)"
               icon
@@ -410,6 +526,170 @@ function canCancel(item: any) { return !['APPROVED', 'CANCELED'].includes(item.s
             @click="doAction"
           >
             {{ t('Confirm') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Count detail + record_count -->
+    <VDialog
+      v-model="detailDialog"
+      max-width="1100"
+      scrollable
+    >
+      <VCard>
+        <VCardText class="py-3 d-flex align-center justify-space-between">
+          <div>
+            <div class="text-h6">
+              {{ detailCount?.count_number ?? t('Count') }}
+            </div>
+            <div class="text-caption text-disabled">
+              {{ detailCount?.location?.name ?? detailCount?.location_name }} · {{ t(`count_type_${detailCount?.count_type}`) }}
+            </div>
+          </div>
+          <VChip
+            v-if="detailCount?.status"
+            :color="statusColor[detailCount.status] ?? 'default'"
+            variant="tonal"
+          >
+            {{ t(`count_status_${detailCount.status}`) }}
+          </VChip>
+        </VCardText>
+        <VDivider />
+        <VCardText style="max-height:75vh;overflow-y:auto;">
+          <!-- summary strip -->
+          <VRow
+            v-if="detailSummary"
+            class="mb-3"
+          >
+            <VCol cols="6" sm="3">
+              <div class="text-caption text-disabled">{{ t('Total items') }}</div>
+              <div class="text-h6">{{ detailSummary.total_items }}</div>
+            </VCol>
+            <VCol cols="6" sm="3">
+              <div class="text-caption text-success">{{ t('Counted') }}</div>
+              <div class="text-h6">{{ detailSummary.counted_items }}</div>
+            </VCol>
+            <VCol cols="6" sm="3">
+              <div class="text-caption text-warning">{{ t('Pending') }}</div>
+              <div class="text-h6">{{ detailSummary.pending_items }}</div>
+            </VCol>
+            <VCol cols="6" sm="3">
+              <div class="text-caption text-error">{{ t('With variance') }}</div>
+              <div class="text-h6">{{ detailSummary.items_with_variance }}</div>
+            </VCol>
+          </VRow>
+
+          <!-- filter chips -->
+          <VBtnToggle
+            v-model="itemFilter"
+            variant="outlined"
+            density="compact"
+            color="primary"
+            class="mb-3"
+            mandatory
+          >
+            <VBtn size="small" value="all">{{ t('All') }}</VBtn>
+            <VBtn size="small" value="pending">{{ t('Pending') }}</VBtn>
+            <VBtn size="small" value="counted">{{ t('Counted') }}</VBtn>
+            <VBtn size="small" value="variance">{{ t('Variance') }}</VBtn>
+          </VBtnToggle>
+
+          <VProgressLinear
+            v-if="detailLoading"
+            indeterminate
+            class="mb-2"
+          />
+
+          <VTable density="compact">
+            <thead>
+              <tr>
+                <th>{{ t('Item') }}</th>
+                <th class="text-end">{{ t('System qty') }}</th>
+                <th class="text-end" style="min-inline-size:160px;">{{ t('Counted qty') }}</th>
+                <th class="text-end">{{ t('Variance') }}</th>
+                <th style="min-inline-size:180px;">{{ t('Reason') }}</th>
+                <th>{{ t('Notes') }}</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="i in filteredItems"
+                :key="i.id"
+              >
+                <td class="font-weight-medium">{{ i.stock_item?.name ?? i.item?.name ?? '—' }}</td>
+                <td class="text-end">{{ i.system_quantity }} {{ i.stock_item?.unit?.short_name ?? '' }}</td>
+                <td class="text-end">
+                  <VTextField
+                    v-model.number="i._input"
+                    type="number"
+                    step="0.01"
+                    density="compact"
+                    hide-details
+                    :disabled="detailCount?.status !== 'DRAFT' && detailCount?.status !== 'IN_PROGRESS'"
+                  />
+                </td>
+                <td class="text-end">
+                  <VChip
+                    v-if="i.counted_quantity != null"
+                    size="x-small"
+                    :color="Number(i.variance ?? 0) === 0 ? 'success' : (Number(i.variance) < 0 ? 'error' : 'warning')"
+                    variant="tonal"
+                  >
+                    {{ i.variance ?? 0 }} ({{ i.variance_percentage ?? 0 }}%)
+                  </VChip>
+                  <span
+                    v-else
+                    class="text-disabled"
+                  >—</span>
+                </td>
+                <td>
+                  <VSelect
+                    v-model="i._reason_code_id"
+                    :items="varianceCodes.map((c: any) => ({ title: `${c.code} — ${c.name}`, value: c.id }))"
+                    density="compact"
+                    hide-details
+                    clearable
+                    :disabled="detailCount?.status !== 'DRAFT' && detailCount?.status !== 'IN_PROGRESS'"
+                  />
+                </td>
+                <td>
+                  <VTextField
+                    v-model="i._notes"
+                    density="compact"
+                    hide-details
+                    :disabled="detailCount?.status !== 'DRAFT' && detailCount?.status !== 'IN_PROGRESS'"
+                  />
+                </td>
+                <td>
+                  <VBtn
+                    icon
+                    variant="text"
+                    size="small"
+                    color="primary"
+                    :loading="recordingItemId === i.id"
+                    :disabled="detailCount?.status !== 'DRAFT' && detailCount?.status !== 'IN_PROGRESS'"
+                    @click="recordItem(i)"
+                  >
+                    <VIcon icon="bx-save" size="18" />
+                    <VTooltip activator="parent" location="top">{{ t('Record') }}</VTooltip>
+                  </VBtn>
+                </td>
+              </tr>
+              <tr v-if="!filteredItems.length && !detailLoading">
+                <td colspan="7" class="text-center text-disabled py-4">
+                  {{ t('No items') }}
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
+        </VCardText>
+        <VDivider />
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="text" @click="detailDialog = false">
+            {{ t('Close') }}
           </VBtn>
         </VCardActions>
       </VCard>

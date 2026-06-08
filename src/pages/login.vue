@@ -3,6 +3,7 @@ import { useGenerateImageVariant } from '@/@core/composable/useGenerateImageVari
 import boyWithRocketDark from '@images/illustrations/boy-with-rocket-dark.png'
 import boyWithRocketLight from '@images/illustrations/boy-with-rocket-light.png'
 import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
+import NavBarApiHost from '@/layouts/components/NavBarApiHost.vue'
 import { themeConfig } from '@themeConfig'
 import axiosIns from '@/plugins/axios'
 import ability from '@/plugins/casl/ability'
@@ -101,8 +102,9 @@ const login = async () => {
         :max-width="500"
         class="mt-12 mt-sm-0 pa-6 w-100"
       >
-        <!-- Language switcher -->
-        <div class="d-flex justify-end mb-2">
+        <!-- Language switcher + API host -->
+        <div class="d-flex align-center justify-end gap-2 mb-2">
+          <NavBarApiHost />
           <VBtnToggle
             :model-value="locale"
             density="compact"

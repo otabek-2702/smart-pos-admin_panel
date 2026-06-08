@@ -1,9 +1,32 @@
 import axios from 'axios'
 import { getStoredToken } from '@/utils/storage'
 
-// In dev, use relative paths so the Vite proxy (vite.config.ts) forwards to the backend
-// without triggering CORS. In production, set VITE_API_HOST to the backend URL.
-const API_HOST = import.meta.env.VITE_API_HOST ?? ''
+// Runtime override > build-time VITE_API_HOST > empty (dev proxy / relative).
+// Operator can change the backend URL from the Settings dialog without a rebuild;
+// the choice is persisted in localStorage and re-applied to every request below.
+function readRuntimeHost(): string {
+  try {
+    return (localStorage.getItem('apiHost') ?? '').trim().replace(/\/+$/, '')
+  }
+  catch {
+    return ''
+  }
+}
+
+const BUILD_HOST = (import.meta.env.VITE_API_HOST ?? '').replace(/\/+$/, '')
+const API_HOST = readRuntimeHost() || BUILD_HOST
+
+export function getCurrentApiHost(): string {
+  return readRuntimeHost() || BUILD_HOST
+}
+
+export function setApiHost(host: string) {
+  const cleaned = (host ?? '').trim().replace(/\/+$/, '')
+  if (cleaned)
+    localStorage.setItem('apiHost', cleaned)
+  else
+    localStorage.removeItem('apiHost')
+}
 
 // Endpoints that the backend dedupes via `Idempotency-Key`. POSTs to any of
 // these paths get a fresh UUID per request — so a double-click / retry won't
@@ -34,8 +57,16 @@ function newIdempotencyKey(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`
 }
 
-function attachInterceptors(instance: ReturnType<typeof axios.create>) {
+// Each axios instance is created once with the baseURL known at boot. To let
+// the operator swap hosts at runtime we tag the instance with its trailing
+// "/api/..." suffix and rewrite baseURL per-request from the current host.
+function attachInterceptors(instance: ReturnType<typeof axios.create>, suffix = '') {
   instance.interceptors.request.use(config => {
+    if (suffix) {
+      const host = getCurrentApiHost()
+      config.baseURL = `${host}${suffix}`
+    }
+
     const token = getStoredToken()
     if (token) {
       config.headers = config.headers || {}
@@ -83,19 +114,19 @@ function attachInterceptors(instance: ReturnType<typeof axios.create>) {
   return instance
 }
 
-const axiosIns = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins` }))
+const axiosIns = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins` }), '/api/admins')
 
-export const stockApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/stock` }))
+export const stockApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/stock` }), '/api/admins/stock')
 
-export const hrApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/hr` }))
+export const hrApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/hr` }), '/api/admins/hr')
 
-export const discountsApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/discounts` }))
+export const discountsApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/discounts` }), '/api/admins/discounts')
 
-export const notificationsApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/notifications` }))
+export const notificationsApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/notifications` }), '/api/admins/notifications')
 
-export const cashboxApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/cashbox` }))
+export const cashboxApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/admins/cashbox` }), '/api/admins/cashbox')
 
-export const fiscalApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/fiscalization` }))
+export const fiscalApi = attachInterceptors(axios.create({ baseURL: `${API_HOST}/api/fiscalization` }), '/api/fiscalization')
 
 // Licensing endpoints are allowlisted past the kill switch and don't
 // require auth. No Bearer token, no idempotency. Plain axios so the

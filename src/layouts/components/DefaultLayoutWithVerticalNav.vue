@@ -5,6 +5,7 @@ import { useThemeConfig } from '@core/composable/useThemeConfig'
 
 // Components
 import Footer from '@/layouts/components/Footer.vue'
+import NavBarApiHost from '@/layouts/components/NavBarApiHost.vue'
 import NavBarI18n from '@/layouts/components/NavBarI18n.vue'
 import NavBarNotifications from '@/layouts/components/NavBarNotifications.vue'
 import NavbarThemeSwitcher from '@/layouts/components/NavbarThemeSwitcher.vue'
@@ -47,6 +48,7 @@ const globalThemeBackground = computed(() => global.current.value.colors.backgro
 
         <VSpacer />
 
+        <NavBarApiHost />
         <NavBarI18n />
         <NavbarThemeSwitcher />
         <NavBarNotifications class="me-2" />

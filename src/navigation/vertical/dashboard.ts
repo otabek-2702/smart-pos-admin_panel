@@ -13,4 +13,11 @@ export default [
     action: 'manage',
     subject: 'all',
   },
+  {
+    title: 'Shifts',
+    icon: { icon: 'bx-time-five' },
+    to: 'shifts-analytics',
+    action: 'manage',
+    subject: 'all',
+  },
 ]

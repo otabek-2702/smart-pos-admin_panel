@@ -7,7 +7,7 @@ const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 
 // -------- filters --------
-const dateFrom = ref(new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10))
+const dateFrom = ref(new Date().toISOString().slice(0, 10))
 const dateTo = ref(new Date().toISOString().slice(0, 10))
 const userIdFilter = ref<number | null>(null)
 const cashiers = ref<any[]>([])

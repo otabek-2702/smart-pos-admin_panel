@@ -1,0 +1,262 @@
+<script setup lang="ts">
+import { fmtAbbr, fmtNum } from './utils/format'
+import { niceTicks } from './utils/niceTicks'
+import { useWidth } from './utils/useWidth'
+import Skeleton from './Skeleton.vue'
+import StateFill from './StateFill.vue'
+import ChartTip from './ChartTip.vue'
+
+interface Series {
+  key: string
+  label: string
+  color: string
+  data: number[]
+  dashed?: boolean
+}
+
+interface Props {
+  series: Series[]
+  categories: string[]
+  height?: number
+  target?: number
+  unit?: string
+  yFormat?: (n: number) => string
+  loading?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  height: 240,
+})
+
+const [elRef, w] = useWidth()
+
+const padL = 52
+const padR = 16
+const padT = 16
+const padB = 28
+
+const id = `chart-line-${Math.random().toString(36).slice(2, 8)}`
+
+const hover = ref<number | null>(null)
+const tip = ref<{ show: boolean; x: number; y: number }>({ show: false, x: 0, y: 0 })
+
+function reset() {
+  hover.value = null
+  tip.value = { show: false, x: 0, y: 0 }
+}
+
+const yfmt = computed(() => props.yFormat ?? fmtAbbr)
+
+const maxV = computed(() => {
+  let m = 0
+  for (const s of props.series) {
+    for (const v of s.data) {
+      if (v > m)
+        m = v
+    }
+  }
+  if (props.target && props.target > m)
+    m = props.target
+
+  return m
+})
+
+const ticks = computed(() => niceTicks(maxV.value || 1, 4))
+const top = computed(() => ticks.value.top)
+
+const iw = computed(() => Math.max(10, w.value - padL - padR))
+const ih = computed(() => props.height - padT - padB)
+
+function x(i: number): number {
+  const n = props.categories.length
+  if (n <= 1)
+    return padL + iw.value / 2
+
+  return padL + (i / (n - 1)) * iw.value
+}
+function y(v: number): number {
+  return padT + ih.value - (v / top.value) * ih.value
+}
+
+const labelEvery = computed(() => Math.ceil(props.categories.length / 7))
+
+const paths = computed(() => {
+  if (!w.value)
+    return []
+
+  return props.series.map((s, si) => {
+    const pts = s.data.map((v, i) => [x(i), y(v)])
+    const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ')
+    const area = `${line} L${x(props.categories.length - 1)} ${padT + ih.value} L${x(0)} ${padT + ih.value} Z`
+
+    return { si, series: s, line, area }
+  })
+})
+
+function onBandEnter(i: number, e: MouseEvent) {
+  hover.value = i
+  const rect = elRef.value?.getBoundingClientRect()
+  const yScreen = (rect?.top ?? 0) + y(props.series[0].data[i])
+  tip.value = { show: true, x: e.clientX, y: yScreen }
+}
+function onBandMove(e: MouseEvent) {
+  tip.value = { ...tip.value, x: e.clientX, y: e.clientY }
+}
+
+const tipRows = computed(() => {
+  if (hover.value === null)
+    return []
+  const i = hover.value
+
+  return props.series.map(s => ({
+    color: s.color,
+    label: s.label,
+    value: fmtNum(s.data[i]),
+  }))
+})
+
+const tipTitle = computed(() => hover.value !== null ? props.categories[hover.value] : '')
+</script>
+
+<template>
+  <div
+    v-if="loading"
+    ref="elRef"
+    :style="{ height: `${height}px` }"
+  >
+    <Skeleton :h="height" :r="10" />
+  </div>
+  <div
+    v-else-if="!series.length || !categories.length"
+    ref="elRef"
+  >
+    <StateFill icon="bx-line-chart" title="No data for this range" sub="Try a different date range." />
+  </div>
+  <div
+    v-else
+    ref="elRef"
+    style="position: relative;"
+    @mouseleave="reset"
+  >
+    <svg
+      :width="w"
+      :height="height"
+      style="display:block;"
+    >
+      <defs>
+        <linearGradient :id="id" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" :stop-color="series[0]?.color" stop-opacity="0.18" />
+          <stop offset="100%" :stop-color="series[0]?.color" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+
+      <!-- gridlines -->
+      <g v-for="(t, i) in ticks.ticks" :key="`g${i}`">
+        <line
+          :x1="padL"
+          :x2="w - padR"
+          :y1="y(t)"
+          :y2="y(t)"
+          stroke="rgb(var(--v-theme-chart-grid))"
+          stroke-width="1"
+        />
+        <text
+          :x="padL - 10"
+          :y="y(t) + 4"
+          text-anchor="end"
+          font-size="11"
+          fill="rgb(var(--v-theme-chart-axis))"
+          font-family="var(--font-mono)"
+        >{{ yfmt(t) }}</text>
+      </g>
+
+      <!-- target reference -->
+      <g v-if="target">
+        <line
+          :x1="padL"
+          :x2="w - padR"
+          :y1="y(target)"
+          :y2="y(target)"
+          stroke="rgb(var(--v-theme-chart-target))"
+          stroke-width="1.5"
+          stroke-dasharray="5 4"
+        />
+        <text
+          :x="w - padR"
+          :y="y(target) - 6"
+          text-anchor="end"
+          font-size="11"
+          font-weight="600"
+          fill="rgb(var(--v-theme-chart-target))"
+        >Target {{ yfmt(target) }}</text>
+      </g>
+
+      <!-- series paths -->
+      <g v-for="p in paths" :key="`p${p.si}`">
+        <path v-if="p.si === 0" :d="p.area" :fill="`url(#${id})`" />
+        <path
+          :d="p.line"
+          fill="none"
+          :stroke="p.series.color"
+          :stroke-width="p.series.key === 'expense' ? 2 : 2.5"
+          :stroke-dasharray="p.series.dashed ? '5 4' : '0'"
+          stroke-linejoin="round"
+          stroke-linecap="round"
+        />
+      </g>
+
+      <!-- hover crosshair + dots -->
+      <line
+        v-if="hover !== null"
+        :x1="x(hover)"
+        :x2="x(hover)"
+        :y1="padT"
+        :y2="padT + ih"
+        stroke="rgb(var(--v-theme-border-strong))"
+        stroke-width="1"
+      />
+      <circle
+        v-for="(s, si) in (hover !== null ? series : [])"
+        :key="`hc${si}`"
+        :cx="x(hover!)"
+        :cy="y(s.data[hover!])"
+        r="4.5"
+        :fill="`rgb(var(--v-theme-surface))`"
+        :stroke="s.color"
+        stroke-width="2.5"
+      />
+
+      <!-- x labels -->
+      <text
+        v-for="(c, i) in categories"
+        :key="`x${i}`"
+        v-show="i % labelEvery === 0 || i === categories.length - 1"
+        :x="x(i)"
+        :y="height - 8"
+        text-anchor="middle"
+        font-size="11"
+        fill="rgb(var(--v-theme-chart-axis))"
+      >{{ c }}</text>
+
+      <!-- hover bands -->
+      <rect
+        v-for="(_, i) in categories"
+        :key="`h${i}`"
+        :x="x(i) - iw / categories.length / 2"
+        :y="padT"
+        :width="iw / categories.length"
+        :height="ih"
+        fill="transparent"
+        @mouseenter="onBandEnter(i, $event)"
+        @mousemove="onBandMove($event)"
+      />
+    </svg>
+    <ChartTip
+      :show="tip.show"
+      :x="tip.x"
+      :y="tip.y"
+      :title="tipTitle"
+      :rows="tipRows"
+    />
+  </div>
+</template>

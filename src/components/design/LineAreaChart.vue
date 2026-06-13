@@ -223,19 +223,17 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
         stroke="rgb(var(--v-theme-border-strong))"
         stroke-width="1"
       />
-      <template v-if="hover !== null">
-        <circle
-          v-for="(s, si) in series"
-          v-show="Number.isFinite(s.data[hover!])"
-          :key="`hc${si}`"
-          :cx="x(hover!)"
-          :cy="y(s.data[hover!] ?? 0)"
-          r="4.5"
-          :fill="`rgb(var(--v-theme-surface))`"
-          :stroke="s.color"
-          stroke-width="2.5"
-        />
-      </template>
+      <circle
+        v-for="(s, si) in (hover !== null ? series : [])"
+        v-show="hover !== null && Number.isFinite(s.data[hover!])"
+        :key="`hc${si}`"
+        :cx="x(hover!)"
+        :cy="y(s.data[hover!] ?? 0)"
+        r="4.5"
+        :fill="`rgb(var(--v-theme-surface))`"
+        :stroke="s.color"
+        stroke-width="2.5"
+      />
 
       <!-- x labels -->
       <text

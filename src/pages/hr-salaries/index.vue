@@ -247,153 +247,16 @@ async function generate() {
 
 <template>
   <div>
-    <VRow class="mb-4">
-      <VCol
-        cols="6"
-        sm="3"
-      >
-        <VCard>
-          <VCardText class="d-flex align-center gap-2 py-3">
-            <VAvatar
-              color="warning"
-              variant="tonal"
-              size="32"
-              rounded
-            >
-              <VIcon
-                icon="bx-time"
-                size="16"
-              />
-            </VAvatar>
-            <div>
-              <div class="text-subtitle-1 font-weight-bold lh-1">
-                <template v-if="summary">
-                  {{ summary.pending_count ?? 0 }}
-                </template>
-                <span
-                  v-else
-                  class="sk-box d-inline-block"
-                  style="width:36px;height:1em;border-radius:4px;vertical-align:middle;"
-                />
-              </div>
-              <div class="text-caption text-disabled">
-                {{ t('Pending') }}
-              </div>
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-      <VCol
-        cols="6"
-        sm="3"
-      >
-        <VCard>
-          <VCardText class="d-flex align-center gap-2 py-3">
-            <VAvatar
-              color="info"
-              variant="tonal"
-              size="32"
-              rounded
-            >
-              <VIcon
-                icon="bx-check"
-                size="16"
-              />
-            </VAvatar>
-            <div>
-              <div class="text-subtitle-1 font-weight-bold lh-1">
-                <template v-if="summary">
-                  {{ summary.approved_count ?? 0 }}
-                </template>
-                <span
-                  v-else
-                  class="sk-box d-inline-block"
-                  style="width:36px;height:1em;border-radius:4px;vertical-align:middle;"
-                />
-              </div>
-              <div class="text-caption text-disabled">
-                {{ t('Approved') }}
-              </div>
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-      <VCol
-        cols="6"
-        sm="3"
-      >
-        <VCard>
-          <VCardText class="d-flex align-center gap-2 py-3">
-            <VAvatar
-              color="success"
-              variant="tonal"
-              size="32"
-              rounded
-            >
-              <VIcon
-                icon="bx-money"
-                size="16"
-              />
-            </VAvatar>
-            <div>
-              <div class="text-subtitle-1 font-weight-bold lh-1">
-                <template v-if="summary">
-                  {{ summary.paid_count ?? 0 }}
-                </template>
-                <span
-                  v-else
-                  class="sk-box d-inline-block"
-                  style="width:36px;height:1em;border-radius:4px;vertical-align:middle;"
-                />
-              </div>
-              <div class="text-caption text-disabled">
-                {{ t('Paid') }}
-              </div>
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-      <VCol
-        cols="6"
-        sm="3"
-      >
-        <VCard>
-          <VCardText class="d-flex align-center gap-2 py-3">
-            <VAvatar
-              color="primary"
-              variant="tonal"
-              size="32"
-              rounded
-            >
-              <VIcon
-                icon="bx-trending-up"
-                size="16"
-              />
-            </VAvatar>
-            <div>
-              <div class="text-subtitle-1 font-weight-bold lh-1">
-                <template v-if="summary">
-                  {{ formatCurrency(summary.total_amount ?? 0) }}
-                </template>
-                <span
-                  v-else
-                  class="sk-box d-inline-block"
-                  style="width:80px;height:1em;border-radius:4px;vertical-align:middle;"
-                />
-              </div>
-              <div class="text-caption text-disabled">
-                {{ t('Total') }}
-              </div>
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-    </VRow>
-
-    <VCard>
-      <VCardText class="d-flex align-center gap-3 py-3 flex-wrap">
-        <span class="text-h6">{{ t('Salaries') }}</span>
-        <VSpacer />
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
+          {{ t('Salaries') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Generate, approve and pay monthly payroll') }}
+        </div>
+      </div>
+      <div class="page-head__actions">
         <VBtn
           variant="tonal"
           prepend-icon="bx-cog"
@@ -408,7 +271,113 @@ async function generate() {
         >
           {{ t('Approve All') }}
         </VBtn>
-      </VCardText>
+      </div>
+    </div>
+
+    <VRow class="mb-4">
+      <VCol
+        cols="6"
+        sm="3"
+      >
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-warning">
+              <VIcon icon="bx-time" size="20" />
+            </div>
+            <div class="kpi-card__label">
+              {{ t('Pending') }}
+            </div>
+          </div>
+          <div class="kpi-card__value">
+            <template v-if="summary">
+              {{ summary.pending_count ?? 0 }}
+            </template>
+            <span
+              v-else
+              class="sk-box d-inline-block"
+              style="width:36px;height:1em;border-radius:4px;vertical-align:middle;"
+            />
+          </div>
+        </div>
+      </VCol>
+      <VCol
+        cols="6"
+        sm="3"
+      >
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-info">
+              <VIcon icon="bx-check" size="20" />
+            </div>
+            <div class="kpi-card__label">
+              {{ t('Approved') }}
+            </div>
+          </div>
+          <div class="kpi-card__value">
+            <template v-if="summary">
+              {{ summary.approved_count ?? 0 }}
+            </template>
+            <span
+              v-else
+              class="sk-box d-inline-block"
+              style="width:36px;height:1em;border-radius:4px;vertical-align:middle;"
+            />
+          </div>
+        </div>
+      </VCol>
+      <VCol
+        cols="6"
+        sm="3"
+      >
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-success">
+              <VIcon icon="bx-money" size="20" />
+            </div>
+            <div class="kpi-card__label">
+              {{ t('Paid') }}
+            </div>
+          </div>
+          <div class="kpi-card__value">
+            <template v-if="summary">
+              {{ summary.paid_count ?? 0 }}
+            </template>
+            <span
+              v-else
+              class="sk-box d-inline-block"
+              style="width:36px;height:1em;border-radius:4px;vertical-align:middle;"
+            />
+          </div>
+        </div>
+      </VCol>
+      <VCol
+        cols="6"
+        sm="3"
+      >
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-primary">
+              <VIcon icon="bx-trending-up" size="20" />
+            </div>
+            <div class="kpi-card__label">
+              {{ t('Total') }}
+            </div>
+          </div>
+          <div class="kpi-card__value">
+            <template v-if="summary">
+              {{ formatCurrency(summary.total_amount ?? 0) }}<span class="kpi-card__unit">UZS</span>
+            </template>
+            <span
+              v-else
+              class="sk-box d-inline-block"
+              style="width:80px;height:1em;border-radius:4px;vertical-align:middle;"
+            />
+          </div>
+        </div>
+      </VCol>
+    </VRow>
+
+    <VCard>
 
       <VDataTableServer
         :headers="headers"
@@ -432,14 +401,15 @@ async function generate() {
           {{ item.raw.period_year }}-{{ String(item.raw.period_month).padStart(2, '0') }}
         </template>
         <template #item.base_salary="{ item }">
-          {{ formatCurrency(item.raw.base_amount ?? 0) }}
+          <span class="num-tabular">{{ formatCurrency(item.raw.base_amount ?? 0) }}</span>
         </template>
         <template #item.net_salary="{ item }">
-          <span class="font-weight-medium">{{ formatCurrency(item.raw.net_amount ?? 0) }}</span>
+          <span class="font-weight-medium num-tabular">{{ formatCurrency(item.raw.net_amount ?? 0) }}</span>
         </template>
         <template #item.status="{ item }">
           <VChip
             size="small"
+            class="status-pill"
             :color="statusColor[item.raw.status] ?? 'default'"
             variant="tonal"
           >
@@ -569,6 +539,7 @@ async function generate() {
             <VSpacer />
             <VChip
               size="small"
+              class="status-pill"
               :color="statusColor[itemSalary.status] ?? 'default'"
               variant="tonal"
             >

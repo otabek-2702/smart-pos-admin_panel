@@ -322,20 +322,21 @@ async function doAction() {
             :color="qtyColor(item.raw.quantity)"
             size="small"
             variant="tonal"
+            class="status-pill num-tabular"
           >
             {{ formatQty(item.raw.quantity) }} {{ item.raw.stock_item?.unit ?? '' }}
           </VChip>
         </template>
         <template #item.reserved_quantity="{ item }">
-          {{ formatQty(item.raw.reserved_quantity) }}
+          <span class="num-tabular">{{ formatQty(item.raw.reserved_quantity) }}</span>
         </template>
         <template #item.available_quantity="{ item }">
-          <span :class="Number(item.raw.available_quantity) <= 0 ? 'text-error font-weight-medium' : ''">
+          <span :class="['num-tabular', Number(item.raw.available_quantity) <= 0 ? 'text-error font-weight-medium' : '']">
             {{ formatQty(item.raw.available_quantity) }}
           </span>
         </template>
         <template #item.pending_in_quantity="{ item }">
-          {{ formatQty(item.raw.pending_in_quantity) }}
+          <span class="num-tabular">{{ formatQty(item.raw.pending_in_quantity) }}</span>
         </template>
         <template #item.last_movement_at="{ item }">
           {{ formatDateShort(item.raw.last_movement_at) }}

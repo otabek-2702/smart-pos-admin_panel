@@ -142,6 +142,14 @@ const roleColor: Record<string, string> = {
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">{{ t('Roles') }}</h1>
+        <div class="page-head__subtitle">{{ t('Manage role-based permissions') }}</div>
+      </div>
+      <div class="page-head__actions" />
+    </div>
+
     <VRow>
       <!-- Left: role list -->
       <VCol
@@ -220,6 +228,7 @@ const roleColor: Record<string, string> = {
           <VCard class="mb-4">
             <VCardText class="d-flex align-center gap-3 flex-wrap">
               <VChip
+                class="status-pill"
                 :color="roleColor[currentRole.name] ?? 'default'"
                 variant="tonal"
                 size="large"
@@ -230,7 +239,7 @@ const roleColor: Record<string, string> = {
                 <div class="text-subtitle-2">
                   {{ t('Effective permissions') }}
                 </div>
-                <div class="text-caption text-disabled">
+                <div class="text-caption text-disabled num-tabular">
                   {{ isWildcard ? t('Wildcard — full manage-all access') : `${currentRole.permissions.length} / ${permissions.length}` }}
                 </div>
               </div>

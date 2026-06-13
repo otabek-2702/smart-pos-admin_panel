@@ -221,117 +221,137 @@ async function deleteCat(c: any) {
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
+          {{ t('Expenses') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Operational spend — approve, reject and settle') }}
+        </div>
+      </div>
+      <div class="page-head__actions">
+        <VBtn
+          variant="tonal"
+          prepend-icon="bx-folder"
+          @click="openCatManager"
+        >
+          {{ t('Categories') }}
+        </VBtn>
+        <VBtn
+          color="primary"
+          prepend-icon="bx-plus"
+          @click="openCreate"
+        >
+          {{ t('New Expense') }}
+        </VBtn>
+      </div>
+    </div>
+
     <VRow class="mb-4">
       <VCol
         cols="6"
         sm="3"
       >
-        <VCard>
-          <VCardText>
-            <div class="text-subtitle-1 font-weight-bold">
-              <template v-if="stats">
-                {{ stats.pending_count ?? 0 }}
-              </template>
-              <span
-                v-else
-                class="sk-box d-inline-block"
-                style="width:36px;height:1em;border-radius:4px;"
-              />
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-warning">
+              <VIcon icon="bx-time" size="20" />
             </div>
-            <div class="text-caption text-disabled">
+            <div class="kpi-card__label">
               {{ t('Pending') }}
             </div>
-          </VCardText>
-        </VCard>
+          </div>
+          <div class="kpi-card__value">
+            <template v-if="stats">
+              {{ stats.pending_count ?? 0 }}
+            </template>
+            <span
+              v-else
+              class="sk-box d-inline-block"
+              style="width:36px;height:1em;border-radius:4px;"
+            />
+          </div>
+        </div>
       </VCol>
       <VCol
         cols="6"
         sm="3"
       >
-        <VCard>
-          <VCardText>
-            <div class="text-subtitle-1 font-weight-bold">
-              <template v-if="stats">
-                {{ formatCurrency(stats.total_amount ?? 0) }}
-              </template>
-              <span
-                v-else
-                class="sk-box d-inline-block"
-                style="width:80px;height:1em;border-radius:4px;"
-              />
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-primary">
+              <VIcon icon="bx-wallet" size="20" />
             </div>
-            <div class="text-caption text-disabled">
+            <div class="kpi-card__label">
               {{ t('Total') }}
             </div>
-          </VCardText>
-        </VCard>
+          </div>
+          <div class="kpi-card__value">
+            <template v-if="stats">
+              {{ formatCurrency(stats.total_amount ?? 0) }}<span class="kpi-card__unit">UZS</span>
+            </template>
+            <span
+              v-else
+              class="sk-box d-inline-block"
+              style="width:80px;height:1em;border-radius:4px;"
+            />
+          </div>
+        </div>
       </VCol>
       <VCol
         cols="6"
         sm="3"
       >
-        <VCard>
-          <VCardText>
-            <div class="text-subtitle-1 font-weight-bold">
-              <template v-if="stats">
-                {{ formatCurrency(stats.this_month ?? 0) }}
-              </template>
-              <span
-                v-else
-                class="sk-box d-inline-block"
-                style="width:80px;height:1em;border-radius:4px;"
-              />
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-info">
+              <VIcon icon="bx-calendar" size="20" />
             </div>
-            <div class="text-caption text-disabled">
+            <div class="kpi-card__label">
               {{ t('This Month') }}
             </div>
-          </VCardText>
-        </VCard>
+          </div>
+          <div class="kpi-card__value">
+            <template v-if="stats">
+              {{ formatCurrency(stats.this_month ?? 0) }}<span class="kpi-card__unit">UZS</span>
+            </template>
+            <span
+              v-else
+              class="sk-box d-inline-block"
+              style="width:80px;height:1em;border-radius:4px;"
+            />
+          </div>
+        </div>
       </VCol>
       <VCol
         cols="6"
         sm="3"
       >
-        <VCard>
-          <VCardText>
-            <div class="text-subtitle-1 font-weight-bold">
-              <template v-if="stats">
-                {{ formatCurrency(stats.paid_amount ?? 0) }}
-              </template>
-              <span
-                v-else
-                class="sk-box d-inline-block"
-                style="width:80px;height:1em;border-radius:4px;"
-              />
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-success">
+              <VIcon icon="bx-check-circle" size="20" />
             </div>
-            <div class="text-caption text-disabled">
+            <div class="kpi-card__label">
               {{ t('Paid') }}
             </div>
-          </VCardText>
-        </VCard>
+          </div>
+          <div class="kpi-card__value">
+            <template v-if="stats">
+              {{ formatCurrency(stats.paid_amount ?? 0) }}<span class="kpi-card__unit">UZS</span>
+            </template>
+            <span
+              v-else
+              class="sk-box d-inline-block"
+              style="width:80px;height:1em;border-radius:4px;"
+            />
+          </div>
+        </div>
       </VCol>
     </VRow>
 
     <VCard>
-      <VCardText class="d-flex align-center justify-space-between py-3 flex-wrap gap-2">
-        <span class="text-h6">{{ t('Expenses') }}</span>
-        <div class="d-flex gap-2">
-          <VBtn
-            variant="tonal"
-            prepend-icon="bx-folder"
-            @click="openCatManager"
-          >
-            {{ t('Categories') }}
-          </VBtn>
-          <VBtn
-            color="primary"
-            prepend-icon="bx-plus"
-            @click="openCreate"
-          >
-            {{ t('New Expense') }}
-          </VBtn>
-        </div>
-      </VCardText>
 
       <VDataTableServer
         :headers="headers"
@@ -355,11 +375,12 @@ async function deleteCat(c: any) {
           {{ item.raw.category?.name ?? '—' }}
         </template>
         <template #item.amount="{ item }">
-          <span class="font-weight-medium">{{ formatCurrency(item.raw.amount ?? 0) }}</span>
+          <span class="font-weight-medium num-tabular">{{ formatCurrency(item.raw.amount ?? 0) }}</span>
         </template>
         <template #item.status="{ item }">
           <VChip
             size="small"
+            class="status-pill"
             :color="statusColor[item.raw.status] ?? 'default'"
             variant="tonal"
           >

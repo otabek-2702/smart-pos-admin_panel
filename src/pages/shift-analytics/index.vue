@@ -191,6 +191,13 @@ const statusColor: Record<string, string> = {
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">{{ t('Shift Analytics') }}</h1>
+        <div class="page-head__subtitle">{{ t('Select Shift') }}</div>
+      </div>
+    </div>
+
     <VRow>
       <!-- Left: shift list -->
       <VCol
@@ -261,6 +268,7 @@ const statusColor: Record<string, string> = {
               </VListItemSubtitle>
               <template #append>
                 <VChip
+                  class="status-pill"
                   size="x-small"
                   :color="statusColor[s.status] ?? 'default'"
                   variant="tonal"
@@ -312,6 +320,7 @@ const statusColor: Record<string, string> = {
                 </div>
               </div>
               <VChip
+                class="status-pill"
                 :color="statusColor[selectedShift.status] ?? 'default'"
                 variant="tonal"
               >
@@ -330,109 +339,64 @@ const statusColor: Record<string, string> = {
 
           <!-- KPI cards -->
           <VRow class="mb-4">
-            <VCol
-              cols="6"
-              sm="4"
-              lg="2"
-            >
-              <VCard>
-                <VCardText>
-                  <div class="text-caption text-disabled">
-                    {{ t('Total Orders') }}
-                  </div>
-                  <div class="text-h5 font-weight-bold">
-                    <template v-if="perfLoading && !perf">
-                      <span
-                        class="sk-box d-inline-block"
-                        style="width:40px;height:1em;border-radius:4px;"
-                      />
-                    </template>
-                    <template v-else>
-                      {{ perf?.orders_total ?? 0 }}
-                    </template>
-                  </div>
-                </VCardText>
-              </VCard>
+            <VCol cols="6" sm="4" lg="2">
+              <div class="kpi-card">
+                <div class="kpi-card__top">
+                  <div class="kpi-card__icon t-primary"><VIcon icon="bx-receipt" size="20" /></div>
+                  <div class="kpi-card__label">{{ t('Total Orders') }}</div>
+                </div>
+                <div class="kpi-card__value num-tabular">
+                  <template v-if="perfLoading && !perf">
+                    <span class="sk-box d-inline-block" style="width:40px;height:1em;border-radius:4px;" />
+                  </template>
+                  <template v-else>{{ perf?.orders_total ?? 0 }}</template>
+                </div>
+              </div>
             </VCol>
-            <VCol
-              cols="6"
-              sm="4"
-              lg="2"
-            >
-              <VCard>
-                <VCardText>
-                  <div class="text-caption text-success">
-                    {{ t('Completed') }}
-                  </div>
-                  <div class="text-h5 font-weight-bold">
-                    {{ perf?.orders_completed ?? 0 }}
-                  </div>
-                </VCardText>
-              </VCard>
+            <VCol cols="6" sm="4" lg="2">
+              <div class="kpi-card">
+                <div class="kpi-card__top">
+                  <div class="kpi-card__icon t-success"><VIcon icon="bx-check-circle" size="20" /></div>
+                  <div class="kpi-card__label">{{ t('Completed') }}</div>
+                </div>
+                <div class="kpi-card__value num-tabular">{{ perf?.orders_completed ?? 0 }}</div>
+              </div>
             </VCol>
-            <VCol
-              cols="6"
-              sm="4"
-              lg="2"
-            >
-              <VCard>
-                <VCardText>
-                  <div class="text-caption text-error">
-                    {{ t('Cancelled') }} ({{ perf?.cancel_rate_pct ?? 0 }}%)
-                  </div>
-                  <div class="text-h5 font-weight-bold">
-                    {{ perf?.orders_cancelled ?? 0 }}
-                  </div>
-                </VCardText>
-              </VCard>
+            <VCol cols="6" sm="4" lg="2">
+              <div class="kpi-card">
+                <div class="kpi-card__top">
+                  <div class="kpi-card__icon t-error"><VIcon icon="bx-x-circle" size="20" /></div>
+                  <div class="kpi-card__label">{{ t('Cancelled') }} ({{ perf?.cancel_rate_pct ?? 0 }}%)</div>
+                </div>
+                <div class="kpi-card__value num-tabular">{{ perf?.orders_cancelled ?? 0 }}</div>
+              </div>
             </VCol>
-            <VCol
-              cols="6"
-              sm="4"
-              lg="2"
-            >
-              <VCard>
-                <VCardText>
-                  <div class="text-caption text-disabled">
-                    {{ t('Revenue') }}
-                  </div>
-                  <div class="text-h6 font-weight-bold">
-                    {{ formatCurrency(perf?.revenue ?? 0) }}
-                  </div>
-                </VCardText>
-              </VCard>
+            <VCol cols="6" sm="4" lg="2">
+              <div class="kpi-card">
+                <div class="kpi-card__top">
+                  <div class="kpi-card__icon t-success"><VIcon icon="bx-dollar" size="20" /></div>
+                  <div class="kpi-card__label">{{ t('Revenue') }}</div>
+                </div>
+                <div class="kpi-card__value num-tabular">{{ formatCurrency(perf?.revenue ?? 0) }}<span class="kpi-card__unit">UZS</span></div>
+              </div>
             </VCol>
-            <VCol
-              cols="6"
-              sm="4"
-              lg="2"
-            >
-              <VCard>
-                <VCardText>
-                  <div class="text-caption text-disabled">
-                    {{ t('Orders / Hour') }}
-                  </div>
-                  <div class="text-h5 font-weight-bold">
-                    {{ perf?.orders_per_hour ?? 0 }}
-                  </div>
-                </VCardText>
-              </VCard>
+            <VCol cols="6" sm="4" lg="2">
+              <div class="kpi-card">
+                <div class="kpi-card__top">
+                  <div class="kpi-card__icon t-info"><VIcon icon="bx-trending-up" size="20" /></div>
+                  <div class="kpi-card__label">{{ t('Orders / Hour') }}</div>
+                </div>
+                <div class="kpi-card__value num-tabular">{{ perf?.orders_per_hour ?? 0 }}</div>
+              </div>
             </VCol>
-            <VCol
-              cols="6"
-              sm="4"
-              lg="2"
-            >
-              <VCard>
-                <VCardText>
-                  <div class="text-caption text-disabled">
-                    {{ t('Avg Prep Time') }}
-                  </div>
-                  <div class="text-h6 font-weight-bold">
-                    {{ fmtDuration(perf?.avg_prep_seconds) }}
-                  </div>
-                </VCardText>
-              </VCard>
+            <VCol cols="6" sm="4" lg="2">
+              <div class="kpi-card">
+                <div class="kpi-card__top">
+                  <div class="kpi-card__icon t-warning"><VIcon icon="bx-stopwatch" size="20" /></div>
+                  <div class="kpi-card__label">{{ t('Avg Prep Time') }}</div>
+                </div>
+                <div class="kpi-card__value num-tabular">{{ fmtDuration(perf?.avg_prep_seconds) }}</div>
+              </div>
             </VCol>
           </VRow>
 
@@ -457,7 +421,7 @@ const statusColor: Record<string, string> = {
                   <div class="text-caption text-disabled">
                     {{ t('System (recorded)') }}
                   </div>
-                  <div class="text-h6 font-weight-bold">
+                  <div class="text-h6 font-weight-bold num-tabular">
                     {{ formatCurrency(cashVariance.systemCash) }}
                   </div>
                 </VCol>
@@ -468,7 +432,7 @@ const statusColor: Record<string, string> = {
                   <div class="text-caption text-disabled">
                     {{ t('Expected (drawer)') }}
                   </div>
-                  <div class="text-h6 font-weight-bold">
+                  <div class="text-h6 font-weight-bold num-tabular">
                     {{ formatCurrency(cashVariance.expected) }}
                   </div>
                 </VCol>
@@ -479,7 +443,7 @@ const statusColor: Record<string, string> = {
                   <div class="text-caption text-disabled">
                     {{ t('Cashier reported') }}
                   </div>
-                  <div class="text-h6 font-weight-bold">
+                  <div class="text-h6 font-weight-bold num-tabular">
                     <template v-if="cashVariance.actual !== null">
                       {{ formatCurrency(cashVariance.actual) }}
                     </template>

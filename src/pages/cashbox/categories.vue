@@ -51,14 +51,19 @@ onMounted(load)
 
 <template>
   <div>
-    <VCard>
-      <VCardText class="py-3">
-        <span class="text-h6">{{ t('Cashbox Expense Categories') }}</span>
-        <div class="text-caption text-disabled">
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
+          {{ t('Cashbox Expense Categories') }}
+        </h1>
+        <div class="page-head__subtitle">
           {{ t('Categories used when a cashier records a cash-drawer expense during a shift.') }}
         </div>
-      </VCardText>
-      <VDivider />
+      </div>
+      <div class="page-head__actions" />
+    </div>
+
+    <VCard>
       <VCardText>
         <div class="d-flex gap-2 mb-4">
           <VTextField
@@ -100,9 +105,9 @@ onMounted(load)
               v-for="c in categories"
               :key="c.id"
             >
-              <td class="text-end">{{ c.id }}</td>
+              <td class="text-end num-tabular">{{ c.id }}</td>
               <td class="font-weight-medium">{{ c.name }}</td>
-              <td class="text-end">{{ c.sort_order ?? 0 }}</td>
+              <td class="text-end num-tabular">{{ c.sort_order ?? 0 }}</td>
               <td class="text-caption text-disabled">{{ c.created_at ?? '—' }}</td>
             </tr>
             <tr v-if="!categories.length && !loading">

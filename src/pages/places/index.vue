@@ -154,6 +154,18 @@ async function changeTableStatus(tbl: any, status: string) {
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
+          {{ t('Places & Tables') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Manage hall layout, tables and seat capacity') }}
+        </div>
+      </div>
+      <div class="page-head__actions" />
+    </div>
+
     <VRow>
       <VCol
         cols="12"
@@ -288,7 +300,7 @@ async function changeTableStatus(tbl: any, status: string) {
                     size="x-small"
                     :color="statusColors[(tbl as any).status] ?? 'default'"
                     variant="tonal"
-                    class="mt-1"
+                    class="mt-1 status-pill"
                   >
                     {{ t(`status_${(tbl as any).status}`) }}
                   </VChip>

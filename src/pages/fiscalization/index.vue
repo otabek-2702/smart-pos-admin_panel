@@ -137,6 +137,14 @@ const modeColor: Record<string, string> = {
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">{{ t('Fiscalization') }}</h1>
+        <div class="page-head__subtitle">{{ t('Provider') }}: {{ status?.provider ?? '—' }} · {{ t('TIN') }}: {{ status?.tin ?? '—' }}</div>
+      </div>
+      <div class="page-head__actions" />
+    </div>
+
     <!-- Status strip -->
     <VRow class="mb-4">
       <VCol cols="12" md="4">
@@ -146,6 +154,7 @@ const modeColor: Record<string, string> = {
             <div class="d-flex align-center gap-2">
               <VChip
                 v-if="status?.mode"
+                class="status-pill"
                 :color="modeColor[status.mode] ?? 'default'"
                 variant="tonal"
                 size="large"
@@ -160,36 +169,40 @@ const modeColor: Record<string, string> = {
         </VCard>
       </VCol>
       <VCol cols="6" md="2">
-        <VCard color="success" variant="tonal">
-          <VCardText>
-            <div class="text-caption">{{ t('Confirmed') }}</div>
-            <div class="text-h5 font-weight-bold">{{ status?.confirmed ?? status?.stats?.CONFIRMED ?? 0 }}</div>
-          </VCardText>
-        </VCard>
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-success"><VIcon icon="bx-check-circle" size="20" /></div>
+            <div class="kpi-card__label">{{ t('Confirmed') }}</div>
+          </div>
+          <div class="kpi-card__value num-tabular">{{ status?.confirmed ?? status?.stats?.CONFIRMED ?? 0 }}</div>
+        </div>
       </VCol>
       <VCol cols="6" md="2">
-        <VCard color="warning" variant="tonal">
-          <VCardText>
-            <div class="text-caption">{{ t('Pending') }}</div>
-            <div class="text-h5 font-weight-bold">{{ status?.pending ?? status?.stats?.PENDING ?? 0 }}</div>
-          </VCardText>
-        </VCard>
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-warning"><VIcon icon="bx-time" size="20" /></div>
+            <div class="kpi-card__label">{{ t('Pending') }}</div>
+          </div>
+          <div class="kpi-card__value num-tabular">{{ status?.pending ?? status?.stats?.PENDING ?? 0 }}</div>
+        </div>
       </VCol>
       <VCol cols="6" md="2">
-        <VCard color="info" variant="tonal">
-          <VCardText>
-            <div class="text-caption">{{ t('Sent') }}</div>
-            <div class="text-h5 font-weight-bold">{{ status?.sent ?? status?.stats?.SENT ?? 0 }}</div>
-          </VCardText>
-        </VCard>
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-info"><VIcon icon="bx-send" size="20" /></div>
+            <div class="kpi-card__label">{{ t('Sent') }}</div>
+          </div>
+          <div class="kpi-card__value num-tabular">{{ status?.sent ?? status?.stats?.SENT ?? 0 }}</div>
+        </div>
       </VCol>
       <VCol cols="6" md="2">
-        <VCard color="error" variant="tonal">
-          <VCardText>
-            <div class="text-caption">{{ t('Failed') }}</div>
-            <div class="text-h5 font-weight-bold">{{ status?.failed ?? status?.stats?.FAILED ?? 0 }}</div>
-          </VCardText>
-        </VCard>
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-error"><VIcon icon="bx-x-circle" size="20" /></div>
+            <div class="kpi-card__label">{{ t('Failed') }}</div>
+          </div>
+          <div class="kpi-card__value num-tabular">{{ status?.failed ?? status?.stats?.FAILED ?? 0 }}</div>
+        </div>
       </VCol>
     </VRow>
 
@@ -283,11 +296,11 @@ const modeColor: Record<string, string> = {
             </td>
             <td>{{ r.receipt_type ?? '—' }}</td>
             <td>
-              <VChip size="x-small" :color="receiptStatusColor[r.status] ?? 'default'" variant="tonal">
+              <VChip class="status-pill" size="x-small" :color="receiptStatusColor[r.status] ?? 'default'" variant="tonal">
                 {{ r.status }}
               </VChip>
             </td>
-            <td class="text-end">{{ formatCurrency(r.total ?? 0) }}</td>
+            <td class="text-end num-tabular">{{ formatCurrency(r.total ?? 0) }}</td>
             <td class="text-caption">{{ r.fiscal_sign ?? '—' }}</td>
             <td>
               <a

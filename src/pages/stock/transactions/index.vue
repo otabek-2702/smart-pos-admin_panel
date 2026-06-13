@@ -257,6 +257,7 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
             :color="typeColor[item.raw.movement_type] ?? 'default'"
             size="small"
             variant="tonal"
+            class="status-pill"
           >
             <VIcon
               start
@@ -275,16 +276,16 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
         <template #item.quantity_change="{ item }">
           <span
             :class="Number(item.raw.quantity_change) >= 0 ? 'text-success' : 'text-error'"
-            class="font-weight-medium"
+            class="font-weight-medium num-tabular"
           >
             {{ Number(item.raw.quantity_change) >= 0 ? '+' : '' }}{{ formatQty(item.raw.quantity_change) }}
           </span>
         </template>
         <template #item.quantity_before="{ item }">
-          <span class="text-disabled text-body-2">{{ formatQty(item.raw.quantity_before) }}</span>
+          <span class="text-disabled text-body-2 num-tabular">{{ formatQty(item.raw.quantity_before) }}</span>
         </template>
         <template #item.quantity_after="{ item }">
-          <span class="text-body-2">{{ formatQty(item.raw.quantity_after) }}</span>
+          <span class="text-body-2 num-tabular">{{ formatQty(item.raw.quantity_after) }}</span>
         </template>
         <template #item.reference="{ item }">
           <span class="text-body-2 text-disabled">{{ item.raw.reference_type ? `${item.raw.reference_type} #${item.raw.reference_id}` : '—' }}</span>

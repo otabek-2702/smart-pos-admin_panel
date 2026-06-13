@@ -256,10 +256,10 @@ onMounted(() => {
             >
               <div class="d-flex align-center pa-3">
                 <VChip
+                  class="status-pill me-3"
                   size="x-small"
                   :color="priorityColor[s.priority] || 'default'"
                   variant="tonal"
-                  class="me-3"
                 >
                   {{ t(s.priority) }}
                 </VChip>

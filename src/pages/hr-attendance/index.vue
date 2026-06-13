@@ -58,10 +58,16 @@ watch([page, itemsPerPage, dateFrom, dateTo], load)
 
 <template>
   <div>
-    <VCard>
-      <VCardText class="d-flex align-center gap-3 py-3 flex-wrap">
-        <span class="text-h6">{{ t('Attendance') }}</span>
-        <VSpacer />
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
+          {{ t('Attendance') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Daily check-in / check-out log') }}
+        </div>
+      </div>
+      <div class="page-head__actions">
         <VTextField
           v-model="dateFrom"
           type="date"
@@ -80,7 +86,10 @@ watch([page, itemsPerPage, dateFrom, dateTo], load)
           style="max-inline-size:170px;"
           clearable
         />
-      </VCardText>
+      </div>
+    </div>
+
+    <VCard>
 
       <VDataTableServer
         :headers="headers"
@@ -112,6 +121,7 @@ watch([page, itemsPerPage, dateFrom, dateTo], load)
         <template #item.status="{ item }">
           <VChip
             size="small"
+            class="status-pill"
             :color="statusColor[item.raw.status] ?? 'default'"
             variant="tonal"
           >
@@ -119,7 +129,7 @@ watch([page, itemsPerPage, dateFrom, dateTo], load)
           </VChip>
         </template>
         <template #item.hours_worked="{ item }">
-          {{ item.raw.hours_worked ?? '—' }}
+          <span class="num-tabular">{{ item.raw.hours_worked ?? '—' }}</span>
         </template>
       </VDataTableServer>
     </VCard>

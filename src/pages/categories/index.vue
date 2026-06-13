@@ -287,106 +287,101 @@ async function deleteCategory() {
 
 <template>
   <div class="categories-page">
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
+          {{ t('Categories') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Group products into POS categories') }}
+        </div>
+      </div>
+      <div class="page-head__actions">
+        <VBtn
+          prepend-icon="bx-plus"
+          @click="openCreate"
+        >
+          {{ t('Add Category') }}
+        </VBtn>
+      </div>
+    </div>
+
     <!-- Stats row — compact, always shown -->
     <VRow class="mb-3 flex-0-0">
       <VCol cols="4">
-        <VCard>
-          <VCardText class="d-flex align-center gap-2 py-3">
-            <VAvatar
-              color="primary"
-              variant="tonal"
-              size="32"
-              rounded
-            >
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-primary">
               <VIcon
                 icon="bx-category"
-                size="16"
+                size="20"
               />
-            </VAvatar>
-            <div>
-              <div
-                v-if="stats"
-                class="text-subtitle-1 font-weight-bold lh-1"
-              >
-                {{ stats.total_categories ?? '—' }}
-              </div>
-              <div
-                v-else
-                class="sk-box mb-1"
-                style="width:36px;height:16px;border-radius:4px;"
-              />
-              <div class="text-caption text-disabled">
-                {{ t('Total') }}
-              </div>
             </div>
-          </VCardText>
-        </VCard>
+            <div class="kpi-card__label">
+              {{ t('Total') }}
+            </div>
+          </div>
+          <div class="kpi-card__value num-tabular">
+            <template v-if="stats">
+              {{ stats.total_categories ?? '—' }}
+            </template>
+            <span
+              v-else
+              class="sk-box"
+              style="display:inline-block;width:36px;height:20px;border-radius:4px;"
+            />
+          </div>
+        </div>
       </VCol>
       <VCol cols="4">
-        <VCard>
-          <VCardText class="d-flex align-center gap-2 py-3">
-            <VAvatar
-              color="success"
-              variant="tonal"
-              size="32"
-              rounded
-            >
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-success">
               <VIcon
                 icon="bx-check-circle"
-                size="16"
+                size="20"
               />
-            </VAvatar>
-            <div>
-              <div
-                v-if="stats"
-                class="text-subtitle-1 font-weight-bold lh-1"
-              >
-                {{ stats.active_categories ?? '—' }}
-              </div>
-              <div
-                v-else
-                class="sk-box mb-1"
-                style="width:36px;height:16px;border-radius:4px;"
-              />
-              <div class="text-caption text-disabled">
-                {{ t('Active') }}
-              </div>
             </div>
-          </VCardText>
-        </VCard>
+            <div class="kpi-card__label">
+              {{ t('Active') }}
+            </div>
+          </div>
+          <div class="kpi-card__value num-tabular">
+            <template v-if="stats">
+              {{ stats.active_categories ?? '—' }}
+            </template>
+            <span
+              v-else
+              class="sk-box"
+              style="display:inline-block;width:36px;height:20px;border-radius:4px;"
+            />
+          </div>
+        </div>
       </VCol>
       <VCol cols="4">
-        <VCard>
-          <VCardText class="d-flex align-center gap-2 py-3">
-            <VAvatar
-              color="warning"
-              variant="tonal"
-              size="32"
-              rounded
-            >
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-warning">
               <VIcon
                 icon="bx-minus-circle"
-                size="16"
+                size="20"
               />
-            </VAvatar>
-            <div>
-              <div
-                v-if="stats"
-                class="text-subtitle-1 font-weight-bold lh-1"
-              >
-                {{ stats.inactive_categories ?? '—' }}
-              </div>
-              <div
-                v-else
-                class="sk-box mb-1"
-                style="width:36px;height:16px;border-radius:4px;"
-              />
-              <div class="text-caption text-disabled">
-                {{ t('Inactive') }}
-              </div>
             </div>
-          </VCardText>
-        </VCard>
+            <div class="kpi-card__label">
+              {{ t('Inactive') }}
+            </div>
+          </div>
+          <div class="kpi-card__value num-tabular">
+            <template v-if="stats">
+              {{ stats.inactive_categories ?? '—' }}
+            </template>
+            <span
+              v-else
+              class="sk-box"
+              style="display:inline-block;width:36px;height:20px;border-radius:4px;"
+            />
+          </div>
+        </div>
       </VCol>
     </VRow>
 
@@ -402,12 +397,6 @@ async function deleteCategory() {
         clearable
       />
       <VSpacer />
-      <VBtn
-        prepend-icon="bx-plus"
-        @click="openCreate"
-      >
-        {{ t('Add Category') }}
-      </VBtn>
     </div>
 
     <!-- Category card grid -->
@@ -471,9 +460,9 @@ async function deleteCategory() {
               />
             </div>
             <VChip
-              class="mt-2"
+              class="mt-2 status-pill"
               size="x-small"
-              :color="cat.status === 'ACTIVE' ? 'success' : 'warning'"
+              :color="cat.status === 'ACTIVE' ? 'success' : 'default'"
               variant="tonal"
               label
             >

@@ -107,119 +107,49 @@ watch([historyPage, historyPerPage], loadHistory)
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">{{ t('Inkassa') }}</h1>
+        <div class="page-head__subtitle">{{ t('Cash Balance') }}</div>
+      </div>
+    </div>
+
     <VRow class="mb-4">
-      <VCol
-        cols="12"
-        sm="6"
-        lg="4"
-      >
-        <VCard>
-          <VCardText class="d-flex align-center gap-4">
-            <VAvatar
-              color="success"
-              variant="tonal"
-              size="56"
-              rounded
-            >
-              <VIcon
-                icon="bx-wallet"
-                size="32"
-              />
-            </VAvatar>
-            <div>
-              <div
-                v-if="balance"
-                class="text-h5 font-weight-bold"
-              >
-                {{ formatCurrency(balance.balance ?? 0) }}
-              </div>
-              <div
-                v-else
-                class="sk-box mb-1"
-                style="width:120px;height:24px;border-radius:4px;"
-              />
-              <div class="text-body-2 text-disabled">
-                {{ t('Cash Balance') }}
-              </div>
-            </div>
-          </VCardText>
-        </VCard>
+      <VCol cols="12" sm="6" lg="4">
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-success"><VIcon icon="bx-wallet" size="20" /></div>
+            <div class="kpi-card__label">{{ t('Cash Balance') }}</div>
+          </div>
+          <div v-if="balance" class="kpi-card__value num-tabular">
+            {{ formatCurrency(balance.balance ?? 0) }}<span class="kpi-card__unit">UZS</span>
+          </div>
+          <div v-else class="sk-box mb-1" style="width:120px;height:24px;border-radius:4px;" />
+        </div>
       </VCol>
 
-      <VCol
-        cols="12"
-        sm="6"
-        lg="4"
-      >
-        <VCard>
-          <VCardText class="d-flex align-center gap-4">
-            <VAvatar
-              color="primary"
-              variant="tonal"
-              size="56"
-              rounded
-            >
-              <VIcon
-                icon="bx-trending-up"
-                size="32"
-              />
-            </VAvatar>
-            <div>
-              <div
-                v-if="stats"
-                class="text-h5 font-weight-bold"
-              >
-                {{ formatCurrency(stats.today?.total_revenue ?? 0) }}
-              </div>
-              <div
-                v-else
-                class="sk-box mb-1"
-                style="width:120px;height:24px;border-radius:4px;"
-              />
-              <div class="text-body-2 text-disabled">
-                {{ t("Today's Revenue") }}
-              </div>
-            </div>
-          </VCardText>
-        </VCard>
+      <VCol cols="12" sm="6" lg="4">
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-primary"><VIcon icon="bx-trending-up" size="20" /></div>
+            <div class="kpi-card__label">{{ t("Today's Revenue") }}</div>
+          </div>
+          <div v-if="stats" class="kpi-card__value num-tabular">
+            {{ formatCurrency(stats.today?.total_revenue ?? 0) }}<span class="kpi-card__unit">UZS</span>
+          </div>
+          <div v-else class="sk-box mb-1" style="width:120px;height:24px;border-radius:4px;" />
+        </div>
       </VCol>
 
-      <VCol
-        cols="12"
-        sm="6"
-        lg="4"
-      >
-        <VCard>
-          <VCardText class="d-flex align-center gap-4">
-            <VAvatar
-              color="info"
-              variant="tonal"
-              size="56"
-              rounded
-            >
-              <VIcon
-                icon="bx-receipt"
-                size="32"
-              />
-            </VAvatar>
-            <div>
-              <div
-                v-if="stats"
-                class="text-h5 font-weight-bold"
-              >
-                {{ stats.today?.order_count ?? 0 }}
-              </div>
-              <div
-                v-else
-                class="sk-box mb-1"
-                style="width:60px;height:24px;border-radius:4px;"
-              />
-              <div class="text-body-2 text-disabled">
-                {{ t("Today's Orders") }}
-              </div>
-            </div>
-          </VCardText>
-        </VCard>
+      <VCol cols="12" sm="6" lg="4">
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-info"><VIcon icon="bx-receipt" size="20" /></div>
+            <div class="kpi-card__label">{{ t("Today's Orders") }}</div>
+          </div>
+          <div v-if="stats" class="kpi-card__value num-tabular">{{ stats.today?.order_count ?? 0 }}</div>
+          <div v-else class="sk-box mb-1" style="width:60px;height:24px;border-radius:4px;" />
+        </div>
       </VCol>
     </VRow>
 
@@ -253,7 +183,7 @@ watch([historyPage, historyPerPage], loadHistory)
                   </div>
                 </div>
               </div>
-              <span class="text-body-2 font-weight-medium text-success">{{ formatCurrency(c.total_revenue) }}</span>
+              <span class="text-body-2 font-weight-medium text-success num-tabular">{{ formatCurrency(c.total_revenue) }}</span>
             </div>
           </VCardText>
         </VCard>
@@ -339,7 +269,7 @@ watch([historyPage, historyPerPage], loadHistory)
           {{ item.raw.cashier?.name ?? item.raw.cashier_name ?? '—' }}
         </template>
         <template #item.amount="{ item }">
-          <span class="font-weight-medium">{{ formatCurrency(item.raw.amount) }}</span>
+          <span class="font-weight-medium num-tabular">{{ formatCurrency(item.raw.amount) }}</span>
         </template>
         <template #item.notes="{ item }">
           <span class="text-body-2 text-disabled">{{ item.raw.notes || '—' }}</span>
@@ -403,7 +333,7 @@ watch([historyPage, historyPerPage], loadHistory)
           </VRow>
           <div class="d-flex justify-space-between mt-2 mb-3">
             <span class="text-body-2 text-disabled">{{ t('Total') }}</span>
-            <span class="text-body-1 font-weight-bold">{{ formatCurrency(totalRemoved) }}</span>
+            <span class="text-body-1 font-weight-bold num-tabular">{{ formatCurrency(totalRemoved) }}</span>
           </div>
           <VTextarea
             v-model="performNotes"

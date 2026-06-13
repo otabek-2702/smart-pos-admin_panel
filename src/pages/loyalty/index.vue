@@ -105,6 +105,18 @@ function canRedeem(a: any) {
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
+          {{ t('Loyalty') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Stamps program and top customers') }}
+        </div>
+      </div>
+      <div class="page-head__actions" />
+    </div>
+
     <VRow>
       <VCol
         cols="12"
@@ -271,6 +283,7 @@ function canRedeem(a: any) {
             </template>
             <template #item.stamps_balance="{ item }">
               <VChip
+                class="status-pill num-tabular"
                 size="small"
                 :color="canRedeem(item.raw) ? 'success' : 'default'"
                 variant="tonal"

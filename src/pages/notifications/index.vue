@@ -231,6 +231,18 @@ const statusColor: Record<string, string> = {
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
+          {{ t('Notifications') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Telegram settings, templates and delivery log') }}
+        </div>
+      </div>
+      <div class="page-head__actions" />
+    </div>
+
     <VCard>
       <VTabs
         v-model="tab"
@@ -437,6 +449,7 @@ const statusColor: Record<string, string> = {
               </template>
               <template #item.status="{ item }">
                 <VChip
+                  class="status-pill"
                   size="small"
                   :color="statusColor[item.raw.status] ?? 'default'"
                   variant="tonal"

@@ -286,6 +286,7 @@ function canCancel(item: any) { return !['COMPLETED', 'CANCELED'].includes(item.
             :color="statusColor[item.raw.status] ?? 'default'"
             size="small"
             variant="tonal"
+            class="status-pill"
           >
             {{ t(`production_status_${item.raw.status}`) }}
           </VChip>
@@ -295,12 +296,13 @@ function canCancel(item: any) { return !['COMPLETED', 'CANCELED'].includes(item.
             :color="priorityColor[item.raw.priority] ?? 'default'"
             size="small"
             variant="tonal"
+            class="status-pill"
           >
             {{ t(`priority_${item.raw.priority}`) }}
           </VChip>
         </template>
         <template #item.output="{ item }">
-          {{ item.raw.expected_output_qty ?? '—' }} {{ typeof item.raw.output_unit === 'string' ? item.raw.output_unit : item.raw.output_unit?.short_name ?? '' }}
+          <span class="num-tabular">{{ item.raw.expected_output_qty ?? '—' }}</span> {{ typeof item.raw.output_unit === 'string' ? item.raw.output_unit : item.raw.output_unit?.short_name ?? '' }}
         </template>
         <template #item.planned_start="{ item }">
           {{ formatDateShort(item.raw.planned_start ?? item.raw.planned_start_date) }}

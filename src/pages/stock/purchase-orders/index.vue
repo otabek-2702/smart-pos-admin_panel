@@ -294,6 +294,7 @@ function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.s
             :color="statusColor[item.raw.status] ?? 'default'"
             size="small"
             variant="tonal"
+            class="status-pill"
           >
             {{ t(`po_status_${item.raw.status}`) }}
           </VChip>
@@ -304,6 +305,7 @@ function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.s
             :color="paymentColor[item.raw.payment_status] ?? 'default'"
             size="small"
             variant="tonal"
+            class="status-pill"
           >
             {{ t(`po_payment_${item.raw.payment_status}`) }}
           </VChip>
@@ -313,7 +315,7 @@ function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.s
           >—</span>
         </template>
         <template #item.total="{ item }">
-          {{ formatCurrency(item.raw.total ?? item.raw.subtotal ?? 0) }}
+          <span class="num-tabular">{{ formatCurrency(item.raw.total ?? item.raw.subtotal ?? 0) }}</span>
         </template>
         <template #item.order_date="{ item }">
           {{ formatDateShort(item.raw.order_date) }}
@@ -428,10 +430,10 @@ function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.s
                       :key="idx"
                     >
                       <td>{{ li.item?.name ?? li.stock_item?.name ?? '—' }}</td>
-                      <td>{{ li.quantity_ordered ?? li.quantity ?? '—' }}</td>
-                      <td>{{ li.quantity_received ?? '—' }}</td>
-                      <td>{{ formatCurrency(li.unit_price ?? li.price ?? 0) }}</td>
-                      <td>{{ formatCurrency((li.unit_price ?? li.price ?? 0) * (li.quantity_ordered ?? li.quantity ?? 1)) }}</td>
+                      <td class="num-tabular">{{ li.quantity_ordered ?? li.quantity ?? '—' }}</td>
+                      <td class="num-tabular">{{ li.quantity_received ?? '—' }}</td>
+                      <td class="num-tabular">{{ formatCurrency(li.unit_price ?? li.price ?? 0) }}</td>
+                      <td class="num-tabular">{{ formatCurrency((li.unit_price ?? li.price ?? 0) * (li.quantity_ordered ?? li.quantity ?? 1)) }}</td>
                     </tr>
                     <tr v-if="!(item.raw.items?.length ?? item.raw.line_items?.length)">
                       <td

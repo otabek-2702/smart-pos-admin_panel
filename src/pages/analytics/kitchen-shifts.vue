@@ -85,10 +85,15 @@ const byHourOptions = computed(() => ({
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">{{ t('Kitchen Shift Analytics') }}</h1>
+        <div class="page-head__subtitle">{{ dateFrom }} — {{ dateTo }}</div>
+      </div>
+    </div>
+
     <VCard class="mb-4">
       <VCardText class="d-flex flex-wrap align-center gap-3">
-        <span class="text-h6">{{ t('Kitchen Shift Analytics') }}</span>
-        <VSpacer />
         <VTextField v-model="dateFrom" type="date" :label="t('From')" density="compact" hide-details style="max-inline-size:170px;" />
         <VTextField v-model="dateTo" type="date" :label="t('To')" density="compact" hide-details style="max-inline-size:170px;" />
         <VSelect
@@ -128,64 +133,44 @@ const byHourOptions = computed(() => ({
       <!-- KPIs -->
       <VRow class="mb-4">
         <VCol cols="6" sm="3">
-          <VCard>
-            <VCardText>
-              <div class="text-caption text-disabled">
-                {{ t('Shifts') }}
-              </div>
-              <div class="text-h5 font-weight-bold">
-                {{ summary.shift_count }}
-              </div>
-              <div class="text-caption text-disabled">
-                {{ summary.distinct_staff }} {{ t('staff') }}
-              </div>
-            </VCardText>
-          </VCard>
+          <div class="kpi-card">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon t-primary"><VIcon icon="bx-time" size="20" /></div>
+              <div class="kpi-card__label">{{ t('Shifts') }}</div>
+            </div>
+            <div class="kpi-card__value num-tabular">{{ summary.shift_count }}</div>
+            <div class="kpi-card__sub">{{ summary.distinct_staff }} {{ t('staff') }}</div>
+          </div>
         </VCol>
         <VCol cols="6" sm="3">
-          <VCard>
-            <VCardText>
-              <div class="text-caption text-disabled">
-                {{ t('Orders in Window') }}
-              </div>
-              <div class="text-h5 font-weight-bold">
-                {{ summary.orders_in_window }}
-              </div>
-              <div class="text-caption text-success">
-                {{ summary.completion_rate_pct }}% {{ t('completed') }}
-              </div>
-            </VCardText>
-          </VCard>
+          <div class="kpi-card">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon t-info"><VIcon icon="bx-receipt" size="20" /></div>
+              <div class="kpi-card__label">{{ t('Orders in Window') }}</div>
+            </div>
+            <div class="kpi-card__value num-tabular">{{ summary.orders_in_window }}</div>
+            <div class="kpi-card__sub text-success">{{ summary.completion_rate_pct }}% {{ t('completed') }}</div>
+          </div>
         </VCol>
         <VCol cols="6" sm="3">
-          <VCard>
-            <VCardText>
-              <div class="text-caption text-disabled">
-                {{ t('Items Prepared') }}
-              </div>
-              <div class="text-h5 font-weight-bold">
-                {{ summary.items_prepared }}
-              </div>
-              <div class="text-caption text-disabled">
-                {{ summary.items_per_hour }} / {{ t('h') }}
-              </div>
-            </VCardText>
-          </VCard>
+          <div class="kpi-card">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon t-success"><VIcon icon="bx-package" size="20" /></div>
+              <div class="kpi-card__label">{{ t('Items Prepared') }}</div>
+            </div>
+            <div class="kpi-card__value num-tabular">{{ summary.items_prepared }}</div>
+            <div class="kpi-card__sub">{{ summary.items_per_hour }} / {{ t('h') }}</div>
+          </div>
         </VCol>
         <VCol cols="6" sm="3">
-          <VCard color="warning" variant="tonal">
-            <VCardText>
-              <div class="text-caption">
-                {{ t('Avg Prep Time') }}
-              </div>
-              <div class="text-h5 font-weight-bold">
-                {{ fmtSec(summary.prep_time.avg_seconds) }}
-              </div>
-              <div class="text-caption">
-                {{ summary.prep_time.slow_orders }} {{ t('slow') }} ({{ summary.prep_time.slow_rate_pct }}%)
-              </div>
-            </VCardText>
-          </VCard>
+          <div class="kpi-card">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon t-warning"><VIcon icon="bx-stopwatch" size="20" /></div>
+              <div class="kpi-card__label">{{ t('Avg Prep Time') }}</div>
+            </div>
+            <div class="kpi-card__value num-tabular">{{ fmtSec(summary.prep_time.avg_seconds) }}</div>
+            <div class="kpi-card__sub">{{ summary.prep_time.slow_orders }} {{ t('slow') }} ({{ summary.prep_time.slow_rate_pct }}%)</div>
+          </div>
         </VCol>
       </VRow>
 

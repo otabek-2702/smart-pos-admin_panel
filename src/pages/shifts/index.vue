@@ -350,6 +350,13 @@ async function deleteTpl(tpl: any) {
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">{{ t('Shifts') }}</h1>
+        <div class="page-head__subtitle">{{ t('Active') }} · {{ t('History') }} · {{ t('Templates') }}</div>
+      </div>
+    </div>
+
     <VCard>
       <VTabs
         v-model="tab"
@@ -411,6 +418,7 @@ async function deleteTpl(tpl: any) {
                       <VSpacer />
                       <VChip
                         v-if="(s as any).is_live_stats"
+                        class="status-pill"
                         size="x-small"
                         color="success"
                         variant="tonal"
@@ -421,11 +429,11 @@ async function deleteTpl(tpl: any) {
                     </div>
                     <div class="d-flex justify-space-between text-body-2 mb-1">
                       <span class="text-disabled">{{ t('Orders') }}</span>
-                      <span class="font-weight-medium">{{ (s as any).total_orders ?? 0 }}</span>
+                      <span class="font-weight-medium num-tabular">{{ (s as any).total_orders ?? 0 }}</span>
                     </div>
                     <div class="d-flex justify-space-between text-body-2 mb-2">
                       <span class="text-disabled">{{ t('Cash Collected') }}</span>
-                      <span class="font-weight-medium">{{ formatCurrency((s as any).cash_collected ?? 0) }}</span>
+                      <span class="font-weight-medium num-tabular">{{ formatCurrency((s as any).cash_collected ?? 0) }}</span>
                     </div>
                     <div class="d-flex gap-2">
                       <VBtn
@@ -527,6 +535,7 @@ async function deleteTpl(tpl: any) {
             </template>
             <template #item.status="{ item }">
               <VChip
+                class="status-pill"
                 size="small"
                 :color="statusColor[item.raw.status] ?? 'default'"
                 variant="tonal"
@@ -535,7 +544,7 @@ async function deleteTpl(tpl: any) {
               </VChip>
             </template>
             <template #item.cash_collected="{ item }">
-              {{ formatCurrency(item.raw.cash_collected ?? 0) }}
+              <span class="num-tabular">{{ formatCurrency(item.raw.cash_collected ?? 0) }}</span>
             </template>
             <template #item.actions="{ item }">
               <div class="d-flex justify-end gap-1">
@@ -743,7 +752,7 @@ async function deleteTpl(tpl: any) {
           <!-- List -->
           <div class="text-subtitle-2 mb-2 d-flex align-center justify-space-between">
             <span>{{ t('This shift') }} ({{ expRows.length }})</span>
-            <span class="text-error font-weight-bold">−{{ formatCurrency(expTotal) }}</span>
+            <span class="text-error font-weight-bold num-tabular">−{{ formatCurrency(expTotal) }}</span>
           </div>
           <VProgressLinear
             v-if="expLoading"
@@ -765,7 +774,7 @@ async function deleteTpl(tpl: any) {
               <tr v-for="r in expRows" :key="r.id">
                 <td class="text-caption">{{ formatDate(r.created_at) }}</td>
                 <td>{{ r.category?.name ?? r.category_name ?? '—' }}</td>
-                <td class="text-end text-error font-weight-medium">−{{ formatCurrency(r.amount) }}</td>
+                <td class="text-end text-error font-weight-medium num-tabular">−{{ formatCurrency(r.amount) }}</td>
                 <td>
                   <span v-if="r.recipient_user">{{ r.recipient_user.name }}</span>
                   <span v-else-if="r.recipient_supplier">{{ r.recipient_supplier.name }}</span>
@@ -942,77 +951,46 @@ async function deleteTpl(tpl: any) {
             </div>
 
             <VRow>
-              <VCol
-                cols="6"
-                sm="3"
-              >
-                <VCard
-                  variant="tonal"
-                  color="success"
-                >
-                  <VCardText class="text-center pa-2">
-                    <div class="text-h6 font-weight-bold">
-                      {{ formatCurrency(perfData.revenue) }}
-                    </div>
-                    <div class="text-caption">
-                      {{ t('Revenue') }}
-                    </div>
-                  </VCardText>
-                </VCard>
+              <VCol cols="6" sm="3">
+                <div class="kpi-card">
+                  <div class="kpi-card__top">
+                    <div class="kpi-card__icon t-success"><VIcon icon="bx-dollar" size="20" /></div>
+                    <div class="kpi-card__label">{{ t('Revenue') }}</div>
+                  </div>
+                  <div class="kpi-card__value num-tabular">{{ formatCurrency(perfData.revenue) }}<span class="kpi-card__unit">UZS</span></div>
+                </div>
               </VCol>
-              <VCol
-                cols="6"
-                sm="3"
-              >
-                <VCard
-                  variant="tonal"
-                  color="primary"
-                >
-                  <VCardText class="text-center pa-2">
-                    <div class="text-h6 font-weight-bold">
-                      {{ perfData.orders_total }}
-                    </div>
-                    <div class="text-caption">
-                      {{ t('Orders') }}
-                    </div>
-                  </VCardText>
-                </VCard>
+              <VCol cols="6" sm="3">
+                <div class="kpi-card">
+                  <div class="kpi-card__top">
+                    <div class="kpi-card__icon t-primary"><VIcon icon="bx-receipt" size="20" /></div>
+                    <div class="kpi-card__label">{{ t('Orders') }}</div>
+                  </div>
+                  <div class="kpi-card__value num-tabular">{{ perfData.orders_total }}</div>
+                </div>
               </VCol>
-              <VCol
-                cols="6"
-                sm="3"
-              >
-                <VCard
-                  variant="tonal"
-                  color="info"
-                >
-                  <VCardText class="text-center pa-2">
-                    <div class="text-h6 font-weight-bold">
-                      {{ perfData.orders_per_hour }}
-                    </div>
-                    <div class="text-caption">
-                      {{ t('Orders/hour') }}
-                    </div>
-                  </VCardText>
-                </VCard>
+              <VCol cols="6" sm="3">
+                <div class="kpi-card">
+                  <div class="kpi-card__top">
+                    <div class="kpi-card__icon t-info"><VIcon icon="bx-trending-up" size="20" /></div>
+                    <div class="kpi-card__label">{{ t('Orders/hour') }}</div>
+                  </div>
+                  <div class="kpi-card__value num-tabular">{{ perfData.orders_per_hour }}</div>
+                </div>
               </VCol>
-              <VCol
-                cols="6"
-                sm="3"
-              >
-                <VCard
-                  variant="tonal"
-                  :color="perfData.cancel_rate_pct > 10 ? 'error' : 'default'"
-                >
-                  <VCardText class="text-center pa-2">
-                    <div class="text-h6 font-weight-bold">
-                      {{ perfData.cancel_rate_pct }}%
+              <VCol cols="6" sm="3">
+                <div class="kpi-card">
+                  <div class="kpi-card__top">
+                    <div
+                      class="kpi-card__icon"
+                      :class="perfData.cancel_rate_pct > 10 ? 't-error' : 't-neutral'"
+                    >
+                      <VIcon icon="bx-x-circle" size="20" />
                     </div>
-                    <div class="text-caption">
-                      {{ t('Cancel rate') }}
-                    </div>
-                  </VCardText>
-                </VCard>
+                    <div class="kpi-card__label">{{ t('Cancel rate') }}</div>
+                  </div>
+                  <div class="kpi-card__value num-tabular">{{ perfData.cancel_rate_pct }}%</div>
+                </div>
               </VCol>
             </VRow>
 
@@ -1020,23 +998,23 @@ async function deleteTpl(tpl: any) {
 
             <div class="d-flex justify-space-between py-1">
               <span class="text-body-2 text-disabled">{{ t('Completed') }}</span>
-              <span class="font-weight-medium">{{ perfData.orders_completed }}</span>
+              <span class="font-weight-medium num-tabular">{{ perfData.orders_completed }}</span>
             </div>
             <div class="d-flex justify-space-between py-1">
               <span class="text-body-2 text-disabled">{{ t('Cancelled') }}</span>
-              <span class="font-weight-medium">{{ perfData.orders_cancelled }}</span>
+              <span class="font-weight-medium num-tabular">{{ perfData.orders_cancelled }}</span>
             </div>
             <div class="d-flex justify-space-between py-1">
               <span class="text-body-2 text-disabled">{{ t('Paid') }}</span>
-              <span class="font-weight-medium">{{ perfData.orders_paid }}</span>
+              <span class="font-weight-medium num-tabular">{{ perfData.orders_paid }}</span>
             </div>
             <div class="d-flex justify-space-between py-1">
               <span class="text-body-2 text-disabled">{{ t('Avg Prep Time') }}</span>
-              <span class="font-weight-medium">{{ formatPrep(perfData.avg_prep_seconds) }}</span>
+              <span class="font-weight-medium num-tabular">{{ formatPrep(perfData.avg_prep_seconds) }}</span>
             </div>
             <div class="d-flex justify-space-between py-1">
               <span class="text-body-2 text-disabled">{{ t('Revenue/hour') }}</span>
-              <span class="font-weight-medium">{{ formatCurrency(perfData.revenue_per_hour) }}</span>
+              <span class="font-weight-medium num-tabular">{{ formatCurrency(perfData.revenue_per_hour) }}</span>
             </div>
           </template>
         </VCardText>

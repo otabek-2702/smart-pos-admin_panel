@@ -231,6 +231,25 @@ async function deleteProduct() {
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
+          {{ t('Products') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Catalog of products served at the POS') }}
+        </div>
+      </div>
+      <div class="page-head__actions">
+        <VBtn
+          prepend-icon="bx-plus"
+          @click="openCreate"
+        >
+          {{ t('Add Product') }}
+        </VBtn>
+      </div>
+    </div>
+
     <VCard>
       <!-- Toolbar — always shown -->
       <VCardText class="d-flex flex-wrap gap-3 align-center py-3">
@@ -252,13 +271,6 @@ async function deleteProduct() {
           hide-details
           clearable
         />
-        <VSpacer />
-        <VBtn
-          prepend-icon="bx-plus"
-          @click="openCreate"
-        >
-          {{ t('Add Product') }}
-        </VBtn>
       </VCardText>
 
       <VDataTableServer
@@ -372,7 +384,7 @@ async function deleteProduct() {
         </template>
 
         <template #item.price="{ item }">
-          <span class="font-weight-medium">{{ formatCurrency(item.raw.price) }}</span>
+          <span class="font-weight-medium num-tabular">{{ formatCurrency(item.raw.price) }}</span>
         </template>
 
         <template #item.category="{ item }">

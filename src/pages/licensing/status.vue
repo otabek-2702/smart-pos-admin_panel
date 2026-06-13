@@ -41,24 +41,21 @@ const statusDescription: Record<string, string> = {
 
 <template>
   <div>
-    <div class="d-flex align-center mb-4">
-      <div>
-        <div class="text-h5 font-weight-bold">
-          {{ t('License Status') }}
-        </div>
-        <div class="text-caption text-disabled">
-          {{ t('Snapshot from /api/licensing/status') }}
-        </div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">{{ t('License Status') }}</h1>
+        <div class="page-head__subtitle">{{ t('Snapshot from /api/licensing/status') }}</div>
       </div>
-      <VSpacer />
-      <VBtn
-        variant="tonal"
-        prepend-icon="bx-refresh"
-        :loading="loading"
-        @click="load"
-      >
-        {{ t('Refresh') }}
-      </VBtn>
+      <div class="page-head__actions">
+        <VBtn
+          variant="tonal"
+          prepend-icon="bx-refresh"
+          :loading="loading"
+          @click="load"
+        >
+          {{ t('Refresh') }}
+        </VBtn>
+      </div>
     </div>
 
     <VCard
@@ -88,6 +85,7 @@ const statusDescription: Record<string, string> = {
       <VCardText>
         <div class="d-flex align-center gap-3 mb-3">
           <VChip
+            class="status-pill"
             :color="statusColor[state.status] ?? 'default'"
             size="large"
             variant="tonal"
@@ -100,6 +98,7 @@ const statusDescription: Record<string, string> = {
           </VChip>
           <VChip
             v-if="state.is_blocked"
+            class="status-pill"
             color="error"
             size="small"
             variant="tonal"

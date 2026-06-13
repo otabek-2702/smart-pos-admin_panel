@@ -245,21 +245,22 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
           {{ item.raw.location_name ?? '—' }}
         </template>
         <template #item.current_quantity="{ item }">
-          {{ formatQty(item.raw.current_quantity) }}
+          <span class="num-tabular">{{ formatQty(item.raw.current_quantity) }}</span>
         </template>
         <template #item.available_quantity="{ item }">
-          <span :class="Number(item.raw.available_quantity) <= 0 ? 'text-error font-weight-medium' : ''">
+          <span :class="['num-tabular', Number(item.raw.available_quantity) <= 0 ? 'text-error font-weight-medium' : '']">
             {{ formatQty(item.raw.available_quantity) }}
           </span>
         </template>
         <template #item.unit_cost="{ item }">
-          {{ formatCurrency(item.raw.unit_cost) }}
+          <span class="num-tabular">{{ formatCurrency(item.raw.unit_cost) }}</span>
         </template>
         <template #item.status="{ item }">
           <VChip
             :color="BATCH_STATUS_COLOR[item.raw.status] ?? 'default'"
             size="small"
             variant="tonal"
+            class="status-pill"
           >
             {{ item.raw.status_display ?? item.raw.status }}
           </VChip>
@@ -272,6 +273,7 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
             :color="QUALITY_STATUS_COLOR[item.raw.quality_status] ?? 'default'"
             size="small"
             variant="tonal"
+            class="status-pill"
           >
             {{ item.raw.quality_status ? t(`quality_status_${item.raw.quality_status}`) : '—' }}
           </VChip>

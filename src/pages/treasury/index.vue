@@ -173,103 +173,51 @@ function deltaDisplay(t: any) {
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">{{ t('Treasury') }}</h1>
+        <div class="page-head__subtitle">{{ t('Ledger') }}</div>
+      </div>
+    </div>
+
     <!-- Account cards -->
     <VRow class="mb-4">
-      <VCol
-        cols="12"
-        sm="6"
-      >
-        <VCard
-          color="success"
-          variant="tonal"
-        >
-          <VCardText class="d-flex align-center gap-4">
-            <VAvatar
-              color="success"
-              size="56"
-              rounded
-            >
-              <VIcon
-                icon="bx-shield"
-                size="32"
-              />
-            </VAvatar>
-            <div class="flex-grow-1">
-              <div class="text-caption text-medium-emphasis">
-                {{ t('Safe (cash)') }}
-              </div>
-              <div
-                v-if="accounts.SAFE"
-                class="text-h4 font-weight-bold"
-              >
-                {{ formatCurrency(accounts.SAFE.balance ?? 0) }}
-              </div>
-              <div
-                v-else
-                class="sk-box my-1"
-                style="width:140px;height:28px;border-radius:4px;"
-              />
-              <div
-                v-if="accounts.SAFE?.last_updated"
-                class="text-caption text-disabled"
-              >
-                {{ t('Updated') }}: {{ formatDate(accounts.SAFE.last_updated) }}
-              </div>
-            </div>
-          </VCardText>
-        </VCard>
+      <VCol cols="12" sm="6">
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-success"><VIcon icon="bx-shield" size="20" /></div>
+            <div class="kpi-card__label">{{ t('Safe (cash)') }}</div>
+          </div>
+          <div v-if="accounts.SAFE" class="kpi-card__value num-tabular">
+            {{ formatCurrency(accounts.SAFE.balance ?? 0) }}<span class="kpi-card__unit">UZS</span>
+          </div>
+          <div v-else class="sk-box my-1" style="width:140px;height:28px;border-radius:4px;" />
+          <div v-if="accounts.SAFE?.last_updated" class="kpi-card__sub">
+            {{ t('Updated') }}: {{ formatDate(accounts.SAFE.last_updated) }}
+          </div>
+        </div>
       </VCol>
 
-      <VCol
-        cols="12"
-        sm="6"
-      >
-        <VCard
-          color="primary"
-          variant="tonal"
-        >
-          <VCardText class="d-flex align-center gap-4">
-            <VAvatar
-              color="primary"
-              size="56"
-              rounded
-            >
-              <VIcon
-                icon="bx-credit-card"
-                size="32"
-              />
-            </VAvatar>
-            <div class="flex-grow-1">
-              <div class="text-caption text-medium-emphasis">
-                {{ t('Bank (cards)') }}
-              </div>
-              <div
-                v-if="accounts.BANK"
-                class="text-h4 font-weight-bold"
-              >
-                {{ formatCurrency(accounts.BANK.balance ?? 0) }}
-              </div>
-              <div
-                v-else
-                class="sk-box my-1"
-                style="width:140px;height:28px;border-radius:4px;"
-              />
-              <div
-                v-if="accounts.BANK?.last_updated"
-                class="text-caption text-disabled"
-              >
-                {{ t('Updated') }}: {{ formatDate(accounts.BANK.last_updated) }}
-              </div>
-            </div>
-          </VCardText>
-        </VCard>
+      <VCol cols="12" sm="6">
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-primary"><VIcon icon="bx-credit-card" size="20" /></div>
+            <div class="kpi-card__label">{{ t('Bank (cards)') }}</div>
+          </div>
+          <div v-if="accounts.BANK" class="kpi-card__value num-tabular">
+            {{ formatCurrency(accounts.BANK.balance ?? 0) }}<span class="kpi-card__unit">UZS</span>
+          </div>
+          <div v-else class="sk-box my-1" style="width:140px;height:28px;border-radius:4px;" />
+          <div v-if="accounts.BANK?.last_updated" class="kpi-card__sub">
+            {{ t('Updated') }}: {{ formatDate(accounts.BANK.last_updated) }}
+          </div>
+        </div>
       </VCol>
     </VRow>
 
     <!-- History card -->
     <VCard>
       <VCardText class="d-flex align-center gap-3 py-3 flex-wrap">
-        <span class="text-h6">{{ t('Ledger') }}</span>
         <VSpacer />
         <VSelect
           v-model="accountFilter"
@@ -348,6 +296,7 @@ function deltaDisplay(t: any) {
         </template>
         <template #item.account="{ item }">
           <VChip
+            class="status-pill"
             size="x-small"
             :color="item.raw.account === 'SAFE' ? 'success' : 'primary'"
             variant="tonal"
@@ -357,6 +306,7 @@ function deltaDisplay(t: any) {
         </template>
         <template #item.type="{ item }">
           <VChip
+            class="status-pill"
             size="small"
             :color="txnTypeColor[item.raw.type] ?? 'default'"
             variant="tonal"
@@ -366,18 +316,18 @@ function deltaDisplay(t: any) {
         </template>
         <template #item.delta="{ item }">
           <span
-            class="font-weight-medium"
+            class="font-weight-medium num-tabular"
             :class="deltaDisplay(item.raw).color"
           >{{ deltaDisplay(item.raw).text }}</span>
           <div
             v-if="Number(item.raw.fee ?? 0) > 0"
-            class="text-caption text-disabled"
+            class="text-caption text-disabled num-tabular"
           >
             {{ t('Fee') }}: {{ formatCurrency(item.raw.fee) }}
           </div>
         </template>
         <template #item.balance_after="{ item }">
-          {{ formatCurrency(item.raw.balance_after) }}
+          <span class="num-tabular">{{ formatCurrency(item.raw.balance_after) }}</span>
         </template>
         <template #item.category="{ item }">
           {{ item.raw.category || '—' }}
@@ -460,7 +410,7 @@ function deltaDisplay(t: any) {
             <VCol cols="12">
               <div class="d-flex justify-space-between text-body-2 px-2">
                 <span class="text-disabled">{{ t('Destination will receive') }}</span>
-                <span class="font-weight-bold">{{ formatCurrency(transferCredited) }}</span>
+                <span class="font-weight-bold num-tabular">{{ formatCurrency(transferCredited) }}</span>
               </div>
             </VCol>
           </VRow>

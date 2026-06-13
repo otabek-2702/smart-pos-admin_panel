@@ -218,40 +218,86 @@ async function doDelete() {
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
+          {{ t('Employees') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Staff directory, contracts and base pay') }}
+        </div>
+      </div>
+      <div class="page-head__actions">
+        <VBtn
+          color="primary"
+          prepend-icon="bx-plus"
+          @click="openCreate"
+        >
+          {{ t('New Employee') }}
+        </VBtn>
+      </div>
+    </div>
+
     <VRow class="mb-4">
       <VCol cols="6" sm="3">
-        <VCard>
-          <VCardText>
-            <div class="text-caption text-disabled">{{ t('Total') }}</div>
-            <div class="text-h5 font-weight-bold">
-              {{ stats?.total ?? '—' }}
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-primary">
+              <VIcon icon="bx-group" size="20" />
             </div>
-          </VCardText>
-        </VCard>
+            <div class="kpi-card__label">
+              {{ t('Total') }}
+            </div>
+          </div>
+          <div class="kpi-card__value">
+            {{ stats?.total ?? '—' }}
+          </div>
+        </div>
       </VCol>
       <VCol cols="6" sm="3">
-        <VCard>
-          <VCardText>
-            <div class="text-caption text-success">{{ t('Active') }}</div>
-            <div class="text-h5 font-weight-bold">{{ stats?.active ?? '—' }}</div>
-          </VCardText>
-        </VCard>
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-success">
+              <VIcon icon="bx-user-check" size="20" />
+            </div>
+            <div class="kpi-card__label">
+              {{ t('Active') }}
+            </div>
+          </div>
+          <div class="kpi-card__value">
+            {{ stats?.active ?? '—' }}
+          </div>
+        </div>
       </VCol>
       <VCol cols="6" sm="3">
-        <VCard>
-          <VCardText>
-            <div class="text-caption text-disabled">{{ t('Departments') }}</div>
-            <div class="text-h5 font-weight-bold">{{ stats?.departments ?? departments.length }}</div>
-          </VCardText>
-        </VCard>
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-info">
+              <VIcon icon="bx-buildings" size="20" />
+            </div>
+            <div class="kpi-card__label">
+              {{ t('Departments') }}
+            </div>
+          </div>
+          <div class="kpi-card__value">
+            {{ stats?.departments ?? departments.length }}
+          </div>
+        </div>
       </VCol>
       <VCol cols="6" sm="3">
-        <VCard>
-          <VCardText>
-            <div class="text-caption text-disabled">{{ t('Avg salary') }}</div>
-            <div class="text-h6 font-weight-bold">{{ formatCurrency(stats?.avg_salary ?? 0) }}</div>
-          </VCardText>
-        </VCard>
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-warning">
+              <VIcon icon="bx-money" size="20" />
+            </div>
+            <div class="kpi-card__label">
+              {{ t('Avg salary') }}
+            </div>
+          </div>
+          <div class="kpi-card__value">
+            {{ formatCurrency(stats?.avg_salary ?? 0) }}<span class="kpi-card__unit">UZS</span>
+          </div>
+        </div>
       </VCol>
     </VRow>
 
@@ -294,13 +340,6 @@ async function doDelete() {
           style="min-inline-size:140px;"
         />
         <VSpacer />
-        <VBtn
-          color="primary"
-          prepend-icon="bx-plus"
-          @click="openCreate"
-        >
-          {{ t('New Employee') }}
-        </VBtn>
       </VCardText>
 
       <VDataTableServer
@@ -333,12 +372,12 @@ async function doDelete() {
           {{ item.raw.department?.name ?? '—' }}
         </template>
         <template #item.contract_type="{ item }">
-          <VChip size="x-small" variant="tonal">
+          <VChip size="x-small" class="status-pill" color="info" variant="tonal">
             {{ item.raw.contract_type }}
           </VChip>
         </template>
         <template #item.base_salary="{ item }">
-          {{ formatCurrency(item.raw.base_salary) }}
+          <span class="num-tabular">{{ formatCurrency(item.raw.base_salary) }}</span>
         </template>
         <template #item.hire_date="{ item }">
           {{ formatDate(item.raw.hire_date) }}
@@ -346,6 +385,7 @@ async function doDelete() {
         <template #item.is_active="{ item }">
           <VChip
             size="small"
+            class="status-pill"
             :color="item.raw.is_active ? 'success' : 'default'"
             variant="tonal"
           >

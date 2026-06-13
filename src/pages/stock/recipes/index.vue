@@ -320,6 +320,7 @@ async function toggleActive(item: any) {
         </template>
         <template #item.recipe_type="{ item }">
           <VChip
+            class="status-pill"
             :color="typeColor[item.raw.recipe_type] ?? 'default'"
             size="small"
             variant="tonal"
@@ -331,10 +332,11 @@ async function toggleActive(item: any) {
           {{ item.raw.output_item_name ?? '—' }}
         </template>
         <template #item.output_quantity="{ item }">
-          {{ item.raw.output_quantity }} {{ item.raw.output_unit ?? '' }}
+          <span class="num-tabular">{{ item.raw.output_quantity }}</span> {{ item.raw.output_unit ?? '' }}
         </template>
         <template #item.is_active="{ item }">
           <VChip
+            class="status-pill"
             :color="item.raw.is_active ? 'success' : 'default'"
             size="small"
             variant="tonal"

@@ -35,6 +35,7 @@ const typeColor: Record<string, string> = {
       <VCardText>
         <div class="d-flex gap-2 mb-3 flex-wrap">
           <VChip
+            class="status-pill"
             :color="typeColor[recipe.recipe_type] ?? 'default'"
             size="small"
             variant="tonal"
@@ -43,6 +44,7 @@ const typeColor: Record<string, string> = {
           </VChip>
           <VChip
             v-if="recipe.version"
+            class="status-pill"
             color="secondary"
             size="small"
             variant="tonal"
@@ -52,7 +54,7 @@ const typeColor: Record<string, string> = {
         </div>
         <div class="mb-3">
           <span class="text-body-2 text-disabled">{{ t('Output') }}: </span>
-          <strong>{{ recipe.output_quantity }} {{ recipe.output_unit ?? '' }} {{ recipe.output_item?.name ?? recipe.output_item_name ?? '' }}</strong>
+          <strong><span class="num-tabular">{{ recipe.output_quantity }}</span> {{ recipe.output_unit ?? '' }} {{ recipe.output_item?.name ?? recipe.output_item_name ?? '' }}</strong>
         </div>
         <p class="text-overline text-disabled mb-1">
           {{ t('Ingredients') }}
@@ -71,7 +73,7 @@ const typeColor: Record<string, string> = {
               :key="idx"
             >
               <td>{{ ing.stock_item?.name ?? '—' }}</td>
-              <td>{{ ing.quantity }}</td>
+              <td class="num-tabular">{{ ing.quantity }}</td>
               <td>{{ ing.unit ?? '—' }}</td>
             </tr>
             <tr v-if="!(recipe.ingredients?.length)">

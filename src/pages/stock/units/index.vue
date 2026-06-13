@@ -272,6 +272,7 @@ const baseUnitOptions = computed(() =>
 
         <template #item.unit_type="{ item }">
           <VChip
+            class="status-pill"
             :color="typeColor[item.raw.unit_type] ?? 'default'"
             size="small"
             variant="tonal"
@@ -282,6 +283,7 @@ const baseUnitOptions = computed(() =>
         <template #item.is_base_unit="{ item }">
           <VChip
             v-if="item.raw.is_base_unit"
+            class="status-pill"
             color="primary"
             size="small"
             variant="tonal"
@@ -294,10 +296,11 @@ const baseUnitOptions = computed(() =>
           >{{ item.raw.base_unit?.short_name ?? '—' }}</span>
         </template>
         <template #item.conversion_factor="{ item }">
-          {{ item.raw.is_base_unit ? '1' : item.raw.conversion_factor }}
+          <span class="num-tabular">{{ item.raw.is_base_unit ? '1' : item.raw.conversion_factor }}</span>
         </template>
         <template #item.is_active="{ item }">
           <VChip
+            class="status-pill"
             :color="item.raw.is_active ? 'success' : 'default'"
             size="small"
             variant="tonal"

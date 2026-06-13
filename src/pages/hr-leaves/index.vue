@@ -81,10 +81,16 @@ async function reject(l: any) {
 
 <template>
   <div>
-    <VCard>
-      <VCardText class="d-flex align-center gap-3 py-3 flex-wrap">
-        <span class="text-h6">{{ t('Leave Requests') }}</span>
-        <VSpacer />
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
+          {{ t('Leave Requests') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Approve or reject time-off requests') }}
+        </div>
+      </div>
+      <div class="page-head__actions">
         <VSelect
           v-model="statusFilter"
           :items="['PENDING', 'APPROVED', 'REJECTED', 'CANCELED']"
@@ -94,7 +100,10 @@ async function reject(l: any) {
           hide-details
           clearable
         />
-      </VCardText>
+      </div>
+    </div>
+
+    <VCard>
 
       <VDataTableServer
         :headers="headers"
@@ -124,11 +133,12 @@ async function reject(l: any) {
           {{ formatDate(item.raw.end_date) }}
         </template>
         <template #item.days="{ item }">
-          {{ item.raw.days_count ?? item.raw.duration ?? '—' }}
+          <span class="num-tabular">{{ item.raw.days_count ?? item.raw.duration ?? '—' }}</span>
         </template>
         <template #item.status="{ item }">
           <VChip
             size="small"
+            class="status-pill"
             :color="statusColor[item.raw.status] ?? 'default'"
             variant="tonal"
           >

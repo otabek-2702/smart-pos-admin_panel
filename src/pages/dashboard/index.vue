@@ -179,7 +179,10 @@ const todayDateLine = computed(() => {
 </script>
 
 <template>
-  <div class="page">
+  <div class="page" style="background: rgba(255,0,0,0.08); min-height: 400px; border: 2px dashed red;">
+    <div style="background: lime; color: black; padding: 10px; font-weight: 700; font-size: 18px;">
+      DEBUG: dashboard page IS rendering. If you see this, components below should also be visible.
+    </div>
     <AppPageHeader
       :title="t('Dashboard')"
       :subtitle="todayDateLine"

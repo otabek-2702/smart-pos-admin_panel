@@ -334,20 +334,9 @@ body {
   }
 }
 
-/* ---------- Delta chip ---------- */
-.delta {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  padding: 2px 7px 2px 5px;
-  border-radius: var(--r-pill);
-
-  &.is-up { color: rgb(var(--v-theme-success)); background: rgb(var(--v-theme-success-weak)); }
-  &.is-down { color: rgb(var(--v-theme-error)); background: rgb(var(--v-theme-error-weak)); }
-  &.is-flat { color: rgb(var(--v-theme-text-secondary)); background: rgb(var(--v-theme-neutral-weak)); }
-}
+/* Delta chip — see src/components/design/Delta.vue for the canonical
+   scoped styles. The global rule lives only here for old pages that still
+   render .delta directly (no component). New code should import Delta.vue. */
 
 /* ---------- Filter chip row ---------- */
 .filter-chips {

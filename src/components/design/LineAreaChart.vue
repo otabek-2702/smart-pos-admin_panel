@@ -35,7 +35,11 @@ const padR = 16
 const padT = 16
 const padB = 28
 
-const id = `chart-line-${Math.random().toString(36).slice(2, 8)}`
+let _gid = 0
+function nextId() {
+  return `chart-line-${++_gid}`
+}
+const id = nextId()
 
 const hover = ref<number | null>(null)
 const tip = ref<{ show: boolean; x: number; y: number }>({ show: false, x: 0, y: 0 })
@@ -87,7 +91,11 @@ const paths = computed(() => {
   return props.series.map((s, si) => {
     const pts = s.data.map((v, i) => [x(i), y(v)])
     const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ')
-    const area = `${line} L${x(props.categories.length - 1)} ${padT + ih.value} L${x(0)} ${padT + ih.value} Z`
+    // Close the area at the actual last data point, NOT categories.length-1 —
+    // a series shorter than categories.length would otherwise produce a
+    // triangular spike past the line's end.
+    const lastIdx = Math.max(0, s.data.length - 1)
+    const area = `${line} L${x(lastIdx)} ${padT + ih.value} L${x(0)} ${padT + ih.value} Z`
 
     return { si, series: s, line, area }
   })
@@ -95,12 +103,10 @@ const paths = computed(() => {
 
 function onBandEnter(i: number, e: MouseEvent) {
   hover.value = i
-  const rect = elRef.value?.getBoundingClientRect()
-  const yScreen = (rect?.top ?? 0) + y(props.series[0].data[i])
-  tip.value = { show: true, x: e.clientX, y: yScreen }
+  tip.value = { show: true, x: e.clientX, y: e.clientY }
 }
 function onBandMove(e: MouseEvent) {
-  tip.value = { ...tip.value, x: e.clientX, y: e.clientY }
+  tip.value = { show: true, x: e.clientX, y: e.clientY }
 }
 
 const tipRows = computed(() => {
@@ -108,11 +114,13 @@ const tipRows = computed(() => {
     return []
   const i = hover.value
 
-  return props.series.map(s => ({
-    color: s.color,
-    label: s.label,
-    value: fmtNum(s.data[i]),
-  }))
+  return props.series
+    .filter(s => Number.isFinite(s.data[i]))
+    .map(s => ({
+      color: s.color,
+      label: s.label,
+      value: fmtNum(s.data[i]),
+    }))
 })
 
 const tipTitle = computed(() => hover.value !== null ? props.categories[hover.value] : '')
@@ -215,16 +223,19 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
         stroke="rgb(var(--v-theme-border-strong))"
         stroke-width="1"
       />
-      <circle
-        v-for="(s, si) in (hover !== null ? series : [])"
-        :key="`hc${si}`"
-        :cx="x(hover!)"
-        :cy="y(s.data[hover!])"
-        r="4.5"
-        :fill="`rgb(var(--v-theme-surface))`"
-        :stroke="s.color"
-        stroke-width="2.5"
-      />
+      <template v-if="hover !== null">
+        <circle
+          v-for="(s, si) in series"
+          v-show="Number.isFinite(s.data[hover!])"
+          :key="`hc${si}`"
+          :cx="x(hover!)"
+          :cy="y(s.data[hover!] ?? 0)"
+          r="4.5"
+          :fill="`rgb(var(--v-theme-surface))`"
+          :stroke="s.color"
+          stroke-width="2.5"
+        />
+      </template>
 
       <!-- x labels -->
       <text

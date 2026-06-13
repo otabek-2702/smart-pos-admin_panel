@@ -28,12 +28,13 @@ async function load() {
 
     data.value = res.data?.data ?? res.data
   }
+  catch {
+    data.value = null
+  }
   finally {
     loading.value = false
   }
 }
-
-onMounted(load)
 
 const today = computed(() => data.value?.today ?? null)
 const paymentBreakdown = computed(() => data.value?.payment_breakdown_today ?? {})
@@ -114,13 +115,14 @@ const topProductInsight = computed(() => {
   return `${topProductsForChart.value[0].name} leads revenue`
 })
 
+// BE returns peak_hour as a bare integer 0-23 (or null) — NOT { hour, orders }.
+// See alpha_pos/admins/services/dashboard_service.py::_today_peak_hour.
 const peakHourLabel = computed(() => {
-  const p = today.value?.peak_hour
-  if (!p || p.hour === undefined || p.hour === null)
+  const h = today.value?.peak_hour
+  if (h === null || h === undefined)
     return null
-  const h = String(p.hour).padStart(2, '0')
 
-  return `${h}:00`
+  return `${String(h).padStart(2, '0')}:00`
 })
 
 const ordersByHourInsight = computed(() => {
@@ -150,12 +152,12 @@ async function loadRecentOrders() {
   }
 }
 
-onMounted(loadRecentOrders)
-
-const refresh = () => {
+onMounted(() => {
   load()
   loadRecentOrders()
-}
+})
+
+const refresh = () => Promise.all([load(), loadRecentOrders()])
 
 // ---- Empty placeholders for series the BE doesn't yet return.
 // Front-end shows a "No data" state — see docs/design-system.md for the
@@ -164,13 +166,9 @@ const revenueSeries = computed(() => [])
 const revenueCategories = computed<string[]>(() => [])
 const revenueTarget = computed(() => 0)
 const ordersByHourData = computed<any[]>(() => {
-  const peak = today.value?.peak_hour
-  if (!peak)
-    return []
-
-  // BE only returns the peak hour, not the full 24h breakdown. Display a single
-  // "peak" bar inline until the BE exposes a per-hour series.
-  return [{ label: String(peak.hour).padStart(2, '0'), value: peak.orders || 0, peak: true }]
+  // BE does not yet expose a per-hour orders series — only the peak hour
+  // integer. Show empty state until /api/admins/dashboard/orders-by-hour ships.
+  return []
 })
 
 const todayDateLine = computed(() => {
@@ -440,7 +438,11 @@ const todayDateLine = computed(() => {
               v-else
               :key="c.shift_id ?? c.name"
               class="clockin-row"
+              role="button"
+              tabindex="0"
               @click="router.push('/shifts-analytics')"
+              @keydown.enter="router.push('/shifts-analytics')"
+              @keydown.space.prevent="router.push('/shifts-analytics')"
             >
               <div class="avatar--sm">
                 {{ ((c.name ?? '?').trim()[0] || '?').toUpperCase() }}

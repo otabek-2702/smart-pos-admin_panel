@@ -58,7 +58,7 @@ export function fmtPct(n: number | null | undefined, digits = 1): string {
   if (n === null || n === undefined || Number.isNaN(n))
     return '—'
 
-  return n.toFixed(digits).replace(/\.0$/, '') + '%'
+  return n.toFixed(digits).replace(/\.?0+$/, '') + '%'
 }
 
 export function fmtDelta(n: number | null | undefined, digits?: number): string {
@@ -69,22 +69,36 @@ export function fmtDelta(n: number | null | undefined, digits?: number): string 
   return (n > 0 ? '+' : n < 0 ? '−' : '') + s
 }
 
-export function fmtTime(d: Date | string | number): string {
+function parseDate(d: Date | string | number | null | undefined): Date | null {
+  if (d === null || d === undefined || d === '')
+    return null
   const x = d instanceof Date ? d : new Date(d)
+
+  return Number.isNaN(x.getTime()) ? null : x
+}
+
+export function fmtTime(d: Date | string | number | null | undefined): string {
+  const x = parseDate(d)
+  if (!x)
+    return '—'
   const p = (v: number) => v < 10 ? `0${v}` : `${v}`
 
   return `${p(x.getHours())}:${p(x.getMinutes())}`
 }
 
-export function fmtDate(d: Date | string | number): string {
-  const x = d instanceof Date ? d : new Date(d)
+export function fmtDate(d: Date | string | number | null | undefined): string {
+  const x = parseDate(d)
+  if (!x)
+    return '—'
   const p = (v: number) => v < 10 ? `0${v}` : `${v}`
 
   return `${p(x.getDate())}.${p(x.getMonth() + 1)}.${x.getFullYear()}`
 }
 
-export function fmtDateTime(d: Date | string | number): string {
-  const x = d instanceof Date ? d : new Date(d)
+export function fmtDateTime(d: Date | string | number | null | undefined): string {
+  const x = parseDate(d)
+  if (!x)
+    return '—'
   const p = (v: number) => v < 10 ? `0${v}` : `${v}`
 
   return `${fmtDate(x)}, ${p(x.getHours())}:${p(x.getMinutes())}`

@@ -29,6 +29,14 @@ const STATUS_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'pr
 }
 
 const tone = computed(() => STATUS_TONE[props.value?.toUpperCase?.()] ?? 'neutral')
+
+const label = computed(() => {
+  if (!props.value)
+    return '—'
+  const v = String(props.value)
+
+  return v.charAt(0).toUpperCase() + v.slice(1).toLowerCase()
+})
 </script>
 
 <template>
@@ -36,6 +44,6 @@ const tone = computed(() => STATUS_TONE[props.value?.toUpperCase?.()] ?? 'neutra
     :tone="tone"
     :dot="dot"
   >
-    {{ value }}
+    {{ label }}
   </Badge>
 </template>

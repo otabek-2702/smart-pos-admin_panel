@@ -49,24 +49,25 @@ const avgOrderValue = computed(() => {
 
 <template>
   <div>
-    <div class="d-flex align-center mb-4">
-      <div>
-        <div class="text-h5 font-weight-bold">
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
           {{ t("Today's Snapshot") }}
-        </div>
-        <div class="text-caption text-disabled">
+        </h1>
+        <div class="page-head__subtitle">
           {{ formatDate(new Date().toISOString()) }}
         </div>
       </div>
-      <VSpacer />
-      <VBtn
-        variant="tonal"
-        prepend-icon="bx-refresh"
-        :loading="loading"
-        @click="load"
-      >
-        {{ t('Refresh') }}
-      </VBtn>
+      <div class="page-head__actions">
+        <VBtn
+          variant="tonal"
+          prepend-icon="bx-refresh"
+          :loading="loading"
+          @click="load"
+        >
+          {{ t('Refresh') }}
+        </VBtn>
+      </div>
     </div>
 
     <VRow class="mb-4">
@@ -75,37 +76,27 @@ const avgOrderValue = computed(() => {
         sm="6"
         lg="3"
       >
-        <VCard>
-          <VCardText class="d-flex align-center gap-3">
-            <VAvatar
-              color="success"
-              variant="tonal"
-              size="48"
-              rounded
-            >
-              <VIcon
-                icon="bx-money"
-                size="24"
-              />
-            </VAvatar>
-            <div>
-              <div
-                v-if="today"
-                class="text-h5 font-weight-bold"
-              >
-                {{ formatCurrency(today.revenue ?? 0) }}
-              </div>
-              <div
-                v-else
-                class="sk-box mb-1"
-                style="width:100px;height:22px;border-radius:4px;"
-              />
-              <div class="text-body-2 text-disabled">
-                {{ t("Today's Revenue") }}
-              </div>
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-success">
+              <VIcon icon="bx-money" size="20" />
             </div>
-          </VCardText>
-        </VCard>
+            <div class="kpi-card__label">
+              {{ t("Today's Revenue") }}
+            </div>
+          </div>
+          <div
+            v-if="today"
+            class="kpi-card__value"
+          >
+            {{ formatCurrency(today.revenue ?? 0) }}<span class="kpi-card__unit">UZS</span>
+          </div>
+          <div
+            v-else
+            class="sk-box"
+            style="width:140px;height:32px;border-radius:4px;"
+          />
+        </div>
       </VCol>
 
       <VCol
@@ -113,37 +104,27 @@ const avgOrderValue = computed(() => {
         sm="6"
         lg="3"
       >
-        <VCard>
-          <VCardText class="d-flex align-center gap-3">
-            <VAvatar
-              color="primary"
-              variant="tonal"
-              size="48"
-              rounded
-            >
-              <VIcon
-                icon="bx-receipt"
-                size="24"
-              />
-            </VAvatar>
-            <div>
-              <div
-                v-if="today"
-                class="text-h5 font-weight-bold"
-              >
-                {{ today.orders ?? 0 }}
-              </div>
-              <div
-                v-else
-                class="sk-box mb-1"
-                style="width:50px;height:22px;border-radius:4px;"
-              />
-              <div class="text-body-2 text-disabled">
-                {{ t('Orders Today') }}
-              </div>
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-primary">
+              <VIcon icon="bx-receipt" size="20" />
             </div>
-          </VCardText>
-        </VCard>
+            <div class="kpi-card__label">
+              {{ t('Orders Today') }}
+            </div>
+          </div>
+          <div
+            v-if="today"
+            class="kpi-card__value"
+          >
+            {{ today.orders ?? 0 }}
+          </div>
+          <div
+            v-else
+            class="sk-box"
+            style="width:80px;height:32px;border-radius:4px;"
+          />
+        </div>
       </VCol>
 
       <VCol
@@ -151,37 +132,27 @@ const avgOrderValue = computed(() => {
         sm="6"
         lg="3"
       >
-        <VCard>
-          <VCardText class="d-flex align-center gap-3">
-            <VAvatar
-              color="info"
-              variant="tonal"
-              size="48"
-              rounded
-            >
-              <VIcon
-                icon="bx-trending-up"
-                size="24"
-              />
-            </VAvatar>
-            <div>
-              <div
-                v-if="today"
-                class="text-h5 font-weight-bold"
-              >
-                {{ formatCurrency(avgOrderValue) }}
-              </div>
-              <div
-                v-else
-                class="sk-box mb-1"
-                style="width:80px;height:22px;border-radius:4px;"
-              />
-              <div class="text-body-2 text-disabled">
-                {{ t('Avg Order Value') }}
-              </div>
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-info">
+              <VIcon icon="bx-trending-up" size="20" />
             </div>
-          </VCardText>
-        </VCard>
+            <div class="kpi-card__label">
+              {{ t('Avg Order Value') }}
+            </div>
+          </div>
+          <div
+            v-if="today"
+            class="kpi-card__value"
+          >
+            {{ formatCurrency(avgOrderValue) }}<span class="kpi-card__unit">UZS</span>
+          </div>
+          <div
+            v-else
+            class="sk-box"
+            style="width:120px;height:32px;border-radius:4px;"
+          />
+        </div>
       </VCol>
 
       <VCol
@@ -189,40 +160,34 @@ const avgOrderValue = computed(() => {
         sm="6"
         lg="3"
       >
-        <VCard
+        <div
+          class="kpi-card"
           :class="{ 'cursor-pointer': lowStock && lowStock > 0 }"
           @click="lowStock && lowStock > 0 && router.push('/stock/items')"
         >
-          <VCardText class="d-flex align-center gap-3">
-            <VAvatar
-              :color="lowStock && lowStock > 0 ? 'warning' : 'success'"
-              variant="tonal"
-              size="48"
-              rounded
+          <div class="kpi-card__top">
+            <div
+              class="kpi-card__icon"
+              :class="lowStock && lowStock > 0 ? 't-warning' : 't-success'"
             >
-              <VIcon
-                icon="bx-package"
-                size="24"
-              />
-            </VAvatar>
-            <div>
-              <div
-                v-if="lowStock !== null"
-                class="text-h5 font-weight-bold"
-              >
-                {{ lowStock }}
-              </div>
-              <div
-                v-else
-                class="sk-box mb-1"
-                style="width:40px;height:22px;border-radius:4px;"
-              />
-              <div class="text-body-2 text-disabled">
-                {{ t('Low Stock Items') }}
-              </div>
+              <VIcon icon="bx-package" size="20" />
             </div>
-          </VCardText>
-        </VCard>
+            <div class="kpi-card__label">
+              {{ t('Low Stock Items') }}
+            </div>
+          </div>
+          <div
+            v-if="lowStock !== null"
+            class="kpi-card__value"
+          >
+            {{ lowStock }}
+          </div>
+          <div
+            v-else
+            class="sk-box"
+            style="width:60px;height:32px;border-radius:4px;"
+          />
+        </div>
       </VCol>
     </VRow>
 

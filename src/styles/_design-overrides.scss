@@ -131,21 +131,27 @@ body {
   }
 }
 
-/* ---------- Topbar ---------- */
+/* ---------- Topbar ----------
+   Sneat's vertical-nav layout puts the visible surface on the INNER
+   `.navbar-content-container` (the outer `.layout-navbar` is a sticky
+   wrapper that holds floating-mode margin/padding around it). Paint the
+   inner only — painting the outer leaks the surface into the gap above
+   the navbar, which shows as a misplaced band.
+*/
 .layout-navbar {
-  background: rgb(var(--v-theme-surface)) !important;
-  border-block-end: 1px solid rgb(var(--v-theme-border));
+  background: transparent !important;
   box-shadow: none !important;
 
   .navbar-content-container {
     block-size: var(--topbar-h);
+    background: rgb(var(--v-theme-surface));
+    border-block-end: 1px solid rgb(var(--v-theme-border));
   }
 }
 
 /* Sneat's vertical-nav layout uses a "nav-header::after" decorative
    circle that bridges the sidebar to the navbar. With our new tokens it
-   sits behind the navbar and shows up as a light bump when the navbar is
-   semi-transparent. Hide it. */
+   sits behind the navbar and shows up as a light bump. Hide it. */
 .layout-vertical-nav .nav-header::after {
   display: none !important;
 }

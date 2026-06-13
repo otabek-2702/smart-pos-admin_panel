@@ -190,13 +190,21 @@ const PAYMENT_LABELS: Record<string, string> = {
   MIXED: 'Mixed',
 }
 
+function tokenColor(name: string, fallback: string): string {
+  if (typeof window === 'undefined')
+    return fallback
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+
+  return v || fallback
+}
+
 const PAYMENT_COLORS: Record<string, string> = {
-  CASH: '#4caf50',
-  UZCARD: '#2196f3',
-  HUMO: '#00bcd4',
-  PAYME: '#9c27b0',
-  CLICK: '#ff9800',
-  MIXED: '#9e9e9e',
+  CASH: tokenColor('--chart-cash', '#15935A'),
+  UZCARD: tokenColor('--chart-card', '#3A5BDB'),
+  HUMO: tokenColor('--c4', '#6E8BFF'),
+  PAYME: tokenColor('--c5', '#9AA3B2'),
+  CLICK: tokenColor('--chart-expense', '#E0823C'),
+  MIXED: tokenColor('--c5', '#9AA3B2'),
 }
 
 interface PaymentRow {
@@ -441,6 +449,7 @@ const skeletonCards = computed(() => Array.from({ length: 6 }))
                 </div>
               </div>
               <VChip
+                class="status-pill"
                 :color="statusColor[s.status] ?? 'default'"
                 size="small"
                 variant="flat"
@@ -486,7 +495,7 @@ const skeletonCards = computed(() => Array.from({ length: 6 }))
                 <div class="text-caption text-disabled">
                   {{ t('Orders') }}
                 </div>
-                <div class="text-h6 font-weight-bold">
+                <div class="text-h6 font-weight-bold font-mono num-tabular">
                   {{ s.total_orders ?? 0 }}
                 </div>
               </div>
@@ -495,7 +504,7 @@ const skeletonCards = computed(() => Array.from({ length: 6 }))
                 <div class="text-caption text-disabled">
                   {{ t('Gross') }}
                 </div>
-                <div class="text-h6 font-weight-bold">
+                <div class="text-h6 font-weight-bold font-mono num-tabular">
                   {{ formatCurrency(s.total_revenue ?? 0) }}
                 </div>
               </div>
@@ -504,7 +513,7 @@ const skeletonCards = computed(() => Array.from({ length: 6 }))
                 <div class="text-caption text-disabled">
                   {{ t('Net') }}
                 </div>
-                <div class="text-h6 font-weight-bold text-success">
+                <div class="text-h6 font-weight-bold text-success font-mono num-tabular">
                   {{ formatCurrency(netRevenue(s)) }}
                 </div>
               </div>

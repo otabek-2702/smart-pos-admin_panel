@@ -133,14 +133,21 @@ body {
 
 /* ---------- Topbar ---------- */
 .layout-navbar {
-  background: color-mix(in srgb, rgb(var(--v-theme-surface)) 78%, transparent) !important;
+  background: rgb(var(--v-theme-surface)) !important;
   border-block-end: 1px solid rgb(var(--v-theme-border));
-  backdrop-filter: blur(10px);
   box-shadow: none !important;
 
   .navbar-content-container {
     block-size: var(--topbar-h);
   }
+}
+
+/* Sneat's vertical-nav layout uses a "nav-header::after" decorative
+   circle that bridges the sidebar to the navbar. With our new tokens it
+   sits behind the navbar and shows up as a light bump when the navbar is
+   semi-transparent. Hide it. */
+.layout-vertical-nav .nav-header::after {
+  display: none !important;
 }
 
 /* ---------- Cards: lift to token shape ---------- */

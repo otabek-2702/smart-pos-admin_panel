@@ -219,6 +219,26 @@ async function toggleStatus(user: any) {
 
 <template>
   <div>
+    <div class="page-head">
+      <div>
+        <h1 class="page-head__title">
+          {{ t('Users') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Manage accounts, roles and access') }}
+        </div>
+      </div>
+      <div class="page-head__actions">
+        <VBtn
+          color="primary"
+          prepend-icon="bx-plus"
+          @click="openCreate"
+        >
+          {{ t('New User') }}
+        </VBtn>
+      </div>
+    </div>
+
     <UserStatsRow :stats="stats" />
 
     <VCard>
@@ -250,14 +270,6 @@ async function toggleStatus(user: any) {
           hide-details
           clearable
         />
-        <VSpacer />
-        <VBtn
-          color="primary"
-          prepend-icon="bx-plus"
-          @click="openCreate"
-        >
-          {{ t('New User') }}
-        </VBtn>
       </VCardText>
 
       <VDataTableServer
@@ -337,6 +349,9 @@ async function toggleStatus(user: any) {
           </tr>
         </template>
 
+        <template #item.id="{ item }">
+          <span class="text-mono text-tertiary num-tabular">#{{ item.raw.id }}</span>
+        </template>
         <template #item.name="{ item }">
           <div class="d-flex align-center gap-2">
             <VAvatar
@@ -351,8 +366,12 @@ async function toggleStatus(user: any) {
             </div>
           </div>
         </template>
+        <template #item.email="{ item }">
+          <span class="text-muted">{{ item.raw.email }}</span>
+        </template>
         <template #item.role="{ item }">
           <VChip
+            class="status-pill"
             size="small"
             :color="roleColors[item.raw.role] ?? 'default'"
             variant="tonal"
@@ -362,6 +381,7 @@ async function toggleStatus(user: any) {
         </template>
         <template #item.status="{ item }">
           <VChip
+            class="status-pill"
             size="small"
             :color="item.raw.status === 'ACTIVE' ? 'success' : 'default'"
             variant="tonal"
@@ -434,11 +454,36 @@ async function toggleStatus(user: any) {
 
     <VDialog
       v-model="dialogOpen"
-      max-width="560"
+      max-width="640"
       persistent
     >
-      <VCard :title="editing ? t('Edit User') : t('New User')">
-        <VCardText>
+      <VCard class="dlg">
+        <div class="dlg__head">
+          <div class="dlg__head-text">
+            <div class="dlg__title">
+              {{ editing ? t('Edit User') : t('New User') }}
+            </div>
+            <div class="dlg__subtitle">
+              {{ editing
+                ? t('Update details for') + ' ' + (editing.first_name || '') + ' ' + (editing.last_name || '')
+                : t('Create a new account and assign a role') }}
+            </div>
+          </div>
+          <VBtn
+            icon
+            variant="text"
+            size="small"
+            class="dlg__close"
+            @click="dialogOpen = false"
+          >
+            <VIcon
+              icon="bx-x"
+              size="20"
+            />
+          </VBtn>
+        </div>
+
+        <div class="dlg__body">
           <VRow>
             <VCol
               cols="12"
@@ -507,9 +552,9 @@ async function toggleStatus(user: any) {
               />
             </VCol>
           </VRow>
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
+        </div>
+
+        <div class="dlg__foot">
           <VBtn
             variant="text"
             @click="dialogOpen = false"
@@ -523,18 +568,56 @@ async function toggleStatus(user: any) {
           >
             {{ t('Save') }}
           </VBtn>
-        </VCardActions>
+        </div>
       </VCard>
     </VDialog>
 
     <VDialog
       v-model="deleteDialog"
-      max-width="420"
+      max-width="440"
     >
-      <VCard :title="t('Delete User')">
-        <VCardText>{{ t('Are you sure you want to delete this user?') }}</VCardText>
-        <VCardActions>
-          <VSpacer />
+      <VCard class="dlg">
+        <div class="dlg__head">
+          <div class="dlg__head-text">
+            <div class="dlg__title">
+              {{ t('Delete User') }}
+            </div>
+            <div class="dlg__subtitle">
+              {{ t('This action cannot be undone') }}
+            </div>
+          </div>
+          <VBtn
+            icon
+            variant="text"
+            size="small"
+            class="dlg__close"
+            @click="deleteDialog = false"
+          >
+            <VIcon
+              icon="bx-x"
+              size="20"
+            />
+          </VBtn>
+        </div>
+        <div class="dlg__body">
+          <div class="d-flex align-start gap-3">
+            <div class="kpi-card__icon t-error" style="flex:0 0 44px;inline-size:44px;block-size:44px;">
+              <VIcon
+                icon="bx-error"
+                size="22"
+              />
+            </div>
+            <div>
+              <div class="font-weight-semibold">
+                {{ t('Are you sure you want to delete this user?') }}
+              </div>
+              <div class="text-tertiary text-body-2 mt-1">
+                {{ t('This permanently revokes account access.') }}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dlg__foot">
           <VBtn
             variant="text"
             @click="deleteDialog = false"
@@ -547,7 +630,7 @@ async function toggleStatus(user: any) {
           >
             {{ t('Delete') }}
           </VBtn>
-        </VCardActions>
+        </div>
       </VCard>
     </VDialog>
 
@@ -560,6 +643,62 @@ async function toggleStatus(user: any) {
     </VSnackbar>
   </div>
 </template>
+
+<style lang="scss" scoped>
+.dlg {
+  border-radius: var(--r-lg);
+  overflow: hidden;
+
+  &__head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 20px 24px 14px;
+    border-block-end: 1px solid rgb(var(--v-theme-border));
+  }
+
+  &__head-text {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  &__title {
+    font-size: var(--fs-h3);
+    line-height: var(--lh-h3);
+    font-weight: var(--fw-bold);
+    letter-spacing: -0.01em;
+    color: rgb(var(--v-theme-on-surface));
+  }
+
+  &__subtitle {
+    color: rgb(var(--v-theme-text-secondary));
+    font-size: var(--fs-sm);
+    margin-block-start: 4px;
+  }
+
+  &__close {
+    margin-inline-start: auto;
+    flex: 0 0 auto;
+    color: rgb(var(--v-theme-text-tertiary));
+  }
+
+  &__body {
+    padding: 20px 24px;
+  }
+
+  &__foot {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 24px;
+    background: rgb(var(--v-theme-surface-2));
+    border-block-start: 1px solid rgb(var(--v-theme-border));
+    position: sticky;
+    inset-block-end: 0;
+  }
+}
+</style>
 
 <route lang="yaml">
 meta:

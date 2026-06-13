@@ -144,139 +144,133 @@ async function exportOneC() {
 
 <template>
   <div>
-    <!-- Stats row -->
+    <!-- Page head -->
+    <div class="page-head">
+      <div>
+        <h1 class="page-head__title">
+          {{ t('Orders') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Track, settle and reconcile every order') }}
+        </div>
+      </div>
+      <div class="page-head__actions">
+        <VBtn
+          color="primary"
+          prepend-icon="bx-export"
+          :disabled="!dateFrom || !dateTo"
+          @click="exportOneC"
+        >
+          {{ t('Export to 1C') }}
+        </VBtn>
+      </div>
+    </div>
+
+    <!-- KPI strip -->
     <VRow class="mb-4">
       <VCol
         cols="6"
         sm="3"
       >
-        <VCard>
-          <VCardText class="d-flex align-center gap-3">
-            <VAvatar
-              color="primary"
-              variant="tonal"
-              size="40"
-              rounded
-            >
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-primary">
               <VIcon icon="bx-receipt" />
-            </VAvatar>
-            <div>
-              <div
-                v-if="stats"
-                class="text-h6"
-              >
-                {{ stats.total_orders ?? '—' }}
-              </div>
-              <div
-                v-else
-                class="sk-box mb-1"
-                style="width:40px;height:20px;border-radius:4px;"
-              />
-              <div class="text-sm">
-                {{ t('Total') }}
-              </div>
             </div>
-          </VCardText>
-        </VCard>
+            <div class="kpi-card__label">
+              {{ t('Total') }}
+            </div>
+          </div>
+          <div
+            v-if="stats"
+            class="kpi-card__value"
+          >
+            {{ stats.total_orders ?? '—' }}
+          </div>
+          <div
+            v-else
+            class="sk-box"
+            style="width:60px;height:32px;border-radius:4px;"
+          />
+        </div>
       </VCol>
       <VCol
         cols="6"
         sm="3"
       >
-        <VCard>
-          <VCardText class="d-flex align-center gap-3">
-            <VAvatar
-              color="warning"
-              variant="tonal"
-              size="40"
-              rounded
-            >
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-warning">
               <VIcon icon="bx-time" />
-            </VAvatar>
-            <div>
-              <div
-                v-if="stats"
-                class="text-h6"
-              >
-                {{ stats.preparing_orders ?? '—' }}
-              </div>
-              <div
-                v-else
-                class="sk-box mb-1"
-                style="width:40px;height:20px;border-radius:4px;"
-              />
-              <div class="text-sm">
-                {{ t('Preparing') }}
-              </div>
             </div>
-          </VCardText>
-        </VCard>
+            <div class="kpi-card__label">
+              {{ t('Preparing') }}
+            </div>
+          </div>
+          <div
+            v-if="stats"
+            class="kpi-card__value"
+          >
+            {{ stats.preparing_orders ?? '—' }}
+          </div>
+          <div
+            v-else
+            class="sk-box"
+            style="width:60px;height:32px;border-radius:4px;"
+          />
+        </div>
       </VCol>
       <VCol
         cols="6"
         sm="3"
       >
-        <VCard>
-          <VCardText class="d-flex align-center gap-3">
-            <VAvatar
-              color="success"
-              variant="tonal"
-              size="40"
-              rounded
-            >
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-success">
               <VIcon icon="bx-check-double" />
-            </VAvatar>
-            <div>
-              <div
-                v-if="stats"
-                class="text-h6"
-              >
-                {{ stats.ready_orders ?? '—' }}
-              </div>
-              <div
-                v-else
-                class="sk-box mb-1"
-                style="width:40px;height:20px;border-radius:4px;"
-              />
-              <div class="text-sm">
-                {{ t('Ready') }}
-              </div>
             </div>
-          </VCardText>
-        </VCard>
+            <div class="kpi-card__label">
+              {{ t('Ready') }}
+            </div>
+          </div>
+          <div
+            v-if="stats"
+            class="kpi-card__value"
+          >
+            {{ stats.ready_orders ?? '—' }}
+          </div>
+          <div
+            v-else
+            class="sk-box"
+            style="width:60px;height:32px;border-radius:4px;"
+          />
+        </div>
       </VCol>
       <VCol
         cols="6"
         sm="3"
       >
-        <VCard>
-          <VCardText class="d-flex align-center gap-3">
-            <VAvatar
-              color="info"
-              variant="tonal"
-              size="40"
-              rounded
-            >
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-info">
               <VIcon icon="bx-money" />
-            </VAvatar>
-            <div>
-              <div
-                v-if="stats"
-                class="text-h6"
-              >
-                {{ formatCurrency(stats.total_revenue ?? 0) }}
-              </div>
-              <div
-                v-else
-                class="sk-box mb-1"
-                style="width:70px;height:20px;border-radius:4px;"
-              />
-              <div class="text-sm">
-                {{ t('Revenue') }}
-              </div>
             </div>
-          </VCardText>
-        </VCard>
+            <div class="kpi-card__label">
+              {{ t('Revenue') }}
+            </div>
+          </div>
+          <div
+            v-if="stats"
+            class="kpi-card__value"
+          >
+            {{ formatCurrency(stats.total_revenue ?? 0) }}
+          </div>
+          <div
+            v-else
+            class="sk-box"
+            style="width:110px;height:32px;border-radius:4px;"
+          />
+        </div>
       </VCol>
     </VRow>
 
@@ -311,6 +305,7 @@ async function exportOneC() {
           hide-details
           clearable
         />
+        <VSpacer />
         <VTextField
           v-model="dateFrom"
           type="date"
@@ -329,16 +324,77 @@ async function exportOneC() {
           style="min-inline-size: 150px; max-inline-size: 170px;"
           clearable
         />
-        <VSpacer />
-        <VBtn
-          variant="tonal"
-          color="info"
-          prepend-icon="bx-export"
-          :disabled="!dateFrom || !dateTo"
-          @click="exportOneC"
-        >
-          {{ t('Export to 1C') }}
-        </VBtn>
+      </VCardText>
+
+      <!-- Active filter chips -->
+      <VCardText
+        v-if="search || statusFilter.length || paymentFilter || dateFrom || dateTo"
+        class="pt-0"
+      >
+        <div class="filter-chips">
+          <span class="text-tertiary" style="font-size:13px;">{{ t('Filters') }}:</span>
+          <span
+            v-if="search"
+            class="filter-chip"
+          >
+            <span>{{ t('Search') }}: <b>{{ search }}</b></span>
+            <VIcon
+              icon="bx-x"
+              size="14"
+              style="cursor:pointer;"
+              @click="search = ''"
+            />
+          </span>
+          <span
+            v-for="s in statusFilter"
+            :key="s"
+            class="filter-chip"
+          >
+            <span>{{ t('Status') }}: <b>{{ s }}</b></span>
+            <VIcon
+              icon="bx-x"
+              size="14"
+              style="cursor:pointer;"
+              @click="statusFilter = statusFilter.filter(x => x !== s)"
+            />
+          </span>
+          <span
+            v-if="paymentFilter"
+            class="filter-chip"
+          >
+            <span>{{ t('Payment') }}: <b>{{ paymentFilter }}</b></span>
+            <VIcon
+              icon="bx-x"
+              size="14"
+              style="cursor:pointer;"
+              @click="paymentFilter = undefined"
+            />
+          </span>
+          <span
+            v-if="dateFrom"
+            class="filter-chip"
+          >
+            <span>{{ t('From') }}: <b>{{ dateFrom }}</b></span>
+            <VIcon
+              icon="bx-x"
+              size="14"
+              style="cursor:pointer;"
+              @click="dateFrom = ''"
+            />
+          </span>
+          <span
+            v-if="dateTo"
+            class="filter-chip"
+          >
+            <span>{{ t('To') }}: <b>{{ dateTo }}</b></span>
+            <VIcon
+              icon="bx-x"
+              size="14"
+              style="cursor:pointer;"
+              @click="dateTo = ''"
+            />
+          </span>
+        </div>
       </VCardText>
 
       <VDataTableServer
@@ -440,20 +496,21 @@ async function exportOneC() {
         </template>
 
         <template #item.display_id="{ item }">
-          <span class="font-weight-medium">#{{ item.raw.display_id ?? item.raw.id }}</span>
+          <span class="font-weight-semibold text-mono">#{{ item.raw.display_id ?? item.raw.id }}</span>
         </template>
         <template #item.order_type="{ item }">
           <VChip
             size="small"
-            color="secondary"
+            :color="item.raw.order_type === 'DELIVERY' ? 'info' : item.raw.order_type === 'PICKUP' ? 'primary' : 'default'"
             variant="tonal"
+            class="status-pill"
           >
             {{ item.raw.order_type }}
           </VChip>
         </template>
         <!-- phone for delivery, description for hall -->
         <template #item.info="{ item }">
-          <span class="text-body-2 text-disabled">
+          <span class="text-body-2 text-muted">
             {{ item.raw.phone_number && item.raw.phone_number !== '+998' ? item.raw.phone_number : (item.raw.description || '—') }}
           </span>
         </template>
@@ -462,6 +519,7 @@ async function exportOneC() {
             size="small"
             :color="statusColor[item.raw.status] ?? 'default'"
             variant="tonal"
+            class="status-pill"
           >
             {{ item.raw.status }}
           </VChip>
@@ -469,20 +527,21 @@ async function exportOneC() {
         <template #item.is_paid="{ item }">
           <VChip
             size="small"
-            :color="item.raw.is_paid ? 'success' : 'warning'"
+            :color="item.raw.is_paid ? 'success' : 'error'"
             variant="tonal"
+            class="status-pill"
           >
             {{ item.raw.is_paid ? t('PAID') : t('UNPAID') }}
           </VChip>
         </template>
         <template #item.total_amount="{ item }">
-          {{ formatCurrency(item.raw.total_amount ?? 0) }}
+          <span class="num-tabular font-weight-semibold">{{ formatCurrency(item.raw.total_amount ?? 0) }}</span>
         </template>
         <template #item.items_count="{ item }">
-          {{ item.raw.items_count ?? item.raw.items?.length ?? '—' }}
+          <span class="num-tabular text-muted">{{ item.raw.items_count ?? item.raw.items?.length ?? '—' }}</span>
         </template>
         <template #item.created_at="{ item }">
-          {{ formatDate(item.raw.created_at) }}
+          <span class="num-tabular text-muted">{{ formatDate(item.raw.created_at) }}</span>
         </template>
         <template #item.actions="{ item }">
           <div
@@ -534,17 +593,17 @@ async function exportOneC() {
         <template #expanded-row="{ item, columns }">
           <tr>
             <td :colspan="columns.length">
-              <div class="pa-3">
-                <div class="text-body-2 font-weight-medium mb-2">
+              <div class="expanded-wrap">
+                <div class="expanded-label">
                   {{ t('Order Items') }}
                 </div>
-                <VTable density="compact">
+                <VTable density="compact" class="expanded-table">
                   <thead>
                     <tr>
                       <th>{{ t('Product') }}</th>
-                      <th>{{ t('Qty') }}</th>
-                      <th>{{ t('Price') }}</th>
-                      <th>{{ t('Subtotal') }}</th>
+                      <th class="text-end">{{ t('Qty') }}</th>
+                      <th class="text-end">{{ t('Price') }}</th>
+                      <th class="text-end">{{ t('Subtotal') }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -552,15 +611,15 @@ async function exportOneC() {
                       v-for="(orderItem, idx) in ((item.raw.items ?? []) as any[])"
                       :key="idx"
                     >
-                      <td>{{ orderItem.product__name ?? '—' }}</td>
-                      <td>{{ orderItem.quantity ?? '—' }}</td>
-                      <td>{{ formatCurrency(orderItem.price ?? 0) }}</td>
-                      <td>{{ formatCurrency((Number(orderItem.price) || 0) * (orderItem.quantity ?? 1)) }}</td>
+                      <td class="font-weight-semibold">{{ orderItem.product__name ?? '—' }}</td>
+                      <td class="text-end num-tabular">{{ orderItem.quantity ?? '—' }}</td>
+                      <td class="text-end num-tabular text-muted">{{ formatCurrency(orderItem.price ?? 0) }}</td>
+                      <td class="text-end num-tabular font-weight-semibold">{{ formatCurrency((Number(orderItem.price) || 0) * (orderItem.quantity ?? 1)) }}</td>
                     </tr>
                     <tr v-if="!(item.raw.items?.length)">
                       <td
                         colspan="4"
-                        class="text-center text-disabled"
+                        class="text-center text-tertiary"
                       >
                         {{ t('No items') }}
                       </td>
@@ -583,6 +642,29 @@ async function exportOneC() {
     </VSnackbar>
   </div>
 </template>
+
+<style scoped lang="scss">
+.expanded-wrap {
+  padding: var(--sp-4);
+  background: rgb(var(--v-theme-surface-inset));
+}
+
+.expanded-label {
+  font-size: var(--fs-label);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: rgb(var(--v-theme-text-secondary));
+  margin-block-end: 10px;
+}
+
+.expanded-table {
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgb(var(--v-theme-border));
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+</style>
 
 <route lang="yaml">
 meta:

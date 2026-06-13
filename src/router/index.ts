@@ -13,7 +13,7 @@ const router = createRouter({
       path: '/',
       redirect: to => {
         if (isUserLoggedIn())
-          return { name: 'index', query: to.query }
+          return { name: 'dashboard', query: to.query }
 
         return { name: 'login', query: to.query }
       },

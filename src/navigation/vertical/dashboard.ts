@@ -2,7 +2,7 @@ export default [
   {
     title: 'Dashboard',
     icon: { icon: 'bx-home' },
-    to: 'index',
+    to: 'dashboard',
     action: 'manage',
     subject: 'all',
   },

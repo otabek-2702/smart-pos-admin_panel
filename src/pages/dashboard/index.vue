@@ -874,7 +874,6 @@ function titleCase(v: any): string {
   flex-direction: column;
   gap: 14px;
 }
-.hbar-row { }
 .hbar-head {
   display: flex;
   align-items: center;

@@ -9,14 +9,12 @@ export {}
 
 declare module '@vue/runtime-core' {
   export interface GlobalComponents {
-    AddAuthenticatorAppDialog: typeof import('./src/@core/components/AddAuthenticatorAppDialog.vue')['default']
     AppBarSearch: typeof import('./src/@core/components/AppBarSearch.vue')['default']
     AppCardActions: typeof import('./src/@core/components/AppCardActions.vue')['default']
     AppDateTimePicker: typeof import('./src/@core/components/AppDateTimePicker.vue')['default']
     AppDrawerHeaderSection: typeof import('./src/@core/components/AppDrawerHeaderSection.vue')['default']
     AppOtpInput: typeof import('./src/@core/components/AppOtpInput.vue')['default']
     AppPriceInput: typeof import('./src/@core/components/AppPriceInput.vue')['default']
-    AppSearchHeader: typeof import('./src/@core/components/AppSearchHeader.vue')['default']
     AppSkeleton: typeof import('./src/@core/components/AppSkeleton.vue')['default']
     CardStatisticsHorizontal: typeof import('./src/@core/components/CardStatisticsHorizontal.vue')['default']
     CardStatisticsTarget: typeof import('./src/@core/components/CardStatisticsTarget.vue')['default']

@@ -1,16 +1,7 @@
 /* ============================================================
    ALPHA POS — DESIGN TOKENS
-   Mirror of the design handoff bundle's tokens.css.
    High-contrast minimalism. Light-first, dark via [data-theme].
-
-   These raw CSS variables (--bg, --primary, --surface, etc.) are
-   intentionally kept as a parallel system to Vuetify's --v-theme-*
-   variables so design HTML/CSS from the handoff can be lifted into
-   components with minimal rewrites.
-
-   Vuetify theme keys (colors[primary], colors[surface], etc.) are
-   defined in src/plugins/vuetify/theme.ts and point at the SAME
-   underlying values — keep them in sync.
+   All values are named so they map 1:1 to Vuetify/Quasar theme keys.
    ============================================================ */
 
 :root {
@@ -134,12 +125,9 @@
 }
 
 /* ============================================================
-   DARK THEME — Vuetify drives the active theme via the [theme]
-   prop on <v-app>. We also accept [data-theme="dark"] on <html>
-   so the raw HTML prototype's [data-theme] mode-switch still works.
+   DARK THEME
    ============================================================ */
-[data-theme="dark"],
-.v-theme--dark {
+[data-theme="dark"] {
   --bg: #0E1219;
   --bg-subtle: #0A0D13;
   --surface: #161B24;
@@ -208,10 +196,3 @@
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6), 0 4px 10px rgba(0, 0, 0, 0.4);
   --shadow-focus: 0 0 0 3px var(--primary-ring);
 }
-
-/* ============================================================
-   Typography utilities — apply tabular numbers wherever the
-   handoff prototype expected them.
-   ============================================================ */
-.mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1; letter-spacing: -0.01em; }
-.num  { font-variant-numeric: tabular-nums; }

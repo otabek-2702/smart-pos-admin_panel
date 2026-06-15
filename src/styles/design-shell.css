@@ -1,18 +1,101 @@
 /* ============================================================
    ALPHA POS — design shell styles
    Ported from .tmp-design-bundle/project/styles/app.css.
-   Class names match the bundle 1:1 so design HTML can be lifted
-   into Vue components without renames.
+   Class names match the bundle 1:1.
 
-   The Sneat/Vuetify app shell (sidebar, topbar) already paints the
-   outer chrome — the .app/.sidebar/.topbar rules from the bundle
-   are intentionally OMITTED here so they don't fight the existing
-   layout. Everything else (page, btn, kpi, card, dtable, charts,
-   badges, etc.) is byte-identical to the bundle.
+   The shell selectors (.app, .sidebar, .main, .topbar, .iconbtn,
+   .avatar, .page) are owned by the new design layout
+   (src/layouts/design.vue + DesignSidebar.vue + DesignTopbar.vue).
+   Verified: no overlap with Sneat's layout-vertical-nav / layout-navbar
+   classes, so unscoped rules below are safe.
    ============================================================ */
 
 .mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1; letter-spacing: -0.01em; }
 .num  { font-variant-numeric: tabular-nums; }
+
+/* ---------- App layout ---------- */
+.app { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: var(--sidebar-w);
+  flex: 0 0 var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  position: sticky; top: 0; height: 100vh;
+  z-index: 30;
+}
+.sidebar__brand {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: 0 var(--sp-5); height: var(--topbar-h);
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 var(--topbar-h);
+}
+.sidebar__logo {
+  width: 32px; height: 32px; border-radius: var(--r-sm);
+  background: var(--primary); color: var(--on-primary);
+  display: grid; place-items: center; flex: 0 0 32px;
+  box-shadow: var(--shadow-xs);
+}
+.sidebar__name { font-weight: var(--fw-bold); font-size: 16px; letter-spacing: -0.01em; }
+.sidebar__name span { color: var(--primary); }
+.sidebar__nav { flex: 1; overflow-y: auto; padding: var(--sp-4) var(--sp-3); }
+.sidebar__nav::-webkit-scrollbar { width: 8px; }
+.sidebar__nav::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
+
+.nav-section {
+  font-size: var(--fs-micro); font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-label); text-transform: uppercase;
+  color: var(--text-tertiary); padding: var(--sp-4) var(--sp-3) var(--sp-2);
+}
+.nav-item {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: 9px var(--sp-3); border-radius: var(--r-sm);
+  color: var(--text-secondary); font-weight: var(--fw-medium);
+  cursor: pointer; user-select: none; position: relative;
+  transition: background .14s ease, color .14s ease;
+  font-size: var(--fs-body);
+}
+.nav-item:hover { background: var(--surface-2); color: var(--text); }
+.nav-item.is-active { background: var(--primary-weak); color: var(--primary); font-weight: var(--fw-semibold); }
+[data-theme="dark"] .nav-item.is-active { color: var(--primary-hover); }
+.nav-item.is-active::before {
+  content: ""; position: absolute; left: -12px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 20px; border-radius: 3px; background: var(--primary);
+}
+.nav-item__icon { width: 20px; height: 20px; flex: 0 0 20px; display: grid; place-items: center; }
+.nav-item__badge {
+  margin-left: auto; font-size: var(--fs-micro); font-weight: var(--fw-semibold);
+  background: var(--neutral-weak); color: var(--text-secondary);
+  padding: 1px 7px; border-radius: var(--r-pill);
+}
+.nav-item.is-active .nav-item__badge { background: var(--primary-weak-2); color: var(--primary); }
+.sidebar.is-collapsed { width: 74px; flex-basis: 74px; }
+.sidebar.is-collapsed .sidebar__brand { justify-content: center; padding: 0; }
+.sidebar.is-collapsed .nav-item { justify-content: center; padding: 9px; }
+.sidebar.is-collapsed .nav-item.is-active::before { left: -6px; }
+.sidebar.is-collapsed .sidebar__nav { padding: 16px 12px; }
+
+/* ---------- Main column ---------- */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.topbar {
+  height: var(--topbar-h); flex: 0 0 var(--topbar-h);
+  display: flex; align-items: center; gap: var(--sp-4);
+  padding: 0 var(--sp-7); background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 20;
+}
+.topbar__crumbs { display: flex; align-items: center; gap: var(--sp-2); color: var(--text-tertiary); font-size: var(--fs-sm); }
+.topbar__crumbs b { color: var(--text); font-weight: var(--fw-semibold); }
+.topbar__spacer { flex: 1; }
+.iconbtn {
+  width: 38px; height: 38px; border-radius: var(--r-sm); border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-secondary); display: grid; place-items: center;
+  cursor: pointer; transition: all .14s ease; position: relative;
+}
+.iconbtn:hover { background: var(--surface-2); color: var(--text); border-color: var(--border-strong); }
+.iconbtn__dot { position: absolute; top: 8px; right: 9px; width: 7px; height: 7px; border-radius: 99px; background: var(--error); border: 2px solid var(--surface); }
 
 .avatar {
   width: 36px; height: 36px; border-radius: var(--r-pill); flex: 0 0 36px;

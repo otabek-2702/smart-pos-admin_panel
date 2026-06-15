@@ -709,7 +709,10 @@ async function deleteCategory() {
 .categories-page {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 64px - 56px - 40px);
+  /* Old Sneat offset was 64+56+40 (navbar + page padding + footer). Under the
+     design layout the outer .page-shell already pads, so subtract only the
+     topbar + outer vertical padding. */
+  min-height: calc(100vh - var(--topbar-h, 64px) - var(--sp-6, 24px) - var(--sp-6, 24px));
 }
 
 /* ── Card grid ── */

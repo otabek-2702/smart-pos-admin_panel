@@ -387,6 +387,7 @@ onMounted(() => {
           >
             <template #append-inner>
               <VBtn
+                class="chat-send-btn"
                 color="primary"
                 :loading="sending"
                 :disabled="!input.trim()"
@@ -415,11 +416,17 @@ meta:
 
 <style scoped lang="scss">
 .ai-chat-page {
-  block-size: calc(100vh - 10rem);
+  // Old Sneat layout offset 10rem worked there but clips top under the new
+  // design layout. Use the design layout's topbar var instead so the chat
+  // column fills the visible content area exactly.
+  block-size: calc(100vh - var(--topbar-h, 64px) - var(--sp-6, 24px) - var(--sp-6, 24px));
+  display: flex;
+  flex-direction: column;
 }
 
 .ai-chat-card {
-  block-size: 100%;
+  flex: 1;
+  min-block-size: 0;
   overflow: hidden;
 }
 
@@ -430,6 +437,17 @@ meta:
 
 .empty-state {
   min-block-size: 100%;
+}
+
+// VTextField append-inner doesn't always vertical-center the action button on
+// density="comfortable". Force center alignment so the send icon sits on the
+// vertical midline of the input row.
+.chat-input :deep(.v-field__append-inner) {
+  align-items: center;
+  padding-block: 0;
+}
+.chat-send-btn {
+  align-self: center;
 }
 
 .suggestion-card {

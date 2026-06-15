@@ -21,7 +21,7 @@ onMounted(() => {
         v-model:date-range="dateRange"
         @toggle-sidebar="collapsed = !collapsed"
       />
-      <main style="flex:1;">
+      <main class="page-shell">
         <RouterView v-slot="{ Component }">
           <Transition name="fade" mode="out-in">
             <Component :is="Component" :date-range="dateRange" />
@@ -33,6 +33,17 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.page-shell {
+  flex: 1;
+  padding: var(--sp-6) var(--sp-7);
+  min-width: 0;
+}
+.page-shell > :deep(.page) {
+  padding: 0;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
 .fade-enter-active, .fade-leave-active { transition: opacity .15s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

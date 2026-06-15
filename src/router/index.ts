@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { isUserLoggedIn } from './utils'
 import routes from '~pages'
 import { canNavigate } from '@layouts/plugins/casl'
+import { armMotion, replayMotion } from '@/composables/useDesignMotion'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -20,6 +21,17 @@ const router = createRouter({
     },
     ...setupLayouts(routes),
   ],
+})
+
+// Arm the page-entrance motion as early as possible (bundle parity:
+// `armMotion` adds html.anim then html.anim.rin after 1200ms; transitions
+// resolve to the visible state even in hidden tabs).
+armMotion()
+
+// Replay the page-level entrance on every route change so KPI cards +
+// chart cards re-stagger their reveal — mirrors shell.jsx useEffect.
+router.afterEach(() => {
+  replayMotion()
 })
 
 router.beforeEach(to => {

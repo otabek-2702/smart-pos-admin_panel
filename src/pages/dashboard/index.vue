@@ -443,6 +443,27 @@ function initial(s: string | undefined | null): string {
     return '?'
   return (s.trim()[0] || '?').toUpperCase()
 }
+
+// ============================================================
+// Chart entrance animations (parity with .tmp-design-bundle/app/charts.jsx)
+// `useShown` flips true `delay` ms after mount via setTimeout — survives
+// hidden tabs because the resulting CSS transition resolves to its END
+// state when the engine wakes up. See src/composables/useDesignMotion.ts.
+// ============================================================
+const lineShown = useShown(140)
+const barShown = useShown(120)
+const donutShown = useShown(120)
+const hbarShown = useShown(140)
+
+// Count-up motion for the 4 top KPI numbers (ease-out-cubic, 900ms).
+const revenueTarget01 = computed(() => Number(today.value?.revenue ?? 0))
+const ordersTarget01 = computed(() => Number(today.value?.orders ?? 0))
+const lowStockTarget01 = computed(() => Number(lowStockCount.value ?? 0))
+const aovTarget01 = computed(() => Number(aov.value ?? 0))
+const revenueCounted = useCountUp(revenueTarget01)
+const ordersCounted = useCountUp(ordersTarget01)
+const lowStockCounted = useCountUp(lowStockTarget01)
+const aovCounted = useCountUp(aovTarget01)
 </script>
 
 <template>
@@ -483,7 +504,7 @@ function initial(s: string | undefined | null): string {
         </div>
         <div v-if="loading" class="skel" style="width:140px;height:30px;" />
         <div v-else class="kpi__value">
-          {{ fmtAbbr(Number(today?.revenue ?? 0)) }}<span class="kpi__unit">UZS</span>
+          {{ fmtAbbr(revenueCounted) }}<span class="kpi__unit">UZS</span>
         </div>
         <div class="kpi__foot">
           <span
@@ -511,7 +532,7 @@ function initial(s: string | undefined | null): string {
         </div>
         <div v-if="loading" class="skel" style="width:90px;height:30px;" />
         <div v-else class="kpi__value">
-          {{ fmtNum(Number(today?.orders ?? 0)) }}
+          {{ fmtNum(Math.round(ordersCounted)) }}
         </div>
         <div class="kpi__foot">
           <span
@@ -539,7 +560,7 @@ function initial(s: string | undefined | null): string {
         </div>
         <div v-if="loading" class="skel" style="width:130px;height:30px;" />
         <div v-else class="kpi__value">
-          {{ fmtAbbr(aov) }}<span class="kpi__unit">UZS</span>
+          {{ fmtAbbr(aovCounted) }}<span class="kpi__unit">UZS</span>
         </div>
         <div class="kpi__foot">
           <span
@@ -567,7 +588,7 @@ function initial(s: string | undefined | null): string {
         </div>
         <div v-if="loading" class="skel" style="width:70px;height:30px;" />
         <div v-else class="kpi__value">
-          {{ fmtNum(lowStockCount) }}
+          {{ fmtNum(Math.round(lowStockCounted)) }}
         </div>
         <div class="kpi__foot">
           <span class="kpi__subtext">{{ lowStockCount > 0 ? t('needs reorder') : t('all stocked') }}</span>
@@ -662,10 +683,10 @@ function initial(s: string | undefined | null): string {
                 <text :x="LINE_W - LINE_PAD_R" :y="lineY(revenueTarget) - 6" text-anchor="end" font-size="11" font-weight="600" fill="var(--chart-target)">{{ t('Daily target') }} {{ fmtAbbr(revenueTarget) }}</text>
               </g>
 
-              <!-- area + lines -->
-              <path :d="linePaths.revArea" :fill="`url(#${lineGradId})`" />
-              <path :d="linePaths.revLine" fill="none" stroke="var(--chart-revenue)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
-              <path :d="linePaths.expLine" fill="none" stroke="var(--chart-expense)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+              <!-- area + lines (spark-area / spark-line — entrance: stroke-dashoffset 1→0) -->
+              <path class="spark-area" :d="linePaths.revArea" :fill="`url(#${lineGradId})`" />
+              <path class="spark-line" :d="linePaths.revLine" path-length="1" :stroke-dasharray="1" :stroke-dashoffset="lineShown ? 0 : 1" fill="none" stroke="var(--chart-revenue)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+              <path class="spark-line" :d="linePaths.expLine" path-length="1" :stroke-dasharray="1" :stroke-dashoffset="lineShown ? 0 : 1" fill="none" stroke="var(--chart-expense)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
 
               <!-- crosshair + hover dots -->
               <g v-if="lineHover !== null">
@@ -738,7 +759,12 @@ function initial(s: string | undefined | null): string {
           </div>
           <div v-else class="row" style="gap: 24px; align-items: center; flex-wrap: wrap;">
             <div style="position: relative; flex: 0 0 auto;">
-              <svg :width="DONUT_SIZE" :height="DONUT_SIZE">
+              <svg
+                class="donut-in"
+                :width="DONUT_SIZE"
+                :height="DONUT_SIZE"
+                :style="{ opacity: donutShown ? 1 : 0, transform: donutShown ? 'none' : 'rotate(-10deg) scale(.9)' }"
+              >
                 <path
                   v-for="(a, i) in donutArcs"
                   :key="`da${i}`"
@@ -811,6 +837,7 @@ function initial(s: string | undefined | null): string {
               </g>
               <g v-for="(d, i) in ordersByHour" :key="`b${i}`">
                 <rect
+                  class="bar-rise"
                   :x="BAR_PAD_L + barBand * i + (barBand - barWidth) / 2"
                   :y="barY(Number(d.orders) || 0)"
                   :width="barWidth"
@@ -818,7 +845,7 @@ function initial(s: string | undefined | null): string {
                   rx="4"
                   :fill="d.peak ? 'var(--chart-revenue)' : (barHover === i ? 'var(--primary-hover)' : 'var(--c4)')"
                   :opacity="barHover !== null && barHover !== i && !d.peak ? 0.55 : 1"
-                  style="transition: opacity .12s;"
+                  :style="{ transition: 'opacity .12s ease, transform .6s cubic-bezier(.2,.8,.2,1)', transform: barShown ? 'scaleY(1)' : 'scaleY(0)', transitionDelay: `${(0.04 + i * 0.03).toFixed(3)}s` }"
                 />
                 <text
                   v-if="d.peak"
@@ -879,7 +906,7 @@ function initial(s: string | undefined | null): string {
             </div>
           </div>
           <div v-else style="display: flex; flex-direction: column; gap: 14px;">
-            <div v-for="(d, i) in topProductsForChart" :key="`hp${i}`">
+            <div v-for="(d, i) in topProductsForChart" :key="`hp${i}`" class="hbar-row">
               <div class="row between" style="margin-bottom: 6px;">
                 <span style="font-weight: 500; font-size: var(--fs-sm); display: flex; align-items: center; gap: 7px;">
                   <svg v-if="i === 0" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="color: var(--warning);"><path d="M12 2L14.6 8.6 21.5 9.1 16.2 13.5 17.8 20.3 12 16.7 6.2 20.3 7.8 13.5 2.5 9.1 9.4 8.6Z" /></svg>
@@ -889,13 +916,16 @@ function initial(s: string | undefined | null): string {
                 <span class="mono" style="font-weight: 700; font-size: var(--fs-sm);">{{ fmtAbbr(d.value) }}</span>
               </div>
               <div style="height: 10px; border-radius: 99px; background: var(--chart-track); overflow: hidden;">
-                <div :style="{
-                  width: `${(d.value / topProductMax) * 100}%`,
-                  height: '100%',
-                  borderRadius: '99px',
-                  background: i === 0 ? 'var(--chart-revenue)' : 'var(--c4)',
-                  transition: 'width .5s cubic-bezier(.2,.8,.3,1)',
-                }" />
+                <div
+                  class="hbar-fill"
+                  :style="{
+                    width: `${hbarShown ? (d.value / topProductMax) * 100 : 0}%`,
+                    height: '100%',
+                    borderRadius: '99px',
+                    background: i === 0 ? 'var(--chart-revenue)' : 'var(--c4)',
+                    transitionDelay: `${(0.05 + i * 0.06).toFixed(2)}s`,
+                  }"
+                />
               </div>
             </div>
           </div>

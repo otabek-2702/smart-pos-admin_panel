@@ -312,6 +312,15 @@ const statusOptions = [
   { value: 'Awaiting cash', label: 'Awaiting cash' },
   { value: 'Reconciled', label: 'Reconciled' },
 ]
+
+// ============================================================
+// Count-up motion on the 4 summary KPI numbers.
+// See src/composables/useDesignMotion.ts and .tmp-design-bundle/app/anim.jsx.
+// ============================================================
+const activeCounted = useCountUp(() => Number(summary.value.active ?? 0))
+const awaitingCounted = useCountUp(() => Number(summary.value.awaiting ?? 0))
+const cashCounted = useCountUp(() => Number(summary.value.cashToReceive ?? 0))
+const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ?? 0)))
 </script>
 
 <template>
@@ -358,7 +367,7 @@ const statusOptions = [
         </div>
         <div v-if="loading" class="skel" style="width:60px;height:30px;" />
         <div v-else class="kpi__value">
-          {{ fmtNum(summary.active) }}
+          {{ fmtNum(Math.round(activeCounted)) }}
         </div>
         <div class="kpi__foot">
           <span class="kpi__subtext">{{ t('live shifts') }}</span>
@@ -379,7 +388,7 @@ const statusOptions = [
         </div>
         <div v-if="loading" class="skel" style="width:60px;height:30px;" />
         <div v-else class="kpi__value">
-          {{ fmtNum(summary.awaiting) }}
+          {{ fmtNum(Math.round(awaitingCounted)) }}
         </div>
         <div class="kpi__foot">
           <span class="kpi__subtext">{{ t('to reconcile') }}</span>
@@ -400,7 +409,7 @@ const statusOptions = [
         </div>
         <div v-if="loading" class="skel" style="width:140px;height:30px;" />
         <div v-else class="kpi__value">
-          {{ fmtAbbr(summary.cashToReceive) }}<span class="kpi__unit">UZS</span>
+          {{ fmtAbbr(cashCounted) }}<span class="kpi__unit">UZS</span>
         </div>
         <div class="kpi__foot">
           <span class="kpi__subtext">{{ t('across') }} {{ summary.awaiting }} {{ t('shifts') }}</span>
@@ -421,7 +430,7 @@ const statusOptions = [
         </div>
         <div v-if="loading" class="skel" style="width:110px;height:30px;" />
         <div v-else class="kpi__value" :style="{ color: summary.netVariance < 0 ? 'var(--error)' : summary.netVariance > 0 ? 'var(--success)' : 'var(--text)' }">
-          {{ summary.netVariance > 0 ? '+' : summary.netVariance < 0 ? '−' : '' }}{{ fmtAbbr(Math.abs(summary.netVariance)) }}
+          {{ summary.netVariance > 0 ? '+' : summary.netVariance < 0 ? '−' : '' }}{{ fmtAbbr(varCounted) }}
         </div>
         <div class="kpi__foot">
           <span class="kpi__subtext">{{ t('reconciled today') }}</span>

@@ -1,36 +1,38 @@
-<script lang="ts" setup>
-import { useSkins } from '@core/composable/useSkins'
-import { useThemeConfig } from '@core/composable/useThemeConfig'
+<script setup lang="ts">
+import DesignSidebar from '@/layouts/components/DesignSidebar.vue'
+import DesignTopbar from '@/layouts/components/DesignTopbar.vue'
 
-// @layouts plugin
-import { AppContentLayoutNav } from '@layouts/enums'
+const collapsed = ref(false)
+const dateRange = ref('14d')
 
-// const DefaultLayoutWithHorizontalNav = defineAsyncComponent(() => import('./components/DefaultLayoutWithHorizontalNav.vue'))
-const DefaultLayoutWithVerticalNav = defineAsyncComponent(() => import('./components/DefaultLayoutWithVerticalNav.vue'))
-
-const { width: windowWidth } = useWindowSize()
-const { appContentLayoutNav, switchToVerticalNavOnLtOverlayNavBreakpoint } = useThemeConfig()
-
-// ℹ️ This will switch to vertical nav when define breakpoint is reached when in horizontal nav layout
-// Remove below composable usage if you are not using horizontal nav layout in your app
-switchToVerticalNavOnLtOverlayNavBreakpoint(windowWidth)
-
-const { layoutAttrs, injectSkinClasses } = useSkins()
-
-injectSkinClasses()
+// Apply data-theme attr on mount so the design's [data-theme="dark"] CSS rules kick in.
+onMounted(() => {
+  const saved = localStorage.getItem('alphapos-theme')
+  if (saved === 'light' || saved === 'dark')
+    document.documentElement.setAttribute('data-theme', saved)
+})
 </script>
 
 <template>
-  <template v-if="appContentLayoutNav === AppContentLayoutNav.Vertical">
-    <DefaultLayoutWithVerticalNav v-bind="layoutAttrs" />
-  </template>
-  <template v-else>
-    <!-- <DefaultLayoutWithHorizontalNav v-bind="layoutAttrs" /> -->
-    <RouterView />
-  </template>
+  <div class="app">
+    <DesignSidebar :collapsed="collapsed" />
+    <div class="main">
+      <DesignTopbar
+        v-model:date-range="dateRange"
+        @toggle-sidebar="collapsed = !collapsed"
+      />
+      <main style="flex:1;">
+        <RouterView v-slot="{ Component }">
+          <Transition name="fade" mode="out-in">
+            <Component :is="Component" :date-range="dateRange" />
+          </Transition>
+        </RouterView>
+      </main>
+    </div>
+  </div>
 </template>
 
-<style lang="scss">
-// As we are using `layouts` plugin we need its styles to be imported
-@use "@layouts/styles/default-layout";
+<style scoped>
+.fade-enter-active, .fade-leave-active { transition: opacity .15s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

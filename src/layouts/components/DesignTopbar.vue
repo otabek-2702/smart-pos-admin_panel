@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { useTheme } from 'vuetify'
+import axios from '@/plugins/axios'
+import { initialAbility } from '@/plugins/casl/ability'
+import { useAppAbility } from '@/plugins/casl/useAppAbility'
 
 /* ============================================================
    Alpha POS — Design Topbar
@@ -23,7 +26,50 @@ const dateRange = computed({
 })
 
 const route = useRoute()
-const { t } = useI18n({ useScope: 'global' })
+const router = useRouter()
+const ability = useAppAbility()
+const { t, locale } = useI18n({ useScope: 'global' })
+
+/* ---------- Language switcher ---------- */
+interface Lang { code: string; label: string }
+const LANGS: Lang[] = [
+  { code: 'uz', label: 'O\'zbekcha' },
+  { code: 'ru', label: 'Русский' },
+  { code: 'en', label: 'English' },
+]
+const langOpen = ref(false)
+const langRoot = ref<HTMLElement | null>(null)
+const currentLangCode = computed(() => String(locale.value).toUpperCase())
+
+function pickLang(code: string) {
+  locale.value = code
+  localStorage.setItem('appLocale', code)
+  langOpen.value = false
+}
+
+/* ---------- Avatar dropdown ---------- */
+const avatarOpen = ref(false)
+const avatarRoot = ref<HTMLElement | null>(null)
+const userData = computed(() => {
+  try {
+    const raw = localStorage.getItem('userData')
+    return raw ? JSON.parse(raw) : {}
+  }
+  catch { return {} }
+})
+const userEmail = computed(() => userData.value?.email || '')
+const userRole = computed(() => userData.value?.role || '')
+
+async function logout() {
+  try { await axios.post('/auth-logout') }
+  catch { /* noop */ }
+  localStorage.removeItem('userData')
+  localStorage.removeItem('accessToken')
+  localStorage.removeItem('userAbilities')
+  ability.update(initialAbility)
+  avatarOpen.value = false
+  router.push('/login')
+}
 
 /* ---------- Date presets (verbatim from bundle) ----------
    Hard-coded date strings — we can't call `new Date()` here. */
@@ -143,10 +189,13 @@ function pickPreset(v: string) {
 }
 
 function onDocMousedown(e: MouseEvent) {
-  if (!dateRoot.value)
-    return
-  if (!dateRoot.value.contains(e.target as Node))
+  const target = e.target as Node
+  if (dateRoot.value && !dateRoot.value.contains(target))
     dateOpen.value = false
+  if (langRoot.value && !langRoot.value.contains(target))
+    langOpen.value = false
+  if (avatarRoot.value && !avatarRoot.value.contains(target))
+    avatarOpen.value = false
 }
 
 onMounted(() => {
@@ -291,23 +340,94 @@ onBeforeUnmount(() => {
       </svg>
     </button>
 
-    <button
-      class="iconbtn"
-      :title="t('Notifications')"
+    <!-- Language switcher -->
+    <div
+      ref="langRoot"
+      style="position: relative;"
     >
-      <!-- bell icon -->
-      <svg
-        class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+      <button
+        class="iconbtn"
+        :title="t('Language')"
+        style="inline-size:auto;padding:0 10px;font-weight:600;font-size:12px;letter-spacing:.04em;"
+        @click="langOpen = !langOpen"
       >
-        <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z" />
-        <path d="M10 19a2 2 0 0 0 4 0" />
-      </svg>
-      <span class="iconbtn__dot" />
-    </button>
+        {{ currentLangCode }}
+      </button>
+      <div
+        v-if="langOpen"
+        class="card"
+        style="position: absolute; right: 0; top: calc(100% + 6px); width: 170px; z-index: 40; box-shadow: var(--shadow-lg); padding: 6px;"
+      >
+        <div
+          v-for="l in LANGS"
+          :key="l.code"
+          class="nav-item"
+          :class="{ 'is-active': l.code === locale }"
+          style="border-radius: 8px;"
+          @click="pickLang(l.code)"
+        >
+          <span style="flex: 1;">{{ l.label }}</span>
+          <svg
+            v-if="l.code === locale"
+            class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+          >
+            <path d="m5 12 5 5 9-11" />
+          </svg>
+        </div>
+      </div>
+    </div>
 
-    <div class="avatar" :title="userName">
-      {{ initials }}
+    <!-- Avatar w/ dropdown (account + logout) -->
+    <div
+      ref="avatarRoot"
+      style="position: relative;"
+    >
+      <div
+        class="avatar"
+        style="cursor:pointer;"
+        :title="userName"
+        @click="avatarOpen = !avatarOpen"
+      >
+        {{ initials }}
+      </div>
+      <div
+        v-if="avatarOpen"
+        class="card"
+        style="position: absolute; right: 0; top: calc(100% + 8px); width: 240px; z-index: 40; box-shadow: var(--shadow-lg); padding: 8px;"
+      >
+        <div style="padding: 10px 12px;">
+          <div style="font-weight:var(--fw-semibold);font-size:var(--fs-body);color:var(--text);">
+            {{ userName }}
+          </div>
+          <div
+            v-if="userRole"
+            style="font-size:var(--fs-label);color:var(--text-tertiary);margin-top:2px;text-transform:uppercase;letter-spacing:var(--tracking-label);"
+          >
+            {{ userRole }}
+          </div>
+          <div
+            v-if="userEmail"
+            style="font-size:var(--fs-label);color:var(--text-secondary);margin-top:4px;"
+          >
+            {{ userEmail }}
+          </div>
+        </div>
+        <div class="hr" style="margin: 6px 0;" />
+        <div
+          class="nav-item"
+          style="border-radius:8px;color:var(--error);"
+          @click="logout"
+        >
+          <svg
+            class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+          >
+            <path d="M16 17l5-5-5-5M21 12H9M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          </svg>
+          <span>{{ t('Logout') }}</span>
+        </div>
+      </div>
     </div>
   </header>
 </template>

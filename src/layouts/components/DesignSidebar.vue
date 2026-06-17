@@ -17,9 +17,7 @@ const router = useRouter()
 const route = useRoute()
 
 const NAV: NavEntry[] = [
-  { type: 'item', id: 'design', label: 'Design System', icon: 'sliders', to: '/design-system' },
   { type: 'item', id: 'dashboard', label: 'Dashboard', icon: 'dashboard', to: '/dashboard' },
-  { type: 'item', id: 'analytics', label: 'Analytics', icon: 'chart', to: '/analytics/shift-handover' },
   { type: 'item', id: 'ai', label: 'AI Assistant', icon: 'ai', to: '/ai-assistant' },
   { type: 'item', id: 'shifts', label: 'Shifts', icon: 'clock', to: '/shifts-analytics', badge: '2' },
   { type: 'section', label: 'Management' },

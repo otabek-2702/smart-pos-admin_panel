@@ -1115,6 +1115,7 @@
   "Are you sure you want to delete": "Are you sure you want to delete?",
   "Password": "Password",
   "Logout": "Logout",
+  "Language": "Language",
   "Last login": "Last login",
   "welcome_to": "Welcome to {appName}!",
   "login_subtitle": "Sign in to your account to access the dashboard",

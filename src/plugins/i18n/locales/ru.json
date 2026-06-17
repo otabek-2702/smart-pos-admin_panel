@@ -504,6 +504,7 @@
   "Statistics": "Статистика",
   "Settings": "Настройки",
   "Logout": "Выйти",
+  "Language": "Язык",
   "welcome_to": "Добро пожаловать в {appName}!",
   "login_subtitle": "Войдите в аккаунт для доступа к панели управления",
   "login_btn": "Войти",

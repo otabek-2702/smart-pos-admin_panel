@@ -32,25 +32,21 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped>
-.page-shell {
-  /* Default padding for every routed page. Generous breathing room around
-     the content so pages don't hug the topbar or the sidebar edge — same
-     gap on every page makes the layout feel uniform. */
+<style>
+/* NOT scoped — page-shell wraps the routed page, so its rule must apply
+   regardless of which page is rendered. Same selector lives globally. */
+main.page-shell {
   flex: 1;
-  padding: var(--sp-7) var(--sp-8);  /* 32px top/bottom · 40px left/right */
+  /* Generous breathing room: 32px top/bottom · 40px left/right. */
+  padding: var(--sp-7, 32px) var(--sp-8, 40px);
   min-width: 0;
-  /* Allow pages whose root sets block-size: 100% (e.g. chat layouts) to fill
-     the full content area. Children get a definite height via flex:1. */
   display: flex;
   flex-direction: column;
 }
-/* Routed children inherit the padded box automatically — width is whatever
-   the page sets. No forced 100% (broke flex layouts like the AI chat). */
-.page-shell > :deep(.page) {
-  /* Pages built with their own .page wrapper (dashboard, shifts-analytics)
-     already provide padding + max-width; cancel the outer padding so they
-     don't double up. */
+/* Pages built with their own .page wrapper (dashboard, shifts-analytics)
+   already provide padding + max-width; cancel the outer padding so they
+   don't double up. */
+main.page-shell > .page {
   padding: 0;
   max-width: 1440px;
   margin: 0 auto;

@@ -32,16 +32,15 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped>
-.page-shell {
+<style>
+main.page-shell {
   flex: 1;
-  padding: var(--sp-7) var(--sp-8);  /* 32px top/bottom · 40px left/right */
+  padding: var(--sp-7, 32px) var(--sp-8, 40px);
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
-/* Routed children inherit the padded box automatically. */
-.page-shell > :deep(.page) {
+main.page-shell > .page {
   padding: 0;
   max-width: 1440px;
   margin: 0 auto;

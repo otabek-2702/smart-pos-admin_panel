@@ -34,10 +34,11 @@ onMounted(() => {
 
 <style scoped>
 .page-shell {
-  /* Default padding for every routed page so non-redesigned pages
-     (any page without its own .page wrapper) don't hug the topbar. */
+  /* Default padding for every routed page. Generous breathing room around
+     the content so pages don't hug the topbar or the sidebar edge — same
+     gap on every page makes the layout feel uniform. */
   flex: 1;
-  padding: var(--sp-6) var(--sp-7);
+  padding: var(--sp-7) var(--sp-8);  /* 32px top/bottom · 40px left/right */
   min-width: 0;
   /* Allow pages whose root sets block-size: 100% (e.g. chat layouts) to fill
      the full content area. Children get a definite height via flex:1. */

@@ -35,7 +35,7 @@ onMounted(() => {
 <style scoped>
 .page-shell {
   flex: 1;
-  padding: var(--sp-6) var(--sp-7);
+  padding: var(--sp-7) var(--sp-8);  /* 32px top/bottom · 40px left/right */
   min-width: 0;
   display: flex;
   flex-direction: column;

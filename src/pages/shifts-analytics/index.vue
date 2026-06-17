@@ -265,6 +265,11 @@ function closeReceive() {
   receiving.value = null
 }
 
+const router = useRouter()
+function openReport(s: any) {
+  router.push({ path: '/analytics/shift-handover', query: { shift: String(s.id) } })
+}
+
 async function confirmReceive() {
   if (!receiving.value || countedParsed.value === null) return
   busy.value = true
@@ -730,9 +735,9 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               </svg>
               {{ t('Live report') }}
             </button>
-            <button class="btn btn--ghost">
+            <button class="btn btn--ghost" @click="openReport(s)">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" />
+                <polyline points="3 17 9 11 13 15 21 7" /><polyline points="15 7 21 7 21 13" />
               </svg>
               {{ t('End shift') }}
             </button>
@@ -744,7 +749,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               </svg>
               {{ t('Receive cash') }}
             </button>
-            <button class="btn btn--secondary">
+            <button class="btn btn--secondary" @click="openReport(s)">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 17 9 11 13 15 21 7" /><polyline points="15 7 21 7 21 13" />
               </svg>
@@ -758,7 +763,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               </svg>
               {{ t('Handover complete') }}
             </div>
-            <button class="btn btn--ghost">
+            <button class="btn btn--ghost" @click="openReport(s)">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 17 9 11 13 15 21 7" /><polyline points="15 7 21 7 21 13" />
               </svg>

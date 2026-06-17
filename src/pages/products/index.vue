@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import AppPriceInput from '@core/components/AppPriceInput.vue'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
 import axios from '@/plugins/axios'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -53,8 +51,25 @@ const form = ref({
   is_instant: false,
 })
 
-// Color picker
-const colorMenuOpen = ref(false)
+// Price input display (formatted with NBSP grouping)
+const priceDisplay = ref('')
+
+function fmtPrice(n: number): string {
+  if (!n)
+    return ''
+  return String(Math.trunc(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+}
+
+function onPriceInput(e: Event) {
+  const input = e.target as HTMLInputElement
+  const cleaned = input.value.replace(/\D/g, '')
+  const num = Number(cleaned) || 0
+  form.value.price = num
+  priceDisplay.value = cleaned === '' ? '' : fmtPrice(num)
+  nextTick(() => {
+    input.value = priceDisplay.value
+  })
+}
 
 // Characteristic colors
 const characteristicColors = computed(() => [
@@ -78,6 +93,7 @@ const previewColor = computed(() => {
   return categoryColorMap.value[form.value.category_id] || '#9e9e9e'
 })
 
+// Headers preserved (kept for parity with prior version)
 const headers = [
   { title: t('ID'), key: 'id', sortable: false, width: '60px' },
   { title: t('Name'), key: 'name', sortable: false },
@@ -145,9 +161,7 @@ watch(categoryFilter, () => {
 const initialForm = ref({ name: '', description: '', price: 0, category_id: null as number | null, color: '' })
 const isDirty = computed(() => JSON.stringify(form.value) !== JSON.stringify(initialForm.value))
 
-function tryCloseDialog(val: boolean) {
-  if (val)
-    return
+function tryCloseDialog() {
   if (isDirty.value) {
     notify(t('Unsaved changes! Use the close button to discard.'), 'warning')
 
@@ -161,6 +175,7 @@ function openCreate() {
   editingProduct.value = null
   form.value = { name: '', description: '', price: 0, category_id: null, color: '', is_instant: false }
   initialForm.value = { ...form.value }
+  priceDisplay.value = ''
   dialogOpen.value = true
 }
 
@@ -175,6 +190,7 @@ function openEdit(product: any) {
     is_instant: product.is_instant ?? false,
   }
   initialForm.value = { ...form.value }
+  priceDisplay.value = fmtPrice(form.value.price)
   dialogOpen.value = true
 }
 
@@ -227,244 +243,596 @@ async function deleteProduct() {
     notify(e?.response?.data?.message ?? t('Error deleting product'), 'error')
   }
 }
+
+// ---- Active filter chips ----
+const activeFilters = computed(() => {
+  const list: { k: string, label: string, val: string, clear: () => void }[] = []
+  if (search.value)
+    list.push({ k: 'q', label: t('Search'), val: search.value, clear: () => { search.value = '' } })
+  if (categoryFilter.value) {
+    const cat = categoriesList.value.find((c: any) => c.id === categoryFilter.value)
+    list.push({
+      k: 'c',
+      label: t('Category'),
+      val: cat?.name ?? String(categoryFilter.value),
+      clear: () => { categoryFilter.value = undefined },
+    })
+  }
+  return list
+})
+
+function clearAll() {
+  search.value = ''
+  categoryFilter.value = undefined
+}
+
+// ---- Pagination ----
+const totalPages = computed(() => Math.max(1, Math.ceil(totalProducts.value / itemsPerPage.value)))
+const pageStart = computed(() => totalProducts.value === 0 ? 0 : (page.value - 1) * itemsPerPage.value + 1)
+const pageEnd = computed(() => Math.min(totalProducts.value, page.value * itemsPerPage.value))
+
+const pageList = computed<(number | '…')[]>(() => {
+  const tp = totalPages.value
+  const cp = page.value
+  const arr: (number | '…')[] = []
+  if (tp <= 7) {
+    for (let i = 1; i <= tp; i++) arr.push(i)
+    return arr
+  }
+  const add = (n: number | '…') => arr.push(n)
+  add(1)
+  if (cp > 4) add('…')
+  const start = Math.max(2, cp - 1)
+  const end = Math.min(tp - 1, cp + 1)
+  for (let i = start; i <= end; i++) add(i)
+  if (cp < tp - 3) add('…')
+  add(tp)
+  return arr
+})
+
+function goPage(p: number | '…') {
+  if (p === '…' || p === page.value || p < 1 || p > totalPages.value)
+    return
+  page.value = p
+}
 </script>
 
 <template>
-  <div>
-    <div class="page-head">
+  <div class="page">
+    <!-- ============== HEAD ============== -->
+    <div class="page__head">
       <div style="min-width:0;">
-        <h1 class="page-head__title">
+        <h1 class="page__title">
           {{ t('Products') }}
         </h1>
-        <div class="page-head__subtitle">
+        <div class="page__subtitle">
           {{ t('Catalog of products served at the POS') }}
         </div>
       </div>
-      <div class="page-head__actions">
-        <VBtn
-          prepend-icon="bx-plus"
+      <div class="page__head-actions">
+        <button
+          class="btn btn--primary"
           @click="openCreate"
         >
+          <svg
+            class="ic"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line
+              x1="12"
+              y1="5"
+              x2="12"
+              y2="19"
+            />
+            <line
+              x1="5"
+              y1="12"
+              x2="19"
+              y2="12"
+            />
+          </svg>
           {{ t('Add Product') }}
-        </VBtn>
+        </button>
       </div>
     </div>
 
-    <VCard>
-      <!-- Toolbar — always shown -->
-      <VCardText class="d-flex flex-wrap gap-3 align-center py-3">
-        <VTextField
-          v-model="search"
-          :placeholder="t('Search')"
-          prepend-inner-icon="bx-search"
-          density="compact"
-          style="max-inline-size: 240px;"
-          hide-details
-          clearable
-        />
-        <VSelect
-          v-model="categoryFilter"
-          :items="categoryOptions"
-          :placeholder="t('All Categories')"
-          density="compact"
-          style="min-inline-size: 220px;"
-          hide-details
-          clearable
-        />
-      </VCardText>
-
-      <VDataTableServer
-        :headers="headers"
-        :items="products"
-        :items-length="totalProducts"
-        :loading="loading"
-        :items-per-page="itemsPerPage"
-        :page="page"
-      >
-        <!-- Custom footer with numbered pagination -->
-        <template #bottom>
-          <DataTableFooter
-            v-model:page="page"
-            v-model:items-per-page="itemsPerPage"
-            :total-items="totalProducts"
-          />
-        </template>
-
-        <!-- Skeleton rows on initial load -->
-        <template
-          v-if="loading && products.length === 0"
-          #body
+    <!-- ============== CARD ============== -->
+    <div class="card">
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div
+          class="grow"
+          style="max-width:280px;"
         >
-          <tr
-            v-for="n in itemsPerPage"
-            :key="n"
-            class="sk-row"
-          >
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:30px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div class="d-flex align-center gap-2">
-                <div
-                  class="sk-box"
-                  style="width:10px;height:10px;border-radius:50%;flex-shrink:0;"
-                />
-                <div
-                  class="sk-box"
-                  style="width:110px;height:13px;border-radius:4px;"
-                />
-              </div>
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:80px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div class="d-flex align-center gap-2">
-                <div
-                  class="sk-box"
-                  style="width:10px;height:10px;border-radius:3px;flex-shrink:0;"
-                />
-                <div
-                  class="sk-box"
-                  style="width:80px;height:22px;border-radius:12px;"
-                />
-              </div>
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:90px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td
-              class="sk-cell"
-              style="text-align:end;"
+          <div class="control">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
             >
-              <div class="d-flex justify-end gap-1">
-                <div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:50%;"
-                />
-                <div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:50%;"
-                />
-              </div>
-            </td>
-          </tr>
-        </template>
-
-        <template #item.id="{ item }">
-          <span class="text-sm text-disabled font-weight-medium">#{{ item.raw.id }}</span>
-        </template>
-
-        <template #item.name="{ item }">
-          <div class="d-flex align-center gap-2">
-            <div
-              :style="{ background: categoryColorMap[item.raw.category?.id] || 'rgba(var(--v-theme-on-surface),0.12)' }"
-              style="width:10px;height:10px;border-radius:3px;flex-shrink:0;"
-            />
-            <span class="font-weight-medium">{{ item.raw.name }}</span>
-            <VChip
-              v-if="item.raw.is_instant"
-              size="x-small"
-              color="warning"
-              variant="tonal"
-              prepend-icon="bx-bolt-circle"
+              <circle
+                cx="11"
+                cy="11"
+                r="8"
+              />
+              <line
+                x1="21"
+                y1="21"
+                x2="16.65"
+                y2="16.65"
+              />
+            </svg>
+            <input
+              v-model="search"
+              type="text"
+              :placeholder="t('Search')"
             >
-              {{ t('Instant') }}
-            </VChip>
           </div>
-        </template>
+        </div>
 
-        <template #item.price="{ item }">
-          <span class="font-weight-medium num-tabular">{{ formatCurrency(item.raw.price) }}</span>
-        </template>
+        <div style="width:220px;">
+          <div class="control control--select">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+            <select
+              v-model="categoryFilter"
+              :value="categoryFilter"
+            >
+              <option :value="undefined">
+                {{ t('All Categories') }}
+              </option>
+              <option
+                v-for="opt in categoryOptions"
+                :key="opt.value"
+                :value="opt.value"
+              >
+                {{ opt.title }}
+              </option>
+            </select>
+            <svg
+              class="ic chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
+        </div>
+      </div>
 
-        <template #item.category="{ item }">
-          <VChip
-            v-if="item.raw.category"
-            size="small"
-            variant="tonal"
-            :style="categoryColorMap[item.raw.category.id]
-              ? { backgroundColor: `${categoryColorMap[item.raw.category.id]}28`, color: categoryColorMap[item.raw.category.id] }
-              : {}"
-          >
-            {{ item.raw.category.name }}
-          </VChip>
+      <!-- Active filter chips -->
+      <div
+        v-if="activeFilters.length > 0"
+        class="toolbar"
+        style="padding-top:0;"
+      >
+        <div class="chips">
           <span
-            v-else
-            class="text-disabled"
-          >—</span>
-        </template>
-
-        <template #item.created_at="{ item }">
-          <span class="text-sm text-disabled">{{ formatDate(item.raw.created_at) }}</span>
-        </template>
-
-        <template #item.actions="{ item }">
-          <div
-            class="d-flex justify-end"
-            style="gap:2px;"
+            class="tertiary"
+            style="font-size:13px;margin-right:2px;"
+          >{{ t('Filters') }}:</span>
+          <span
+            v-for="f in activeFilters"
+            :key="f.k"
+            class="chip"
           >
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              @click="openEdit(item.raw)"
+            <span>{{ f.label }}: <b>{{ f.val }}</b></span>
+            <span
+              class="chip__x"
+              @click="f.clear()"
             >
-              <VIcon
-                icon="bx-edit"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
+              <svg
+                viewBox="0 0 24 24"
+                width="13"
+                height="13"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
               >
-                {{ t('Edit') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              color="error"
-              @click="confirmDelete(item.raw)"
-            >
-              <VIcon
-                icon="bx-trash"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Delete') }}
-              </VTooltip>
-            </VBtn>
-          </div>
-        </template>
-      </VDataTableServer>
-    </VCard>
+                <line
+                  x1="18"
+                  y1="6"
+                  x2="6"
+                  y2="18"
+                />
+                <line
+                  x1="6"
+                  y1="6"
+                  x2="18"
+                  y2="18"
+                />
+              </svg>
+            </span>
+          </span>
+          <button
+            class="chip--clear"
+            @click="clearAll"
+          >
+            {{ t('Clear all') }}
+          </button>
+        </div>
+      </div>
 
-    <!-- Create/Edit Dialog -->
-    <VDialog
-      :model-value="dialogOpen"
-      max-width="500"
-      @update:model-value="tryCloseDialog"
+      <div class="card__divider" />
+
+      <!-- Table -->
+      <div class="tablewrap">
+        <table class="dtable">
+          <thead>
+            <tr>
+              <th style="width:80px;">
+                {{ t('ID') }}
+              </th>
+              <th>{{ t('Name') }}</th>
+              <th>{{ t('Price') }}</th>
+              <th>{{ t('Category') }}</th>
+              <th>{{ t('Created') }}</th>
+              <th class="num">
+                {{ t('Actions') }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Skeleton rows -->
+            <template v-if="loading && products.length === 0">
+              <tr
+                v-for="n in itemsPerPage"
+                :key="`sk-${n}`"
+              >
+                <td>
+                  <div
+                    class="skel"
+                    style="width:30px;height:13px;"
+                  />
+                </td>
+                <td>
+                  <div
+                    class="row"
+                    style="gap:8px;"
+                  >
+                    <div
+                      class="skel"
+                      style="width:10px;height:10px;border-radius:50%;flex:0 0 10px;"
+                    />
+                    <div
+                      class="skel"
+                      style="width:140px;height:13px;"
+                    />
+                  </div>
+                </td>
+                <td>
+                  <div
+                    class="skel"
+                    style="width:80px;height:13px;"
+                  />
+                </td>
+                <td>
+                  <div
+                    class="skel"
+                    style="width:90px;height:22px;border-radius:12px;"
+                  />
+                </td>
+                <td>
+                  <div
+                    class="skel"
+                    style="width:90px;height:13px;"
+                  />
+                </td>
+                <td>
+                  <div
+                    class="row"
+                    style="justify-content:flex-end;gap:4px;"
+                  >
+                    <div
+                      class="skel"
+                      style="width:28px;height:28px;border-radius:50%;"
+                    />
+                    <div
+                      class="skel"
+                      style="width:28px;height:28px;border-radius:50%;"
+                    />
+                  </div>
+                </td>
+              </tr>
+            </template>
+
+            <!-- Empty -->
+            <tr v-else-if="!loading && products.length === 0">
+              <td
+                colspan="6"
+                style="padding:0;"
+              >
+                <div class="statefill">
+                  <div class="statefill__icon">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="24"
+                      height="24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+                      <line
+                        x1="3"
+                        y1="6"
+                        x2="21"
+                        y2="6"
+                      />
+                      <path d="M16 10a4 4 0 0 1-8 0" />
+                    </svg>
+                  </div>
+                  <div class="statefill__title">
+                    {{ t('No products match your filters') }}
+                  </div>
+                  <div
+                    v-if="activeFilters.length > 0"
+                    style="margin-top:12px;"
+                  >
+                    <button
+                      class="btn btn--secondary btn--sm"
+                      @click="clearAll"
+                    >
+                      {{ t('Clear all') }}
+                    </button>
+                  </div>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Real rows -->
+            <tr
+              v-for="p in products"
+              v-else
+              :key="p.id"
+            >
+              <td>
+                <span class="mono cell-muted">#{{ p.id }}</span>
+              </td>
+              <td>
+                <div
+                  class="row"
+                  style="gap:10px;"
+                >
+                  <div
+                    :style="{ background: categoryColorMap[p.category?.id] || 'var(--border-strong)' }"
+                    style="width:10px;height:10px;border-radius:3px;flex:0 0 10px;"
+                  />
+                  <span class="cell-strong">{{ p.name }}</span>
+                  <span
+                    v-if="p.is_instant"
+                    class="badge t-warning"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="11"
+                      height="11"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                    </svg>
+                    {{ t('Instant') }}
+                  </span>
+                </div>
+              </td>
+              <td>
+                <span class="mono cell-strong">{{ formatCurrency(p.price) }}</span>
+              </td>
+              <td>
+                <span
+                  v-if="p.category"
+                  class="badge t-neutral"
+                  :style="categoryColorMap[p.category.id]
+                    ? { backgroundColor: `${categoryColorMap[p.category.id]}28`, color: categoryColorMap[p.category.id], borderColor: `${categoryColorMap[p.category.id]}40` }
+                    : {}"
+                >
+                  {{ p.category.name }}
+                </span>
+                <span
+                  v-else
+                  class="tertiary"
+                >—</span>
+              </td>
+              <td>
+                <span class="mono cell-muted nowrap">{{ formatDate(p.created_at) }}</span>
+              </td>
+              <td>
+                <div
+                  class="row"
+                  style="justify-content:flex-end;gap:2px;"
+                >
+                  <button
+                    class="iconaction is-primary"
+                    :title="t('Edit')"
+                    @click="openEdit(p)"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5Z" />
+                    </svg>
+                  </button>
+                  <button
+                    class="iconaction is-danger"
+                    :title="t('Delete')"
+                    @click="confirmDelete(p)"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div
+        v-if="totalProducts > 0"
+        class="pagination"
+      >
+        <span class="muted">
+          {{ pageStart }}–{{ pageEnd }} {{ t('of') }} {{ totalProducts }}
+        </span>
+        <span class="pagination__spacer" />
+        <div class="pglist">
+          <button
+            class="pgbtn"
+            :disabled="page <= 1"
+            @click="goPage(page - 1)"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <button
+            v-for="(p, i) in pageList"
+            :key="`pg-${i}-${p}`"
+            class="pgbtn"
+            :class="{ 'is-active': p === page }"
+            :disabled="p === '…'"
+            @click="goPage(p)"
+          >
+            {{ p }}
+          </button>
+          <button
+            class="pgbtn"
+            :disabled="page >= totalPages"
+            @click="goPage(page + 1)"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== CREATE / EDIT MODAL ============== -->
+    <div
+      v-if="dialogOpen"
+      class="overlay"
+      @click.self="tryCloseDialog"
     >
-      <VCard :title="editingProduct ? t('Edit Product') : t('Add Product')">
-        <DialogCloseBtn @click="dialogOpen = false" />
-        <VCardText class="pb-2">
+      <div
+        class="modal"
+        style="max-width:560px;"
+      >
+        <div class="modal__head">
+          <div style="flex:1;min-width:0;">
+            <h2 class="modal__title">
+              {{ editingProduct ? t('Edit Product') : t('Add Product') }}
+            </h2>
+            <div class="modal__sub">
+              {{ editingProduct ? editingProduct.name : t('Catalog of products served at the POS') }}
+            </div>
+          </div>
+          <button
+            class="iconaction"
+            :title="t('Close')"
+            @click="tryCloseDialog"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line
+                x1="18"
+                y1="6"
+                x2="6"
+                y2="18"
+              />
+              <line
+                x1="6"
+                y1="6"
+                x2="18"
+                y2="18"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div class="modal__body">
           <!-- POS Preview -->
-          <div class="pos-preview mb-3">
-            <span class="text-caption text-disabled d-block mb-2">{{ t('POS Preview') }}</span>
+          <div class="pos-preview">
+            <span
+              class="field__label"
+              style="display:block;margin-bottom:8px;"
+            >{{ t('POS Preview') }}</span>
             <div class="pos-preview__cards">
               <div
                 class="pos-product-card"
@@ -485,157 +853,299 @@ async function deleteProduct() {
             </div>
           </div>
 
-          <VRow>
-            <VCol cols="12">
-              <VTextField
-                v-model="form.name"
-                :label="t('Name')"
-                density="compact"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VTextField
-                v-model="form.description"
-                :label="t('Description')"
-                density="compact"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VSwitch
-                v-model="form.is_instant"
-                :label="t('Instant — skip the kitchen / KDS')"
-                :hint="t('Cold drinks, packaged items, etc. Skips PREPARING; never appears on chef display.')"
-                persistent-hint
-                density="compact"
-                color="warning"
-              />
-            </VCol>
-            <VCol cols="6">
-              <AppPriceInput
-                v-model="form.price"
-                :label="t('Price')"
-                density="compact"
-              />
-            </VCol>
-            <VCol cols="6">
-              <VSelect
-                v-model="form.category_id"
-                :label="t('Category')"
-                :items="categoryOptions"
-                density="compact"
-                clearable
-              />
-            </VCol>
+          <div class="form-grid">
+            <div
+              class="field span-2"
+            >
+              <label class="field__label">{{ t('Name') }}</label>
+              <div class="control">
+                <input
+                  v-model="form.name"
+                  type="text"
+                >
+              </div>
+            </div>
 
-            <!-- Product color (characteristic) -->
-            <VCol cols="12">
-              <span class="text-caption text-disabled">{{ t('Product Color') }}</span>
-              <div class="char-colors mt-1">
-                <VTooltip
+            <div
+              class="field span-2"
+            >
+              <label class="field__label">{{ t('Description') }}</label>
+              <div class="control">
+                <input
+                  v-model="form.description"
+                  type="text"
+                >
+              </div>
+            </div>
+
+            <div
+              class="field span-2"
+            >
+              <label class="field__label">{{ t('Instant — skip the kitchen / KDS') }}</label>
+              <div
+                class="row"
+                style="gap:12px;justify-content:space-between;"
+              >
+                <span
+                  class="field__hint"
+                  style="flex:1;"
+                >{{ t('Cold drinks, packaged items, etc. Skips PREPARING; never appears on chef display.') }}</span>
+                <div
+                  class="switch"
+                  :class="{ 'is-on': form.is_instant }"
+                  @click="form.is_instant = !form.is_instant"
+                />
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field__label">{{ t('Price') }}</label>
+              <div class="control">
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  :value="priceDisplay"
+                  @input="onPriceInput"
+                >
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="field__label">{{ t('Category') }}</label>
+              <div class="control control--select">
+                <select v-model="form.category_id">
+                  <option :value="null">
+                    {{ t('All Categories') }}
+                  </option>
+                  <option
+                    v-for="opt in categoryOptions"
+                    :key="opt.value"
+                    :value="opt.value"
+                  >
+                    {{ opt.title }}
+                  </option>
+                </select>
+                <svg
+                  class="ic chev"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </div>
+            </div>
+
+            <div
+              class="field span-2"
+            >
+              <label class="field__label">{{ t('Product Color') }}</label>
+              <div class="char-colors">
+                <button
                   v-for="c in characteristicColors"
                   :key="c.key"
-                  location="top"
-                >
-                  <template #activator="{ props: tip }">
-                    <button
-                      v-bind="tip"
-                      type="button"
-                      class="char-dot"
-                      :class="{ 'char-dot--active': form.color === c.hex }"
-                      :style="{ backgroundColor: c.hex }"
-                      @click="form.color = form.color === c.hex ? '' : c.hex"
-                    />
-                  </template>
-                  {{ c.label }}
-                </VTooltip>
-
-                <!-- Custom color -->
-                <VMenu
-                  v-model="colorMenuOpen"
-                  :close-on-content-click="false"
-                  location="top"
-                >
-                  <template #activator="{ props: menuProps }">
-                    <VTooltip location="top">
-                      <template #activator="{ props: tip }">
-                        <button
-                          v-bind="{ ...menuProps, ...tip }"
-                          type="button"
-                          class="char-dot char-dot--custom"
-                          :class="{ 'char-dot--active': form.color && !characteristicColors.some(c => c.hex === form.color) }"
-                          :style="form.color && !characteristicColors.some(c => c.hex === form.color) ? { backgroundColor: form.color } : {}"
-                        >
-                          <VIcon
-                            icon="bx-palette"
-                            size="14"
-                          />
-                        </button>
-                      </template>
-                      {{ t('Custom') }}
-                    </VTooltip>
-                  </template>
-                  <VColorPicker
-                    v-model="form.color"
-                    mode="hex"
-                    :modes="['hex']"
-                    show-swatches
-                    elevation="0"
-                  />
-                </VMenu>
-
-                <!-- Clear -->
+                  type="button"
+                  class="char-dot"
+                  :class="{ 'char-dot--active': form.color === c.hex }"
+                  :style="{ backgroundColor: c.hex }"
+                  :title="c.label"
+                  @click="form.color = form.color === c.hex ? '' : c.hex"
+                />
                 <button
                   v-if="form.color"
                   type="button"
                   class="char-dot char-dot--clear"
+                  :title="t('Clear')"
                   @click="form.color = ''"
                 >
-                  <VIcon
-                    icon="bx-x"
-                    size="14"
-                  />
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="14"
+                    height="14"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <line
+                      x1="18"
+                      y1="6"
+                      x2="6"
+                      y2="18"
+                    />
+                    <line
+                      x1="6"
+                      y1="6"
+                      x2="18"
+                      y2="18"
+                    />
+                  </svg>
                 </button>
               </div>
-            </VCol>
-          </VRow>
-        </VCardText>
-        <VCardActions class="justify-end pt-0 pb-4 px-4">
-          <VBtn
-            :loading="dialogLoading"
+            </div>
+          </div>
+        </div>
+
+        <div class="modal__foot">
+          <button
+            class="btn btn--ghost"
+            :disabled="dialogLoading"
+            @click="tryCloseDialog"
+          >
+            {{ t('Cancel') }}
+          </button>
+          <button
+            class="btn btn--primary"
+            :class="{ 'is-loading': dialogLoading }"
+            :disabled="dialogLoading"
             @click="saveProduct"
           >
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
             {{ t('Save') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+          </button>
+        </div>
+      </div>
+    </div>
 
-    <!-- Delete Confirm Dialog -->
-    <VDialog
-      v-model="deleteDialog"
-      max-width="400"
+    <!-- ============== DELETE CONFIRM MODAL ============== -->
+    <div
+      v-if="deleteDialog"
+      class="overlay"
+      @click.self="deleteDialog = false"
     >
-      <VCard :title="t('Delete Product')">
-        <VCardText>{{ t('Are you sure you want to delete this product?') }}</VCardText>
-        <VCardActions class="justify-end">
-          <VBtn
-            variant="tonal"
-            color="secondary"
+      <div
+        class="modal"
+        style="max-width:440px;"
+      >
+        <div class="modal__head">
+          <div style="flex:1;min-width:0;">
+            <h2 class="modal__title">
+              {{ t('Delete Product') }}
+            </h2>
+          </div>
+          <button
+            class="iconaction"
+            :title="t('Close')"
+            @click="deleteDialog = false"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line
+                x1="18"
+                y1="6"
+                x2="6"
+                y2="18"
+              />
+              <line
+                x1="6"
+                y1="6"
+                x2="18"
+                y2="18"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div class="modal__body">
+          <div
+            class="row"
+            style="gap:14px;align-items:flex-start;"
+          >
+            <div
+              class="kpi__icon t-error"
+              style="width:44px;height:44px;flex:0 0 44px;"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                <line
+                  x1="12"
+                  y1="9"
+                  x2="12"
+                  y2="13"
+                />
+                <line
+                  x1="12"
+                  y1="17"
+                  x2="12.01"
+                  y2="17"
+                />
+              </svg>
+            </div>
+            <div>
+              <p style="margin:0;font-weight:600;">
+                {{ deletingProduct?.name }} {{ t('will be removed.') }}
+              </p>
+              <p
+                class="muted"
+                style="margin:6px 0 0;font-size:14px;"
+              >
+                {{ t('Are you sure you want to delete this product?') }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal__foot">
+          <button
+            class="btn btn--ghost"
             @click="deleteDialog = false"
           >
             {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="error"
+          </button>
+          <button
+            class="btn btn--danger"
             @click="deleteProduct"
           >
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
             {{ t('Delete') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+          </button>
+        </div>
+      </div>
+    </div>
 
-    <!-- Snackbar -->
+    <!-- Snackbar (Vuetify allowed off-page for global toast) -->
     <VSnackbar
       v-model="snackbar"
       :color="snackbarColor"
@@ -649,10 +1159,11 @@ async function deleteProduct() {
 <style scoped>
 /* ── POS Preview ── */
 .pos-preview {
-  background: rgba(var(--v-theme-on-surface), 0.04);
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  border-radius: 10px;
+  background: var(--surface-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   padding: 14px;
+  margin-bottom: var(--sp-4);
 }
 
 .pos-preview__cards {
@@ -707,10 +1218,11 @@ async function deleteProduct() {
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
-  transition: transform 0.12s, border-color 0.12s;
+  transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
 }
 
 .char-dot:hover {
@@ -718,18 +1230,14 @@ async function deleteProduct() {
 }
 
 .char-dot--active {
-  border-color: rgb(var(--v-theme-primary));
-  box-shadow: 0 0 0 2px rgba(var(--v-theme-primary), 0.3);
-}
-
-.char-dot--custom {
-  background: rgba(var(--v-theme-on-surface), 0.1);
-  color: rgba(var(--v-theme-on-surface), 0.6);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-weak-2);
 }
 
 .char-dot--clear {
-  background: rgba(var(--v-theme-on-surface), 0.08);
-  color: rgba(var(--v-theme-on-surface), 0.5);
+  background: var(--surface-inset);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
 }
 </style>
 

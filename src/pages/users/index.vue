@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import UserStatsRow from './UserStatsRow.vue'
-import { ROLE_COLOR as roleColors } from '@/constants/statusColors'
+/* ============================================================
+   USERS — accounts, roles, access
+   Ported 1:1 from .tmp-design-bundle/project/pages/Users.jsx
+   ============================================================ */
 import axios from '@/plugins/axios'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 
+// ============================================================
+// State (preserved from previous implementation)
+// ============================================================
 const users = ref<any[]>([])
 const totalUsers = ref(0)
 const loading = ref(false)
@@ -15,8 +19,8 @@ const stats = ref<any>(null)
 const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
-const roleFilter = ref<string | undefined>(undefined)
-const statusFilter = ref<string | undefined>(undefined)
+const roleFilter = ref<string>('')
+const statusFilter = ref<string>('')
 
 const dialogOpen = ref(false)
 const editing = ref<any>(null)
@@ -24,6 +28,7 @@ const dialogLoading = ref(false)
 
 const deleteDialog = ref(false)
 const deleting = ref<any>(null)
+const deleteBusy = ref(false)
 
 const roles = ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER', 'USER']
 const statuses = ['ACTIVE', 'SUSPENDED']
@@ -37,19 +42,55 @@ const form = ref({
   password: '',
 })
 
+const touched = ref<Record<string, boolean>>({})
+
 const isAdminRole = computed(() => form.value.role === 'ADMIN')
 const requiresEmail = computed(() => ['ADMIN', 'MANAGER'].includes(form.value.role))
 const isPinRole = computed(() => ['CASHIER', 'WAITER'].includes(form.value.role))
 
-const headers = computed(() => [
-  { title: t('ID'), key: 'id', sortable: false, width: '60px' },
-  { title: t('Name'), key: 'name', sortable: false },
-  { title: t('Email'), key: 'email', sortable: false },
-  { title: t('Role'), key: 'role', sortable: false },
-  { title: t('Status'), key: 'status', sortable: false },
-  { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
-])
+// ============================================================
+// Tone maps (mirror bundle's STATUS_TONE)
+// ============================================================
+const ROLE_TONE: Record<string, string> = {
+  ADMIN: 'primary',
+  MANAGER: 'primary',
+  CASHIER: 'info',
+  WAITER: 'info',
+  USER: 'neutral',
+}
+const STATUS_TONE: Record<string, string> = {
+  ACTIVE: 'success',
+  SUSPENDED: 'warning',
+  INACTIVE: 'neutral',
+}
 
+// ============================================================
+// Formatters
+// ============================================================
+const NB = ' ' // narrow no-break space
+function fmtNum(n: number | null | undefined): string {
+  if (n === null || n === undefined || Number.isNaN(Number(n))) return '—'
+  const neg = Number(n) < 0
+  const s = Math.round(Math.abs(Number(n))).toString().replace(/\B(?=(\d{3})+(?!\d))/g, NB)
+  return (neg ? '−' : '') + s
+}
+function fmtAbbr(n: number | null | undefined): string {
+  if (n === null || n === undefined || Number.isNaN(Number(n))) return '—'
+  const v = Number(n)
+  const a = Math.abs(v)
+  const trim2 = (x: number) => x.toFixed(2).replace(/\.?0+$/, '')
+  const trim1 = (x: number) => x.toFixed(1).replace(/\.0$/, '')
+  let out: string
+  if (a >= 1e9) out = `${trim2(a / 1e9)}B`
+  else if (a >= 1e6) out = `${trim2(a / 1e6)}M`
+  else if (a >= 1e3) out = `${trim1(a / 1e3)}K`
+  else out = String(Math.round(a))
+  return (v < 0 ? '−' : '') + out
+}
+
+// ============================================================
+// API — preserved from previous implementation
+// ============================================================
 async function loadUsers() {
   loading.value = true
   try {
@@ -67,11 +108,12 @@ async function loadUsers() {
     totalUsers.value = d?.pagination?.total_users ?? d?.pagination?.total ?? users.value.length
 
     // Derive light stats from list — backend doesn't expose /users/stats yet.
+    const distinctRoles = new Set(users.value.map((u: any) => u.role).filter(Boolean))
     stats.value = {
       total_users: totalUsers.value,
       active_users: users.value.filter((u: any) => u.status === 'ACTIVE').length,
-      total_departments: 0,
-      total_salary: 0,
+      total_roles: distinctRoles.size,
+      total_salary: users.value.reduce((s: number, u: any) => s + (Number(u.salary) || 0), 0),
     }
   }
   catch {
@@ -90,6 +132,9 @@ const debouncedSearch = useDebounceFn(() => { page.value = 1; loadUsers() }, 400
 watch(search, debouncedSearch)
 watch([roleFilter, statusFilter], () => { page.value = 1; loadUsers() })
 
+// ============================================================
+// Dialog
+// ============================================================
 function openCreate() {
   editing.value = null
   form.value = {
@@ -100,6 +145,7 @@ function openCreate() {
     status: 'ACTIVE',
     password: '',
   }
+  touched.value = {}
   dialogOpen.value = true
 }
 
@@ -124,7 +170,13 @@ function openEdit(user: any) {
     status: user.status ?? 'ACTIVE',
     password: '',
   }
+  touched.value = {}
   dialogOpen.value = true
+}
+
+function closeDialog() {
+  if (dialogLoading.value) return
+  dialogOpen.value = false
 }
 
 async function save() {
@@ -192,6 +244,7 @@ function confirmDelete(user: any) {
 async function doDelete() {
   if (!deleting.value)
     return
+  deleteBusy.value = true
   try {
     await axios.delete(`/users/${deleting.value.id}`)
     notify(t('User deleted'))
@@ -200,6 +253,9 @@ async function doDelete() {
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+  finally {
+    deleteBusy.value = false
   }
 }
 
@@ -215,425 +271,574 @@ async function toggleStatus(user: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
   }
 }
+
+// ============================================================
+// Filter chips
+// ============================================================
+const activeFilters = computed(() => {
+  const out: { k: string; label: string; val: string; clear: () => void }[] = []
+  if (search.value)
+    out.push({ k: 'q', label: t('Search'), val: search.value, clear: () => { search.value = '' } })
+  if (roleFilter.value)
+    out.push({ k: 'r', label: t('Role'), val: roleFilter.value, clear: () => { roleFilter.value = '' } })
+  if (statusFilter.value)
+    out.push({ k: 's', label: t('Status'), val: statusFilter.value, clear: () => { statusFilter.value = '' } })
+  return out
+})
+
+function clearAllFilters() {
+  search.value = ''
+  roleFilter.value = ''
+  statusFilter.value = ''
+}
+
+// ============================================================
+// Pagination helpers
+// ============================================================
+const totalPages = computed(() => Math.max(1, Math.ceil(totalUsers.value / itemsPerPage.value)))
+const pageStart = computed(() => totalUsers.value === 0 ? 0 : (page.value - 1) * itemsPerPage.value + 1)
+const pageEnd = computed(() => Math.min(page.value * itemsPerPage.value, totalUsers.value))
+const pageNums = computed<(number | string)[]>(() => {
+  const pages = totalPages.value
+  const p = page.value
+  if (pages <= 7) {
+    const arr: (number | string)[] = []
+    for (let i = 1; i <= pages; i++) arr.push(i)
+    return arr
+  }
+  if (p <= 4) return [1, 2, 3, 4, 5, '…', pages]
+  if (p >= pages - 3) return [1, '…', pages - 4, pages - 3, pages - 2, pages - 1, pages]
+  return [1, '…', p - 1, p, p + 1, '…', pages]
+})
+
+function gotoPage(n: number | string) {
+  if (typeof n !== 'number') return
+  if (n < 1 || n > totalPages.value) return
+  page.value = n
+}
+
+function initialOf(u: any): string {
+  return (u?.first_name?.[0] || u?.email?.[0] || '?').toUpperCase()
+}
 </script>
 
 <template>
-  <div>
-    <div class="page-head">
+  <div class="page">
+    <!-- Page header -->
+    <div class="page__head">
       <div>
-        <h1 class="page-head__title">
+        <h1 class="page__title">
           {{ t('Users') }}
         </h1>
-        <div class="page-head__subtitle">
+        <div class="page__subtitle">
           {{ t('Manage accounts, roles and access') }}
         </div>
       </div>
-      <div class="page-head__actions">
-        <VBtn
-          color="primary"
-          prepend-icon="bx-plus"
-          @click="openCreate"
-        >
+      <div class="page__head-actions">
+        <button class="btn btn--primary" @click="openCreate">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
           {{ t('New User') }}
-        </VBtn>
+        </button>
       </div>
     </div>
 
-    <UserStatsRow :stats="stats" />
+    <!-- KPI strip -->
+    <div class="grid cols-4" style="margin-bottom: var(--sp-5);">
+      <!-- Total -->
+      <div class="kpi">
+        <div class="kpi__top">
+          <div class="kpi__icon t-primary">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 00-3-3.87" />
+              <path d="M16 3.13a4 4 0 010 7.75" />
+            </svg>
+          </div>
+          <div class="kpi__label">
+            {{ t('Total') }}
+          </div>
+        </div>
+        <div v-if="!stats" class="skel" style="width:80px;height:30px;" />
+        <div v-else class="kpi__value">
+          {{ fmtNum(stats.total_users) }}
+        </div>
+        <div class="kpi__foot">
+          <span class="kpi__subtext">{{ t('Users') }}</span>
+        </div>
+      </div>
 
-    <VCard>
-      <VCardText class="d-flex align-center gap-3 py-3 flex-wrap">
-        <VTextField
-          v-model="search"
-          :placeholder="t('Search users...')"
-          prepend-inner-icon="bx-search"
-          density="compact"
-          style="min-inline-size:200px;max-inline-size:280px;"
-          hide-details
-          clearable
-        />
-        <VSelect
-          v-model="roleFilter"
-          :items="roles"
-          :placeholder="t('Role')"
-          density="compact"
-          style="min-inline-size:160px;"
-          hide-details
-          clearable
-        />
-        <VSelect
-          v-model="statusFilter"
-          :items="statuses"
-          :placeholder="t('Status')"
-          density="compact"
-          style="min-inline-size:160px;"
-          hide-details
-          clearable
-        />
-      </VCardText>
+      <!-- Active -->
+      <div class="kpi">
+        <div class="kpi__top">
+          <div class="kpi__icon t-success">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <polyline points="16 11 18 13 22 9" />
+            </svg>
+          </div>
+          <div class="kpi__label">
+            {{ t('Active') }}
+          </div>
+        </div>
+        <div v-if="!stats" class="skel" style="width:60px;height:30px;" />
+        <div v-else class="kpi__value">
+          {{ fmtNum(stats.active_users) }}
+        </div>
+        <div class="kpi__foot">
+          <span class="kpi__subtext">{{ t('on current page') }}</span>
+        </div>
+      </div>
 
-      <VDataTableServer
-        :headers="headers"
-        :items="users"
-        :items-length="totalUsers"
-        :loading="loading"
-        :items-per-page="itemsPerPage"
-        :page="page"
-      >
-        <template #bottom>
-          <DataTableFooter
-            v-model:page="page"
-            v-model:items-per-page="itemsPerPage"
-            :total-items="totalUsers"
-          />
-        </template>
+      <!-- Roles count -->
+      <div class="kpi">
+        <div class="kpi__top">
+          <div class="kpi__icon t-info">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 21h18" />
+              <path d="M5 21V7l8-4v18" />
+              <path d="M19 21V11l-6-4" />
+            </svg>
+          </div>
+          <div class="kpi__label">
+            {{ t('Roles') }}
+          </div>
+        </div>
+        <div v-if="!stats" class="skel" style="width:40px;height:30px;" />
+        <div v-else class="kpi__value">
+          {{ fmtNum(stats.total_roles) }}
+        </div>
+        <div class="kpi__foot">
+          <span class="kpi__subtext">{{ t('distinct') }}</span>
+        </div>
+      </div>
 
-        <template
-          v-if="loading && users.length === 0"
-          #body
-        >
-          <tr
-            v-for="n in itemsPerPage"
-            :key="n"
-            class="sk-row"
-          >
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:30px;height:13px;border-radius:4px;"
-              />
+      <!-- Total Salary -->
+      <div class="kpi">
+        <div class="kpi__top">
+          <div class="kpi__icon t-neutral">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="6" width="20" height="12" rx="2" />
+              <circle cx="12" cy="12" r="3" />
+              <path d="M6 12h.01M18 12h.01" />
+            </svg>
+          </div>
+          <div class="kpi__label">
+            {{ t('Total Salary') }}
+          </div>
+        </div>
+        <div v-if="!stats" class="skel" style="width:120px;height:30px;" />
+        <div v-else class="kpi__value">
+          {{ fmtAbbr(stats.total_salary) }}<span class="kpi__unit">UZS</span>
+        </div>
+        <div class="kpi__foot">
+          <span class="kpi__subtext">{{ t('payroll') }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toolbar + table -->
+    <div class="card">
+      <div class="toolbar">
+        <!-- Search -->
+        <div style="flex:1;max-width:300px;">
+          <div class="control">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);flex:0 0 18px;">
+              <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input v-model="search" :placeholder="t('Search users…')">
+          </div>
+        </div>
+
+        <!-- Role -->
+        <div style="width:180px;">
+          <div class="control control--select">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);flex:0 0 18px;">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+            <select v-model="roleFilter" :style="{ color: roleFilter ? 'var(--text)' : 'var(--text-tertiary)' }">
+              <option value="">
+                {{ t('All roles') }}
+              </option>
+              <option v-for="r in roles" :key="r" :value="r" style="color:var(--text);">
+                {{ r }}
+              </option>
+            </select>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chev"><polyline points="6 9 12 15 18 9" /></svg>
+          </div>
+        </div>
+
+        <!-- Status -->
+        <div style="width:180px;">
+          <div class="control control--select">
+            <select v-model="statusFilter" :style="{ color: statusFilter ? 'var(--text)' : 'var(--text-tertiary)' }">
+              <option value="">
+                {{ t('All statuses') }}
+              </option>
+              <option v-for="s in statuses" :key="s" :value="s" style="color:var(--text);">
+                {{ s }}
+              </option>
+            </select>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chev"><polyline points="6 9 12 15 18 9" /></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter chips -->
+      <div v-if="activeFilters.length > 0" class="toolbar" style="padding-top:0;">
+        <div class="chips">
+          <span class="tertiary" style="font-size:13px;margin-right:2px;">{{ t('Filters') }}:</span>
+          <span v-for="f in activeFilters" :key="f.k" class="chip">
+            <span>{{ f.label }}: <b>{{ f.val }}</b></span>
+            <span class="chip__x" @click="f.clear()">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </span>
+          </span>
+          <button class="chip--clear" @click="clearAllFilters">
+            {{ t('Clear all') }}
+          </button>
+        </div>
+      </div>
+
+      <div class="card__divider" />
+
+      <!-- Table -->
+      <table class="dtable">
+        <thead>
+          <tr>
+            <th style="width:80px;">
+              {{ t('ID') }}
+            </th>
+            <th>{{ t('Name') }}</th>
+            <th>{{ t('Email') }}</th>
+            <th>{{ t('Role') }}</th>
+            <th>{{ t('Status') }}</th>
+            <th style="text-align:right;width:140px;">
+              {{ t('Actions') }}
+            </th>
+          </tr>
+        </thead>
+
+        <tbody v-if="loading && users.length === 0">
+          <tr v-for="n in itemsPerPage" :key="`sk-${n}`">
+            <td><div class="skel" style="width:32px;height:14px;" /></td>
+            <td>
+              <div class="row" style="gap:11px;align-items:center;">
+                <div class="skel" style="width:28px;height:28px;border-radius:99px;" />
+                <div class="skel" style="width:140px;height:14px;" />
+              </div>
             </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:140px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:160px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:80px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:60px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td
-              class="sk-cell"
-              style="text-align:end;"
-            >
-              <div class="d-flex justify-end gap-1">
-                <div
-                  class="sk-box"
-                  style="width:32px;height:32px;border-radius:6px;"
-                />
-                <div
-                  class="sk-box"
-                  style="width:32px;height:32px;border-radius:6px;"
-                />
-                <div
-                  class="sk-box"
-                  style="width:32px;height:32px;border-radius:6px;"
-                />
+            <td><div class="skel" style="width:180px;height:14px;" /></td>
+            <td><div class="skel" style="width:80px;height:22px;border-radius:6px;" /></td>
+            <td><div class="skel" style="width:70px;height:22px;border-radius:6px;" /></td>
+            <td>
+              <div class="row" style="gap:4px;justify-content:flex-end;">
+                <div class="skel" style="width:32px;height:32px;border-radius:8px;" />
+                <div class="skel" style="width:32px;height:32px;border-radius:8px;" />
+                <div class="skel" style="width:32px;height:32px;border-radius:8px;" />
               </div>
             </td>
           </tr>
-        </template>
+        </tbody>
 
-        <template #item.id="{ item }">
-          <span class="text-mono text-tertiary num-tabular">#{{ item.raw.id }}</span>
-        </template>
-        <template #item.name="{ item }">
-          <div class="d-flex align-center gap-2">
-            <VAvatar
-              size="32"
-              :color="roleColors[item.raw.role] ?? 'primary'"
-              variant="tonal"
-            >
-              <span class="text-caption">{{ (item.raw.first_name ?? '?')[0] }}</span>
-            </VAvatar>
-            <div class="text-body-2 font-weight-medium">
-              {{ item.raw.first_name }} {{ item.raw.last_name }}
+        <tbody v-else-if="users.length === 0">
+          <tr>
+            <td colspan="6" style="padding:0;">
+              <div class="statefill">
+                <div class="statefill__icon">
+                  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
+                  </svg>
+                </div>
+                <div class="statefill__title">
+                  {{ t('No users match your filters') }}
+                </div>
+                <div style="margin-top:12px;">
+                  <button class="btn btn--secondary" @click="clearAllFilters">
+                    {{ t('Clear filters') }}
+                  </button>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+
+        <tbody v-else>
+          <tr v-for="u in users" :key="u.id">
+            <td><span class="mono cell-muted">#{{ u.id }}</span></td>
+            <td>
+              <div class="row" style="gap:11px;align-items:center;">
+                <div class="avatar avatar--sm">
+                  {{ initialOf(u) }}
+                </div>
+                <span class="cell-strong nowrap">{{ u.first_name }} {{ u.last_name }}</span>
+              </div>
+            </td>
+            <td><span class="cell-muted">{{ u.email }}</span></td>
+            <td>
+              <span class="badge" :class="`t-${ROLE_TONE[u.role] || 'neutral'}`">{{ u.role }}</span>
+            </td>
+            <td>
+              <span class="badge badge--dot" :class="`t-${STATUS_TONE[u.status] || 'neutral'}`">{{ u.status }}</span>
+            </td>
+            <td>
+              <div class="row" style="gap:4px;justify-content:flex-end;">
+                <button
+                  class="iconaction is-warning"
+                  :title="u.status === 'ACTIVE' ? t('Suspend') : t('Activate')"
+                  @click="toggleStatus(u)"
+                >
+                  <svg v-if="u.status === 'ACTIVE'" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />
+                  </svg>
+                  <svg v-else viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="6 4 20 12 6 20 6 4" />
+                  </svg>
+                </button>
+                <button class="iconaction is-primary" :title="t('Edit')" @click="openEdit(u)">
+                  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4L16.5 3.5z" />
+                  </svg>
+                </button>
+                <button class="iconaction is-danger" :title="t('Delete')" @click="confirmDelete(u)">
+                  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6" /><path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2" />
+                  </svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Pagination -->
+      <div class="pagination">
+        <div class="row" style="gap:8px;">
+          <span>{{ t('Rows per page') }}:</span>
+          <div style="width:76px;">
+            <div class="control control--select control--sm">
+              <select v-model.number="itemsPerPage">
+                <option :value="10">
+                  10
+                </option>
+                <option :value="20">
+                  20
+                </option>
+                <option :value="50">
+                  50
+                </option>
+              </select>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chev"><polyline points="6 9 12 15 18 9" /></svg>
             </div>
           </div>
-        </template>
-        <template #item.email="{ item }">
-          <span class="text-muted">{{ item.raw.email }}</span>
-        </template>
-        <template #item.role="{ item }">
-          <VChip
-            class="status-pill"
-            size="small"
-            :color="roleColors[item.raw.role] ?? 'default'"
-            variant="tonal"
-          >
-            {{ item.raw.role }}
-          </VChip>
-        </template>
-        <template #item.status="{ item }">
-          <VChip
-            class="status-pill"
-            size="small"
-            :color="item.raw.status === 'ACTIVE' ? 'success' : 'default'"
-            variant="tonal"
-          >
-            {{ item.raw.status }}
-          </VChip>
-        </template>
-        <template #item.actions="{ item }">
-          <div
-            class="d-flex justify-end"
-            style="gap:2px;"
-          >
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              :color="item.raw.status === 'ACTIVE' ? 'warning' : 'success'"
-              @click="toggleStatus(item.raw)"
-            >
-              <VIcon
-                :icon="item.raw.status === 'ACTIVE' ? 'bx-pause' : 'bx-play'"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ item.raw.status === 'ACTIVE' ? t('Suspend') : t('Activate') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              @click="openEdit(item.raw)"
-            >
-              <VIcon
-                icon="bx-edit-alt"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Edit') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              color="error"
-              @click="confirmDelete(item.raw)"
-            >
-              <VIcon
-                icon="bx-trash"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Delete') }}
-              </VTooltip>
-            </VBtn>
-          </div>
-        </template>
-      </VDataTableServer>
-    </VCard>
+        </div>
+        <div class="pagination__spacer" />
+        <span class="num">{{ pageStart }}–{{ pageEnd }} {{ t('of') }} {{ fmtNum(totalUsers) }}</span>
+        <div class="pglist">
+          <button class="pgbtn" :disabled="page <= 1" @click="gotoPage(page - 1)">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+          <template v-for="(n, i) in pageNums" :key="`pg-${i}`">
+            <span v-if="n === '…'" class="pgbtn" style="pointer-events:none;">…</span>
+            <button v-else class="pgbtn" :class="{ 'is-active': n === page }" @click="gotoPage(n)">
+              {{ n }}
+            </button>
+          </template>
+          <button class="pgbtn" :disabled="page >= totalPages" @click="gotoPage(page + 1)">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </button>
+        </div>
+      </div>
+    </div>
 
-    <VDialog
-      v-model="dialogOpen"
-      max-width="640"
-      persistent
-    >
-      <VCard class="dlg">
-        <div class="dlg__head">
-          <div class="dlg__head-text">
-            <div class="dlg__title">
+    <!-- Edit / New User modal -->
+    <div v-if="dialogOpen" class="overlay" @mousedown.self="closeDialog">
+      <div class="modal" style="max-width:640px;" role="dialog" aria-modal="true">
+        <div class="modal__head">
+          <div style="flex:1;min-width:0;">
+            <h3 class="modal__title">
               {{ editing ? t('Edit User') : t('New User') }}
-            </div>
-            <div class="dlg__subtitle">
+            </h3>
+            <div class="modal__sub">
               {{ editing
                 ? t('Update details for') + ' ' + (editing.first_name || '') + ' ' + (editing.last_name || '')
                 : t('Create a new account and assign a role') }}
             </div>
           </div>
-          <VBtn
-            icon
-            variant="text"
-            size="small"
-            class="dlg__close"
-            @click="dialogOpen = false"
-          >
-            <VIcon
-              icon="bx-x"
-              size="20"
-            />
-          </VBtn>
+          <button class="iconaction" :title="t('Close')" @click="closeDialog">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
 
-        <div class="dlg__body">
-          <VRow>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.first_name"
-                :label="t('First Name')"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.last_name"
-                :label="t('Last Name')"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VSelect
-                v-model="form.role"
-                :items="roles"
-                :label="t('Role')"
-                @update:model-value="onRoleChange"
-              />
-            </VCol>
-            <VCol
-              v-if="editing"
-              cols="12"
-              sm="6"
-            >
-              <VSelect
-                v-model="form.status"
-                :items="statuses"
-                :label="t('Status')"
-              />
-            </VCol>
-            <VCol
-              v-if="isAdminRole || editing"
-              cols="12"
-            >
-              <VTextField
-                v-if="editing || requiresEmail"
-                v-model="form.email"
-                :label="t('Email')"
-                type="email"
-                :hint="!editing && requiresEmail ? t('Required for ADMIN / MANAGER') : ''"
-                :persistent-hint="!editing && requiresEmail"
-                :required="!editing && requiresEmail"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VTextField
-                v-model="form.password"
-                :label="editing ? t('New Password (leave blank to keep)') : (isPinRole ? t('4-digit PIN') : t('Password'))"
-                :type="isPinRole ? 'tel' : 'password'"
-                :hint="!editing && isPinRole ? t('Exactly 4 digits') : ''"
-                :persistent-hint="!editing && isPinRole"
-                :maxlength="isPinRole ? 4 : undefined"
-                :pattern="isPinRole ? '[0-9]{4}' : undefined"
-                inputmode="numeric"
-              />
-            </VCol>
-          </VRow>
+        <div class="modal__body">
+          <div class="form-grid">
+            <!-- User ID (edit only) -->
+            <label v-if="editing" class="field span-2">
+              <span class="field__label">{{ t('User ID') }}</span>
+              <div class="control is-disabled">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 16px;color:var(--text-tertiary);">
+                  <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
+                </svg>
+                <input :value="`#${editing.id}`" disabled>
+              </div>
+              <span class="field__hint">{{ t("Identifier is assigned automatically and can't be changed.") }}</span>
+            </label>
+
+            <!-- First name -->
+            <label class="field">
+              <span class="field__label">{{ t('First Name') }}</span>
+              <div class="control">
+                <input v-model="form.first_name" :placeholder="t('First Name')">
+              </div>
+            </label>
+
+            <!-- Last name -->
+            <label class="field">
+              <span class="field__label">{{ t('Last Name') }}</span>
+              <div class="control">
+                <input v-model="form.last_name" :placeholder="t('Last Name')">
+              </div>
+            </label>
+
+            <!-- Role -->
+            <label class="field">
+              <span class="field__label">{{ t('Role') }}</span>
+              <div class="control control--select">
+                <select v-model="form.role" @change="onRoleChange">
+                  <option v-for="r in roles" :key="r" :value="r">
+                    {{ r }}
+                  </option>
+                </select>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chev"><polyline points="6 9 12 15 18 9" /></svg>
+              </div>
+            </label>
+
+            <!-- Status (edit only — uses switch on edit; create defaults to ACTIVE) -->
+            <label v-if="editing" class="field">
+              <span class="field__label">{{ t('Status') }}</span>
+              <div class="row" style="gap:10px;align-items:center;height:42px;">
+                <span
+                  class="switch"
+                  :class="{ 'is-on': form.status === 'ACTIVE' }"
+                  role="switch"
+                  :aria-checked="form.status === 'ACTIVE'"
+                  @click="form.status = form.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'"
+                />
+                <span style="font-size:14px;font-weight:500;color:var(--text-secondary);">
+                  {{ form.status }}
+                </span>
+              </div>
+            </label>
+
+            <!-- Email -->
+            <label v-if="editing || isAdminRole || requiresEmail" class="field span-2">
+              <span class="field__label">{{ t('Email') }}</span>
+              <div class="control">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 18px;color:var(--text-tertiary);">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" />
+                </svg>
+                <input v-model="form.email" type="email" placeholder="name@pos.local">
+              </div>
+              <span v-if="!editing && requiresEmail" class="field__hint">{{ t('Required for ADMIN / MANAGER') }}</span>
+            </label>
+
+            <!-- Password -->
+            <label class="field span-2">
+              <span class="field__label">
+                {{ editing ? t('New Password (leave blank to keep)') : (isPinRole ? t('4-digit PIN') : t('Password')) }}
+              </span>
+              <div class="control">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 18px;color:var(--text-tertiary);">
+                  <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
+                </svg>
+                <input
+                  v-model="form.password"
+                  :type="isPinRole ? 'tel' : 'password'"
+                  :placeholder="editing ? t('Leave blank to keep') : '••••••••'"
+                  :maxlength="isPinRole ? 4 : undefined"
+                  :pattern="isPinRole ? '[0-9]{4}' : undefined"
+                  inputmode="numeric"
+                >
+              </div>
+              <span v-if="!editing && isPinRole" class="field__hint">{{ t('Exactly 4 digits') }}</span>
+            </label>
+          </div>
         </div>
 
-        <div class="dlg__foot">
-          <VBtn
-            variant="text"
-            @click="dialogOpen = false"
-          >
+        <div class="modal__foot">
+          <button class="btn btn--ghost" :disabled="dialogLoading" @click="closeDialog">
             {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="primary"
-            :loading="dialogLoading"
-            @click="save"
-          >
+          </button>
+          <button class="btn btn--primary" :class="{ 'is-loading': dialogLoading }" :disabled="dialogLoading" @click="save">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
             {{ t('Save') }}
-          </VBtn>
+          </button>
         </div>
-      </VCard>
-    </VDialog>
+      </div>
+    </div>
 
-    <VDialog
-      v-model="deleteDialog"
-      max-width="440"
-    >
-      <VCard class="dlg">
-        <div class="dlg__head">
-          <div class="dlg__head-text">
-            <div class="dlg__title">
+    <!-- Delete confirm modal -->
+    <div v-if="deleteDialog" class="overlay" @mousedown.self="deleteDialog = false">
+      <div class="modal" style="max-width:440px;" role="dialog" aria-modal="true">
+        <div class="modal__head">
+          <div style="flex:1;min-width:0;">
+            <h3 class="modal__title">
               {{ t('Delete User') }}
-            </div>
-            <div class="dlg__subtitle">
+            </h3>
+            <div class="modal__sub">
               {{ t('This action cannot be undone') }}
             </div>
           </div>
-          <VBtn
-            icon
-            variant="text"
-            size="small"
-            class="dlg__close"
-            @click="deleteDialog = false"
-          >
-            <VIcon
-              icon="bx-x"
-              size="20"
-            />
-          </VBtn>
+          <button class="iconaction" :title="t('Close')" @click="deleteDialog = false">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
-        <div class="dlg__body">
-          <div class="d-flex align-start gap-3">
-            <div class="kpi-card__icon t-error" style="flex:0 0 44px;inline-size:44px;block-size:44px;">
-              <VIcon
-                icon="bx-error"
-                size="22"
-              />
+        <div class="modal__body">
+          <div class="row" style="gap:14px;align-items:flex-start;">
+            <div class="kpi__icon t-error" style="width:44px;height:44px;flex:0 0 44px;">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
             </div>
             <div>
-              <div class="font-weight-semibold">
-                {{ t('Are you sure you want to delete this user?') }}
-              </div>
-              <div class="text-tertiary text-body-2 mt-1">
+              <p style="margin:0;font-weight:600;">
+                {{ deleting ? `${deleting.first_name || ''} ${deleting.last_name || ''}`.trim() : '' }}
+                {{ t('will be removed.') }}
+              </p>
+              <p class="muted" style="margin:6px 0 0;font-size:14px;">
                 {{ t('This permanently revokes account access.') }}
-              </div>
+              </p>
             </div>
           </div>
         </div>
-        <div class="dlg__foot">
-          <VBtn
-            variant="text"
-            @click="deleteDialog = false"
-          >
+        <div class="modal__foot">
+          <button class="btn btn--ghost" :disabled="deleteBusy" @click="deleteDialog = false">
             {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="error"
-            @click="doDelete"
-          >
+          </button>
+          <button class="btn btn--danger" :class="{ 'is-loading': deleteBusy }" :disabled="deleteBusy" @click="doDelete">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6" /><path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6" /><path d="M10 11v6M14 11v6" />
+            </svg>
             {{ t('Delete') }}
-          </VBtn>
+          </button>
         </div>
-      </VCard>
-    </VDialog>
+      </div>
+    </div>
 
+    <!-- Toast -->
     <VSnackbar
       v-model="snackbar"
       :color="snackbarColor"
@@ -643,62 +848,6 @@ async function toggleStatus(user: any) {
     </VSnackbar>
   </div>
 </template>
-
-<style lang="scss" scoped>
-.dlg {
-  border-radius: var(--r-lg);
-  overflow: hidden;
-
-  &__head {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 20px 24px 14px;
-    border-block-end: 1px solid rgb(var(--v-theme-border));
-  }
-
-  &__head-text {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  &__title {
-    font-size: var(--fs-h3);
-    line-height: var(--lh-h3);
-    font-weight: var(--fw-bold);
-    letter-spacing: -0.01em;
-    color: rgb(var(--v-theme-on-surface));
-  }
-
-  &__subtitle {
-    color: rgb(var(--v-theme-text-secondary));
-    font-size: var(--fs-sm);
-    margin-block-start: 4px;
-  }
-
-  &__close {
-    margin-inline-start: auto;
-    flex: 0 0 auto;
-    color: rgb(var(--v-theme-text-tertiary));
-  }
-
-  &__body {
-    padding: 20px 24px;
-  }
-
-  &__foot {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 10px;
-    padding: 14px 24px;
-    background: rgb(var(--v-theme-surface-2));
-    border-block-start: 1px solid rgb(var(--v-theme-border));
-    position: sticky;
-    inset-block-end: 0;
-  }
-}
-</style>
 
 <route lang="yaml">
 meta:

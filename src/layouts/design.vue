@@ -40,9 +40,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
 }
-.page-shell > * {
-  width: 100%;
-}
+/* Routed children inherit the padded box automatically. */
 .page-shell > :deep(.page) {
   padding: 0;
   max-width: 1440px;

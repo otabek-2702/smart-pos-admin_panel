@@ -45,11 +45,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
 }
-.page-shell > * {
-  /* Pages that don't explicitly fill take only the height their content
-     needs; pages that want to fill set block-size:100% themselves. */
-  width: 100%;
-}
+/* Routed children inherit the padded box automatically — width is whatever
+   the page sets. No forced 100% (broke flex layouts like the AI chat). */
 .page-shell > :deep(.page) {
   /* Pages built with their own .page wrapper (dashboard, shifts-analytics)
      already provide padding + max-width; cancel the outer padding so they

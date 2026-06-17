@@ -203,7 +203,7 @@ onMounted(() => {
       >
         <div
           v-if="!messages.length"
-          class="empty-state d-flex flex-column align-center justify-center h-100 text-center"
+          class="empty-state d-flex flex-column align-center text-center pt-8"
         >
           <VAvatar
             size="80"
@@ -416,12 +416,13 @@ meta:
 
 <style scoped lang="scss">
 .ai-chat-page {
-  // Fill the layout's page-shell content area exactly — no 100vh math, which
-  // didn't account for animation transforms / scrollbars / browser UI on
-  // some viewports. Parent .page-shell is flex:1 so this stretches to the
-  // remaining vertical space below the design topbar.
+  // Fill the layout's page-shell content area exactly.
+  // Parent .page-shell is flex:1 + flex-column so block-size:100% stretches
+  // to the remaining vertical space below the design topbar.
+  // min-block-size matches the page-shell padding (sp-7 × 2 vertical).
   block-size: 100%;
-  min-block-size: calc(100vh - var(--topbar-h, 64px) - var(--sp-6, 24px) * 2);
+  inline-size: 100%;
+  min-block-size: calc(100vh - var(--topbar-h, 64px) - var(--sp-7, 32px) * 2);
   display: flex;
   flex-direction: column;
 }
@@ -438,7 +439,12 @@ meta:
 }
 
 .empty-state {
+  // No more justify-center — content starts at the TOP of chat-log so the
+  // quick-action buttons + suggestion cards below the greeting are always
+  // visible without scrolling. min-block-size:100% kept so the empty-state
+  // still fills the chat-log on tall viewports.
   min-block-size: 100%;
+  padding-block-end: var(--sp-6);
 }
 
 // VTextField append-inner doesn't always vertical-center the action button on

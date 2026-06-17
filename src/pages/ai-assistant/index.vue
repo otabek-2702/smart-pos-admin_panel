@@ -203,7 +203,7 @@ onMounted(() => {
       >
         <div
           v-if="!messages.length"
-          class="empty-state d-flex flex-column align-center text-center pt-8"
+          class="empty-state d-flex flex-column align-center justify-center h-100 text-center"
         >
           <VAvatar
             size="80"
@@ -387,7 +387,6 @@ onMounted(() => {
           >
             <template #append-inner>
               <VBtn
-                class="chat-send-btn"
                 color="primary"
                 :loading="sending"
                 :disabled="!input.trim()"
@@ -416,10 +415,8 @@ meta:
 
 <style scoped lang="scss">
 .ai-chat-page {
-  // Fill the layout's page-shell content area exactly.
-  // Parent .page-shell is flex:1 + flex-column so block-size:100% stretches
-  // to the remaining vertical space below the design topbar.
-  // min-block-size matches the page-shell padding (sp-7 × 2 vertical).
+  // Fill the design layout's page-shell content area. Parent main.page-shell
+  // is flex:1 + flex-column so block-size:100% gives a definite height.
   block-size: 100%;
   inline-size: 100%;
   min-block-size: calc(100vh - var(--topbar-h, 64px) - var(--sp-7, 32px) * 2);
@@ -433,29 +430,20 @@ meta:
   overflow: hidden;
 }
 
+// VTextField append-inner doesn't always vertical-center the action button on
+// density="comfortable". Pin send button to the input's vertical midline.
+.chat-input :deep(.v-field__append-inner) {
+  align-items: center;
+  padding-block: 0;
+}
+
 .chat-log {
   overflow-y: auto;
   scroll-behavior: smooth;
 }
 
 .empty-state {
-  // No more justify-center — content starts at the TOP of chat-log so the
-  // quick-action buttons + suggestion cards below the greeting are always
-  // visible without scrolling. min-block-size:100% kept so the empty-state
-  // still fills the chat-log on tall viewports.
   min-block-size: 100%;
-  padding-block-end: var(--sp-6);
-}
-
-// VTextField append-inner doesn't always vertical-center the action button on
-// density="comfortable". Force center alignment so the send icon sits on the
-// vertical midline of the input row.
-.chat-input :deep(.v-field__append-inner) {
-  align-items: center;
-  padding-block: 0;
-}
-.chat-send-btn {
-  align-self: center;
 }
 
 .suggestion-card {

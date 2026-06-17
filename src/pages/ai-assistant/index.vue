@@ -416,10 +416,12 @@ meta:
 
 <style scoped lang="scss">
 .ai-chat-page {
-  // Old Sneat layout offset 10rem worked there but clips top under the new
-  // design layout. Use the design layout's topbar var instead so the chat
-  // column fills the visible content area exactly.
-  block-size: calc(100vh - var(--topbar-h, 64px) - var(--sp-6, 24px) - var(--sp-6, 24px));
+  // Fill the layout's page-shell content area exactly — no 100vh math, which
+  // didn't account for animation transforms / scrollbars / browser UI on
+  // some viewports. Parent .page-shell is flex:1 so this stretches to the
+  // remaining vertical space below the design topbar.
+  block-size: 100%;
+  min-block-size: calc(100vh - var(--topbar-h, 64px) - var(--sp-6, 24px) * 2);
   display: flex;
   flex-direction: column;
 }

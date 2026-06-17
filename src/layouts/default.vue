@@ -39,6 +39,15 @@ onMounted(() => {
   flex: 1;
   padding: var(--sp-6) var(--sp-7);
   min-width: 0;
+  /* Allow pages whose root sets block-size: 100% (e.g. chat layouts) to fill
+     the full content area. Children get a definite height via flex:1. */
+  display: flex;
+  flex-direction: column;
+}
+.page-shell > * {
+  /* Pages that don't explicitly fill take only the height their content
+     needs; pages that want to fill set block-size:100% themselves. */
+  width: 100%;
 }
 .page-shell > :deep(.page) {
   /* Pages built with their own .page wrapper (dashboard, shifts-analytics)

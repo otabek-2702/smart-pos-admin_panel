@@ -37,6 +37,11 @@ onMounted(() => {
   flex: 1;
   padding: var(--sp-6) var(--sp-7);
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.page-shell > * {
+  width: 100%;
 }
 .page-shell > :deep(.page) {
   padding: 0;

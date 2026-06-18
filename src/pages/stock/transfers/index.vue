@@ -288,9 +288,10 @@ function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.s
         </template>
         <template #item.transfer_type="{ item }">
           <VChip
-            color="secondary"
+            color="info"
             size="small"
             variant="tonal"
+            class="status-pill"
           >
             {{ t(`transfer_type_${item.raw.transfer_type}`) }}
           </VChip>
@@ -300,6 +301,7 @@ function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.s
             :color="statusColor[item.raw.status] ?? 'default'"
             size="small"
             variant="tonal"
+            class="status-pill"
           >
             {{ t(`transfer_status_${item.raw.status}`) }}
           </VChip>
@@ -429,7 +431,7 @@ function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.s
                       :key="idx"
                     >
                       <td>{{ li.item?.name ?? li.stock_item?.name ?? '—' }}</td>
-                      <td>{{ li.requested_qty ?? li.quantity }}</td>
+                      <td class="num-tabular">{{ li.requested_qty ?? li.quantity }}</td>
                       <td>{{ li.unit_short ?? li.unit?.short_name ?? '—' }}</td>
                     </tr>
                     <tr v-if="!(item.raw.items?.length ?? item.raw.line_items?.length)">

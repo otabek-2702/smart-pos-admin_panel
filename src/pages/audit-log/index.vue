@@ -78,10 +78,20 @@ function shortMetadata(meta: any): string {
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
+          {{ t('Audit Log') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Trail of admin actions across the system') }}
+        </div>
+      </div>
+      <div class="page-head__actions" />
+    </div>
+
     <VCard>
       <VCardText class="d-flex align-center gap-3 py-3 flex-wrap">
-        <span class="text-h6">{{ t('Audit Log') }}</span>
-        <VSpacer />
         <VTextField
           v-model="actionFilter"
           :placeholder="t('Action filter (e.g. USER_CREATE)')"
@@ -193,6 +203,7 @@ function shortMetadata(meta: any): string {
         </template>
         <template #item.action="{ item }">
           <VChip
+            class="status-pill"
             size="small"
             :color="actionColor[item.raw.action] ?? 'default'"
             variant="tonal"

@@ -36,16 +36,12 @@ const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.pr
 
 <template>
   <div>
-    <VCard class="mb-4">
-      <VCardText class="d-flex align-center justify-space-between">
-        <div>
-          <div class="text-h5 font-weight-bold">
-            {{ t('Demand Forecast') }}
-          </div>
-          <div class="text-caption text-disabled">
-            {{ t('What to prep tomorrow morning, based on last 30 days') }}
-          </div>
-        </div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">{{ t('Demand Forecast') }}</h1>
+        <div class="page-head__subtitle">{{ t('What to prep tomorrow morning, based on last 30 days') }}</div>
+      </div>
+      <div class="page-head__actions">
         <VBtn
           variant="tonal"
           prepend-icon="bx-refresh"
@@ -54,8 +50,8 @@ const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.pr
         >
           {{ t('Recalculate') }}
         </VBtn>
-      </VCardText>
-    </VCard>
+      </div>
+    </div>
 
     <VAlert
       v-if="reason === 'no_history'"
@@ -127,7 +123,7 @@ const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.pr
               class="text-end"
               style="min-width: 80px;"
             >
-              <span class="text-h6 font-weight-bold">{{ p.predicted_quantity }}</span>
+              <span class="text-h6 font-weight-bold num-tabular">{{ p.predicted_quantity }}</span>
               <div class="text-caption text-disabled">
                 {{ t('units') }}
               </div>

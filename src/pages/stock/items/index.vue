@@ -270,6 +270,7 @@ async function toggleActive(item: any) {
         </template>
         <template #item.item_type="{ item }">
           <VChip
+            class="status-pill"
             :color="typeColor[item.raw.item_type] ?? 'default'"
             size="small"
             variant="tonal"
@@ -284,10 +285,11 @@ async function toggleActive(item: any) {
           {{ item.raw.base_unit?.short_name ?? item.raw.base_unit?.name ?? '—' }}
         </template>
         <template #item.cost_price="{ item }">
-          {{ formatCurrency(item.raw.cost_price ?? 0) }}
+          <span class="num-tabular">{{ formatCurrency(item.raw.cost_price ?? 0) }}</span>
         </template>
         <template #item.is_active="{ item }">
           <VChip
+            class="status-pill"
             :color="item.raw.is_active ? 'success' : 'default'"
             size="small"
             variant="tonal"

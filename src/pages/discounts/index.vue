@@ -164,6 +164,26 @@ async function remove(d: any) {
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
+          {{ t('Discounts') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Promo codes and price reductions') }}
+        </div>
+      </div>
+      <div class="page-head__actions">
+        <VBtn
+          color="primary"
+          prepend-icon="bx-plus"
+          @click="openCreate"
+        >
+          {{ t('New Discount') }}
+        </VBtn>
+      </div>
+    </div>
+
     <VCard>
       <VCardText class="d-flex align-center gap-3 py-3 flex-wrap">
         <VTextField
@@ -184,14 +204,6 @@ async function remove(d: any) {
           hide-details
           clearable
         />
-        <VSpacer />
-        <VBtn
-          color="primary"
-          prepend-icon="bx-plus"
-          @click="openCreate"
-        >
-          {{ t('New Discount') }}
-        </VBtn>
       </VCardText>
 
       <VDataTableServer
@@ -287,10 +299,11 @@ async function remove(d: any) {
           </div>
         </template>
         <template #item.value="{ item }">
-          {{ item.raw.discount_type?.discount_method === 'PERCENTAGE' ? `${item.raw.value}%` : formatCurrency(item.raw.value ?? 0) }}
+          <span class="num-tabular">{{ item.raw.discount_type?.discount_method === 'PERCENTAGE' ? `${item.raw.value}%` : formatCurrency(item.raw.value ?? 0) }}</span>
         </template>
         <template #item.is_active="{ item }">
           <VChip
+            class="status-pill"
             size="small"
             :color="item.raw.is_active ? 'success' : 'default'"
             variant="tonal"

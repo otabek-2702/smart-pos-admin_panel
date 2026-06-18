@@ -222,6 +222,7 @@ async function doDelete() {
             :color="item.raw.requires_approval ? 'warning' : 'default'"
             size="small"
             variant="tonal"
+            class="status-pill"
           >
             {{ item.raw.requires_approval ? t('Yes') : t('No') }}
           </VChip>
@@ -231,6 +232,7 @@ async function doDelete() {
             :color="item.raw.is_active ? 'success' : 'default'"
             size="small"
             variant="tonal"
+            class="status-pill"
           >
             {{ item.raw.is_active ? t('Active') : t('Inactive') }}
           </VChip>

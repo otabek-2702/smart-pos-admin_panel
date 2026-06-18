@@ -114,11 +114,16 @@ function varianceColor(v: string | number) {
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">{{ t('Cashier Shift Analytics') }}</h1>
+        <div class="page-head__subtitle">{{ dateFrom }} — {{ dateTo }}</div>
+      </div>
+    </div>
+
     <!-- Filters -->
     <VCard class="mb-4">
       <VCardText class="d-flex flex-wrap align-center gap-3">
-        <span class="text-h6">{{ t('Cashier Shift Analytics') }}</span>
-        <VSpacer />
         <VTextField
           v-model="dateFrom"
           type="date"
@@ -157,77 +162,45 @@ function varianceColor(v: string | number) {
     <template v-else-if="summary">
       <!-- Top-line KPIs -->
       <VRow class="mb-4">
-        <VCol
-          cols="6"
-          sm="3"
-        >
-          <VCard>
-            <VCardText>
-              <div class="text-caption text-disabled">
-                {{ t('Shifts') }}
-              </div>
-              <div class="text-h5 font-weight-bold">
-                {{ summary.shift_count }}
-              </div>
-              <div class="text-caption text-disabled">
-                {{ summary.distinct_cashiers }} {{ t('cashiers') }}
-              </div>
-            </VCardText>
-          </VCard>
+        <VCol cols="6" sm="3">
+          <div class="kpi-card">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon t-primary"><VIcon icon="bx-time" size="20" /></div>
+              <div class="kpi-card__label">{{ t('Shifts') }}</div>
+            </div>
+            <div class="kpi-card__value num-tabular">{{ summary.shift_count }}</div>
+            <div class="kpi-card__sub">{{ summary.distinct_cashiers }} {{ t('cashiers') }}</div>
+          </div>
         </VCol>
-        <VCol
-          cols="6"
-          sm="3"
-        >
-          <VCard>
-            <VCardText>
-              <div class="text-caption text-disabled">
-                {{ t('Total Hours') }}
-              </div>
-              <div class="text-h5 font-weight-bold">
-                {{ summary.total_hours }}h
-              </div>
-              <div class="text-caption text-disabled">
-                {{ t('avg') }} {{ Math.round(summary.avg_shift_minutes) }}m
-              </div>
-            </VCardText>
-          </VCard>
+        <VCol cols="6" sm="3">
+          <div class="kpi-card">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon t-info"><VIcon icon="bx-stopwatch" size="20" /></div>
+              <div class="kpi-card__label">{{ t('Total Hours') }}</div>
+            </div>
+            <div class="kpi-card__value num-tabular">{{ summary.total_hours }}<span class="kpi-card__unit">h</span></div>
+            <div class="kpi-card__sub">{{ t('avg') }} {{ Math.round(summary.avg_shift_minutes) }}m</div>
+          </div>
         </VCol>
-        <VCol
-          cols="6"
-          sm="3"
-        >
-          <VCard>
-            <VCardText>
-              <div class="text-caption text-disabled">
-                {{ t('Orders') }}
-              </div>
-              <div class="text-h5 font-weight-bold">
-                {{ summary.orders.total }}
-              </div>
-              <div class="text-caption text-error">
-                {{ summary.orders.cancelled }} {{ t('cancelled') }} ({{ summary.orders.cancel_rate_pct }}%)
-              </div>
-            </VCardText>
-          </VCard>
+        <VCol cols="6" sm="3">
+          <div class="kpi-card">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon t-warning"><VIcon icon="bx-receipt" size="20" /></div>
+              <div class="kpi-card__label">{{ t('Orders') }}</div>
+            </div>
+            <div class="kpi-card__value num-tabular">{{ summary.orders.total }}</div>
+            <div class="kpi-card__sub text-error">{{ summary.orders.cancelled }} {{ t('cancelled') }} ({{ summary.orders.cancel_rate_pct }}%)</div>
+          </div>
         </VCol>
-        <VCol
-          cols="6"
-          sm="3"
-        >
-          <VCard color="success" variant="tonal">
-            <VCardText>
-              <div class="text-caption">
-                {{ t('Revenue') }}
-              </div>
-              <div class="text-h5 font-weight-bold">
-                {{ formatCurrency(summary.money.revenue) }}
-              </div>
-              <div class="text-caption">
-                {{ formatCurrency(summary.money.revenue_per_hour) }} / {{ t('h') }}
-              </div>
-            </VCardText>
-          </VCard>
+        <VCol cols="6" sm="3">
+          <div class="kpi-card">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon t-success"><VIcon icon="bx-dollar" size="20" /></div>
+              <div class="kpi-card__label">{{ t('Revenue') }}</div>
+            </div>
+            <div class="kpi-card__value num-tabular">{{ formatCurrency(summary.money.revenue) }}<span class="kpi-card__unit">UZS</span></div>
+            <div class="kpi-card__sub">{{ formatCurrency(summary.money.revenue_per_hour) }} / {{ t('h') }}</div>
+          </div>
         </VCol>
       </VRow>
 
@@ -494,7 +467,7 @@ function varianceColor(v: string | number) {
               <tr v-for="s in perShift" :key="s.shift_id">
                 <td class="font-weight-medium">{{ s.user_name }}</td>
                 <td>
-                  <VChip size="x-small" :color="s.status === 'COMPLETED' ? 'success' : (s.status === 'ENDED' ? 'warning' : 'default')" variant="tonal">
+                  <VChip class="status-pill" size="x-small" :color="s.status === 'COMPLETED' ? 'success' : (s.status === 'ENDED' ? 'warning' : 'default')" variant="tonal">
                     {{ t(`shift_status_${s.status}`) }}
                   </VChip>
                 </td>

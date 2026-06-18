@@ -84,6 +84,13 @@ const headers = computed(() => [
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">{{ t('Menu Engineering') }}</h1>
+        <div class="page-head__subtitle">{{ dateFrom }} — {{ dateTo }}</div>
+      </div>
+    </div>
+
     <VCard class="mb-4">
       <VCardText class="d-flex flex-wrap gap-3 align-center">
         <VTextField
@@ -132,44 +139,36 @@ const headers = computed(() => [
         cols="6"
         sm="3"
       >
-        <VCard
-          border
-          :class="{ 'border-2': classFilter === key }"
-          :style="classFilter === key ? `border-color: rgb(var(--v-theme-${classColor[key]}))` : ''"
-          class="cursor-pointer"
+        <div
+          class="kpi-card cursor-pointer"
+          :style="classFilter === key ? `border-color: rgb(var(--v-theme-${classColor[key]})); border-width: 2px;` : ''"
           @click="classFilter = classFilter === key ? undefined : (key as string)"
         >
-          <VCardText class="d-flex align-center gap-3">
-            <VAvatar
-              :color="classColor[key]"
-              variant="tonal"
-              size="48"
-              rounded
+          <div class="kpi-card__top">
+            <div
+              class="kpi-card__icon"
+              :class="{
+                't-success': classColor[key] === 'success',
+                't-info': classColor[key] === 'info',
+                't-warning': classColor[key] === 'warning',
+                't-error': classColor[key] === 'error',
+              }"
             >
-              <VIcon
-                :icon="classIcon[key]"
-                size="24"
-              />
-            </VAvatar>
-            <div>
-              <div class="text-h5 font-weight-bold">
-                {{ klass }}
-              </div>
-              <div class="text-body-2 text-disabled">
-                {{ t(key as string) }}
-              </div>
+              <VIcon :icon="classIcon[key]" size="20" />
             </div>
-          </VCardText>
-        </VCard>
+            <div class="kpi-card__label">{{ t(key as string) }}</div>
+          </div>
+          <div class="kpi-card__value num-tabular">{{ klass }}</div>
+        </div>
       </VCol>
     </VRow>
 
     <VCard>
       <VCardText class="d-flex align-center gap-3 py-3">
-        <span class="text-h6">{{ t('Menu Engineering') }}</span>
         <VSpacer />
         <VChip
           v-if="classFilter"
+          class="status-pill"
           closable
           @click:close="classFilter = undefined"
         >
@@ -200,6 +199,7 @@ const headers = computed(() => [
 
         <template #item.class="{ item }">
           <VChip
+            class="status-pill"
             size="small"
             :color="classColor[item.raw.class] ?? 'default'"
             variant="tonal"
@@ -209,17 +209,17 @@ const headers = computed(() => [
           </VChip>
         </template>
         <template #item.price="{ item }">
-          {{ formatCurrency(item.raw.price) }}
+          <span class="num-tabular">{{ formatCurrency(item.raw.price) }}</span>
         </template>
         <template #item.revenue="{ item }">
-          {{ formatCurrency(item.raw.revenue) }}
+          <span class="num-tabular">{{ formatCurrency(item.raw.revenue) }}</span>
         </template>
         <template #item.margin_per_unit="{ item }">
-          {{ formatCurrency(item.raw.margin_per_unit) }}
+          <span class="num-tabular">{{ formatCurrency(item.raw.margin_per_unit) }}</span>
           <span class="text-caption text-disabled">({{ item.raw.margin_pct }}%)</span>
         </template>
         <template #item.profit="{ item }">
-          <span class="font-weight-medium">{{ formatCurrency(item.raw.profit) }}</span>
+          <span class="font-weight-medium num-tabular">{{ formatCurrency(item.raw.profit) }}</span>
         </template>
       </VDataTable>
     </VCard>

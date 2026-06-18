@@ -18,6 +18,10 @@ export default {
     // ℹ️ Remove after next release
     variant: 'flat',
   },
+  VCard: {
+    rounded: 'lg',
+    elevation: 0,
+  },
   VBadge: {
     // set v-badge default color to primary
     color: 'primary',

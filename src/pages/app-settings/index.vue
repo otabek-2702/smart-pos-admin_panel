@@ -49,28 +49,59 @@ const modules = computed(() => [
 </script>
 
 <template>
-  <div>
+  <div class="app-settings-page">
+    <!-- Page head -->
+    <div class="page-head">
+      <div>
+        <h1 class="page-head__title">
+          {{ t('App Settings') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Toggle modules on or off across the entire system') }}
+        </div>
+      </div>
+    </div>
+
     <VRow>
       <VCol
         cols="12"
         md="8"
       >
-        <VCard>
-          <VCardItem>
-            <VCardTitle>{{ t('App Modules') }}</VCardTitle>
-            <VCardSubtitle>{{ t('Toggle modules on or off across the entire system') }}</VCardSubtitle>
-          </VCardItem>
-          <VDivider />
-          <VCardText>
+        <!-- Modules panel -->
+        <VCard class="settings-panel">
+          <div class="card__head">
+            <div class="card__head-title">
+              {{ t('App Modules') }}
+            </div>
+            <div class="card__head-sub">
+              {{ t('Toggle modules on or off across the entire system') }}
+            </div>
+          </div>
+
+          <div class="settings-list">
             <template v-if="loading">
               <div
                 v-for="n in 3"
                 :key="n"
-                class="mb-3"
+                class="setting-row"
               >
                 <div
+                  class="kpi-card__icon t-neutral"
+                  style="visibility:hidden;"
+                />
+                <div class="setting-row__body">
+                  <div
+                    class="sk-box"
+                    style="width:160px;height:16px;border-radius:4px;margin-bottom:8px;"
+                  />
+                  <div
+                    class="sk-box"
+                    style="width:80%;height:12px;border-radius:4px;"
+                  />
+                </div>
+                <div
                   class="sk-box"
-                  style="width:100%;height:80px;border-radius:8px;"
+                  style="width:46px;height:24px;border-radius:12px;"
                 />
               </div>
             </template>
@@ -78,24 +109,22 @@ const modules = computed(() => [
               <div
                 v-for="m in modules"
                 :key="m.key"
-                class="d-flex align-center gap-3 pa-3 mb-2"
-                style="border:1px solid rgba(var(--v-theme-on-surface),0.12);border-radius:8px;"
+                class="setting-row"
               >
-                <VAvatar
-                  :color="settings[m.key] ? 'success' : 'default'"
-                  variant="tonal"
-                  size="48"
+                <div
+                  class="kpi-card__icon"
+                  :class="settings[m.key] ? 't-success' : 't-neutral'"
                 >
                   <VIcon
                     :icon="m.icon"
-                    size="24"
+                    size="20"
                   />
-                </VAvatar>
-                <div class="flex-grow-1">
-                  <div class="text-body-1 font-weight-medium">
+                </div>
+                <div class="setting-row__body">
+                  <div class="setting-row__label">
                     {{ t(m.label) }}
                   </div>
-                  <div class="text-caption text-disabled">
+                  <div class="setting-row__hint">
                     {{ t(m.description) }}
                   </div>
                 </div>
@@ -104,21 +133,33 @@ const modules = computed(() => [
                   color="primary"
                   hide-details
                   inset
+                  density="compact"
                 />
               </div>
             </template>
+          </div>
 
-            <div class="d-flex justify-end mt-4">
-              <VBtn
-                color="primary"
-                :loading="saving"
-                prepend-icon="bx-save"
-                @click="save"
-              >
-                {{ t('Save Changes') }}
-              </VBtn>
-            </div>
-          </VCardText>
+          <!-- Save bar -->
+          <div class="save-bar">
+            <VBtn
+              variant="outlined"
+              color="default"
+              :disabled="loading || saving"
+              prepend-icon="bx-reset"
+              @click="load"
+            >
+              {{ t('Reset') }}
+            </VBtn>
+            <VBtn
+              color="primary"
+              :loading="saving"
+              :disabled="loading"
+              prepend-icon="bx-save"
+              @click="save"
+            >
+              {{ t('Save') }}
+            </VBtn>
+          </div>
         </VCard>
       </VCol>
 
@@ -126,14 +167,19 @@ const modules = computed(() => [
         cols="12"
         md="4"
       >
-        <VCard>
-          <VCardItem>
-            <VCardTitle>{{ t('Tip') }}</VCardTitle>
-          </VCardItem>
-          <VDivider />
-          <VCardText class="text-body-2 text-disabled">
+        <!-- Tip panel -->
+        <VCard class="settings-panel">
+          <div class="card__head">
+            <div class="card__head-title">
+              {{ t('Tip') }}
+            </div>
+            <div class="card__head-sub">
+              {{ t('How module toggles affect the app') }}
+            </div>
+          </div>
+          <div class="tip-body text-muted">
             {{ t('Disabling a module hides its endpoints and navigation. Settings persist across logins.') }}
-          </VCardText>
+          </div>
         </VCard>
       </VCol>
     </VRow>
@@ -147,6 +193,86 @@ const modules = computed(() => [
     </VSnackbar>
   </div>
 </template>
+
+<style lang="scss" scoped>
+.app-settings-page {
+  /* container */
+}
+
+.settings-panel {
+  overflow: hidden;
+}
+
+.card__head {
+  padding: var(--sp-5);
+  border-block-end: 1px solid rgb(var(--v-theme-border));
+
+  &-title {
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-semibold);
+    color: rgb(var(--v-theme-on-surface));
+    letter-spacing: -0.01em;
+  }
+
+  &-sub {
+    margin-block-start: 4px;
+    font-size: var(--fs-sm);
+    color: rgb(var(--v-theme-text-secondary));
+  }
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: var(--sp-4) var(--sp-5);
+  border-block-end: 1px solid rgb(var(--v-theme-border));
+
+  &:last-child {
+    border-block-end: none;
+  }
+
+  &__body {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+  }
+
+  &__label {
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semibold);
+    color: rgb(var(--v-theme-on-surface));
+    line-height: 1.3;
+  }
+
+  &__hint {
+    margin-block-start: 2px;
+    font-size: var(--fs-sm);
+    color: rgb(var(--v-theme-text-secondary));
+    line-height: 1.4;
+  }
+}
+
+.save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: var(--sp-4) var(--sp-5);
+  border-block-start: 1px solid rgb(var(--v-theme-border));
+  background: rgb(var(--v-theme-surface-2));
+}
+
+.tip-body {
+  padding: var(--sp-5);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+</style>
 
 <route lang="yaml">
 meta:

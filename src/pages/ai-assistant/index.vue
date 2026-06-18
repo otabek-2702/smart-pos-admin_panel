@@ -256,10 +256,10 @@ onMounted(() => {
             >
               <div class="d-flex align-center pa-3">
                 <VChip
+                  class="status-pill me-3"
                   size="x-small"
                   :color="priorityColor[s.priority] || 'default'"
                   variant="tonal"
-                  class="me-3"
                 >
                   {{ t(s.priority) }}
                 </VChip>
@@ -415,12 +415,26 @@ meta:
 
 <style scoped lang="scss">
 .ai-chat-page {
-  block-size: calc(100vh - 10rem);
+  // Fill the design layout's page-shell content area. Parent main.page-shell
+  // is flex:1 + flex-column so block-size:100% gives a definite height.
+  block-size: 100%;
+  inline-size: 100%;
+  min-block-size: calc(100vh - var(--topbar-h, 64px) - var(--sp-7, 32px) * 2);
+  display: flex;
+  flex-direction: column;
 }
 
 .ai-chat-card {
-  block-size: 100%;
+  flex: 1;
+  min-block-size: 0;
   overflow: hidden;
+}
+
+// VTextField append-inner doesn't always vertical-center the action button on
+// density="comfortable". Pin send button to the input's vertical midline.
+.chat-input :deep(.v-field__append-inner) {
+  align-items: center;
+  padding-block: 0;
 }
 
 .chat-log {

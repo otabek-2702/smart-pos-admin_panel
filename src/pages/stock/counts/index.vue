@@ -330,9 +330,10 @@ async function recordItem(item: any) {
         </template>
         <template #item.count_type="{ item }">
           <VChip
-            color="secondary"
+            color="info"
             size="small"
             variant="tonal"
+            class="status-pill"
           >
             {{ t(`count_type_${item.raw.count_type}`) }}
           </VChip>
@@ -342,12 +343,13 @@ async function recordItem(item: any) {
             :color="statusColor[item.raw.status] ?? 'default'"
             size="small"
             variant="tonal"
+            class="status-pill"
           >
             {{ t(`count_status_${item.raw.status}`) }}
           </VChip>
         </template>
         <template #item.items_counted="{ item }">
-          {{ item.raw.items_counted ?? item.raw.count_items?.length ?? '—' }}
+          <span class="num-tabular">{{ item.raw.items_counted ?? item.raw.count_items?.length ?? '—' }}</span>
         </template>
         <template #item.created_at="{ item }">
           {{ formatDateShort(item.raw.created_at) }}
@@ -551,6 +553,7 @@ async function recordItem(item: any) {
             v-if="detailCount?.status"
             :color="statusColor[detailCount.status] ?? 'default'"
             variant="tonal"
+            class="status-pill"
           >
             {{ t(`count_status_${detailCount.status}`) }}
           </VChip>
@@ -619,7 +622,7 @@ async function recordItem(item: any) {
                 :key="i.id"
               >
                 <td class="font-weight-medium">{{ i.stock_item?.name ?? i.item?.name ?? '—' }}</td>
-                <td class="text-end">{{ i.system_quantity }} {{ i.stock_item?.unit?.short_name ?? '' }}</td>
+                <td class="text-end num-tabular">{{ i.system_quantity }} {{ i.stock_item?.unit?.short_name ?? '' }}</td>
                 <td class="text-end">
                   <VTextField
                     v-model.number="i._input"
@@ -636,6 +639,7 @@ async function recordItem(item: any) {
                     size="x-small"
                     :color="Number(i.variance ?? 0) === 0 ? 'success' : (Number(i.variance) < 0 ? 'error' : 'warning')"
                     variant="tonal"
+                    class="status-pill num-tabular"
                   >
                     {{ i.variance ?? 0 }} ({{ i.variance_percentage ?? 0 }}%)
                   </VChip>

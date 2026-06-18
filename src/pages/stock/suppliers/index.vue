@@ -363,6 +363,7 @@ const ledgerTypeColor: Record<string, string> = {
         </template>
         <template #item.is_active="{ item }">
           <VChip
+            class="status-pill"
             :color="item.raw.is_active ? 'success' : 'default'"
             size="small"
             variant="tonal"
@@ -725,7 +726,7 @@ const ledgerTypeColor: Record<string, string> = {
             v-if="paying"
             class="text-body-2 mb-3"
           >
-            {{ paying.name }}<span v-if="paying.current_balance"> · {{ t('Owed') }}: <strong class="text-warning">{{ formatCurrency(paying.current_balance) }}</strong></span>
+            {{ paying.name }}<span v-if="paying.current_balance"> · {{ t('Owed') }}: <strong class="text-warning num-tabular">{{ formatCurrency(paying.current_balance) }}</strong></span>
           </div>
           <VRow>
             <VCol cols="12" sm="6">
@@ -800,7 +801,7 @@ const ledgerTypeColor: Record<string, string> = {
               v-if="ledgerBalance !== null"
               class="text-caption"
             >
-              {{ t('Current balance') }}: <strong :class="Number(ledgerBalance) > 0 ? 'text-warning' : 'text-success'">{{ formatCurrency(ledgerBalance) }}</strong>
+              {{ t('Current balance') }}: <strong class="num-tabular" :class="Number(ledgerBalance) > 0 ? 'text-warning' : 'text-success'">{{ formatCurrency(ledgerBalance) }}</strong>
             </div>
           </div>
           <VBtn
@@ -838,6 +839,7 @@ const ledgerTypeColor: Record<string, string> = {
                 <td>{{ formatDate(r.created_at) }}</td>
                 <td>
                   <VChip
+                    class="status-pill"
                     size="x-small"
                     :color="ledgerTypeColor[r.type] ?? 'default'"
                     variant="tonal"
@@ -846,12 +848,12 @@ const ledgerTypeColor: Record<string, string> = {
                   </VChip>
                 </td>
                 <td
-                  class="text-end font-weight-medium"
+                  class="text-end font-weight-medium num-tabular"
                   :class="Number(r.amount ?? r.delta) > 0 ? 'text-warning' : 'text-success'"
                 >
                   {{ formatCurrency(r.amount ?? r.delta ?? 0) }}
                 </td>
-                <td class="text-end">{{ formatCurrency(r.balance_after ?? 0) }}</td>
+                <td class="text-end num-tabular">{{ formatCurrency(r.balance_after ?? 0) }}</td>
                 <td>
                   <span
                     v-if="r.reference_type"

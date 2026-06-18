@@ -277,6 +277,7 @@ const deductStatusItems = computed(() =>
             :color="typeColor[item.raw.link_type] ?? 'default'"
             size="small"
             variant="tonal"
+            class="status-pill"
           >
             {{ item.raw.link_type_display ?? item.raw.link_type }}
           </VChip>
@@ -289,6 +290,7 @@ const deductStatusItems = computed(() =>
             color="info"
             size="small"
             variant="tonal"
+            class="status-pill"
           >
             {{ item.raw.deduct_on_status_display ?? item.raw.deduct_on_status }}
           </VChip>

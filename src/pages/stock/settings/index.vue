@@ -98,6 +98,13 @@ onMounted(loadSettings)
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">{{ t('Stock Settings') }}</h1>
+        <div class="page-head__subtitle">{{ t('Configure stock tracking, alerts, modules, and approvals') }}</div>
+      </div>
+      <div class="page-head__actions" />
+    </div>
     <VRow>
       <!-- General -->
       <VCol

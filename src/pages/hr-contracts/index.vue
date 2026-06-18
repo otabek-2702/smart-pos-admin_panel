@@ -257,9 +257,16 @@ async function doRenew() {
 
 <template>
   <div>
-    <VCard>
-      <VCardText class="d-flex align-center justify-space-between py-3">
-        <span class="text-h6">{{ t('Contracts') }}</span>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
+          {{ t('Contracts') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Employment contracts — draft, activate, renew or terminate') }}
+        </div>
+      </div>
+      <div class="page-head__actions">
         <VBtn
           color="primary"
           prepend-icon="bx-plus"
@@ -267,8 +274,10 @@ async function doRenew() {
         >
           {{ t('New Contract') }}
         </VBtn>
-      </VCardText>
+      </div>
+    </div>
 
+    <VCard>
       <VDataTableServer
         :headers="headers"
         :items="items"
@@ -354,6 +363,7 @@ async function doRenew() {
         <template #item.contract_type="{ item }">
           <VChip
             size="small"
+            class="status-pill"
             color="info"
             variant="tonal"
           >
@@ -367,11 +377,12 @@ async function doRenew() {
           {{ item.raw.end_date ? formatDate(item.raw.end_date) : '—' }}
         </template>
         <template #item.salary="{ item }">
-          {{ formatCurrency(item.raw.salary_amount ?? item.raw.salary ?? item.raw.base_salary ?? 0) }}
+          <span class="num-tabular">{{ formatCurrency(item.raw.salary_amount ?? item.raw.salary ?? item.raw.base_salary ?? 0) }}</span>
         </template>
         <template #item.status="{ item }">
           <VChip
             size="small"
+            class="status-pill"
             :color="statusColor[item.raw.status] ?? 'default'"
             variant="tonal"
           >

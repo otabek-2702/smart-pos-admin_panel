@@ -271,6 +271,7 @@ const parentOptions = computed(() =>
 
         <template #item.type="{ item }">
           <VChip
+            class="status-pill"
             :color="typeColor[item.raw.type] ?? 'default'"
             size="small"
             variant="tonal"
@@ -307,6 +308,7 @@ const parentOptions = computed(() =>
         </template>
         <template #item.is_active="{ item }">
           <VChip
+            class="status-pill"
             :color="item.raw.is_active ? 'success' : 'default'"
             size="small"
             variant="tonal"

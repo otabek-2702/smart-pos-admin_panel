@@ -99,6 +99,26 @@ async function remove(d: any) {
 
 <template>
   <div>
+    <div class="page-head">
+      <div style="min-width:0;">
+        <h1 class="page-head__title">
+          {{ t('Departments') }}
+        </h1>
+        <div class="page-head__subtitle">
+          {{ t('Organisational units for employees') }}
+        </div>
+      </div>
+      <div class="page-head__actions">
+        <VBtn
+          color="primary"
+          prepend-icon="bx-plus"
+          @click="openCreate"
+        >
+          {{ t('New Department') }}
+        </VBtn>
+      </div>
+    </div>
+
     <VCard>
       <VCardText class="d-flex align-center gap-3 py-3 flex-wrap">
         <VTextField
@@ -111,13 +131,6 @@ async function remove(d: any) {
           clearable
         />
         <VSpacer />
-        <VBtn
-          color="primary"
-          prepend-icon="bx-plus"
-          @click="openCreate"
-        >
-          {{ t('New Department') }}
-        </VBtn>
       </VCardText>
 
       <VDataTableServer
@@ -188,6 +201,7 @@ async function remove(d: any) {
         <template #item.is_active="{ item }">
           <VChip
             size="small"
+            class="status-pill"
             :color="item.raw.is_active ? 'success' : 'default'"
             variant="tonal"
           >

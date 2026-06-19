@@ -3,6 +3,7 @@ import axios from '@/plugins/axios'
 
 const { t } = useI18n({ useScope: 'global' })
 const router = useRouter()
+const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 
 // ============================================================
 // Inline format helpers (ported from .tmp-design-bundle/.../format.js)
@@ -82,6 +83,7 @@ const data = ref<any>(null)
 const recentOrders = ref<any[]>([])
 const recentOrdersLoading = ref(true)
 const nowStamp = ref(new Date())
+const exporting = ref(false)
 
 async function load() {
   loading.value = true
@@ -90,8 +92,9 @@ async function load() {
     data.value = res.data?.data ?? res.data
     nowStamp.value = new Date()
   }
-  catch {
+  catch (e: any) {
     data.value = null
+    notify(e?.response?.data?.message ?? t('Failed to load dashboard'), 'error')
   }
   finally {
     loading.value = false
@@ -105,11 +108,38 @@ async function loadRecentOrders() {
     const d = res.data?.data ?? res.data
     recentOrders.value = d?.orders ?? d?.items ?? (Array.isArray(d) ? d : [])
   }
-  catch {
+  catch (e: any) {
     recentOrders.value = []
+    notify(e?.response?.data?.message ?? t('Failed to load recent orders'), 'error')
   }
   finally {
     recentOrdersLoading.value = false
+  }
+}
+
+async function exportReport() {
+  if (exporting.value)
+    return
+  exporting.value = true
+  try {
+    const res = await axios.get('/dashboard/export', { responseType: 'blob' })
+    const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const stamp = new Date().toISOString().slice(0, 10)
+    a.download = `dashboard-${stamp}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    notify(t('Export downloaded'))
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Export failed'), 'error')
+  }
+  finally {
+    exporting.value = false
   }
 }
 
@@ -176,7 +206,7 @@ const paymentMix = computed(() => {
   return Object.entries(paymentBreakdown.value)
     .map(([k, v]) => ({
       key: k,
-      label: PAYMENT_LABELS[k] ?? k,
+      label: k === 'CASH' ? t('Cash') : (PAYMENT_LABELS[k] ?? k),
       value: Number(v) || 0,
       color: PAYMENT_COLORS[k] ?? 'var(--c5)',
     }))
@@ -483,7 +513,7 @@ const aovCounted = useCountUp(aovTarget01)
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-3-6.7" /><polyline points="21 4 21 11 14 11" /></svg>
           {{ t('Refresh') }}
         </button>
-        <button class="btn btn--primary">
+        <button class="btn btn--primary" :class="{ 'is-loading': exporting }" :disabled="exporting" @click="exportReport">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
           {{ t('Export report') }}
         </button>
@@ -640,7 +670,7 @@ const aovCounted = useCountUp(aovTarget01)
     </div>
 
     <!-- ===== Revenue trend + payment mix ===== -->
-    <div class="grid" style="grid-template-columns: 1.7fr 1fr; margin-bottom: var(--sp-5);">
+    <div class="grid split-1-7" style="margin-bottom: var(--sp-5);">
       <div class="card">
         <div class="card__head">
           <div class="card__head-text">
@@ -662,7 +692,8 @@ const aovCounted = useCountUp(aovTarget01)
               {{ t('No data for this range') }}
             </div>
           </div>
-          <div v-else ref="lineEl" style="position:relative;">
+          <div v-else style="overflow-x:auto;">
+            <div ref="lineEl" style="position:relative; min-width:600px;">
             <svg :width="LINE_W" :height="LINE_H" style="display:block;">
               <defs>
                 <linearGradient :id="lineGradId" x1="0" y1="0" x2="0" y2="1">
@@ -728,6 +759,7 @@ const aovCounted = useCountUp(aovTarget01)
                 {{ t('Daily target') }} <b>{{ fmtMoney(revenueTarget) }}</b>
               </span>
             </div>
+            </div>
           </div>
         </div>
       </div>
@@ -761,9 +793,8 @@ const aovCounted = useCountUp(aovTarget01)
             <div style="position: relative; flex: 0 0 auto;">
               <svg
                 class="donut-in"
-                :width="DONUT_SIZE"
-                :height="DONUT_SIZE"
-                :style="{ opacity: donutShown ? 1 : 0, transform: donutShown ? 'none' : 'rotate(-10deg) scale(.9)' }"
+                :viewBox="`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`"
+                :style="{ opacity: donutShown ? 1 : 0, transform: donutShown ? 'none' : 'rotate(-10deg) scale(.9)', width: '100%', maxWidth: `${DONUT_SIZE}px`, height: 'auto', display: 'block', margin: '0 auto' }"
               >
                 <path
                   v-for="(a, i) in donutArcs"
@@ -804,7 +835,7 @@ const aovCounted = useCountUp(aovTarget01)
     </div>
 
     <!-- ===== Orders by hour + top products ===== -->
-    <div class="grid" style="grid-template-columns: 1.4fr 1fr; margin-bottom: var(--sp-5);">
+    <div class="grid split-1-4" style="margin-bottom: var(--sp-5);">
       <div class="card">
         <div class="card__head">
           <div class="card__head-text">
@@ -829,7 +860,8 @@ const aovCounted = useCountUp(aovTarget01)
               {{ t('No data for this range') }}
             </div>
           </div>
-          <div v-else ref="barEl" style="position:relative;">
+          <div v-else style="overflow-x:auto;">
+            <div ref="barEl" style="position:relative; min-width:520px;">
             <svg :width="BAR_W" :height="BAR_H" style="display:block;">
               <g v-for="(tv, i) in barTicks.ticks" :key="`bg${i}`">
                 <line :x1="BAR_PAD_L" :x2="BAR_W - BAR_PAD_R" :y1="barY(tv)" :y2="barY(tv)" stroke="var(--chart-grid)" stroke-width="1" />
@@ -874,6 +906,7 @@ const aovCounted = useCountUp(aovTarget01)
                 />
               </g>
             </svg>
+            </div>
           </div>
         </div>
       </div>
@@ -934,7 +967,7 @@ const aovCounted = useCountUp(aovTarget01)
     </div>
 
     <!-- ===== Recent orders + side column ===== -->
-    <div class="grid" style="grid-template-columns: 1.7fr 1fr;">
+    <div class="grid split-1-7">
       <div class="card">
         <div class="card__head">
           <div class="card__head-text">
@@ -985,10 +1018,10 @@ const aovCounted = useCountUp(aovTarget01)
                 #{{ o.display_id ?? o.id }}
               </td>
               <td>
-                <span class="badge t-neutral">{{ titleCase(o.order_type ?? 'HALL') }}</span>
+                <span class="badge t-neutral">{{ t(titleCase(o.order_type ?? 'HALL')) }}</span>
               </td>
               <td>
-                <span class="badge badge--dot" :class="`t-${statusTone(o.status)}`">{{ titleCase(o.status) }}</span>
+                <span class="badge badge--dot" :class="`t-${statusTone(o.status)}`">{{ t(titleCase(o.status)) }}</span>
               </td>
               <td>
                 <span class="badge" :class="`t-${statusTone(o.is_paid ? 'PAID' : 'UNPAID')}`">{{ o.is_paid ? t('Paid') : t('UNPAID') }}</span>
@@ -1076,8 +1109,26 @@ const aovCounted = useCountUp(aovTarget01)
         </div>
       </div>
     </div>
+
+    <!-- Toast / snackbar -->
+    <VSnackbar
+      v-model="snackbar"
+      :color="snackbarColor"
+      location="top end"
+      timeout="3500"
+    >
+      {{ snackbarMsg }}
+    </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.split-1-7 { grid-template-columns: 1.7fr 1fr; }
+.split-1-4 { grid-template-columns: 1.4fr 1fr; }
+@media (max-width: 1100px) {
+  .split-1-7, .split-1-4 { grid-template-columns: 1fr; }
+}
+</style>
 
 <route lang="yaml">
 meta:

@@ -26,6 +26,21 @@ const selected = ref<Set<number | string>>(new Set())
 const sortKey = ref<string>('id')
 const sortDir = ref<'asc' | 'desc'>('desc')
 
+// Per-row + bulk loading state to prevent duplicate POSTs
+const actingOnId = ref<number | string | null>(null)
+const bulking = ref(false)
+const exporting = ref(false)
+
+// Destructive-action confirm dialogs
+type ConfirmKind = 'cancel-one' | 'cancel-bulk' | 'pay-one' | 'pay-bulk'
+const confirmDialog = ref<{ kind: ConfirmKind, order?: any } | null>(null)
+function openConfirm(kind: ConfirmKind, order?: any) {
+  confirmDialog.value = { kind, order }
+}
+function closeConfirm() {
+  confirmDialog.value = null
+}
+
 const debouncedSearch = useDebounceFn(() => {
   page.value = 1
   loadOrders()
@@ -100,6 +115,8 @@ watch(search, () => debouncedSearch())
 
 // ---- actions ----
 async function markPaid(order: any) {
+  if (actingOnId.value === order.id) return
+  actingOnId.value = order.id
   try {
     await axios.post(`/orders/${order.id}/pay`)
     notify(t('Order marked as paid'))
@@ -108,9 +125,14 @@ async function markPaid(order: any) {
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error updating order'), 'error')
   }
+  finally {
+    actingOnId.value = null
+  }
 }
 
 async function cancelOrder(order: any) {
+  if (actingOnId.value === order.id) return
+  actingOnId.value = order.id
   try {
     await axios.post(`/orders/${order.id}/cancel`)
     notify(t('Order cancelled'))
@@ -119,6 +141,29 @@ async function cancelOrder(order: any) {
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error cancelling order'), 'error')
   }
+  finally {
+    actingOnId.value = null
+  }
+}
+
+// Wrappers triggered from confirm dialog
+async function confirmCancelOne() {
+  const o = confirmDialog.value?.order
+  closeConfirm()
+  if (o) await cancelOrder(o)
+}
+async function confirmPayOne() {
+  const o = confirmDialog.value?.order
+  closeConfirm()
+  if (o) await markPaid(o)
+}
+async function confirmCancelBulk() {
+  closeConfirm()
+  await bulkCancel()
+}
+async function confirmPayBulk() {
+  closeConfirm()
+  await bulkMarkPaid()
 }
 
 async function exportOneC() {
@@ -126,6 +171,8 @@ async function exportOneC() {
     notify(t('Pick a date range to export'), 'error')
     return
   }
+  if (exporting.value) return
+  exporting.value = true
   try {
     const res = await axios.get('/exports/1c', {
       params: { from: dateFrom.value, to: dateTo.value },
@@ -144,24 +191,41 @@ async function exportOneC() {
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Export failed'), 'error')
   }
+  finally {
+    exporting.value = false
+  }
 }
 
 // ---- bulk + selection ----
 async function bulkMarkPaid() {
-  const ids = [...selected.value]
-  for (const id of ids) {
-    const o = orders.value.find((x: any) => x.id === id)
-    if (o) await markPaid(o)
+  if (bulking.value) return
+  bulking.value = true
+  try {
+    const ids = [...selected.value]
+    for (const id of ids) {
+      const o = orders.value.find((x: any) => x.id === id)
+      if (o) await markPaid(o)
+    }
+    selected.value = new Set()
   }
-  selected.value = new Set()
+  finally {
+    bulking.value = false
+  }
 }
 async function bulkCancel() {
-  const ids = [...selected.value]
-  for (const id of ids) {
-    const o = orders.value.find((x: any) => x.id === id)
-    if (o) await cancelOrder(o)
+  if (bulking.value) return
+  bulking.value = true
+  try {
+    const ids = [...selected.value]
+    for (const id of ids) {
+      const o = orders.value.find((x: any) => x.id === id)
+      if (o) await cancelOrder(o)
+    }
+    selected.value = new Set()
   }
-  selected.value = new Set()
+  finally {
+    bulking.value = false
+  }
 }
 
 function toggleRow(id: number | string) {
@@ -264,8 +328,8 @@ function itemsOf(o: any) {
       <div class="page__head-actions">
         <button
           class="btn btn--primary"
-          :class="{ 'is-disabled': !dateFrom || !dateTo }"
-          :disabled="!dateFrom || !dateTo"
+          :class="{ 'is-disabled': !dateFrom || !dateTo || exporting, 'is-loading': exporting }"
+          :disabled="!dateFrom || !dateTo || exporting"
           @click="exportOneC"
         >
           <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -362,7 +426,7 @@ function itemsOf(o: any) {
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
-            <input v-model="search" :placeholder="t('Search orders...')">
+            <input v-model="search" :placeholder="t('Search orders...')" :aria-label="t('Search orders')">
           </div>
         </div>
 
@@ -376,7 +440,7 @@ function itemsOf(o: any) {
                 {{ t('Filter by Status') }}
               </option>
               <option v-for="s in orderStatuses" :key="s" :value="s">
-                {{ s }}
+                {{ t(s) }}
               </option>
             </select>
             <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -392,7 +456,7 @@ function itemsOf(o: any) {
                 {{ t('Payment Status') }}
               </option>
               <option v-for="p in paymentStatuses" :key="p" :value="p">
-                {{ p }}
+                {{ t(p) }}
               </option>
             </select>
             <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -427,7 +491,7 @@ function itemsOf(o: any) {
           </span>
 
           <span v-for="s in statusFilter" :key="s" class="chip">
-            <span>{{ t('Status') }}: <b>{{ s }}</b></span>
+            <span>{{ t('Status') }}: <b>{{ t(s) }}</b></span>
             <span class="chip__x" @click="statusFilter = statusFilter.filter(x => x !== s)">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -436,7 +500,7 @@ function itemsOf(o: any) {
           </span>
 
           <span v-if="paymentFilter" class="chip">
-            <span>{{ t('Payment') }}: <b>{{ paymentFilter }}</b></span>
+            <span>{{ t('Payment') }}: <b>{{ t(paymentFilter) }}</b></span>
             <span class="chip__x" @click="paymentFilter = undefined">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -472,29 +536,40 @@ function itemsOf(o: any) {
 
       <!-- Bulk actions bar -->
       <div v-if="selected.size > 0" class="bulkbar">
-        <span class="bulkbar__count">{{ selected.size }} {{ t('selected') }}</span>
+        <span class="bulkbar__count">{{ t('{n} selected', { n: selected.size }) }}</span>
         <div class="row" style="gap: 8px; margin-left: auto;">
-          <button class="btn btn--secondary btn--sm" @click="bulkMarkPaid">
+          <button
+            class="btn btn--secondary btn--sm"
+            :class="{ 'is-loading': bulking }"
+            :disabled="bulking"
+            @click="openConfirm('pay-bulk')"
+          >
             <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="12" y1="1" x2="12" y2="23" />
               <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
             </svg>
             {{ t('Mark paid') }}
           </button>
-          <button class="btn btn--danger-soft btn--sm" @click="bulkCancel">
+          <button
+            class="btn btn--danger-soft btn--sm"
+            :class="{ 'is-loading': bulking }"
+            :disabled="bulking"
+            @click="openConfirm('cancel-bulk')"
+          >
             <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
             {{ t('Cancel') }}
           </button>
-          <button class="btn btn--ghost btn--sm" @click="selected = new Set()">
+          <button class="btn btn--ghost btn--sm" :disabled="bulking" @click="selected = new Set()">
             {{ t('Clear') }}
           </button>
         </div>
       </div>
 
       <!-- Table -->
-      <table class="dtable">
+      <div class="tablewrap">
+        <table class="dtable">
         <thead>
           <tr>
             <th style="width: 36px;">
@@ -517,7 +592,7 @@ function itemsOf(o: any) {
             </th>
             <th>{{ t('Type') }}</th>
             <th>{{ t('Info') }}</th>
-            <th class="sortable" @click="setSort('status')">
+            <th class="sortable" :title="t('Sorts current page only')" @click="setSort('status')">
               {{ t('Status') }} <span v-if="sortKey === 'status'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
             <th>{{ t('Payment') }}</th>
@@ -610,13 +685,13 @@ function itemsOf(o: any) {
                 <span class="cell-strong mono">#{{ o.display_id ?? o.id }}</span>
               </td>
               <td>
-                <span class="badge" :class="`t-${tone(o.order_type)}`">{{ o.order_type }}</span>
+                <span class="badge" :class="`t-${tone(o.order_type)}`">{{ t(o.order_type) }}</span>
               </td>
               <td>
                 <span class="cell-muted">{{ infoOf(o) }}</span>
               </td>
               <td>
-                <span class="badge badge--dot" :class="`t-${tone(o.status)}`">{{ o.status }}</span>
+                <span class="badge badge--dot" :class="`t-${tone(o.status)}`">{{ t(o.status) }}</span>
               </td>
               <td>
                 <span class="badge" :class="o.is_paid ? 't-success' : 't-error'">
@@ -637,8 +712,10 @@ function itemsOf(o: any) {
                   <button
                     v-if="!o.is_paid && o.status !== 'CANCELED'"
                     class="iconaction is-success"
+                    :class="{ 'is-loading': actingOnId === o.id }"
+                    :disabled="actingOnId === o.id"
                     :title="t('Pay')"
-                    @click="markPaid(o)"
+                    @click="openConfirm('pay-one', o)"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <line x1="12" y1="1" x2="12" y2="23" />
@@ -648,20 +725,15 @@ function itemsOf(o: any) {
                   <button
                     v-if="o.status !== 'CANCELED' && o.status !== 'COMPLETED'"
                     class="iconaction is-danger"
+                    :class="{ 'is-loading': actingOnId === o.id }"
+                    :disabled="actingOnId === o.id"
                     :title="t('Cancel')"
-                    @click="cancelOrder(o)"
+                    @click="openConfirm('cancel-one', o)"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <circle cx="12" cy="12" r="10" />
                       <line x1="15" y1="9" x2="9" y2="15" />
                       <line x1="9" y1="9" x2="15" y2="15" />
-                    </svg>
-                  </button>
-                  <button class="iconaction" :title="t('More')" @click.stop>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="12" r="1" />
-                      <circle cx="19" cy="12" r="1" />
-                      <circle cx="5" cy="12" r="1" />
                     </svg>
                   </button>
                 </div>
@@ -675,7 +747,8 @@ function itemsOf(o: any) {
                   <div class="kpi__label" style="margin-bottom: 10px;">
                     {{ t('Order Items') }}
                   </div>
-                  <table class="dtable" style="background: var(--surface); border-radius: 10px; border: 1px solid var(--border); overflow: hidden;">
+                  <div class="tablewrap">
+                    <table class="dtable" style="background: var(--surface); border-radius: 10px; border: 1px solid var(--border); overflow: hidden;">
                     <thead>
                       <tr>
                         <th>{{ t('Product') }}</th>
@@ -711,13 +784,15 @@ function itemsOf(o: any) {
                         </td>
                       </tr>
                     </tbody>
-                  </table>
+                    </table>
+                  </div>
                 </div>
               </td>
             </tr>
           </template>
         </tbody>
-      </table>
+        </table>
+      </div>
 
       <!-- Pagination -->
       <div class="pagination">
@@ -765,6 +840,116 @@ function itemsOf(o: any) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="9 18 15 12 9 6" />
             </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm action modal (cancel / mark paid, single or bulk) -->
+    <div v-if="confirmDialog" class="overlay" @mousedown.self="closeConfirm">
+      <div class="modal" style="max-width:440px;" role="dialog" aria-modal="true">
+        <div class="modal__head">
+          <div style="flex:1;min-width:0;">
+            <h3 class="modal__title">
+              <template v-if="confirmDialog.kind === 'cancel-one'">
+                {{ t('Cancel this order?') }}
+              </template>
+              <template v-else-if="confirmDialog.kind === 'cancel-bulk'">
+                {{ t('Cancel selected orders?') }}
+              </template>
+              <template v-else-if="confirmDialog.kind === 'pay-one'">
+                {{ t('Mark this order as paid?') }}
+              </template>
+              <template v-else>
+                {{ t('Mark selected orders as paid?') }}
+              </template>
+            </h3>
+            <div class="modal__sub">
+              <template v-if="confirmDialog.kind === 'cancel-one' || confirmDialog.kind === 'cancel-bulk'">
+                {{ t('This action cannot be undone') }}
+              </template>
+              <template v-else>
+                {{ t('Payment status will change immediately.') }}
+              </template>
+            </div>
+          </div>
+          <button class="iconaction" :title="t('Close')" @click="closeConfirm">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <div class="row" style="gap:14px;align-items:flex-start;">
+            <div
+              class="kpi__icon"
+              :class="(confirmDialog.kind === 'cancel-one' || confirmDialog.kind === 'cancel-bulk') ? 't-error' : 't-success'"
+              style="width:44px;height:44px;flex:0 0 44px;"
+            >
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <div>
+              <p v-if="confirmDialog.order" style="margin:0;font-weight:600;">
+                #{{ confirmDialog.order.display_id ?? confirmDialog.order.id }}
+                · {{ formatCurrency(confirmDialog.order.total_amount ?? 0) }}
+              </p>
+              <p v-else style="margin:0;font-weight:600;">
+                {{ t('{n} selected', { n: selected.size }) }}
+              </p>
+              <p class="muted" style="margin:6px 0 0;font-size:14px;">
+                <template v-if="confirmDialog.kind === 'cancel-one' || confirmDialog.kind === 'cancel-bulk'">
+                  {{ t('Cancelling may require a refund and impact the customer.') }}
+                </template>
+                <template v-else>
+                  {{ t('No refund flow will be triggered.') }}
+                </template>
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="modal__foot">
+          <button class="btn btn--ghost" :disabled="bulking || actingOnId !== null" @click="closeConfirm">
+            {{ t('Close') }}
+          </button>
+          <button
+            v-if="confirmDialog.kind === 'cancel-one'"
+            class="btn btn--danger"
+            :class="{ 'is-loading': actingOnId !== null }"
+            :disabled="actingOnId !== null"
+            @click="confirmCancelOne"
+          >
+            {{ t('Cancel order') }}
+          </button>
+          <button
+            v-else-if="confirmDialog.kind === 'cancel-bulk'"
+            class="btn btn--danger"
+            :class="{ 'is-loading': bulking }"
+            :disabled="bulking"
+            @click="confirmCancelBulk"
+          >
+            {{ t('Cancel orders') }}
+          </button>
+          <button
+            v-else-if="confirmDialog.kind === 'pay-one'"
+            class="btn btn--primary"
+            :class="{ 'is-loading': actingOnId !== null }"
+            :disabled="actingOnId !== null"
+            @click="confirmPayOne"
+          >
+            {{ t('Mark paid') }}
+          </button>
+          <button
+            v-else
+            class="btn btn--primary"
+            :class="{ 'is-loading': bulking }"
+            :disabled="bulking"
+            @click="confirmPayBulk"
+          >
+            {{ t('Mark paid') }}
           </button>
         </div>
       </div>

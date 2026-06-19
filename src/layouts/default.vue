@@ -52,6 +52,16 @@ main.page-shell > .page {
   margin: 0 auto;
 }
 
+@media (max-width: 900px) {
+  main.page-shell { padding: var(--sp-5) var(--sp-5); }
+}
+@media (max-width: 600px) {
+  main.page-shell { padding: var(--sp-4) var(--sp-4); }
+}
+@media (max-width: 420px) {
+  main.page-shell { padding: var(--sp-3) var(--sp-3); }
+}
+
 .fade-enter-active, .fade-leave-active { transition: opacity .15s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

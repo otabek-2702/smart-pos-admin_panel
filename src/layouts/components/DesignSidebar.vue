@@ -69,7 +69,7 @@ function go(item: NavItem) {
         </svg>
       </div>
       <div v-if="!collapsed" class="sidebar__name">
-        Alpha<span> POS</span>
+        {{ t('Alpha POS') }}
       </div>
     </div>
 

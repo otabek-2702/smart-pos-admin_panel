@@ -38,6 +38,7 @@ const dialogLoading = ref(false)
 // Confirm delete
 const deleteDialog = ref(false)
 const deletingProduct = ref<any>(null)
+const deleteBusy = ref(false)
 
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 
@@ -143,7 +144,11 @@ onMounted(() => {
   loadCategories()
 })
 
-watch([page, itemsPerPage], loadProducts)
+watch(page, loadProducts)
+watch(itemsPerPage, () => {
+  page.value = 1
+  loadProducts()
+})
 
 const debouncedSearch = useDebounceFn(() => {
   page.value = 1
@@ -167,6 +172,11 @@ function tryCloseDialog() {
 
     return
   }
+  dialogOpen.value = false
+}
+
+// Always closes the dialog without dirty checks. Used by the X button & Cancel.
+function forceClose() {
   dialogOpen.value = false
 }
 
@@ -225,14 +235,20 @@ async function saveProduct() {
   }
 }
 
+const deleteConfirmBtn = ref<HTMLButtonElement | null>(null)
+
 function confirmDelete(product: any) {
   deletingProduct.value = product
   deleteDialog.value = true
+  nextTick(() => {
+    deleteConfirmBtn.value?.focus()
+  })
 }
 
 async function deleteProduct() {
   if (!deletingProduct.value)
     return
+  deleteBusy.value = true
   try {
     await axios.delete(`/products/${deletingProduct.value.id}`)
     notify(t('Product deleted'))
@@ -241,6 +257,9 @@ async function deleteProduct() {
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting product'), 'error')
+  }
+  finally {
+    deleteBusy.value = false
   }
 }
 
@@ -589,7 +608,7 @@ function goPage(p: number | '…') {
                     </svg>
                   </div>
                   <div class="statefill__title">
-                    {{ t('No products match your filters') }}
+                    {{ activeFilters.length > 0 ? t('No products match your filters') : t('No products yet') }}
                   </div>
                   <div
                     v-if="activeFilters.length > 0"
@@ -600,6 +619,39 @@ function goPage(p: number | '…') {
                       @click="clearAll"
                     >
                       {{ t('Clear all') }}
+                    </button>
+                  </div>
+                  <div
+                    v-else
+                    style="margin-top:12px;"
+                  >
+                    <button
+                      class="btn btn--primary btn--sm"
+                      @click="openCreate"
+                    >
+                      <svg
+                        class="ic"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <line
+                          x1="12"
+                          y1="5"
+                          x2="12"
+                          y2="19"
+                        />
+                        <line
+                          x1="5"
+                          y1="12"
+                          x2="19"
+                          y2="12"
+                        />
+                      </svg>
+                      {{ t('Add Product') }}
                     </button>
                   </div>
                 </div>
@@ -721,10 +773,46 @@ function goPage(p: number | '…') {
         v-if="totalProducts > 0"
         class="pagination"
       >
+        <div
+          class="row"
+          style="gap: 8px; align-items: center;"
+        >
+          <span>{{ t('Rows per page') }}:</span>
+          <div
+            class="control control--select control--sm"
+            style="width: 84px;"
+          >
+            <select v-model.number="itemsPerPage">
+              <option :value="10">
+                10
+              </option>
+              <option :value="25">
+                25
+              </option>
+              <option :value="50">
+                50
+              </option>
+              <option :value="100">
+                100
+              </option>
+            </select>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
+        </div>
+        <span class="pagination__spacer" />
         <span class="muted">
           {{ pageStart }}–{{ pageEnd }} {{ t('of') }} {{ totalProducts }}
         </span>
-        <span class="pagination__spacer" />
         <div class="pglist">
           <button
             class="pgbtn"
@@ -780,11 +868,12 @@ function goPage(p: number | '…') {
     <div
       v-if="dialogOpen"
       class="overlay"
-      @click.self="tryCloseDialog"
+      @mousedown.self="tryCloseDialog"
     >
-      <div
+      <form
         class="modal"
         style="max-width:560px;"
+        @submit.prevent="saveProduct"
       >
         <div class="modal__head">
           <div style="flex:1;min-width:0;">
@@ -796,9 +885,10 @@ function goPage(p: number | '…') {
             </div>
           </div>
           <button
+            type="button"
             class="iconaction"
             :title="t('Close')"
-            @click="tryCloseDialog"
+            @click="forceClose"
           >
             <svg
               viewBox="0 0 24 24"
@@ -842,7 +932,7 @@ function goPage(p: number | '…') {
                   {{ form.name || t('Name') }}
                 </div>
                 <div class="pos-product-card__price">
-                  {{ form.price ? `${formatCurrency(form.price)} so'm` : '0 so\'m' }}
+                  {{ form.price ? `${formatCurrency(form.price)} ${t('currency_short')}` : `0 ${t('currency_short')}` }}
                 </div>
                 <div
                   v-if="form.color"
@@ -915,7 +1005,7 @@ function goPage(p: number | '…') {
               <div class="control control--select">
                 <select v-model="form.category_id">
                   <option :value="null">
-                    {{ t('All Categories') }}
+                    {{ t('Choose category') }}
                   </option>
                   <option
                     v-for="opt in categoryOptions"
@@ -992,17 +1082,18 @@ function goPage(p: number | '…') {
 
         <div class="modal__foot">
           <button
+            type="button"
             class="btn btn--ghost"
             :disabled="dialogLoading"
-            @click="tryCloseDialog"
+            @click="forceClose"
           >
             {{ t('Cancel') }}
           </button>
           <button
+            type="submit"
             class="btn btn--primary"
             :class="{ 'is-loading': dialogLoading }"
             :disabled="dialogLoading"
-            @click="saveProduct"
           >
             <svg
               class="ic"
@@ -1018,14 +1109,14 @@ function goPage(p: number | '…') {
             {{ t('Save') }}
           </button>
         </div>
-      </div>
+      </form>
     </div>
 
     <!-- ============== DELETE CONFIRM MODAL ============== -->
     <div
       v-if="deleteDialog"
       class="overlay"
-      @click.self="deleteDialog = false"
+      @mousedown.self="() => { if (!deleteBusy) deleteDialog = false }"
     >
       <div
         class="modal"
@@ -1040,6 +1131,7 @@ function goPage(p: number | '…') {
           <button
             class="iconaction"
             :title="t('Close')"
+            :disabled="deleteBusy"
             @click="deleteDialog = false"
           >
             <svg
@@ -1119,12 +1211,16 @@ function goPage(p: number | '…') {
         <div class="modal__foot">
           <button
             class="btn btn--ghost"
+            :disabled="deleteBusy"
             @click="deleteDialog = false"
           >
             {{ t('Cancel') }}
           </button>
           <button
+            ref="deleteConfirmBtn"
             class="btn btn--danger"
+            :class="{ 'is-loading': deleteBusy }"
+            :disabled="deleteBusy"
             @click="deleteProduct"
           >
             <svg

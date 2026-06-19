@@ -223,8 +223,8 @@ const activeFilters = computed(() => {
   }
   if (statusF.value) arr.push({ k: 's', label: t('Status'), val: t(statusF.value), clear: () => (statusF.value = '') })
   if (liveOnly.value) arr.push({ k: 'l', label: t('Live only'), val: t('On'), clear: () => (liveOnly.value = false) })
-  if (dateFrom.value) arr.push({ k: 'f', label: t('From'), val: dateFrom.value, clear: () => (dateFrom.value = '') })
-  if (dateTo.value) arr.push({ k: 't', label: t('To'), val: dateTo.value, clear: () => (dateTo.value = '') })
+  if (dateFrom.value) arr.push({ k: 'f', label: t('Date from'), val: dateFrom.value, clear: () => (dateFrom.value = '') })
+  if (dateTo.value) arr.push({ k: 't', label: t('Date to'), val: dateTo.value, clear: () => (dateTo.value = '') })
   return arr
 })
 function clearAllFilters() {
@@ -270,42 +270,105 @@ function openReport(s: any) {
   router.push({ path: '/analytics/shift-handover', query: { shift: String(s.id) } })
 }
 
+// ------------------------------------------------------------
+// End shift confirmation (destructive)
+// ------------------------------------------------------------
+const endingShift = ref<any | null>(null)
+function askEndShift(s: any) {
+  endingShift.value = s
+}
+function cancelEndShift() {
+  endingShift.value = null
+}
+function confirmEndShift() {
+  const s = endingShift.value
+  endingShift.value = null
+  if (s) openReport(s)
+}
+
+// ------------------------------------------------------------
+// Export (CSV) — current filtered set
+// ------------------------------------------------------------
+function exportShifts() {
+  const rows = filtered.value
+  if (!rows.length) {
+    notify(t('Nothing to export'), 'warning')
+    return
+  }
+  const header = ['id', 'cashier', 'start', 'end', 'orders', 'gross', 'net', 'cash_collected', 'expenses', 'state']
+  const csv = [header.join(',')]
+  for (const s of rows) {
+    csv.push([
+      s.id,
+      JSON.stringify(fullName(s.user)),
+      s.start_time || '',
+      s.end_time || '',
+      num(s.total_orders),
+      num(s.total_revenue),
+      netOf(s),
+      num(s.cash_collected),
+      num(s.expenses_total),
+      shiftState(s),
+    ].join(','))
+  }
+  const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `shifts-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 async function confirmReceive() {
   if (!receiving.value || countedParsed.value === null) return
   busy.value = true
   const s = receiving.value
   const variance = liveVariance.value ?? 0
+  let success = false
+  let endpointMissing = false
   try {
     // POST to backend reconciliation endpoint
-    // TODO: confirm endpoint shape — current alpha_pos backend may differ. If
-    // /shifts/:id/reconcile doesn't exist yet we fall back to local update.
     await axios.post(`/shifts/${s.id}/reconcile`, {
       counted_cash: countedParsed.value,
       variance,
       note: note.value || undefined,
     })
+    success = true
     notify(`${t('Cash received from')} ${fullName(s.user)} · ${fmtMoney(countedParsed.value!)} UZS`, variance === 0 ? 'success' : variance > 0 ? 'info' : 'warning')
   }
-  catch {
-    // Local fallback so the manager workflow still works in preview / when BE
-    // endpoint isn't deployed yet.
-    notify(`${t('Recorded locally — backend endpoint not available')} (${fmtMoney(countedParsed.value!)} UZS)`, 'warning')
+  catch (e: any) {
+    const status = e?.response?.status
+    if (status === 404) {
+      // Treat as a graceful fallback — endpoint not deployed yet.
+      endpointMissing = true
+      notify(`${t('Recorded locally — backend endpoint not available')} (${fmtMoney(countedParsed.value!)} UZS)`, 'warning')
+    }
+    else {
+      // Real backend error — surface as error and do NOT optimistically update.
+      const msg = e?.response?.data?.message || e?.message || t('Failed to record cash handover')
+      notify(msg, 'error')
+    }
   }
-  // Update local list either way so the card flips to RECONCILED.
-  shifts.value = shifts.value.map((x: any) => x.id === s.id
-    ? {
-        ...x,
-        reconciliation: {
-          ...(x.reconciliation || {}),
-          counted_cash: countedParsed.value,
-          variance,
-          reported_by_user: { first_name: 'Manager' },
-          note: note.value || undefined,
-        },
-      }
-    : x)
+  // Only flip the card locally when we actually succeeded (or when BE is missing).
+  if (success || endpointMissing) {
+    shifts.value = shifts.value.map((x: any) => x.id === s.id
+      ? {
+          ...x,
+          reconciliation: {
+            ...(x.reconciliation || {}),
+            counted_cash: countedParsed.value,
+            variance,
+            reported_by_user: { first_name: 'Manager' },
+            note: note.value || undefined,
+          },
+        }
+      : x)
+    receiving.value = null
+  }
   busy.value = false
-  receiving.value = null
 }
 
 // ============================================================
@@ -317,6 +380,98 @@ const statusOptions = [
   { value: 'Awaiting cash', label: 'Awaiting cash' },
   { value: 'Reconciled', label: 'Reconciled' },
 ]
+
+// ============================================================
+// Modal ergonomics: ESC to close + focus trap.
+// Applies to both the receive-cash modal and the end-shift confirm modal.
+// ============================================================
+const receiveModalEl = ref<HTMLElement | null>(null)
+const endModalEl = ref<HTMLElement | null>(null)
+
+function focusableIn(root: HTMLElement | null): HTMLElement[] {
+  if (!root) return []
+  const sel = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  return Array.from(root.querySelectorAll<HTMLElement>(sel)).filter(el => !el.hasAttribute('aria-hidden'))
+}
+function trapTab(e: KeyboardEvent, root: HTMLElement | null) {
+  if (e.key !== 'Tab' || !root) return
+  const list = focusableIn(root)
+  if (list.length === 0) return
+  const first = list[0]
+  const last = list[list.length - 1]
+  const active = document.activeElement as HTMLElement | null
+  if (e.shiftKey) {
+    if (active === first || !root.contains(active)) {
+      e.preventDefault()
+      last.focus()
+    }
+  }
+  else {
+    if (active === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
+}
+
+function onReceiveKey(e: KeyboardEvent) {
+  if (e.key === 'Escape' && !busy.value) {
+    e.preventDefault()
+    closeReceive()
+  }
+  else if (e.key === 'Tab') {
+    trapTab(e, receiveModalEl.value)
+  }
+}
+function onEndKey(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    cancelEndShift()
+  }
+  else if (e.key === 'Tab') {
+    trapTab(e, endModalEl.value)
+  }
+}
+
+watch(receiving, async (val) => {
+  if (val) {
+    document.addEventListener('keydown', onReceiveKey)
+    await nextTick()
+    const list = focusableIn(receiveModalEl.value)
+    list[0]?.focus()
+  }
+  else {
+    document.removeEventListener('keydown', onReceiveKey)
+  }
+})
+watch(endingShift, async (val) => {
+  if (val) {
+    document.addEventListener('keydown', onEndKey)
+    await nextTick()
+    const list = focusableIn(endModalEl.value)
+    list[0]?.focus()
+  }
+  else {
+    document.removeEventListener('keydown', onEndKey)
+  }
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onReceiveKey)
+  document.removeEventListener('keydown', onEndKey)
+})
+
+// Guard for click-overlay-to-close so we don't dismiss the modal when the user
+// click-drags from inside the dialog and releases outside. Only close when both
+// mousedown and mouseup happened on the overlay itself.
+const overlayMouseDownTarget = ref<EventTarget | null>(null)
+function onOverlayMouseDown(e: MouseEvent) {
+  overlayMouseDownTarget.value = e.target
+}
+function onOverlayMouseUp(e: MouseEvent, closeFn: () => void) {
+  if (overlayMouseDownTarget.value === e.currentTarget && e.target === e.currentTarget && !busy.value)
+    closeFn()
+  overlayMouseDownTarget.value = null
+}
 
 // ============================================================
 // Count-up motion on the 4 summary KPI numbers.
@@ -347,7 +502,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
           </svg>
           {{ t('Refresh') }}
         </button>
-        <button class="btn btn--secondary">
+        <button class="btn btn--secondary" @click="exportShifts">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
           </svg>
@@ -417,7 +572,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
           {{ fmtAbbr(cashCounted) }}<span class="kpi__unit">UZS</span>
         </div>
         <div class="kpi__foot">
-          <span class="kpi__subtext">{{ t('across') }} {{ summary.awaiting }} {{ t('shifts') }}</span>
+          <span class="kpi__subtext">{{ t('across {n} shifts', { n: summary.awaiting }) }}</span>
         </div>
       </div>
 
@@ -447,7 +602,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
     <div class="card" style="margin-bottom: var(--sp-5);">
       <div class="toolbar">
         <!-- Cashier select -->
-        <div style="width:200px;">
+        <div style="flex:1 1 200px; min-width:0;">
           <div class="control control--select">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);flex:0 0 18px;">
               <circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
@@ -465,7 +620,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         </div>
 
         <!-- Status select -->
-        <div style="width:190px;">
+        <div style="flex:1 1 190px; min-width:0;">
           <div class="control control--select">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);flex:0 0 18px;">
               <polygon points="4 4 20 4 14 12 14 19 10 21 10 12 4 4" />
@@ -489,18 +644,18 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         </div>
 
         <!-- Date range -->
-        <div class="row" style="gap:8px;">
-          <div class="control control--sm" style="width:150px;">
-            <input v-model="dateFrom" type="date" :placeholder="t('From')">
+        <div style="display:flex; align-items:center; gap:8px; flex:1 1 320px; min-width:0;">
+          <div class="control control--sm" style="flex:1 1 140px; min-width:0;">
+            <input v-model="dateFrom" type="date" :max="dateTo || undefined" :placeholder="t('From')">
           </div>
           <span class="tertiary">→</span>
-          <div class="control control--sm" style="width:150px;">
-            <input v-model="dateTo" type="date" :placeholder="t('To')">
+          <div class="control control--sm" style="flex:1 1 140px; min-width:0;">
+            <input v-model="dateTo" type="date" :min="dateFrom || undefined" :placeholder="t('To')">
           </div>
         </div>
 
         <!-- Live only switch -->
-        <div class="row" style="gap:10px;margin-left:auto;">
+        <div class="row" style="gap:10px;">
           <span class="row" style="gap:8px;font-size:14px;font-weight:500;">
             <span
               class="switch"
@@ -532,7 +687,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
     </div>
 
     <!-- Cards grid -->
-    <div v-if="loading" class="grid" style="grid-template-columns: repeat(auto-fill, minmax(430px, 1fr));">
+    <div v-if="loading" class="grid" style="grid-template-columns: repeat(auto-fill, minmax(min(430px, 100%), 1fr));">
       <div v-for="i in 3" :key="i" class="card" style="padding: var(--sp-5);">
         <div class="row" style="gap:12px;margin-bottom:16px;">
           <div class="skel" style="width:40px;height:40px;border-radius:99px;" />
@@ -562,6 +717,9 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         <div class="statefill__sub">
           {{ t('Adjust the cashier, status or date range.') }}
         </div>
+        <div v-if="shifts.length > 0" class="statefill__sub" style="margin-top:6px;font-size:12px;">
+          {{ t('Note: status and live-only filters only narrow the first {n} shifts loaded.', { n: shifts.length }) }}
+        </div>
         <div style="margin-top:12px;">
           <button class="btn btn--secondary" @click="clearAllFilters">
             {{ t('Clear filters') }}
@@ -570,7 +728,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
       </div>
     </div>
 
-    <div v-else class="grid" style="grid-template-columns: repeat(auto-fill, minmax(430px, 1fr));align-items:start;">
+    <div v-else class="grid" style="grid-template-columns: repeat(auto-fill, minmax(min(430px, 100%), 1fr));align-items:start;">
       <div
         v-for="s in filtered"
         :key="s.id"
@@ -615,8 +773,8 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         </div>
 
         <!-- KPI strip: orders / gross / net -->
-        <div class="row" style="gap:0;padding: var(--sp-4) var(--sp-5) var(--sp-3);">
-          <div style="flex:1;min-width:0;">
+        <div class="row" style="flex-wrap:wrap; gap:12px; padding: var(--sp-4) var(--sp-5) var(--sp-3);">
+          <div style="flex:1 1 90px; min-width:0;">
             <div class="kpi__label" style="margin-bottom:3px;">
               {{ t('Orders') }}
             </div>
@@ -624,7 +782,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               {{ fmtNum(s.total_orders) }}
             </div>
           </div>
-          <div style="flex:1;min-width:0;">
+          <div style="flex:1 1 90px; min-width:0;">
             <div class="kpi__label" style="margin-bottom:3px;">
               {{ t('Gross') }}
             </div>
@@ -632,7 +790,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               {{ fmtMoney(s.total_revenue) }}
             </div>
           </div>
-          <div style="flex:1;min-width:0;">
+          <div style="flex:1 1 90px; min-width:0;">
             <div class="kpi__label" style="margin-bottom:3px;">
               {{ t('Net') }}
             </div>
@@ -727,15 +885,15 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         </div>
 
         <!-- actions -->
-        <div class="row" style="gap:8px;padding: var(--sp-4) var(--sp-5);border-top:1px solid var(--border);background: var(--surface-2);border-radius: 0 0 var(--r-lg) var(--r-lg);">
+        <div class="row" style="gap:8px;padding: var(--sp-4) var(--sp-5);border-top:1px solid var(--border);background: var(--surface-2);border-radius: 0 0 var(--r-lg) var(--r-lg); flex-wrap:wrap;">
           <template v-if="shiftState(s) === 'active'">
-            <button class="btn btn--secondary" style="flex:1;">
+            <button class="btn btn--secondary" style="flex:1 1 160px;" @click="openReport(s)">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 17 9 11 13 15 21 7" /><polyline points="15 7 21 7 21 13" />
               </svg>
               {{ t('Live report') }}
             </button>
-            <button class="btn btn--ghost" @click="openReport(s)">
+            <button class="btn btn--ghost" @click="askEndShift(s)">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 17 9 11 13 15 21 7" /><polyline points="15 7 21 7 21 13" />
               </svg>
@@ -743,7 +901,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
             </button>
           </template>
           <template v-else-if="shiftState(s) === 'awaiting'">
-            <button class="btn btn--primary" style="flex:1;" @click="openReceive(s)">
+            <button class="btn btn--primary" style="flex:1 1 160px;" @click="openReceive(s)">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="12" y1="2" x2="12" y2="22" /><path d="M17 6H9a3 3 0 100 6h6a3 3 0 110 6H7" />
               </svg>
@@ -757,7 +915,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
             </button>
           </template>
           <template v-else>
-            <div class="row" style="gap:7px;flex:1;color:var(--success);font-weight:600;font-size:13px;">
+            <div class="row" style="gap:7px;flex:1 1 160px;color:var(--success);font-weight:600;font-size:13px;">
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="9" /><polyline points="9 12 11 14 15 10" />
               </svg>
@@ -775,8 +933,22 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
     </div>
 
     <!-- Receive-cash modal -->
-    <div v-if="receiving" class="overlay" @mousedown.self="closeReceive">
-      <div class="modal" style="max-width:520px;" role="dialog" aria-modal="true">
+    <div
+      v-if="receiving"
+      class="overlay"
+      @mousedown="onOverlayMouseDown"
+      @mouseup="onOverlayMouseUp($event, closeReceive)"
+    >
+      <form
+        ref="receiveModalEl"
+        class="modal"
+        style="max-width:520px;"
+        role="dialog"
+        aria-modal="true"
+        @submit.prevent="countedParsed !== null && !busy && confirmReceive()"
+        @mousedown.stop
+        @mouseup.stop
+      >
         <div class="modal__head">
           <div style="flex:1;min-width:0;">
             <h3 class="modal__title">
@@ -786,7 +958,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               {{ t('Shift') }} #{{ receiving.id }} · {{ t('count the drawer and confirm the handover') }}
             </div>
           </div>
-          <button class="iconaction" :title="t('Close')" @click="closeReceive">
+          <button type="button" class="iconaction" :title="t('Close')" @click="closeReceive">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
         </div>
@@ -876,19 +1048,64 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
           </label>
         </div>
         <div class="modal__foot">
-          <button class="btn btn--ghost" :disabled="busy" @click="closeReceive">
+          <button type="button" class="btn btn--ghost" :disabled="busy" @click="closeReceive">
             {{ t('Cancel') }}
           </button>
           <button
+            type="submit"
             class="btn btn--primary"
             :class="{ 'is-loading': busy }"
             :disabled="countedParsed === null || busy"
-            @click="confirmReceive"
           >
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12" />
             </svg>
             {{ t('Confirm handover') }}
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- End-shift confirm modal -->
+    <div
+      v-if="endingShift"
+      class="overlay"
+      @mousedown="onOverlayMouseDown"
+      @mouseup="onOverlayMouseUp($event, cancelEndShift)"
+    >
+      <div
+        ref="endModalEl"
+        class="modal"
+        style="max-width:440px;"
+        role="dialog"
+        aria-modal="true"
+        @mousedown.stop
+        @mouseup.stop
+      >
+        <div class="modal__head">
+          <div style="flex:1;min-width:0;">
+            <h3 class="modal__title">
+              {{ t('End this shift?') }}
+            </h3>
+            <div class="modal__sub">
+              {{ t('Shift') }} #{{ endingShift.id }} · {{ fullName(endingShift.user) }}
+            </div>
+          </div>
+          <button type="button" class="iconaction" :title="t('Close')" @click="cancelEndShift">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <p style="font-size:14px;color:var(--text-secondary);line-height:1.5;margin:0;">
+            {{ t('Once ended, the cashier will no longer be able to take orders and the drawer must be reconciled before the next shift starts.') }}
+          </p>
+        </div>
+        <div class="modal__foot">
+          <button type="button" class="btn btn--ghost" @click="cancelEndShift">
+            {{ t('Cancel') }}
+          </button>
+          <button type="button" class="btn btn--primary" @click="confirmEndShift">
+            {{ t('End shift') }}
           </button>
         </div>
       </div>

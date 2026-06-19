@@ -71,21 +71,48 @@ async function logout() {
   router.push('/login')
 }
 
-/* ---------- Date presets (verbatim from bundle) ----------
-   Hard-coded date strings — we can't call `new Date()` here. */
+/* ---------- Date presets (locale-aware) ----------
+   Range strings are derived from `new Date()` using Intl.DateTimeFormat
+   so month abbreviations follow the active locale (uz/ru/en). */
 interface DatePreset {
   value: string
   label: string
   range: string
 }
 
-const DATE_PRESETS: DatePreset[] = [
-  { value: 'today', label: 'Today',        range: '13 Jun 2026' },
-  { value: '7d',    label: 'Last 7 days',  range: '7–13 Jun 2026' },
-  { value: '14d',   label: 'Last 14 days', range: '31 May – 13 Jun 2026' },
-  { value: 'month', label: 'This month',   range: '1–13 Jun 2026' },
-  { value: 'prev',  label: 'Last month',   range: '1–31 May 2026' },
-]
+const DATE_PRESETS = computed<DatePreset[]>(() => {
+  const loc = String(locale.value || 'en')
+  const fmtDM = new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short' })
+  const fmtDMY = new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short', year: 'numeric' })
+  const fmtD = new Intl.DateTimeFormat(loc, { day: 'numeric' })
+
+  const today = new Date()
+  const addDays = (d: Date, n: number) => {
+    const x = new Date(d)
+    x.setDate(x.getDate() + n)
+    return x
+  }
+  const monthStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1)
+  const monthEnd = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0)
+
+  const last7Start = addDays(today, -6)
+  const last14Start = addDays(today, -13)
+  const thisMonthStart = monthStart(today)
+  const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+  const prevMonthEnd = monthEnd(prevMonth)
+
+  const sameMonth = (a: Date, b: Date) => a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()
+  const rangeStr = (a: Date, b: Date) =>
+    sameMonth(a, b) ? `${fmtD.format(a)}–${fmtDM.format(b)} ${b.getFullYear()}` : `${fmtDM.format(a)} – ${fmtDM.format(b)} ${b.getFullYear()}`
+
+  return [
+    { value: 'today', label: 'Today', range: fmtDMY.format(today) },
+    { value: '7d', label: 'Last 7 days', range: rangeStr(last7Start, today) },
+    { value: '14d', label: 'Last 14 days', range: rangeStr(last14Start, today) },
+    { value: 'month', label: 'This month', range: rangeStr(thisMonthStart, today) },
+    { value: 'prev', label: 'Last month', range: rangeStr(prevMonth, prevMonthEnd) },
+  ]
+})
 
 /* ---------- Navigation labels (mirror sidebar NAV) ---------- */
 const NAV_LABELS: Record<string, string> = {
@@ -150,15 +177,15 @@ const initials = computed(() => {
   try {
     const raw = localStorage.getItem('userData')
     if (!raw)
-      return 'RL'
+      return '?'
     const u = JSON.parse(raw) as { first_name?: string; last_name?: string }
     const a = (u.first_name || '').charAt(0)
     const b = (u.last_name || '').charAt(0)
     const out = (a + b).toUpperCase()
-    return out || 'RL'
+    return out || '?'
   }
   catch {
-    return 'RL'
+    return '?'
   }
 })
 
@@ -166,12 +193,12 @@ const userName = computed(() => {
   try {
     const raw = localStorage.getItem('userData')
     if (!raw)
-      return 'Reese Lewis'
+      return t('Unknown')
     const u = JSON.parse(raw) as { first_name?: string; last_name?: string }
-    return `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Reese Lewis'
+    return `${u.first_name || ''} ${u.last_name || ''}`.trim() || t('Unknown')
   }
   catch {
-    return 'Reese Lewis'
+    return t('Unknown')
   }
 })
 
@@ -180,7 +207,7 @@ const dateOpen = ref(false)
 const dateRoot = ref<HTMLElement | null>(null)
 
 const currentPreset = computed<DatePreset>(() =>
-  DATE_PRESETS.find(p => p.value === dateRange.value) || DATE_PRESETS[2],
+  DATE_PRESETS.value.find(p => p.value === dateRange.value) || DATE_PRESETS.value[2],
 )
 
 function pickPreset(v: string) {
@@ -274,8 +301,8 @@ onBeforeUnmount(() => {
 
       <div
         v-if="dateOpen"
-        class="card"
-        style="position: absolute; right: 0; top: calc(100% + 6px); width: 240px; z-index: 40; box-shadow: var(--shadow-lg); padding: 6px;"
+        class="card topbar-dd topbar-dd--date"
+        style="position: absolute; right: 0; left: auto; top: calc(100% + 6px); width: 240px; max-width: calc(100vw - 16px); z-index: 40; box-shadow: var(--shadow-lg); padding: 6px;"
       >
         <div
           v-for="p in DATE_PRESETS"
@@ -355,8 +382,8 @@ onBeforeUnmount(() => {
       </button>
       <div
         v-if="langOpen"
-        class="card"
-        style="position: absolute; right: 0; top: calc(100% + 6px); width: 170px; z-index: 40; box-shadow: var(--shadow-lg); padding: 6px;"
+        class="card topbar-dd topbar-dd--lang"
+        style="position: absolute; right: 0; left: auto; top: calc(100% + 6px); width: 170px; max-width: calc(100vw - 16px); z-index: 40; box-shadow: var(--shadow-lg); padding: 6px;"
       >
         <div
           v-for="l in LANGS"
@@ -393,8 +420,8 @@ onBeforeUnmount(() => {
       </div>
       <div
         v-if="avatarOpen"
-        class="card"
-        style="position: absolute; right: 0; top: calc(100% + 8px); width: 240px; z-index: 40; box-shadow: var(--shadow-lg); padding: 8px;"
+        class="card topbar-dd topbar-dd--avatar"
+        style="position: absolute; right: 0; left: auto; top: calc(100% + 8px); width: 240px; max-width: calc(100vw - 16px); z-index: 40; box-shadow: var(--shadow-lg); padding: 8px;"
       >
         <div style="padding: 10px 12px;">
           <div style="font-weight:var(--fw-semibold);font-size:var(--fs-body);color:var(--text);">
@@ -431,3 +458,15 @@ onBeforeUnmount(() => {
     </div>
   </header>
 </template>
+
+<style scoped>
+/* Keep topbar dropdowns inside the viewport on narrow screens. */
+@media (max-width: 600px) {
+  .topbar-dd {
+    right: 8px !important;
+    left: 8px !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+}
+</style>

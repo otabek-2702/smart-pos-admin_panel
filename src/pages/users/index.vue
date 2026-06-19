@@ -43,10 +43,31 @@ const form = ref({
 })
 
 const touched = ref<Record<string, boolean>>({})
+const errors = ref<Record<string, string>>({})
+const togglingId = ref<number | null>(null)
+const editingId = ref<number | null>(null)
+const deletingId = ref<number | null>(null)
+const statusConfirm = ref<{ user: any; newStatus: string } | null>(null)
 
 const isAdminRole = computed(() => form.value.role === 'ADMIN')
 const requiresEmail = computed(() => ['ADMIN', 'MANAGER'].includes(form.value.role))
 const isPinRole = computed(() => ['CASHIER', 'WAITER'].includes(form.value.role))
+
+function validateField(field: string) {
+  // Surfaces inline errors without blocking submission flow.
+  const err: Record<string, string> = { ...errors.value }
+  delete err[field]
+  if (field === 'email' && !editing.value && requiresEmail.value && !form.value.email.trim())
+    err.email = t('Email is required for this role')
+  if (field === 'password' && !editing.value && isPinRole.value && !/^\d{4}$/.test(form.value.password))
+    err.password = t('PIN must be exactly 4 digits')
+  errors.value = err
+}
+
+function onBlur(field: string) {
+  touched.value[field] = true
+  validateField(field)
+}
 
 // ============================================================
 // Tone maps (mirror bundle's STATUS_TONE)
@@ -146,6 +167,7 @@ function openCreate() {
     password: '',
   }
   touched.value = {}
+  errors.value = {}
   dialogOpen.value = true
 }
 
@@ -161,6 +183,8 @@ function onRoleChange() {
 }
 
 function openEdit(user: any) {
+  if (editingId.value !== null) return
+  editingId.value = user.id
   editing.value = user
   form.value = {
     first_name: user.first_name ?? '',
@@ -171,25 +195,29 @@ function openEdit(user: any) {
     password: '',
   }
   touched.value = {}
+  errors.value = {}
   dialogOpen.value = true
 }
 
 function closeDialog() {
   if (dialogLoading.value) return
   dialogOpen.value = false
+  editingId.value = null
 }
 
 async function save() {
-  // ADMIN + MANAGER require explicit email; cashier/waiter get one auto-assigned.
-  if (!editing.value && requiresEmail.value && !form.value.email.trim()) {
-    notify(t('Email is required for this role'), 'error')
+  // Compute inline errors first; surface a toast only when something is wrong
+  // so screen-reader users hear something instead of a silent failure.
+  const newErrors: Record<string, string> = {}
+  if (!editing.value && requiresEmail.value && !form.value.email.trim())
+    newErrors.email = t('Email is required for this role')
+  if (!editing.value && isPinRole.value && !/^\d{4}$/.test(form.value.password))
+    newErrors.password = t('PIN must be exactly 4 digits')
 
-    return
-  }
-
-  // PIN-role passwords must be exactly 4 digits (BE rejects otherwise).
-  if (!editing.value && isPinRole.value && !/^\d{4}$/.test(form.value.password)) {
-    notify(t('PIN must be exactly 4 digits'), 'error')
+  errors.value = newErrors
+  if (Object.keys(newErrors).length > 0) {
+    touched.value = { ...touched.value, email: true, password: true }
+    notify(Object.values(newErrors)[0], 'error')
 
     return
   }
@@ -226,6 +254,7 @@ async function save() {
       notify(t('User created'))
     }
     dialogOpen.value = false
+    editingId.value = null
     await loadUsers()
   }
   catch (e: any) {
@@ -237,8 +266,16 @@ async function save() {
 }
 
 function confirmDelete(user: any) {
+  if (deletingId.value !== null) return
+  deletingId.value = user.id
   deleting.value = user
   deleteDialog.value = true
+}
+
+function closeDeleteDialog() {
+  if (deleteBusy.value) return
+  deleteDialog.value = false
+  deletingId.value = null
 }
 
 async function doDelete() {
@@ -249,6 +286,7 @@ async function doDelete() {
     await axios.delete(`/users/${deleting.value.id}`)
     notify(t('User deleted'))
     deleteDialog.value = false
+    deletingId.value = null
     await loadUsers()
   }
   catch (e: any) {
@@ -259,10 +297,10 @@ async function doDelete() {
   }
 }
 
-async function toggleStatus(user: any) {
+async function performStatusChange(user: any, newStatus: string) {
+  if (togglingId.value !== null) return
+  togglingId.value = user.id
   try {
-    const newStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
-
     await axios.patch(`/users/${user.id}`, { status: newStatus })
     notify(t('Status updated'))
     await loadUsers()
@@ -270,6 +308,33 @@ async function toggleStatus(user: any) {
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
   }
+  finally {
+    togglingId.value = null
+  }
+}
+
+function toggleStatus(user: any) {
+  // Suspending privileged roles is sensitive — gate behind a confirm dialog.
+  // Cashier/Waiter/User toggles fire immediately, matching prior UX.
+  const newStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
+  const sensitive = ['ADMIN', 'MANAGER'].includes(user.role) && newStatus === 'SUSPENDED'
+  if (sensitive) {
+    statusConfirm.value = { user, newStatus }
+
+    return
+  }
+  performStatusChange(user, newStatus)
+}
+
+function confirmStatusChange() {
+  if (!statusConfirm.value) return
+  const { user, newStatus } = statusConfirm.value
+  statusConfirm.value = null
+  performStatusChange(user, newStatus)
+}
+
+function cancelStatusChange() {
+  statusConfirm.value = null
 }
 
 // ============================================================
@@ -280,9 +345,9 @@ const activeFilters = computed(() => {
   if (search.value)
     out.push({ k: 'q', label: t('Search'), val: search.value, clear: () => { search.value = '' } })
   if (roleFilter.value)
-    out.push({ k: 'r', label: t('Role'), val: roleFilter.value, clear: () => { roleFilter.value = '' } })
+    out.push({ k: 'r', label: t('Role'), val: t(roleFilter.value), clear: () => { roleFilter.value = '' } })
   if (statusFilter.value)
-    out.push({ k: 's', label: t('Status'), val: statusFilter.value, clear: () => { statusFilter.value = '' } })
+    out.push({ k: 's', label: t('Status'), val: t(statusFilter.value), clear: () => { statusFilter.value = '' } })
   return out
 })
 
@@ -320,6 +385,38 @@ function gotoPage(n: number | string) {
 function initialOf(u: any): string {
   return (u?.first_name?.[0] || u?.email?.[0] || '?').toUpperCase()
 }
+
+// ESC handler — close whichever modal is open, top-most first.
+function onKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return
+  if (statusConfirm.value) {
+    cancelStatusChange()
+    e.preventDefault()
+
+    return
+  }
+  if (deleteDialog.value) {
+    if (!deleteBusy.value) {
+      deleteDialog.value = false
+      deletingId.value = null
+      e.preventDefault()
+    }
+
+    return
+  }
+  if (dialogOpen.value) {
+    closeDialog()
+    e.preventDefault()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+})
 </script>
 
 <template>
@@ -381,7 +478,7 @@ function initialOf(u: any): string {
             </svg>
           </div>
           <div class="kpi__label">
-            {{ t('Active') }}
+            {{ t('Active (this page)') }}
           </div>
         </div>
         <div v-if="!stats" class="skel" style="width:60px;height:30px;" />
@@ -449,7 +546,7 @@ function initialOf(u: any): string {
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);flex:0 0 18px;">
               <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
-            <input v-model="search" :placeholder="t('Search users…')">
+            <input v-model="search" :placeholder="t('Search users...')">
           </div>
         </div>
 
@@ -461,10 +558,10 @@ function initialOf(u: any): string {
             </svg>
             <select v-model="roleFilter" :style="{ color: roleFilter ? 'var(--text)' : 'var(--text-tertiary)' }">
               <option value="">
-                {{ t('All roles') }}
+                {{ t('All Roles') }}
               </option>
               <option v-for="r in roles" :key="r" :value="r" style="color:var(--text);">
-                {{ r }}
+                {{ t(r) }}
               </option>
             </select>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chev"><polyline points="6 9 12 15 18 9" /></svg>
@@ -476,10 +573,10 @@ function initialOf(u: any): string {
           <div class="control control--select">
             <select v-model="statusFilter" :style="{ color: statusFilter ? 'var(--text)' : 'var(--text-tertiary)' }">
               <option value="">
-                {{ t('All statuses') }}
+                {{ t('All Statuses') }}
               </option>
               <option v-for="s in statuses" :key="s" :value="s" style="color:var(--text);">
-                {{ s }}
+                {{ t(s) }}
               </option>
             </select>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chev"><polyline points="6 9 12 15 18 9" /></svg>
@@ -581,31 +678,36 @@ function initialOf(u: any): string {
             </td>
             <td><span class="cell-muted">{{ u.email }}</span></td>
             <td>
-              <span class="badge" :class="`t-${ROLE_TONE[u.role] || 'neutral'}`">{{ u.role }}</span>
+              <span class="badge" :class="`t-${ROLE_TONE[u.role] || 'neutral'}`">{{ u.role ? t(u.role) : '' }}</span>
             </td>
             <td>
-              <span class="badge badge--dot" :class="`t-${STATUS_TONE[u.status] || 'neutral'}`">{{ u.status }}</span>
+              <span class="badge badge--dot" :class="`t-${STATUS_TONE[u.status] || 'neutral'}`">{{ u.status ? t(u.status) : '' }}</span>
             </td>
             <td>
               <div class="row" style="gap:4px;justify-content:flex-end;">
                 <button
                   class="iconaction is-warning"
+                  :class="{ 'is-busy': togglingId === u.id }"
                   :title="u.status === 'ACTIVE' ? t('Suspend') : t('Activate')"
+                  :disabled="togglingId === u.id"
                   @click="toggleStatus(u)"
                 >
-                  <svg v-if="u.status === 'ACTIVE'" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <svg v-if="togglingId === u.id" class="iconspin" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12a9 9 0 11-6.219-8.56" />
+                  </svg>
+                  <svg v-else-if="u.status === 'ACTIVE'" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />
                   </svg>
                   <svg v-else viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="6 4 20 12 6 20 6 4" />
                   </svg>
                 </button>
-                <button class="iconaction is-primary" :title="t('Edit')" @click="openEdit(u)">
+                <button class="iconaction is-primary" :title="t('Edit')" :disabled="editingId === u.id" @click="openEdit(u)">
                   <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4L16.5 3.5z" />
                   </svg>
                 </button>
-                <button class="iconaction is-danger" :title="t('Delete')" @click="confirmDelete(u)">
+                <button class="iconaction is-danger" :title="t('Delete')" :disabled="deletingId === u.id" @click="confirmDelete(u)">
                   <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="3 6 5 6 21 6" /><path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2" />
                   </svg>
@@ -677,7 +779,7 @@ function initialOf(u: any): string {
           </button>
         </div>
 
-        <div class="modal__body">
+        <form class="modal__body" @submit.prevent="save">
           <div class="form-grid">
             <!-- User ID (edit only) -->
             <label v-if="editing" class="field span-2">
@@ -713,7 +815,7 @@ function initialOf(u: any): string {
               <div class="control control--select">
                 <select v-model="form.role" @change="onRoleChange">
                   <option v-for="r in roles" :key="r" :value="r">
-                    {{ r }}
+                    {{ t(r) }}
                   </option>
                 </select>
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chev"><polyline points="6 9 12 15 18 9" /></svg>
@@ -732,7 +834,7 @@ function initialOf(u: any): string {
                   @click="form.status = form.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'"
                 />
                 <span style="font-size:14px;font-weight:500;color:var(--text-secondary);">
-                  {{ form.status }}
+                  {{ t(form.status) }}
                 </span>
               </div>
             </label>
@@ -740,13 +842,14 @@ function initialOf(u: any): string {
             <!-- Email -->
             <label v-if="editing || isAdminRole || requiresEmail" class="field span-2">
               <span class="field__label">{{ t('Email') }}</span>
-              <div class="control">
+              <div class="control" :class="{ 'has-error': errors.email }">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 18px;color:var(--text-tertiary);">
                   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" />
                 </svg>
-                <input v-model="form.email" type="email" placeholder="name@pos.local">
+                <input v-model="form.email" type="email" placeholder="name@pos.local" @blur="onBlur('email')">
               </div>
-              <span v-if="!editing && requiresEmail" class="field__hint">{{ t('Required for ADMIN / MANAGER') }}</span>
+              <span v-if="errors.email" class="field__error">{{ errors.email }}</span>
+              <span v-else-if="!editing && requiresEmail" class="field__hint">{{ t('Required for ADMIN / MANAGER') }}</span>
             </label>
 
             <!-- Password -->
@@ -754,7 +857,7 @@ function initialOf(u: any): string {
               <span class="field__label">
                 {{ editing ? t('New Password (leave blank to keep)') : (isPinRole ? t('4-digit PIN') : t('Password')) }}
               </span>
-              <div class="control">
+              <div class="control" :class="{ 'has-error': errors.password }">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 18px;color:var(--text-tertiary);">
                   <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
                 </svg>
@@ -765,29 +868,31 @@ function initialOf(u: any): string {
                   :maxlength="isPinRole ? 4 : undefined"
                   :pattern="isPinRole ? '[0-9]{4}' : undefined"
                   inputmode="numeric"
+                  @blur="onBlur('password')"
                 >
               </div>
-              <span v-if="!editing && isPinRole" class="field__hint">{{ t('Exactly 4 digits') }}</span>
+              <span v-if="errors.password" class="field__error">{{ errors.password }}</span>
+              <span v-else-if="!editing && isPinRole" class="field__hint">{{ t('Exactly 4 digits') }}</span>
             </label>
           </div>
-        </div>
 
-        <div class="modal__foot">
-          <button class="btn btn--ghost" :disabled="dialogLoading" @click="closeDialog">
-            {{ t('Cancel') }}
-          </button>
-          <button class="btn btn--primary" :class="{ 'is-loading': dialogLoading }" :disabled="dialogLoading" @click="save">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            {{ t('Save') }}
-          </button>
-        </div>
+          <div class="modal__foot">
+            <button type="button" class="btn btn--ghost" :disabled="dialogLoading" @click="closeDialog">
+              {{ t('Cancel') }}
+            </button>
+            <button type="submit" class="btn btn--primary" :class="{ 'is-loading': dialogLoading }" :disabled="dialogLoading">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              {{ t('Save') }}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
     <!-- Delete confirm modal -->
-    <div v-if="deleteDialog" class="overlay" @mousedown.self="deleteDialog = false">
+    <div v-if="deleteDialog" class="overlay" @mousedown.self="closeDeleteDialog">
       <div class="modal" style="max-width:440px;" role="dialog" aria-modal="true">
         <div class="modal__head">
           <div style="flex:1;min-width:0;">
@@ -798,7 +903,7 @@ function initialOf(u: any): string {
               {{ t('This action cannot be undone') }}
             </div>
           </div>
-          <button class="iconaction" :title="t('Close')" @click="deleteDialog = false">
+          <button class="iconaction" :title="t('Close')" @click="closeDeleteDialog">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -825,7 +930,7 @@ function initialOf(u: any): string {
           </div>
         </div>
         <div class="modal__foot">
-          <button class="btn btn--ghost" :disabled="deleteBusy" @click="deleteDialog = false">
+          <button class="btn btn--ghost" :disabled="deleteBusy" @click="closeDeleteDialog">
             {{ t('Cancel') }}
           </button>
           <button class="btn btn--danger" :class="{ 'is-loading': deleteBusy }" :disabled="deleteBusy" @click="doDelete">
@@ -833,6 +938,57 @@ function initialOf(u: any): string {
               <polyline points="3 6 5 6 21 6" /><path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6" /><path d="M10 11v6M14 11v6" />
             </svg>
             {{ t('Delete') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status change confirm (ADMIN/MANAGER suspension) -->
+    <div v-if="statusConfirm" class="overlay" @mousedown.self="cancelStatusChange">
+      <div class="modal" style="max-width:440px;" role="dialog" aria-modal="true">
+        <div class="modal__head">
+          <div style="flex:1;min-width:0;">
+            <h3 class="modal__title">
+              {{ statusConfirm.newStatus === 'SUSPENDED' ? t('Suspend account') : t('Activate account') }}
+            </h3>
+            <div class="modal__sub">
+              {{ t('Confirm sensitive role status change') }}
+            </div>
+          </div>
+          <button class="iconaction" :title="t('Close')" @click="cancelStatusChange">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <div class="row" style="gap:14px;align-items:flex-start;">
+            <div class="kpi__icon t-warning" style="width:44px;height:44px;flex:0 0 44px;">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <div>
+              <p style="margin:0;font-weight:600;">
+                {{ `${statusConfirm.user.first_name || ''} ${statusConfirm.user.last_name || ''}`.trim() }}
+                ({{ t(statusConfirm.user.role) }})
+              </p>
+              <p class="muted" style="margin:6px 0 0;font-size:14px;">
+                {{ statusConfirm.newStatus === 'SUSPENDED'
+                  ? t('Suspending a privileged account revokes their dashboard access immediately.')
+                  : t('Activating restores full dashboard access for this account.') }}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="modal__foot">
+          <button type="button" class="btn btn--ghost" @click="cancelStatusChange">
+            {{ t('Cancel') }}
+          </button>
+          <button type="button" class="btn btn--primary" @click="confirmStatusChange">
+            {{ statusConfirm.newStatus === 'SUSPENDED' ? t('Suspend') : t('Activate') }}
           </button>
         </div>
       </div>
@@ -848,6 +1004,34 @@ function initialOf(u: any): string {
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.field__error {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-danger, #ef4444);
+  line-height: 1.3;
+}
+.control.has-error {
+  border-color: var(--color-danger, #ef4444) !important;
+  box-shadow: 0 0 0 1px var(--color-danger, #ef4444) inset;
+}
+.iconaction.is-busy {
+  cursor: progress;
+  opacity: 0.7;
+}
+.iconaction:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.iconspin {
+  animation: users-spin 0.85s linear infinite;
+}
+@keyframes users-spin {
+  to { transform: rotate(360deg); }
+}
+</style>
 
 <route lang="yaml">
 meta:

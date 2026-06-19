@@ -6,6 +6,7 @@
    HBar) — no Vuetify components on this page.
    ============================================================ */
 import axios from '@/plugins/axios'
+import { STATUS_TONE } from '@/constants/statusTones'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -19,8 +20,11 @@ const router = useRouter()
 const shiftIdInput = ref<number | null>(Number(route.query.shift) || null)
 const data = ref<any>(null)
 const loading = ref(false)
+const loadError = ref<string | null>(null)
+const exporting = ref(false)
 
 async function load() {
+  loadError.value = null
   if (!shiftIdInput.value) {
     data.value = null
     return
@@ -32,11 +36,40 @@ async function load() {
     router.replace({ query: { ...route.query, shift: String(shiftIdInput.value) } })
   }
   catch (e: any) {
-    notify(e?.response?.data?.message ?? t('Failed to load'), 'error')
+    const msg = e?.response?.data?.message ?? t('Failed to load')
+    notify(msg, 'error')
+    loadError.value = msg
     data.value = null
   }
   finally {
     loading.value = false
+  }
+}
+
+async function doExport() {
+  if (!shiftIdInput.value || exporting.value) return
+  exporting.value = true
+  try {
+    const res = await axios.get(
+      `/analytics/shifts/${shiftIdInput.value}/report/export`,
+      { responseType: 'blob' },
+    )
+    const blob = new Blob([res.data], { type: res.headers?.['content-type'] || 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `shift-${shiftIdInput.value}-handover.csv`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+    notify(t('Export downloaded'), 'success')
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Export failed'), 'error')
+  }
+  finally {
+    exporting.value = false
   }
 }
 
@@ -96,30 +129,8 @@ function fmtPct(n: number | null | undefined, digits = 1): string {
 }
 
 // ============================================================
-// Status / tone maps (mirror bundle ui.jsx STATUS_TONE)
+// Status / tone maps — shared map at @/constants/statusTones
 // ============================================================
-const STATUS_TONE: Record<string, string> = {
-  ACTIVE: 'success',
-  COMPLETED: 'success',
-  READY: 'success',
-  PAID: 'success',
-  PREPARING: 'warning',
-  PENDING: 'warning',
-  OPEN: 'neutral',
-  INACTIVE: 'neutral',
-  CANCELLED: 'error',
-  CANCELED: 'error',
-  UNPAID: 'error',
-  HALL: 'neutral',
-  DELIVERY: 'info',
-  PICKUP: 'primary',
-  CASH: 'success',
-  UZCARD: 'primary',
-  HUMO: 'warning',
-  PAYME: 'info',
-  CLICK: 'info',
-  MIXED: 'primary',
-}
 function tone(v: string | undefined | null): string {
   if (!v) return 'neutral'
   return STATUS_TONE[String(v).toUpperCase()] || 'neutral'
@@ -156,9 +167,9 @@ const PAYMENT_LABELS: Record<string, string> = {
 const paymentMix = computed(() => {
   const mix = shift.value?.money?.payment_mix ?? {}
   return Object.keys(PAYMENT_COLORS)
-    .map((k) => ({
+    .map(k => ({
       key: k,
-      label: PAYMENT_LABELS[k],
+      label: k === 'CASH' ? t('Cash') : PAYMENT_LABELS[k],
       value: Number(mix[k] || 0),
       color: PAYMENT_COLORS[k],
     }))
@@ -355,6 +366,7 @@ function shiftDurationLabel(): string {
               v-model.number="shiftIdInput"
               type="number"
               :placeholder="t('Enter shift id')"
+              :disabled="loading"
               @keydown.enter="load"
             >
           </div>
@@ -367,7 +379,28 @@ function shiftDurationLabel(): string {
     </div>
 
     <!-- ===== Empty / loading boot ===== -->
-    <div v-if="!shift && !loading" class="card">
+    <div v-if="!shift && !loading && loadError" class="card">
+      <div class="statefill" style="padding: 64px 24px;">
+        <div class="statefill__icon" style="color: var(--error);">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+        </div>
+        <div class="statefill__title">
+          {{ t('Could not load shift report') }}
+        </div>
+        <div class="statefill__sub">
+          {{ loadError }}
+        </div>
+        <div class="row" style="gap:10px; margin-top:18px; justify-content:center; flex-wrap:wrap;">
+          <button class="btn btn--primary" :class="{ 'is-loading': loading }" :disabled="loading" @click="load">
+            {{ t('Retry') }}
+          </button>
+          <button class="btn btn--secondary" @click="router.push('/shifts-analytics')">
+            {{ t('Browse shifts') }}
+          </button>
+        </div>
+      </div>
+    </div>
+    <div v-else-if="!shift && !loading" class="card">
       <div class="statefill" style="padding: 64px 24px;">
         <div class="statefill__icon">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
@@ -377,6 +410,11 @@ function shiftDurationLabel(): string {
         </div>
         <div class="statefill__sub">
           {{ t('Enter a shift ID above and press Load') }}
+        </div>
+        <div class="row" style="gap:10px; margin-top:18px; justify-content:center; flex-wrap:wrap;">
+          <button class="btn btn--secondary" @click="router.push('/shifts-analytics')">
+            {{ t('Browse shifts') }}
+          </button>
         </div>
       </div>
     </div>
@@ -411,7 +449,7 @@ function shiftDurationLabel(): string {
               </div>
             </div>
           </div>
-          <div class="row" style="gap:28px;">
+          <div class="row" style="gap:20px; flex-wrap:wrap;">
             <div style="text-align:right;">
               <div class="kpi__label">
                 {{ t('Receipts') }}
@@ -512,7 +550,7 @@ function shiftDurationLabel(): string {
       </div>
 
       <!-- ===== Payment mix donut + Orders by hour bar ===== -->
-      <div class="grid" style="grid-template-columns: 1.7fr 1fr; margin-bottom:var(--sp-5);">
+      <div class="grid split-1-7" style="margin-bottom:var(--sp-5);">
         <div class="card">
           <div class="card__head">
             <div class="card__head-text">
@@ -722,7 +760,7 @@ function shiftDurationLabel(): string {
                 {{ t('Product detail') }}
               </h3>
               <div class="card__sub">
-                {{ products.length }} {{ t('products') }}
+                {{ t('{n} products', { n: products.length }) }}
               </div>
             </div>
           </div>
@@ -941,8 +979,8 @@ function shiftDurationLabel(): string {
             </div>
           </div>
           <div class="card__body">
-            <div class="row" style="gap:0; margin-bottom:18px;">
-              <div style="flex:1;">
+            <div class="row" style="flex-wrap:wrap; gap:12px; margin-bottom:18px;">
+              <div style="flex:1 1 90px; min-width:0;">
                 <div style="font-size:12px; font-weight:600; color:var(--success); margin-bottom:4px;">
                   {{ t('Completed') }}
                 </div>
@@ -950,7 +988,7 @@ function shiftDurationLabel(): string {
                   {{ fmtNum(shift.orders?.completed) }}
                 </div>
               </div>
-              <div style="flex:1;">
+              <div style="flex:1 1 90px; min-width:0;">
                 <div style="font-size:12px; font-weight:600; color:var(--error); margin-bottom:4px;">
                   {{ t('Cancelled') }} ({{ fmtPct(shift.orders?.cancel_rate_pct, 1) }})
                 </div>
@@ -958,7 +996,7 @@ function shiftDurationLabel(): string {
                   {{ fmtNum(shift.orders?.cancelled) }}
                 </div>
               </div>
-              <div style="flex:1;">
+              <div style="flex:1 1 90px; min-width:0;">
                 <div style="font-size:12px; font-weight:600; color:var(--primary); margin-bottom:4px;">
                   {{ t('Paid') }}
                 </div>
@@ -982,11 +1020,11 @@ function shiftDurationLabel(): string {
             <div class="hr" style="margin:12px 0;" />
             <div class="row between" style="padding:7px 0;">
               <span class="muted" style="font-size:14px;">{{ t('Items') }} · {{ shift.items?.line_items }} {{ t('lines') }}</span>
-              <span style="font-weight:600; font-size:14px;">{{ shift.items?.units_sold }} {{ t('units') }}</span>
+              <span style="font-weight:600; font-size:14px;">{{ t('{n} units', { n: shift.items?.units_sold ?? 0 }) }}</span>
             </div>
             <div class="row between" style="padding:7px 0;">
               <span class="muted" style="font-size:14px;">{{ t('Discounts') }}</span>
-              <span style="font-weight:600; font-size:14px;">{{ fmtMoney(shift.discounts?.total_given) }} ({{ shift.discounts?.discounted_orders }} {{ t('orders') }})</span>
+              <span style="font-weight:600; font-size:14px;">{{ fmtMoney(shift.discounts?.total_given) }} ({{ t('{n} orders', { n: shift.discounts?.discounted_orders ?? 0 }) }})</span>
             </div>
           </div>
         </div>
@@ -1057,7 +1095,7 @@ function shiftDurationLabel(): string {
             </div>
           </div>
           <div class="card__actions">
-            <button class="btn btn--secondary btn--sm">
+            <button class="btn btn--secondary btn--sm" :class="{ 'is-loading': exporting }" :disabled="exporting || !receipts.length" @click="doExport">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
               {{ t('Export') }}
             </button>
@@ -1136,6 +1174,17 @@ function shiftDurationLabel(): string {
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.split-1-7 {
+  grid-template-columns: 1.7fr 1fr;
+}
+@media (max-width: 1100px) {
+  .split-1-7 {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
 
 <route lang="yaml">
 meta:

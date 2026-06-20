@@ -440,7 +440,7 @@ function shiftDurationLabel(): string {
             <div>
               <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap;">
                 <span style="font-size:var(--fs-h2); font-weight:700; letter-spacing:-0.01em;">{{ data?.cashier?.name ?? t('Unknown') }}</span>
-                <span class="badge badge--dot" :class="`t-${tone(shift.status)}`">{{ titleCase(shift.status) }}</span>
+                <span class="badge badge--dot" :class="`t-${tone(shift.status)}`">{{ shift.status ? t(`shift_status_${shift.status}`) : '—' }}</span>
               </div>
               <div class="muted" style="font-size:13px;margin-top:2px;">
                 {{ t('Shift') }} #{{ shiftIdInput }} · {{ formatDate(shift.start_time) }} —
@@ -1135,13 +1135,13 @@ function shiftDurationLabel(): string {
                 #{{ r.display_id }}
               </td>
               <td>
-                <span class="badge badge--dot" :class="`t-${tone(r.status)}`">{{ titleCase(r.status) }}</span>
+                <span class="badge badge--dot" :class="`t-${tone(r.status)}`">{{ r.status ? t(`order_status_${r.status}`) : '—' }}</span>
               </td>
               <td>
-                <span class="badge t-neutral">{{ titleCase(r.order_type) }}</span>
+                <span class="badge t-neutral">{{ r.order_type ? t(`order_type_${r.order_type}`) : '—' }}</span>
               </td>
               <td>
-                <span class="badge" :class="`t-${tone(r.payment_method)}`">{{ r.payment_method }}</span>
+                <span class="badge" :class="`t-${tone(r.payment_method)}`">{{ r.payment_method ? t(`payment_method_${r.payment_method}`) : '—' }}</span>
               </td>
               <td class="num mono">
                 {{ r.line_items }}

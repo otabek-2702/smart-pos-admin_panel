@@ -13,6 +13,7 @@ const page = ref(1)
 const itemsPerPage = ref(10)
 const statusFilter = ref<string | undefined>(undefined)
 const locationFilter = ref<number | undefined>(undefined)
+const typeFilter = ref<string | undefined>(undefined)
 
 const locationsList = ref<any[]>([])
 
@@ -49,6 +50,8 @@ async function loadCounts() {
       params.status = statusFilter.value
     if (locationFilter.value)
       params.location_id = locationFilter.value
+    if (typeFilter.value)
+      params.type = typeFilter.value
 
     const res = await axios.get('/counts/', { params })
     const d = res.data?.data ?? res.data
@@ -76,7 +79,7 @@ async function loadLocations() {
 
 onMounted(() => { loadCounts(); loadLocations() })
 watch([page, itemsPerPage], loadCounts)
-watch([statusFilter, locationFilter], () => { page.value = 1; loadCounts() })
+watch([statusFilter, locationFilter, typeFilter], () => { page.value = 1; loadCounts() })
 
 const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.name, value: l.id })))
 
@@ -230,6 +233,15 @@ async function recordItem(item: any) {
           v-model="locationFilter"
           :items="locationOptions"
           :placeholder="t('All Locations')"
+          density="compact"
+          style="min-inline-size: 200px;"
+          hide-details
+          clearable
+        />
+        <VSelect
+          v-model="typeFilter"
+          :items="countTypes.map(v => ({ title: t(`count_type_${v}`), value: v }))"
+          :placeholder="t('All Types')"
           density="compact"
           style="min-inline-size: 200px;"
           hide-details

@@ -22,11 +22,18 @@ import Kpi from '@/components/design/Kpi.vue'
 import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
-import StatusBadge from '@/components/design/StatusBadge.vue'
 import Switch from '@/components/design/Switch.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
+const { formatDate } = useFormatters()
+
+// NOTE: BE _serialize_user also returns 'uuid', 'permissions', and 'is_deleted'.
+// These are intentionally hidden from this surface:
+//   - uuid: internal identifier, never shown to admins
+//   - permissions: raw JSON list; edited via the dedicated Settings -> Roles screen
+//   - is_deleted: soft-delete flag, never user-facing
+// Any future "View details" panel / expanded row MUST also strip these fields.
 
 // ============================================================
 // State (preserved from previous implementation)
@@ -360,9 +367,9 @@ const activeFilters = computed(() => {
   if (search.value)
     out.push({ k: 'q', label: t('Search'), val: search.value, clear: () => { search.value = '' } })
   if (roleFilter.value)
-    out.push({ k: 'r', label: t('Role'), val: t(roleFilter.value), clear: () => { roleFilter.value = '' } })
+    out.push({ k: 'r', label: t('Role'), val: t(`role_${roleFilter.value}`), clear: () => { roleFilter.value = '' } })
   if (statusFilter.value)
-    out.push({ k: 's', label: t('Status'), val: t(statusFilter.value), clear: () => { statusFilter.value = '' } })
+    out.push({ k: 's', label: t('Status'), val: t(`user_status_${statusFilter.value}`), clear: () => { statusFilter.value = '' } })
   return out
 })
 
@@ -420,6 +427,8 @@ const columns: DataTableColumn<any>[] = [
   { key: 'email', label: t('Email'), sortable: true },
   { key: 'role', label: t('Role'), sortable: true },
   { key: 'status', label: t('Status'), sortable: true },
+  { key: 'last_login_at', label: t('Last login'), sortable: true },
+  { key: 'created_at', label: t('Created'), sortable: true },
 ]
 
 // Controlled pagination — backend pages the list. We hand pre-paged
@@ -433,9 +442,9 @@ const tablePagination = computed(() => ({
 }))
 
 // Role select options for the filter dropdown (placeholder = "All roles")
-const roleOptions = computed(() => roles.map(r => ({ value: r, label: t(r) })))
-const statusOptions = computed(() => statuses.map(s => ({ value: s, label: t(s) })))
-const formRoleOptions = computed(() => roles.map(r => ({ value: r, label: t(r) })))
+const roleOptions = computed(() => roles.map(r => ({ value: r, label: t(`role_${r}`) })))
+const statusOptions = computed(() => statuses.map(s => ({ value: s, label: t(`user_status_${s}`) })))
+const formRoleOptions = computed(() => roles.map(r => ({ value: r, label: t(`role_${r}`) })))
 
 // ESC handler — close whichever modal is open, top-most first.
 function onKeydown(e: KeyboardEvent) {
@@ -601,15 +610,25 @@ onBeforeUnmount(() => {
 
         <template #cell.role="{ row }">
           <Badge :tone="ROLE_TONE[row.role] || 'neutral'">
-            {{ row.role ? t(row.role) : '' }}
+            {{ row.role ? t(`role_${row.role}`) : '' }}
           </Badge>
         </template>
 
         <template #cell.status="{ row }">
-          <StatusBadge
-            :value="row.status"
+          <Badge
+            :tone="row.status === 'ACTIVE' ? 'success' : (row.status === 'SUSPENDED' ? 'error' : 'neutral')"
             dot
-          />
+          >
+            {{ row.status ? t(`user_status_${row.status}`) : '' }}
+          </Badge>
+        </template>
+
+        <template #cell.last_login_at="{ row }">
+          <span class="cell-muted">{{ row.last_login_at ? formatDate(row.last_login_at) : t('Never') }}</span>
+        </template>
+
+        <template #cell.created_at="{ row }">
+          <span class="cell-muted">{{ formatDate(row.created_at) }}</span>
         </template>
 
         <!-- Row actions -->
@@ -733,7 +752,7 @@ onBeforeUnmount(() => {
                 @update:model-value="(v: boolean) => form.status = v ? 'ACTIVE' : 'SUSPENDED'"
               />
               <span style="font-size:14px;font-weight:500;color:var(--text-secondary);">
-                {{ t(form.status) }}
+                {{ t(`user_status_${form.status}`) }}
               </span>
             </div>
           </Field>
@@ -878,7 +897,7 @@ onBeforeUnmount(() => {
         <div>
           <p style="margin:0;font-weight:600;">
             {{ `${statusConfirm.user.first_name || ''} ${statusConfirm.user.last_name || ''}`.trim() }}
-            ({{ t(statusConfirm.user.role) }})
+            ({{ t(`role_${statusConfirm.user.role}`) }})
           </p>
           <p
             class="muted"

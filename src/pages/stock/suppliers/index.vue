@@ -44,8 +44,11 @@ const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 // Only columns that the list API actually returns
 const headers = [
   { title: t('Name'), key: 'name', sortable: false },
+  { title: t('Phone'), key: 'phone', sortable: false },
+  { title: t('Contact Person'), key: 'contact_person', sortable: false },
   { title: t('City'), key: 'city', sortable: false },
   { title: t('Rating'), key: 'rating', sortable: false },
+  { title: t('Outstanding Balance'), key: 'current_balance', sortable: false, align: 'end' as const },
   { title: t('Status'), key: 'is_active', sortable: false },
   { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
 ]
@@ -56,8 +59,12 @@ async function loadSuppliers() {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
     if (search.value)
       params.search = search.value
+    // BE accepts `active_only` (default true). Map our 3-state select:
+    //   undefined → omit (BE will hide inactive by default)
+    //   'true'    → active_only=true
+    //   'false'   → active_only=false (show all incl. inactive)
     if (activeFilter.value !== undefined)
-      params.is_active = activeFilter.value
+      params.active_only = activeFilter.value === 'true' ? 'true' : 'false'
 
     const res = await axios.get('/suppliers/', { params })
     const d = res.data?.data ?? res.data
@@ -313,6 +320,18 @@ const ledgerTypeColor: Record<string, string> = {
             <td class="sk-cell">
               <div
                 class="sk-box"
+                style="width:110px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:120px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
                 style="width:90px;height:13px;border-radius:4px;"
               />
             </td>
@@ -320,6 +339,15 @@ const ledgerTypeColor: Record<string, string> = {
               <div
                 class="sk-box"
                 style="width:60px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td
+              class="sk-cell"
+              style="text-align:end;"
+            >
+              <div
+                class="sk-box"
+                style="width:80px;height:13px;border-radius:4px;margin-inline-start:auto;"
               />
             </td>
             <td class="sk-cell">
@@ -348,8 +376,22 @@ const ledgerTypeColor: Record<string, string> = {
           </tr>
         </template>
 
+        <template #item.phone="{ item }">
+          {{ item.raw.phone || '—' }}
+        </template>
+        <template #item.contact_person="{ item }">
+          <span class="hide-sm">{{ item.raw.contact_person || '—' }}</span>
+        </template>
         <template #item.city="{ item }">
           {{ item.raw.city || '—' }}
+        </template>
+        <template #item.current_balance="{ item }">
+          <span
+            class="num-tabular"
+            :class="Number(item.raw.current_balance) > 0 ? 'text-warning' : 'text-disabled'"
+          >
+            {{ formatCurrency(item.raw.current_balance ?? 0) }}
+          </span>
         </template>
         <template #item.rating="{ item }">
           <div class="d-flex align-center gap-1">
@@ -844,7 +886,7 @@ const ledgerTypeColor: Record<string, string> = {
                     :color="ledgerTypeColor[r.type] ?? 'default'"
                     variant="tonal"
                   >
-                    {{ r.type }}
+                    {{ r.type ? t(`supplier_tx_${r.type}`) : '—' }}
                   </VChip>
                 </td>
                 <td
@@ -858,7 +900,7 @@ const ledgerTypeColor: Record<string, string> = {
                   <span
                     v-if="r.reference_type"
                     class="text-caption text-disabled"
-                  >{{ r.reference_type }} #{{ r.reference_id }}</span>
+                  >{{ t(`ref_${r.reference_type}`) }} #{{ r.reference_id }}</span>
                   <span
                     v-else
                     class="text-disabled"

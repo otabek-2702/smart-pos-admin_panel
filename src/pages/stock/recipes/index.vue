@@ -12,6 +12,11 @@ const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
 const typeFilter = ref<string | undefined>(undefined)
+const outputItemFilter = ref<number | undefined>(undefined)
+const productionLocationFilter = ref<number | undefined>(undefined)
+const showInactive = ref(false)
+const showOldVersions = ref(false)
+const locationsList = ref<any[]>([])
 
 const dialog = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
@@ -69,6 +74,14 @@ async function loadRecipes() {
       params.search = search.value
     if (typeFilter.value)
       params.recipe_type = typeFilter.value
+    if (outputItemFilter.value)
+      params.output_item_id = outputItemFilter.value
+    if (productionLocationFilter.value)
+      params.production_location_id = productionLocationFilter.value
+    if (showInactive.value)
+      params.active_only = 'false'
+    if (showOldVersions.value)
+      params.active_version_only = 'false'
 
     const res = await axios.get('/recipes/', { params })
     const d = res.data?.data ?? res.data
@@ -86,13 +99,16 @@ async function loadRecipes() {
 
 async function loadMeta() {
   try {
-    const [itemsRes, unitsRes] = await Promise.all([
+    const [itemsRes, unitsRes, locRes] = await Promise.all([
       axios.get('/items/', { params: { per_page: 300 } }),
       axios.get('/units/', { params: { per_page: 200 } }),
+      axios.get('/locations/', { params: { per_page: 200 } }),
     ])
 
     itemsList.value = itemsRes.data.items ?? []
     unitsList.value = unitsRes.data.units ?? []
+    const locD = locRes.data?.data ?? locRes.data
+    locationsList.value = locD?.locations ?? []
   }
   catch { /* ignore */ }
 }
@@ -100,9 +116,14 @@ async function loadMeta() {
 onMounted(() => { loadRecipes(); loadMeta() })
 watch([page, itemsPerPage], loadRecipes)
 watch([search, typeFilter], () => { page.value = 1; loadRecipes() })
+watch([outputItemFilter, productionLocationFilter, showInactive, showOldVersions], () => { page.value = 1; loadRecipes() })
 
 const itemOptions = computed(() => itemsList.value.map(i => ({ title: `${i.name} (${i.sku ?? '—'})`, value: i.id })))
 const unitOptions = computed(() => unitsList.value.map(u => ({ title: `${u.name} (${u.short_name})`, value: u.id })))
+const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.name, value: l.id })))
+const typeFilterOptions = computed(() => recipeTypes.map(v => ({ title: t(`recipe_type_${v}`), value: v })))
+const recipeTypeOptions = computed(() => recipeTypes.map(v => ({ title: t(`recipe_type_${v}`), value: v })))
+const difficultyOptions = computed(() => difficultyLevels.map(v => ({ title: t(`difficulty_${v}`), value: v })))
 
 function openCreate() {
   dialogMode.value = 'create'
@@ -212,12 +233,44 @@ async function toggleActive(item: any) {
         />
         <VSelect
           v-model="typeFilter"
-          :items="recipeTypes"
+          :items="typeFilterOptions"
           :placeholder="t('All Types')"
           density="compact"
           style="min-inline-size: 180px;"
           hide-details
           clearable
+        />
+        <VAutocomplete
+          v-model="outputItemFilter"
+          :items="itemOptions"
+          :placeholder="t('Output Item')"
+          density="compact"
+          style="min-inline-size: 220px;"
+          hide-details
+          clearable
+        />
+        <VSelect
+          v-model="productionLocationFilter"
+          :items="locationOptions"
+          :placeholder="t('Production Location')"
+          density="compact"
+          style="min-inline-size: 180px;"
+          hide-details
+          clearable
+        />
+        <VSwitch
+          v-model="showInactive"
+          :label="t('Show inactive')"
+          density="compact"
+          hide-details
+          color="primary"
+        />
+        <VSwitch
+          v-model="showOldVersions"
+          :label="t('Show old versions')"
+          density="compact"
+          hide-details
+          color="primary"
         />
         <VSpacer />
         <VBtn
@@ -462,7 +515,7 @@ async function toggleActive(item: any) {
             >
               <VSelect
                 v-model="form.recipe_type"
-                :items="recipeTypes"
+                :items="recipeTypeOptions"
                 :label="t('Type')"
                 required
               />
@@ -473,7 +526,7 @@ async function toggleActive(item: any) {
             >
               <VSelect
                 v-model="form.difficulty_level"
-                :items="difficultyLevels"
+                :items="difficultyOptions"
                 :label="t('Difficulty')"
               />
             </VCol>

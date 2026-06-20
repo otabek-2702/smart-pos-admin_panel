@@ -12,11 +12,15 @@ const itemsPerPage = ref(10)
 const typeFilter = ref<string | undefined>(undefined)
 const locationFilter = ref<number | undefined>(undefined)
 const itemFilter = ref<string>('')
+const stockItemFilter = ref<number | undefined>(undefined)
+const dateFromFilter = ref<string>('')
+const dateToFilter = ref<string>('')
 
 const locationsList = ref<any[]>([])
+const stockItemsList = ref<any[]>([])
 
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
-const { formatDate } = useFormatters()
+const { formatDate, formatCurrency } = useFormatters()
 
 // Real movement types from the API
 const movementTypes = [
@@ -79,6 +83,9 @@ const headers = [
   { title: t('Before'), key: 'quantity_before', sortable: false },
   { title: t('After'), key: 'quantity_after', sortable: false },
   { title: t('Reference'), key: 'reference', sortable: false },
+  { title: t('Unit Cost'), key: 'unit_cost', sortable: false },
+  { title: t('Total Cost'), key: 'total_cost', sortable: false },
+  { title: t('By'), key: 'user', sortable: false },
 ]
 
 function formatQty(val: any) {
@@ -97,8 +104,12 @@ async function loadTransactions() {
       params.movement_type = typeFilter.value
     if (locationFilter.value)
       params.location_id = locationFilter.value
-    if (itemFilter.value)
-      params.search = itemFilter.value
+    if (stockItemFilter.value)
+      params.stock_item_id = stockItemFilter.value
+    if (dateFromFilter.value)
+      params.date_from = dateFromFilter.value
+    if (dateToFilter.value)
+      params.date_to = dateToFilter.value
 
     const res = await axios.get('/transactions/', { params })
     const d = res.data?.data ?? res.data
@@ -124,23 +135,34 @@ async function loadLocations() {
   catch { /* ignore */ }
 }
 
-onMounted(() => { loadTransactions(); loadLocations() })
+async function loadStockItems() {
+  try {
+    const res = await axios.get('/items/', { params: { per_page: 500 } })
+    const d = res.data?.data ?? res.data
+
+    stockItemsList.value = d?.items ?? d?.results ?? []
+  }
+  catch { /* ignore */ }
+}
+
+onMounted(() => { loadTransactions(); loadLocations(); loadStockItems() })
 watch([page, itemsPerPage], loadTransactions)
-watch([typeFilter, locationFilter, itemFilter], () => { page.value = 1; loadTransactions() })
+watch([typeFilter, locationFilter, itemFilter, stockItemFilter, dateFromFilter, dateToFilter], () => { page.value = 1; loadTransactions() })
 
 const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.name, value: l.id })))
+const stockItemOptions = computed(() => stockItemsList.value.map((i: any) => ({ title: i.name, value: i.id })))
 </script>
 
 <template>
   <div>
     <VCard>
       <VCardText class="d-flex flex-wrap gap-3 align-center">
-        <VTextField
-          v-model="itemFilter"
-          :placeholder="t('Search by item...')"
-          prepend-inner-icon="bx-search"
+        <VAutocomplete
+          v-model="stockItemFilter"
+          :items="stockItemOptions"
+          :placeholder="t('All Items')"
           density="compact"
-          style="min-inline-size: 200px;"
+          style="min-inline-size: 220px;"
           hide-details
           clearable
         />
@@ -159,6 +181,24 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
           :placeholder="t('All Locations')"
           density="compact"
           style="min-inline-size: 180px;"
+          hide-details
+          clearable
+        />
+        <VTextField
+          v-model="dateFromFilter"
+          type="date"
+          :placeholder="t('Date From')"
+          density="compact"
+          style="min-inline-size: 160px;"
+          hide-details
+          clearable
+        />
+        <VTextField
+          v-model="dateToFilter"
+          type="date"
+          :placeholder="t('Date To')"
+          density="compact"
+          style="min-inline-size: 160px;"
           hide-details
           clearable
         />
@@ -246,6 +286,24 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
                 style="width:90px;height:13px;border-radius:4px;"
               />
             </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:70px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:80px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:100px;height:13px;border-radius:4px;"
+              />
+            </td>
           </tr>
         </template>
 
@@ -268,7 +326,16 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
           </VChip>
         </template>
         <template #item.item="{ item }">
-          <span class="font-weight-medium">{{ item.raw.stock_item?.name ?? item.raw.item?.name ?? '—' }}</span>
+          <span class="font-weight-medium">
+            {{ item.raw.stock_item?.name ?? item.raw.item?.name ?? '—' }}
+            <VTooltip
+              v-if="item.raw.batch?.batch_number"
+              activator="parent"
+              location="top"
+            >
+              {{ t('Batch #') }} {{ item.raw.batch.batch_number }}
+            </VTooltip>
+          </span>
         </template>
         <template #item.location="{ item }">
           {{ item.raw.location?.name ?? '—' }}
@@ -289,6 +356,17 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
         </template>
         <template #item.reference="{ item }">
           <span class="text-body-2 text-disabled">{{ item.raw.reference_type ? `${item.raw.reference_type} #${item.raw.reference_id}` : '—' }}</span>
+        </template>
+        <template #item.unit_cost="{ item }">
+          <span class="num-tabular">{{ item.raw.unit_cost != null ? formatCurrency(item.raw.unit_cost) : '—' }}</span>
+        </template>
+        <template #item.total_cost="{ item }">
+          <span class="num-tabular font-weight-medium">{{ item.raw.total_cost != null ? formatCurrency(item.raw.total_cost) : '—' }}</span>
+        </template>
+        <template #item.user="{ item }">
+          <span class="text-body-2">
+            {{ item.raw.user ? `${item.raw.user.first_name ?? ''} ${item.raw.user.last_name ?? ''}`.trim() || item.raw.user.email || '—' : '—' }}
+          </span>
         </template>
       </VDataTableServer>
     </VCard>

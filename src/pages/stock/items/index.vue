@@ -13,6 +13,8 @@ const itemsPerPage = ref(10)
 const search = ref('')
 const typeFilter = ref<string | undefined>(undefined)
 const categoryFilter = ref<number | undefined>(undefined)
+const lowStockOnly = ref(false)
+const statusFilter = ref<string>('all')
 
 // Categories for filter dropdown
 const categoriesList = ref<any[]>([])
@@ -58,6 +60,12 @@ async function loadItems() {
       params.item_type = typeFilter.value
     if (categoryFilter.value)
       params.category_id = categoryFilter.value
+    if (lowStockOnly.value)
+      params.low_stock = 'true'
+    if (statusFilter.value === 'active')
+      params.active_only = 'true'
+    else if (statusFilter.value === 'inactive')
+      params.active_only = 'false'
 
     const res = await axios.get('/items/', { params })
     const d = res.data?.data ?? res.data
@@ -91,7 +99,7 @@ async function loadMeta() {
 
 onMounted(() => { loadItems(); loadMeta() })
 watch([page, itemsPerPage], loadItems)
-watch([search, typeFilter, categoryFilter], () => { page.value = 1; loadItems() })
+watch([search, typeFilter, categoryFilter, lowStockOnly, statusFilter], () => { page.value = 1; loadItems() })
 
 const categoryOptions = computed(() => categoriesList.value.map(c => ({ title: c.name, value: c.id })))
 const unitOptions = computed(() => unitsList.value.map(u => ({ title: `${u.name} (${u.short_name})`, value: u.id })))
@@ -156,12 +164,30 @@ async function toggleActive(item: any) {
         />
         <VSelect
           v-model="typeFilter"
-          :items="['RAW', 'SEMI', 'FINISHED', 'PACKAGING']"
+          :items="['RAW', 'SEMI', 'FINISHED', 'PACKAGING'].map(v => ({ title: t(`item_type_${v}`), value: v }))"
           :placeholder="t('All Types')"
           density="compact"
           style="min-inline-size: 150px;"
           hide-details
           clearable
+        />
+        <VSelect
+          v-model="statusFilter"
+          :items="[
+            { title: t('All Statuses'), value: 'all' },
+            { title: t('item_status_active'), value: 'active' },
+            { title: t('item_status_inactive'), value: 'inactive' },
+          ]"
+          density="compact"
+          style="min-inline-size: 150px;"
+          hide-details
+        />
+        <VSwitch
+          v-model="lowStockOnly"
+          :label="t('Low stock only')"
+          density="compact"
+          hide-details
+          color="warning"
         />
         <VSelect
           v-model="categoryFilter"
@@ -275,7 +301,7 @@ async function toggleActive(item: any) {
             size="small"
             variant="tonal"
           >
-            {{ item.raw.item_type_display ?? item.raw.item_type }}
+            {{ item.raw.item_type ? t(`item_type_${item.raw.item_type}`) : (item.raw.item_type_display ?? '—') }}
           </VChip>
         </template>
         <template #item.category="{ item }">

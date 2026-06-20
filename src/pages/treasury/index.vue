@@ -6,11 +6,11 @@ const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 
-const KIND_LABELS: Record<string, string> = { SAFE: 'Safe (cash)', BANK: 'Bank (cards)' }
 const TXN_TYPES = [
   'INKASSA', 'TRANSFER_IN', 'TRANSFER_OUT', 'FEE', 'EXPENSE', 'ADJUSTMENT',
   'SUPPLIER_PAYMENT', 'SALARY_PAYMENT', 'SHIFT_DEPOSIT',
 ]
+const txnTypeItems = computed(() => TXN_TYPES.map(v => ({ title: t(`treasury_txn_${v}`), value: v })))
 
 const txnTypeColor: Record<string, string> = {
   INKASSA: 'success',
@@ -52,6 +52,34 @@ const page = ref(1)
 const itemsPerPage = ref(20)
 const accountFilter = ref<string | undefined>(undefined)
 const typeFilter = ref<string | undefined>(undefined)
+// NOTE: BE /treasury/history does not yet accept date_from/date_to/search params,
+// so these filters are applied client-side over the current page until BE support lands.
+const dateFrom = ref<string>('')
+const dateTo = ref<string>('')
+const search = ref<string>('')
+
+const filteredTxns = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  const from = dateFrom.value ? new Date(dateFrom.value).getTime() : null
+  const to = dateTo.value ? new Date(dateTo.value).getTime() + 86_400_000 : null
+
+  return txns.value.filter((tx: any) => {
+    if (from || to) {
+      const ts = tx.created_at ? new Date(tx.created_at).getTime() : 0
+      if (from && ts < from)
+        return false
+      if (to && ts >= to)
+        return false
+    }
+    if (q) {
+      const hay = `${tx.description ?? ''} ${tx.category ?? ''}`.toLowerCase()
+      if (!hay.includes(q))
+        return false
+    }
+
+    return true
+  })
+})
 
 const headers = [
   { title: t('Date'), key: 'created_at', sortable: false, width: '160px' },
@@ -61,8 +89,21 @@ const headers = [
   { title: t('Balance after'), key: 'balance_after', sortable: false, align: 'end' as const },
   { title: t('Category'), key: 'category', sortable: false },
   { title: t('Description'), key: 'description', sortable: false },
+  { title: t('Reference'), key: 'reference', sortable: false, width: '140px' },
   { title: t('By'), key: 'performed_by', sortable: false },
 ]
+
+const router = useRouter()
+
+function gotoReference(refType: string | undefined | null, refId: string | number | undefined | null) {
+  if (!refType || !refId)
+    return
+  const kind = String(refType).toLowerCase()
+  if (kind.includes('inkassa'))
+    router.push(`/inkassa/${refId}`)
+  else if (kind.includes('shift'))
+    router.push(`/shifts/${refId}`)
+}
 
 async function loadHistory() {
   loading.value = true
@@ -104,6 +145,18 @@ const transferCredited = computed(() =>
   Math.max(0, Number(transferForm.value.amount || 0) - Number(transferForm.value.fee || 0)),
 )
 
+const transferSourceBalance = computed(() => {
+  const src = accounts.value?.[transferForm.value.from]
+
+  return Number(src?.balance ?? 0)
+})
+
+const transferInsufficient = computed(() => {
+  const amt = Number(transferForm.value.amount || 0)
+
+  return amt > 0 && amt > transferSourceBalance.value
+})
+
 async function doTransfer() {
   if (transferForm.value.from === transferForm.value.to) {
     notify(t('From and To must differ'), 'error')
@@ -112,6 +165,11 @@ async function doTransfer() {
   }
   if (!transferForm.value.amount || transferForm.value.amount <= 0) {
     notify(t('Amount must be greater than 0'), 'error')
+
+    return
+  }
+  if (transferInsufficient.value) {
+    notify(t('Insufficient balance: available {bal}', { bal: formatCurrency(transferSourceBalance.value) }), 'error')
 
     return
   }
@@ -218,6 +276,33 @@ function deltaDisplay(t: any) {
     <!-- History card -->
     <VCard>
       <VCardText class="d-flex align-center gap-3 py-3 flex-wrap">
+        <VTextField
+          v-model="search"
+          :placeholder="t('Search description or category')"
+          density="compact"
+          style="min-inline-size:220px;max-inline-size:280px;"
+          hide-details
+          clearable
+          prepend-inner-icon="bx-search"
+        />
+        <VTextField
+          v-model="dateFrom"
+          :placeholder="t('Date from')"
+          type="date"
+          density="compact"
+          style="min-inline-size:160px;"
+          hide-details
+          clearable
+        />
+        <VTextField
+          v-model="dateTo"
+          :placeholder="t('Date to')"
+          type="date"
+          density="compact"
+          style="min-inline-size:160px;"
+          hide-details
+          clearable
+        />
         <VSpacer />
         <VSelect
           v-model="accountFilter"
@@ -230,7 +315,7 @@ function deltaDisplay(t: any) {
         />
         <VSelect
           v-model="typeFilter"
-          :items="TXN_TYPES"
+          :items="txnTypeItems"
           :placeholder="t('Type')"
           density="compact"
           style="min-inline-size:180px;"
@@ -255,7 +340,7 @@ function deltaDisplay(t: any) {
 
       <VDataTableServer
         :headers="headers"
-        :items="txns"
+        :items="filteredTxns"
         :items-length="total"
         :loading="loading"
         :items-per-page="itemsPerPage"
@@ -279,7 +364,7 @@ function deltaDisplay(t: any) {
             class="sk-row"
           >
             <td
-              v-for="c in 8"
+              v-for="c in 9"
               :key="c"
               class="sk-cell"
             >
@@ -328,6 +413,12 @@ function deltaDisplay(t: any) {
         </template>
         <template #item.balance_after="{ item }">
           <span class="num-tabular">{{ formatCurrency(item.raw.balance_after) }}</span>
+          <div
+            v-if="item.raw.balance_before != null"
+            class="text-caption text-disabled num-tabular"
+          >
+            {{ t('Before') }}: {{ formatCurrency(item.raw.balance_before) }}
+          </div>
         </template>
         <template #item.category="{ item }">
           {{ item.raw.category || '—' }}
@@ -338,8 +429,22 @@ function deltaDisplay(t: any) {
             v-if="item.raw.counterparty"
             class="text-caption text-disabled"
           >
-            ↔ {{ item.raw.counterparty }}
+            ↔ {{ t(`treasury_account_${item.raw.counterparty}`) }}
           </div>
+        </template>
+        <template #item.reference="{ item }">
+          <a
+            v-if="item.raw.reference_type && item.raw.reference_id"
+            href="#"
+            class="text-primary text-decoration-none"
+            @click.prevent="gotoReference(item.raw.reference_type, item.raw.reference_id)"
+          >
+            {{ item.raw.reference_type }} #{{ item.raw.reference_id }}
+          </a>
+          <span
+            v-else
+            class="text-disabled"
+          >—</span>
         </template>
         <template #item.performed_by="{ item }">
           {{ item.raw.performed_by || '—' }}
@@ -386,6 +491,10 @@ function deltaDisplay(t: any) {
                 type="number"
                 min="0"
                 autofocus
+                :error="transferInsufficient"
+                :error-messages="transferInsufficient
+                  ? [t('Insufficient balance: available {bal}', { bal: formatCurrency(transferSourceBalance) })]
+                  : []"
               />
             </VCol>
             <VCol

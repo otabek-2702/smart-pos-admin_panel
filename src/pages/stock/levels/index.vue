@@ -11,9 +11,12 @@ const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
 const locationFilter = ref<number | undefined>(undefined)
+const categoryFilter = ref<number | undefined>(undefined)
+const itemTypeFilter = ref<string | undefined>(undefined)
 const lowStockOnly = ref(false)
 
 const locationsList = ref<any[]>([])
+const categoriesList = ref<any[]>([])
 
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatDateShort } = useFormatters()
@@ -26,6 +29,9 @@ const headers = [
   { title: t('Reserved'), key: 'reserved_quantity', sortable: false },
   { title: t('Available'), key: 'available_quantity', sortable: false },
   { title: t('Pending In'), key: 'pending_in_quantity', sortable: false },
+  { title: t('Reorder Point'), key: 'reorder_point', sortable: false },
+  { title: t('Max Qty'), key: 'max_quantity', sortable: false },
+  { title: t('Avg Daily Usage'), key: 'avg_daily_usage', sortable: false },
   { title: t('Last Movement'), key: 'last_movement_at', sortable: false },
   { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const, width: '120px' },
 ]
@@ -48,6 +54,10 @@ async function loadLevels() {
       params.search = search.value
     if (locationFilter.value)
       params.location_id = locationFilter.value
+    if (categoryFilter.value)
+      params.category_id = categoryFilter.value
+    if (itemTypeFilter.value)
+      params.item_type = itemTypeFilter.value
     if (lowStockOnly.value)
       params.low_stock = true
 
@@ -75,11 +85,23 @@ async function loadLocations() {
   catch { /* ignore */ }
 }
 
-onMounted(() => { loadLevels(); loadLocations() })
+async function loadCategories() {
+  try {
+    const res = await axios.get('/categories/', { params: { per_page: 200 } })
+    const d = res.data?.data ?? res.data
+
+    categoriesList.value = d?.categories ?? []
+  }
+  catch { /* ignore */ }
+}
+
+onMounted(() => { loadLevels(); loadLocations(); loadCategories() })
 watch([page, itemsPerPage], loadLevels)
-watch([search, locationFilter, lowStockOnly], () => { page.value = 1; loadLevels() })
+watch([search, locationFilter, categoryFilter, itemTypeFilter, lowStockOnly], () => { page.value = 1; loadLevels() })
 
 const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.name, value: l.id })))
+const categoryOptions = computed(() => categoriesList.value.map(c => ({ title: c.name, value: c.id })))
+const itemTypeOptions = computed(() => ['RAW', 'SEMI', 'FINISHED', 'PACKAGING'].map(v => ({ title: t(`item_type_${v}`), value: v })))
 
 function qtyColor(qty: number) {
   if (qty <= 0)
@@ -215,6 +237,24 @@ async function doAction() {
           hide-details
           clearable
         />
+        <VSelect
+          v-model="categoryFilter"
+          :items="categoryOptions"
+          :placeholder="t('All Categories')"
+          density="compact"
+          style="min-inline-size: 200px;"
+          hide-details
+          clearable
+        />
+        <VSelect
+          v-model="itemTypeFilter"
+          :items="itemTypeOptions"
+          :placeholder="t('Item Type')"
+          density="compact"
+          style="min-inline-size: 180px;"
+          hide-details
+          clearable
+        />
         <VSwitch
           v-model="lowStockOnly"
           :label="t('Low Stock Only')"
@@ -302,6 +342,24 @@ async function doAction() {
             <td class="sk-cell">
               <div
                 class="sk-box"
+                style="width:50px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:50px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:50px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
                 style="width:90px;height:13px;border-radius:4px;"
               />
             </td>
@@ -337,6 +395,15 @@ async function doAction() {
         </template>
         <template #item.pending_in_quantity="{ item }">
           <span class="num-tabular">{{ formatQty(item.raw.pending_in_quantity) }}</span>
+        </template>
+        <template #item.reorder_point="{ item }">
+          <span class="num-tabular text-body-2 text-disabled">{{ formatQty(item.raw.reorder_point) }}</span>
+        </template>
+        <template #item.max_quantity="{ item }">
+          <span class="num-tabular text-body-2 text-disabled">{{ formatQty(item.raw.max_quantity) }}</span>
+        </template>
+        <template #item.avg_daily_usage="{ item }">
+          <span class="num-tabular text-body-2 text-disabled">{{ formatQty(item.raw.avg_daily_usage) }}</span>
         </template>
         <template #item.last_movement_at="{ item }">
           {{ formatDateShort(item.raw.last_movement_at) }}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { hrApi as axios } from '@/plugins/axios'
+import defaultAxios, { hrApi as axios } from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -15,11 +15,24 @@ const search = ref('')
 const dialog = ref(false)
 const editing = ref<any>(null)
 const saving = ref(false)
-const form = ref({ name: '', description: '', is_active: true })
+const form = ref<{ name: string; description: string; is_active: boolean; manager_id: number | null }>({ name: '', description: '', is_active: true, manager_id: null })
+
+const users = ref<any[]>([])
+async function loadUsers() {
+  try {
+    const res = await defaultAxios.get('/users', { params: { per_page: 200 } })
+    const d = res.data?.data ?? res.data
+    users.value = d?.users ?? d?.items ?? d ?? []
+  }
+  catch {
+    users.value = []
+  }
+}
 
 const headers = [
   { title: t('Name'), key: 'name', sortable: false },
   { title: t('Description'), key: 'description', sortable: false },
+  { title: t('Manager'), key: 'manager', sortable: false },
   { title: t('Employees'), key: 'employee_count', sortable: false },
   { title: t('Status'), key: 'is_active', sortable: false },
   { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
@@ -45,7 +58,7 @@ async function load() {
   }
 }
 
-onMounted(load)
+onMounted(() => { load(); loadUsers() })
 watch([page, itemsPerPage], load)
 
 const debouncedSearch = useDebounceFn(() => { page.value = 1; load() }, 400)
@@ -54,13 +67,13 @@ watch(search, debouncedSearch)
 
 function openCreate() {
   editing.value = null
-  form.value = { name: '', description: '', is_active: true }
+  form.value = { name: '', description: '', is_active: true, manager_id: null }
   dialog.value = true
 }
 
 function openEdit(d: any) {
   editing.value = d
-  form.value = { name: d.name ?? '', description: d.description ?? '', is_active: d.is_active ?? true }
+  form.value = { name: d.name ?? '', description: d.description ?? '', is_active: d.is_active ?? true, manager_id: d.manager?.id ?? d.manager_id ?? null }
   dialog.value = true
 }
 
@@ -172,6 +185,12 @@ async function remove(d: any) {
             <td class="sk-cell">
               <div
                 class="sk-box"
+                style="width:120px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
                 style="width:40px;height:13px;border-radius:4px;"
               />
             </td>
@@ -197,6 +216,9 @@ async function remove(d: any) {
               </div>
             </td>
           </tr>
+        </template>
+        <template #item.manager="{ item }">
+          {{ item.raw.manager ? `${item.raw.manager.first_name ?? ''} ${item.raw.manager.last_name ?? ''}`.trim() : '—' }}
         </template>
         <template #item.is_active="{ item }">
           <VChip
@@ -270,6 +292,16 @@ async function remove(d: any) {
             :label="t('Description')"
             rows="2"
             class="mb-3"
+          />
+          <VSelect
+            v-model="form.manager_id"
+            :items="users"
+            :item-title="(u: any) => `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() || u.email"
+            item-value="id"
+            :label="t('Manager')"
+            :placeholder="t('Select Manager')"
+            class="mb-3"
+            clearable
           />
           <VSwitch
             v-model="form.is_active"

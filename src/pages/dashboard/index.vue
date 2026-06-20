@@ -203,6 +203,56 @@ const subKpis = computed(() => [
 ])
 
 // ============================================================
+// Extra headline figures from BE (units_sold, avg_prep_seconds,
+// money_entered, peak_hour) + category_stats_today
+// ============================================================
+function fmtPrepTime(seconds: number): string {
+  const s = Math.max(0, Math.round(Number(seconds) || 0))
+  const m = Math.floor(s / 60)
+  const r = s % 60
+  return `${m}:${String(r).padStart(2, '0')}`
+}
+
+const extraKpis = computed(() => [
+  {
+    key: 'units_sold',
+    label: t('Units Sold'),
+    value: Number(today.value?.units_sold ?? 0),
+    tone: 'primary' as const,
+    sub: peakHourLabel.value ? t('Peak hour {hour}', { hour: peakHourLabel.value }) : undefined,
+  },
+  {
+    key: 'avg_prep',
+    label: t('Avg Prep'),
+    value: today.value?.avg_prep_seconds != null
+      ? fmtPrepTime(Number(today.value.avg_prep_seconds))
+      : '—',
+    tone: 'info' as const,
+    sub: t('mm:ss per order'),
+  },
+  {
+    key: 'money_entered',
+    label: t('Counted into Safe'),
+    value: fmtMoney(Number(today.value?.money_entered ?? 0)),
+    tone: 'success' as const,
+  },
+])
+
+const categoryStatsToday = computed<any[]>(() => data.value?.category_stats_today ?? [])
+const categoryMixData = computed(() =>
+  categoryStatsToday.value.slice(0, 6).map((c: any) => ({
+    name: String(c.category_name ?? c.name ?? '—'),
+    value: Number(c.revenue) || 0,
+    units: Number(c.units) || Number(c.quantity) || 0,
+  })),
+)
+const categoryMixInsight = computed(() =>
+  categoryMixData.value.length
+    ? t('{name} leads category revenue', { name: categoryMixData.value[0].name })
+    : t('No category sales yet'),
+)
+
+// ============================================================
 // Revenue trend — last 14 days (revenue vs expense, with target)
 // Mapped to LineAreaChart series format.
 // ============================================================
@@ -253,21 +303,12 @@ const PAYMENT_COLORS: Record<string, string> = {
   UZCARD: 'var(--c1)',
   HUMO: 'var(--c4)',
   PAYME: 'var(--c5)',
-  CLICK: 'var(--c3)',
   MIXED: 'var(--c5)',
-}
-const PAYMENT_LABELS: Record<string, string> = {
-  CASH: 'Cash',
-  UZCARD: 'Uzcard',
-  HUMO: 'Humo',
-  PAYME: 'Payme',
-  CLICK: 'Click',
-  MIXED: 'Mixed',
 }
 const paymentMix = computed(() =>
   Object.entries(paymentBreakdown.value)
     .map(([k, v]) => ({
-      label: k === 'CASH' ? t('Cash') : (PAYMENT_LABELS[k] ?? k),
+      label: t(`payment_method_${k}`),
       value: Number(v) || 0,
       color: PAYMENT_COLORS[k] ?? 'var(--c5)',
     }))
@@ -393,6 +434,17 @@ function initial(s: string | undefined | null): string {
       </template>
     </div>
 
+    <!-- ===== Extra headline figures (units sold / avg prep / counted into safe) ===== -->
+    <div class="grid cols-3" style="margin-bottom: var(--sp-5);">
+      <template v-for="k in extraKpis" :key="k.key">
+        <div v-if="loading" class="kpi" style="padding: var(--sp-4) var(--sp-5);">
+          <Skeleton :w="90" :h="13" :style="{ marginBottom: '10px' }" />
+          <Skeleton :w="120" :h="24" />
+        </div>
+        <KpiMini v-else :data="k" />
+      </template>
+    </div>
+
     <!-- ===== Revenue trend + payment mix ===== -->
     <div class="grid split-1-7" style="margin-bottom: var(--sp-5);">
       <ChartCard
@@ -474,6 +526,27 @@ function initial(s: string | undefined | null): string {
           :data="topProductsData"
           :value-format="fmtAbbr"
         />
+      </ChartCard>
+    </div>
+
+    <!-- ===== Category mix today ===== -->
+    <div class="grid" style="margin-bottom: var(--sp-5);">
+      <ChartCard
+        :eyebrow="t('Category mix today')"
+        :insight="categoryMixInsight"
+        :sub="t('Revenue and units by category')"
+      >
+        <HBarChart
+          v-if="categoryMixData.length || loading"
+          :loading="loading"
+          :data="categoryMixData"
+          :value-format="fmtAbbr"
+        />
+        <div v-else class="statefill">
+          <div class="statefill__title">
+            {{ t('No category sales yet') }}
+          </div>
+        </div>
       </ChartCard>
     </div>
 

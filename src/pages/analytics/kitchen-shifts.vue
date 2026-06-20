@@ -98,7 +98,12 @@ const byHourOptions = computed(() => ({
         <VTextField v-model="dateTo" type="date" :label="t('To')" density="compact" hide-details style="max-inline-size:170px;" />
         <VSelect
           v-model="roleFilter"
-          :items="['WAITER', 'CASHIER', 'ADMIN']"
+          :items="[
+            { title: t('role_WAITER'), value: 'WAITER' },
+            { title: t('role_CASHIER'), value: 'CASHIER' },
+            { title: t('role_ADMIN'), value: 'ADMIN' },
+            { title: t('role_MANAGER'), value: 'MANAGER' },
+          ]"
           :label="t('Role')"
           density="compact"
           hide-details
@@ -187,6 +192,10 @@ const byHourOptions = computed(() => ({
                 <span class="font-weight-bold">{{ fmtSec(summary.prep_time.avg_seconds) }}</span>
               </div>
               <div class="d-flex justify-space-between mb-2">
+                <span class="text-disabled">{{ t('Median') }}</span>
+                <span class="font-weight-bold">{{ fmtSec(summary.prep_time.median_seconds) }}</span>
+              </div>
+              <div class="d-flex justify-space-between mb-2">
                 <span class="text-success">{{ t('Best shift') }}</span>
                 <span>{{ fmtSec(summary.prep_time.best_shift_avg_seconds) }}</span>
               </div>
@@ -268,6 +277,7 @@ const byHourOptions = computed(() => ({
                 <th class="text-end">{{ t('Readied') }}</th>
                 <th class="text-end">{{ t('Items') }}</th>
                 <th class="text-end">{{ t('Avg Prep') }}</th>
+                <th class="text-end">{{ t('Median prep') }}</th>
                 <th class="text-end">{{ t('Slow') }}</th>
                 <th class="text-end">{{ t('Orders/h') }}</th>
                 <th class="text-end">{{ t('Late') }}</th>
@@ -282,6 +292,7 @@ const byHourOptions = computed(() => ({
                 <td class="text-end">{{ s.orders_readied }} ({{ s.completion_rate_pct }}%)</td>
                 <td class="text-end">{{ s.items_prepared.units }}</td>
                 <td class="text-end">{{ fmtSec(s.prep_time.avg_seconds) }}</td>
+                <td class="text-end">{{ fmtSec(s.prep_time.median_seconds) }}</td>
                 <td class="text-end">{{ s.prep_time.slow_orders }} ({{ s.prep_time.slow_rate_pct }}%)</td>
                 <td class="text-end">{{ s.throughput.orders_per_hour }}</td>
                 <td class="text-end">

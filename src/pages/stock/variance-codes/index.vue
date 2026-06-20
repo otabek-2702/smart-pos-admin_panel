@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { stockApi as axios } from '@/plugins/axios'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -10,6 +9,8 @@ const loading = ref(false)
 const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
+const activeFilter = ref<string | undefined>(undefined)
+const seeding = ref(false)
 
 const dialog = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
@@ -40,9 +41,11 @@ const headers = [
 async function loadCodes() {
   loading.value = true
   try {
-    const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value)
-      params.search = search.value
+    const params: any = {}
+    if (activeFilter.value === 'true')
+      params.active = true
+    else if (activeFilter.value === 'false')
+      params.active = false
 
     const res = await axios.get('/variance-codes/', { params })
     const d = res.data?.data ?? res.data
@@ -58,9 +61,23 @@ async function loadCodes() {
   }
 }
 
+async function seedDefaults() {
+  seeding.value = true
+  try {
+    await axios.post('/variance-codes/seed/')
+    notify(t('Defaults seeded'))
+    await loadCodes()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error seeding defaults'), 'error')
+  }
+  finally {
+    seeding.value = false
+  }
+}
+
 onMounted(loadCodes)
-watch([page, itemsPerPage], loadCodes)
-watch(search, () => { page.value = 1; loadCodes() })
+watch(activeFilter, loadCodes)
 
 function openCreate() {
   dialogMode.value = 'create'
@@ -127,16 +144,28 @@ async function doDelete() {
   <div>
     <VCard>
       <VCardText class="d-flex flex-wrap gap-3 align-center">
-        <VTextField
-          v-model="search"
-          :placeholder="t('Search variance codes...')"
-          prepend-inner-icon="bx-search"
+        <VSelect
+          v-model="activeFilter"
+          :items="[
+            { title: t('All'), value: undefined },
+            { title: t('Active'), value: 'true' },
+            { title: t('Inactive'), value: 'false' },
+          ]"
+          :label="t('Status')"
           density="compact"
-          style="min-inline-size: 240px;"
+          style="min-inline-size: 200px; max-inline-size: 240px;"
           hide-details
           clearable
         />
         <VSpacer />
+        <VBtn
+          variant="tonal"
+          prepend-icon="bx-download"
+          :loading="seeding"
+          @click="seedDefaults"
+        >
+          {{ t('Seed defaults') }}
+        </VBtn>
         <VBtn
           prepend-icon="bx-plus"
           @click="openCreate"
@@ -145,28 +174,20 @@ async function doDelete() {
         </VBtn>
       </VCardText>
 
-      <VDataTableServer
+      <VDataTable
         :headers="headers"
         :items="codes"
-        :items-length="total"
         :loading="loading"
-        :items-per-page="itemsPerPage"
-        :page="page"
+        :items-per-page="-1"
       >
-        <template #bottom>
-          <DataTableFooter
-            v-model:page="page"
-            v-model:items-per-page="itemsPerPage"
-            :total-items="total"
-          />
-        </template>
+        <template #bottom />
 
         <template
           v-if="loading && codes.length === 0"
           #body
         >
           <tr
-            v-for="n in itemsPerPage"
+            v-for="n in 6"
             :key="n"
             class="sk-row"
           >
@@ -279,7 +300,7 @@ async function doDelete() {
             </VBtn>
           </div>
         </template>
-      </VDataTableServer>
+      </VDataTable>
     </VCard>
 
     <VDialog

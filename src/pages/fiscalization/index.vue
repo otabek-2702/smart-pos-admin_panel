@@ -133,6 +133,14 @@ const modeColor: Record<string, string> = {
   mock: 'info',
   live: 'success',
 }
+
+const statusFilterItems = computed(() => [
+  { title: t('fiscal_receipt_status_PENDING'), value: 'PENDING' },
+  { title: t('fiscal_receipt_status_SENT'), value: 'SENT' },
+  { title: t('fiscal_receipt_status_CONFIRMED'), value: 'CONFIRMED' },
+  { title: t('fiscal_receipt_status_FAILED'), value: 'FAILED' },
+  { title: t('fiscal_receipt_status_SKIPPED'), value: 'SKIPPED' },
+])
 </script>
 
 <template>
@@ -159,7 +167,7 @@ const modeColor: Record<string, string> = {
                 variant="tonal"
                 size="large"
               >
-                {{ status.mode.toUpperCase() }}
+                {{ t(`fiscal_mode_${String(status.mode).toUpperCase()}`) }}
               </VChip>
               <span v-else class="sk-box d-inline-block" style="width:80px;height:24px;border-radius:4px;" />
             </div>
@@ -250,7 +258,9 @@ const modeColor: Record<string, string> = {
         <VSpacer />
         <VSelect
           v-model="statusFilter"
-          :items="['PENDING', 'SENT', 'CONFIRMED', 'FAILED']"
+          :items="statusFilterItems"
+          item-title="title"
+          item-value="value"
           :placeholder="t('Status')"
           density="compact"
           hide-details

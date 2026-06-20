@@ -12,9 +12,10 @@ const total = ref(0)
 const loading = ref(false)
 const page = ref(1)
 const itemsPerPage = ref(10)
-const search = ref('')
 const statusFilter = ref<string | undefined>(undefined)
 const priorityFilter = ref<string | undefined>(undefined)
+const recipeFilter = ref<number | undefined>(undefined)
+const locationFilter = ref<number | undefined>(undefined)
 
 const recipesList = ref<any[]>([])
 const locationsList = ref<any[]>([])
@@ -53,12 +54,14 @@ async function loadOrders() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value)
-      params.search = search.value
     if (statusFilter.value)
       params.status = statusFilter.value
     if (priorityFilter.value)
       params.priority = priorityFilter.value
+    if (recipeFilter.value)
+      params.recipe_id = recipeFilter.value
+    if (locationFilter.value)
+      params.location_id = locationFilter.value
 
     const res = await axios.get('/production-orders/', { params })
     const d = res.data?.data ?? res.data
@@ -92,14 +95,7 @@ async function loadMeta() {
 
 onMounted(() => { loadOrders(); loadMeta() })
 watch([page, itemsPerPage], loadOrders)
-watch([statusFilter, priorityFilter], () => { page.value = 1; loadOrders() })
-
-const debouncedSearch = useDebounceFn(() => {
-  page.value = 1
-  loadOrders()
-}, 400)
-
-watch(search, debouncedSearch)
+watch([statusFilter, priorityFilter, recipeFilter, locationFilter], () => { page.value = 1; loadOrders() })
 
 const recipeOptions = computed(() => recipesList.value.map(r => ({ title: r.name, value: r.id })))
 const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.name, value: l.id })))
@@ -154,12 +150,21 @@ function canCancel(item: any) { return !['COMPLETED', 'CANCELED'].includes(item.
   <div>
     <VCard>
       <VCardText class="d-flex flex-wrap gap-3 align-center">
-        <VTextField
-          v-model="search"
-          :placeholder="t('Search orders...')"
-          prepend-inner-icon="bx-search"
+        <VAutocomplete
+          v-model="recipeFilter"
+          :items="recipeOptions"
+          :placeholder="t('All Recipes')"
           density="compact"
-          style="min-inline-size: 240px;"
+          style="min-inline-size: 220px;"
+          hide-details
+          clearable
+        />
+        <VSelect
+          v-model="locationFilter"
+          :items="locationOptions"
+          :placeholder="t('All Locations')"
+          density="compact"
+          style="min-inline-size: 180px;"
           hide-details
           clearable
         />

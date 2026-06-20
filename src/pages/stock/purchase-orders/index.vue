@@ -16,6 +16,8 @@ const search = ref('')
 const statusFilter = ref<string | undefined>(undefined)
 const paymentFilter = ref<string | undefined>(undefined)
 const supplierFilter = ref<number | undefined>(undefined)
+const dateFrom = ref<string>('')
+const dateTo = ref<string>('')
 
 const suppliersList = ref<any[]>([])
 const locationsList = ref<any[]>([])
@@ -36,8 +38,8 @@ const form = ref({
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDateShort } = useFormatters()
 
-const statuses = ['DRAFT', 'SENT', 'CONFIRMED', 'PARTIAL', 'RECEIVED', 'CANCELED']
-const paymentStatuses = ['UNPAID', 'PARTIAL', 'PAID']
+const statuses = computed(() => ['DRAFT', 'SENT', 'CONFIRMED', 'PARTIAL', 'RECEIVED', 'CANCELED'].map(s => ({ title: t(`po_status_${s}`), value: s })))
+const paymentStatuses = computed(() => ['UNPAID', 'PARTIAL', 'PAID'].map(s => ({ title: t(`po_payment_${s}`), value: s })))
 
 const headers = [
   { title: '', key: 'data-table-expand', sortable: false, width: '40px' },
@@ -62,6 +64,10 @@ async function loadOrders() {
       params.payment_status = paymentFilter.value
     if (supplierFilter.value)
       params.supplier_id = supplierFilter.value
+    if (dateFrom.value)
+      params.date_from = dateFrom.value
+    if (dateTo.value)
+      params.date_to = dateTo.value
 
     const res = await axios.get('/purchase-orders/', { params })
     const d = res.data?.data ?? res.data
@@ -95,7 +101,7 @@ async function loadMeta() {
 
 onMounted(() => { loadOrders(); loadMeta() })
 watch([page, itemsPerPage], loadOrders)
-watch([statusFilter, paymentFilter, supplierFilter], () => { page.value = 1; loadOrders() })
+watch([statusFilter, paymentFilter, supplierFilter, dateFrom, dateTo], () => { page.value = 1; loadOrders() })
 
 const debouncedSearch = useDebounceFn(() => {
   page.value = 1
@@ -186,6 +192,26 @@ function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.s
           :placeholder="t('All Suppliers')"
           density="compact"
           style="min-inline-size: 180px;"
+          hide-details
+          clearable
+        />
+        <VTextField
+          v-model="dateFrom"
+          :placeholder="t('Date From')"
+          :label="t('Date From')"
+          type="date"
+          density="compact"
+          style="min-inline-size: 160px;"
+          hide-details
+          clearable
+        />
+        <VTextField
+          v-model="dateTo"
+          :placeholder="t('Date To')"
+          :label="t('Date To')"
+          type="date"
+          density="compact"
+          style="min-inline-size: 160px;"
           hide-details
           clearable
         />

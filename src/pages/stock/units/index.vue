@@ -20,6 +20,13 @@ const deleting = ref(false)
 const selectedItem = ref<any>(null)
 
 const unitTypes = ['WEIGHT', 'VOLUME', 'COUNT', 'LENGTH', 'TIME']
+const unitTypeItems = computed(() => unitTypes.map(v => ({ title: t(`unit_type_${v}`), value: v })))
+const filteredUnits = computed(() => {
+  const q = (search.value ?? '').trim().toLowerCase()
+  if (!q)
+    return units.value
+  return units.value.filter((u: any) => (u.name ?? '').toLowerCase().includes(q) || (u.short_name ?? '').toLowerCase().includes(q))
+})
 
 const typeColor: Record<string, string> = {
   WEIGHT: 'primary',
@@ -57,10 +64,8 @@ async function loadUnits() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value)
-      params.search = search.value
     if (typeFilter.value)
-      params.unit_type = typeFilter.value
+      params.type = typeFilter.value
 
     const res = await axios.get('/units/', { params })
     const d = res.data?.data ?? res.data
@@ -78,7 +83,7 @@ async function loadUnits() {
 
 onMounted(loadUnits)
 watch([page, itemsPerPage], loadUnits)
-watch([search, typeFilter], () => { page.value = 1; loadUnits() })
+watch(typeFilter, () => { page.value = 1; loadUnits() })
 
 function openCreate() {
   dialogMode.value = 'create'
@@ -170,7 +175,7 @@ const baseUnitOptions = computed(() =>
         />
         <VSelect
           v-model="typeFilter"
-          :items="unitTypes"
+          :items="unitTypeItems"
           :placeholder="t('All Types')"
           density="compact"
           style="min-inline-size: 160px;"
@@ -188,7 +193,7 @@ const baseUnitOptions = computed(() =>
 
       <VDataTableServer
         :headers="headers"
-        :items="units"
+        :items="filteredUnits"
         :items-length="total"
         :loading="loading"
         :items-per-page="itemsPerPage"
@@ -277,7 +282,7 @@ const baseUnitOptions = computed(() =>
             size="small"
             variant="tonal"
           >
-            {{ item.raw.unit_type_display ?? item.raw.unit_type }}
+            {{ t(`unit_type_${item.raw.unit_type}`) }}
           </VChip>
         </template>
         <template #item.is_base_unit="{ item }">
@@ -387,7 +392,7 @@ const baseUnitOptions = computed(() =>
             >
               <VSelect
                 v-model="form.unit_type"
-                :items="unitTypes"
+                :items="unitTypeItems"
                 :label="t('Type')"
                 required
               />

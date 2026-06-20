@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { useTheme } from 'vuetify'
+import { storeToRefs } from 'pinia'
 import axios from '@/plugins/axios'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import { initialAbility } from '@/plugins/casl/ability'
 import { useAppAbility } from '@/plugins/casl/useAppAbility'
+import { useAIAssistantStore } from '@/stores/aiAssistant'
 
 /* ============================================================
    Alpha POS — Design Topbar
@@ -34,6 +36,14 @@ const route = useRoute()
 const router = useRouter()
 const ability = useAppAbility()
 const { t, locale } = useI18n({ useScope: 'global' })
+
+/* ---------- AI thinking pill (cross-page indicator) ---------- */
+const aiStore = useAIAssistantStore()
+const { generating: aiGenerating } = storeToRefs(aiStore)
+const showAiPill = computed(() => !!aiGenerating.value && !route.path.startsWith('/ai-assistant'))
+function goAi() {
+  router.push('/ai-assistant')
+}
 
 /* ---------- Language switcher (uz/ru/en) ---------- */
 interface Lang { code: string; label: string }
@@ -254,6 +264,17 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="topbar__spacer" />
+
+    <!-- AI thinking pill (shown when generation is running on another page) -->
+    <button
+      v-if="showAiPill"
+      class="ai-pill"
+      :title="t('AI is generating a reply — click to view')"
+      @click="goAi"
+    >
+      <span class="typing"><span /><span /><span /></span>
+      {{ t('AI is thinking…') }}
+    </button>
 
     <!-- DateRange (only on dashboard / analytics / orders / shifts) -->
     <div

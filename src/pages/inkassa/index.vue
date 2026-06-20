@@ -16,6 +16,32 @@ const historyLoading = ref(false)
 const historyPage = ref(1)
 const historyPerPage = ref(10)
 
+// Client-side filters (BE only accepts page + per_page — type/date filtering deferred to BE)
+const typeFilter = ref<string | undefined>(undefined)
+const dateFrom = ref<string>('')
+const dateTo = ref<string>('')
+const inkassTypeOptions = ['CASH', 'UZCARD', 'HUMO', 'PAYME']
+
+const filteredHistoryItems = computed(() => {
+  return historyItems.value.filter((row: any) => {
+    if (typeFilter.value && row?.inkass_type !== typeFilter.value)
+      return false
+    if (dateFrom.value) {
+      const created = row?.created_at ? new Date(row.created_at) : null
+      if (!created || created < new Date(dateFrom.value))
+        return false
+    }
+    if (dateTo.value) {
+      const created = row?.created_at ? new Date(row.created_at) : null
+      const to = new Date(dateTo.value)
+      to.setHours(23, 59, 59, 999)
+      if (!created || created > to)
+        return false
+    }
+    return true
+  })
+})
+
 const performDialog = ref(false)
 const performLoading = ref(false)
 const performAmounts = ref({ cash: 0, uzcard: 0, humo: 0, payme: 0 })
@@ -28,7 +54,11 @@ const totalRemoved = computed(() =>
 const historyHeaders = [
   { title: t('Date'), key: 'created_at', sortable: false },
   { title: t('Cashier'), key: 'cashier', sortable: false },
+  { title: t('Type'), key: 'inkass_type', sortable: false },
   { title: t('Amount'), key: 'amount', sortable: false },
+  { title: t('Balance After'), key: 'balance_after', sortable: false },
+  { title: t('Total Orders'), key: 'total_orders', sortable: false },
+  { title: t('Total Revenue'), key: 'total_revenue', sortable: false },
   { title: t('Notes'), key: 'notes', sortable: false },
 ]
 
@@ -190,10 +220,70 @@ watch([historyPage, historyPerPage], loadHistory)
       </VCol>
     </VRow>
 
+    <VRow
+      v-if="stats?.top_products?.length"
+      class="mb-4"
+    >
+      <VCol cols="12">
+        <VCard :title="t(`Today's top products`)">
+          <VCardText>
+            <div
+              v-for="p in stats.top_products"
+              :key="p.id"
+              class="d-flex align-center justify-space-between py-2"
+              style="border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);"
+            >
+              <div>
+                <div class="text-body-2 font-weight-medium">
+                  {{ p.name }}
+                </div>
+                <div class="text-caption text-disabled">
+                  {{ p.total_quantity }} {{ t('sold').toLowerCase() }}
+                </div>
+              </div>
+              <span class="text-body-2 font-weight-medium text-success num-tabular">{{ formatCurrency(p.total_revenue) }}</span>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+
     <VCard>
       <VCardText class="d-flex flex-wrap gap-3 align-center">
         <span class="text-h6">{{ t('Inkassa History') }}</span>
         <VSpacer />
+        <VSelect
+          v-model="typeFilter"
+          :items="inkassTypeOptions"
+          :label="t('Type')"
+          density="compact"
+          clearable
+          hide-details
+          style="max-width:180px;"
+        >
+          <template #selection="{ item }">
+            {{ t(`inkass_type_${item.raw}`) }}
+          </template>
+          <template #item="{ item, props }">
+            <VListItem v-bind="props" :title="t(`inkass_type_${item.raw}`)" />
+          </template>
+        </VSelect>
+        <VTextField
+          v-model="dateFrom"
+          :label="t('Date From')"
+          type="date"
+          density="compact"
+          hide-details
+          style="max-width:170px;"
+        />
+        <VTextField
+          v-model="dateTo"
+          :label="t('Date To')"
+          type="date"
+          density="compact"
+          hide-details
+          style="max-width:170px;"
+        />
         <VBtn
           color="primary"
           prepend-icon="bx-plus"
@@ -212,7 +302,7 @@ watch([historyPage, historyPerPage], loadHistory)
 
       <VDataTableServer
         :headers="historyHeaders"
-        :items="historyItems"
+        :items="filteredHistoryItems"
         :items-length="historyTotal"
         :loading="historyLoading"
         :items-per-page="historyPerPage"
@@ -250,6 +340,30 @@ watch([historyPage, historyPerPage], loadHistory)
             <td class="sk-cell">
               <div
                 class="sk-box"
+                style="width:70px;height:13px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:100px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:100px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:40px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
                 style="width:100px;height:13px;border-radius:4px;"
               />
             </td>
@@ -266,10 +380,30 @@ watch([historyPage, historyPerPage], loadHistory)
           {{ formatDate(item.raw.created_at) }}
         </template>
         <template #item.cashier="{ item }">
-          {{ item.raw.cashier?.name ?? item.raw.cashier_name ?? '—' }}
+          {{ item.raw.cashier?.name || '—' }}
+        </template>
+        <template #item.inkass_type="{ item }">
+          <VChip
+            v-if="item.raw.inkass_type"
+            size="small"
+            variant="tonal"
+            color="primary"
+          >
+            {{ t(`inkass_type_${item.raw.inkass_type}`) }}
+          </VChip>
+          <span v-else>—</span>
         </template>
         <template #item.amount="{ item }">
           <span class="font-weight-medium num-tabular">{{ formatCurrency(item.raw.amount) }}</span>
+        </template>
+        <template #item.balance_after="{ item }">
+          <span class="num-tabular">{{ item.raw.balance_after != null ? formatCurrency(item.raw.balance_after) : '—' }}</span>
+        </template>
+        <template #item.total_orders="{ item }">
+          <span class="num-tabular">{{ item.raw.total_orders ?? '—' }}</span>
+        </template>
+        <template #item.total_revenue="{ item }">
+          <span class="num-tabular">{{ item.raw.total_revenue != null ? formatCurrency(item.raw.total_revenue) : '—' }}</span>
         </template>
         <template #item.notes="{ item }">
           <span class="text-body-2 text-disabled">{{ item.raw.notes || '—' }}</span>
@@ -291,7 +425,7 @@ watch([historyPage, historyPerPage], loadHistory)
             >
               <VTextField
                 v-model.number="performAmounts.cash"
-                :label="t('Cash')"
+                :label="t('inkass_type_CASH')"
                 type="number"
                 min="0"
                 autofocus
@@ -303,7 +437,7 @@ watch([historyPage, historyPerPage], loadHistory)
             >
               <VTextField
                 v-model.number="performAmounts.uzcard"
-                :label="t('Uzcard')"
+                :label="t('inkass_type_UZCARD')"
                 type="number"
                 min="0"
               />
@@ -314,7 +448,7 @@ watch([historyPage, historyPerPage], loadHistory)
             >
               <VTextField
                 v-model.number="performAmounts.humo"
-                :label="t('Humo')"
+                :label="t('inkass_type_HUMO')"
                 type="number"
                 min="0"
               />
@@ -325,7 +459,7 @@ watch([historyPage, historyPerPage], loadHistory)
             >
               <VTextField
                 v-model.number="performAmounts.payme"
-                :label="t('Payme')"
+                :label="t('inkass_type_PAYME')"
                 type="number"
                 min="0"
               />

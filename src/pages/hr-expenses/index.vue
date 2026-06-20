@@ -23,15 +23,30 @@ const form = ref({
   description: '',
   expense_date: new Date().toISOString().slice(0, 10),
   receipt_number: '',
+  payment_method: 'CASH' as 'CASH' | 'UZCARD' | 'HUMO' | 'PAYME' | 'BANK_TRANSFER',
+  notes: '',
 })
 
 const categories = ref<any[]>([])
+
+const statusFilter = ref<string | undefined>(undefined)
+const categoryFilter = ref<number | undefined>(undefined)
+const dateFrom = ref<string>('')
+const dateTo = ref<string>('')
+
+const EXPENSE_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'PAID'] as const
+const PAYMENT_METHODS = ['CASH', 'UZCARD', 'HUMO', 'PAYME', 'BANK_TRANSFER'] as const
+const paymentMethodOptions = computed(() => PAYMENT_METHODS.map(v => ({ title: t(`payment_method_${v}`), value: v })))
+const statusFilterOptions = computed(() => EXPENSE_STATUSES.map(v => ({ title: t(`expense_status_${v}`), value: v })))
 
 const headers = [
   { title: t('Date'), key: 'expense_date', sortable: false },
   { title: t('Category'), key: 'category', sortable: false },
   { title: t('Description'), key: 'description', sortable: false },
   { title: t('Amount'), key: 'amount', sortable: false },
+  { title: t('Payment method'), key: 'payment_method', sortable: false },
+  { title: t('Receipt #'), key: 'receipt_number', sortable: false },
+  { title: t('Filed by'), key: 'created_by', sortable: false },
   { title: t('Status'), key: 'status', sortable: false },
   { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
 ]
@@ -46,7 +61,12 @@ const statusColor: Record<string, string> = {
 async function load() {
   loading.value = true
   try {
-    const res = await axios.get('/expenses/', { params: { page: page.value, per_page: itemsPerPage.value } })
+    const params: Record<string, any> = { page: page.value, per_page: itemsPerPage.value }
+    if (statusFilter.value) params.status = statusFilter.value
+    if (categoryFilter.value) params.category_id = categoryFilter.value
+    if (dateFrom.value) params.date_from = dateFrom.value
+    if (dateTo.value) params.date_to = dateTo.value
+    const res = await axios.get('/expenses/', { params })
     const d = res.data?.data ?? res.data
 
     items.value = d?.expenses ?? d?.items ?? []
@@ -81,6 +101,10 @@ async function loadCategories() {
 
 onMounted(() => { load(); loadStats(); loadCategories() })
 watch([page, itemsPerPage], load)
+watch([statusFilter, categoryFilter, dateFrom, dateTo], () => {
+  page.value = 1
+  load()
+})
 
 function openCreate() {
   editing.value = null
@@ -90,6 +114,22 @@ function openCreate() {
     description: '',
     expense_date: new Date().toISOString().slice(0, 10),
     receipt_number: '',
+    payment_method: 'CASH',
+    notes: '',
+  }
+  dialog.value = true
+}
+
+function openEdit(e: any) {
+  editing.value = e
+  form.value = {
+    category_id: e.category?.id ?? e.category_id ?? null,
+    amount: Number(e.amount ?? 0),
+    description: e.description ?? '',
+    expense_date: (e.expense_date ?? new Date().toISOString()).slice(0, 10),
+    receipt_number: e.receipt_number ?? '',
+    payment_method: (e.payment_method ?? 'CASH') as any,
+    notes: e.notes ?? '',
   }
   dialog.value = true
 }
@@ -97,8 +137,14 @@ function openCreate() {
 async function save() {
   saving.value = true
   try {
-    await axios.post('/expenses/', form.value)
-    notify(t('Expense created'))
+    if (editing.value) {
+      await axios.put(`/expenses/${editing.value.id}/`, form.value)
+      notify(t('Expense updated'))
+    }
+    else {
+      await axios.post('/expenses/', form.value)
+      notify(t('Expense created'))
+    }
     dialog.value = false
     await Promise.all([load(), loadStats()])
   }
@@ -107,6 +153,19 @@ async function save() {
   }
   finally {
     saving.value = false
+  }
+}
+
+async function removeExpense(e: any) {
+  if (!confirm(t('Delete this expense?') as string))
+    return
+  try {
+    await axios.delete(`/expenses/${e.id}/`)
+    notify(t('Deleted'))
+    await Promise.all([load(), loadStats()])
+  }
+  catch (err: any) {
+    notify(err?.response?.data?.message ?? t('Error'), 'error')
   }
 }
 
@@ -137,7 +196,7 @@ async function reject(e: any) {
 
 const payDialog = ref(false)
 const paying = ref<any>(null)
-const payMethod = ref<'CASH' | 'UZCARD' | 'HUMO' | 'PAYME'>('CASH')
+const payMethod = ref<'CASH' | 'UZCARD' | 'HUMO' | 'PAYME' | 'BANK_TRANSFER'>('CASH')
 
 function openPay(e: any) {
   paying.value = e
@@ -352,6 +411,48 @@ async function deleteCat(c: any) {
     </VRow>
 
     <VCard>
+      <div class="toolbar pa-3 d-flex flex-wrap" style="gap:8px;">
+        <div class="control control--select" style="min-width:160px;">
+          <VSelect
+            v-model="statusFilter"
+            :items="statusFilterOptions"
+            :label="t('Status')"
+            density="compact"
+            clearable
+            hide-details
+          />
+        </div>
+        <div class="control control--select" style="min-width:180px;">
+          <VSelect
+            v-model="categoryFilter"
+            :items="categories.map((c: any) => ({ title: c.name, value: c.id }))"
+            :label="t('Category')"
+            density="compact"
+            clearable
+            hide-details
+          />
+        </div>
+        <div class="control" style="min-width:150px;">
+          <VTextField
+            v-model="dateFrom"
+            type="date"
+            :label="t('From')"
+            density="compact"
+            clearable
+            hide-details
+          />
+        </div>
+        <div class="control" style="min-width:150px;">
+          <VTextField
+            v-model="dateTo"
+            type="date"
+            :label="t('To')"
+            density="compact"
+            clearable
+            hide-details
+          />
+        </div>
+      </div>
 
       <VDataTableServer
         :headers="headers"
@@ -377,6 +478,21 @@ async function deleteCat(c: any) {
         <template #item.amount="{ item }">
           <span class="font-weight-medium num-tabular">{{ formatCurrency(item.raw.amount ?? 0) }}</span>
         </template>
+        <template #item.payment_method="{ item }">
+          <template v-if="item.raw.payment_method">
+            {{ t(`payment_method_${item.raw.payment_method}`) }}
+          </template>
+          <span v-else class="text-disabled">—</span>
+        </template>
+        <template #item.receipt_number="{ item }">
+          {{ item.raw.receipt_number || '—' }}
+        </template>
+        <template #item.created_by="{ item }">
+          <template v-if="item.raw.created_by">
+            {{ item.raw.created_by.first_name }} {{ item.raw.created_by.last_name }}
+          </template>
+          <span v-else class="text-disabled">—</span>
+        </template>
         <template #item.status="{ item }">
           <VChip
             size="small"
@@ -384,7 +500,19 @@ async function deleteCat(c: any) {
             :color="statusColor[item.raw.status] ?? 'default'"
             variant="tonal"
           >
-            {{ item.raw.status }}
+            {{ t(`expense_status_${item.raw.status}`) }}
+            <VTooltip
+              v-if="item.raw.approved_by || item.raw.paid_by"
+              activator="parent"
+              location="top"
+            >
+              <div v-if="item.raw.approved_by">
+                {{ t('Approved by') }}: {{ item.raw.approved_by.first_name }} {{ item.raw.approved_by.last_name }}
+              </div>
+              <div v-if="item.raw.paid_by">
+                {{ t('Paid by') }}: {{ item.raw.paid_by.first_name }} {{ item.raw.paid_by.last_name }}
+              </div>
+            </VTooltip>
           </VChip>
         </template>
         <template #item.actions="{ item }">
@@ -449,6 +577,43 @@ async function deleteCat(c: any) {
                 {{ t('Pay') }}
               </VTooltip>
             </VBtn>
+            <VBtn
+              v-if="item.raw.status !== 'PAID'"
+              icon
+              variant="text"
+              size="small"
+              @click="openEdit(item.raw)"
+            >
+              <VIcon
+                icon="bx-pencil"
+                size="18"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Edit') }}
+              </VTooltip>
+            </VBtn>
+            <VBtn
+              v-if="item.raw.status !== 'PAID'"
+              icon
+              variant="text"
+              size="small"
+              color="error"
+              @click="removeExpense(item.raw)"
+            >
+              <VIcon
+                icon="bx-trash"
+                size="18"
+              />
+              <VTooltip
+                activator="parent"
+                location="top"
+              >
+                {{ t('Delete') }}
+              </VTooltip>
+            </VBtn>
           </div>
         </template>
       </VDataTableServer>
@@ -459,7 +624,7 @@ async function deleteCat(c: any) {
       max-width="520"
       persistent
     >
-      <VCard :title="t('New Expense')">
+      <VCard :title="editing ? t('Edit Expense') : t('New Expense')">
         <VCardText>
           <VRow>
             <VCol cols="12">
@@ -489,16 +654,36 @@ async function deleteCat(c: any) {
                 :label="t('Date')"
               />
             </VCol>
-            <VCol cols="12">
+            <VCol
+              cols="12"
+              sm="6"
+            >
+              <VSelect
+                v-model="form.payment_method"
+                :items="paymentMethodOptions"
+                :label="t('Payment method')"
+              />
+            </VCol>
+            <VCol
+              cols="12"
+              sm="6"
+            >
               <VTextField
                 v-model="form.receipt_number"
-                :label="t('Reference Number')"
+                :label="t('Receipt #')"
               />
             </VCol>
             <VCol cols="12">
               <VTextarea
                 v-model="form.description"
                 :label="t('Description')"
+                rows="2"
+              />
+            </VCol>
+            <VCol cols="12">
+              <VTextarea
+                v-model="form.notes"
+                :label="t('Notes')"
                 rows="2"
               />
             </VCol>
@@ -535,13 +720,8 @@ async function deleteCat(c: any) {
           </div>
           <VSelect
             v-model="payMethod"
-            :items="[
-              { title: t('Cash'), value: 'CASH' },
-              { title: 'Uzcard', value: 'UZCARD' },
-              { title: 'Humo', value: 'HUMO' },
-              { title: 'Payme', value: 'PAYME' },
-            ]"
-            :label="t('Payment Method')"
+            :items="paymentMethodOptions"
+            :label="t('Payment method')"
             autofocus
           />
           <div class="text-caption text-disabled mt-2">

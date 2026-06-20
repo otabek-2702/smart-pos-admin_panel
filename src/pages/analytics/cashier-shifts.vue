@@ -11,6 +11,33 @@ const dateFrom = ref(new Date().toISOString().slice(0, 10))
 const dateTo = ref(new Date().toISOString().slice(0, 10))
 const userIdFilter = ref<number | null>(null)
 const cashiers = ref<any[]>([])
+const statusFilter = ref<string | null>(null)
+
+function setRangePreset(preset: 'today' | 'last7' | 'last30' | 'thisMonth') {
+  const today = new Date()
+  const iso = (d: Date) => d.toISOString().slice(0, 10)
+  if (preset === 'today') {
+    dateFrom.value = iso(today)
+    dateTo.value = iso(today)
+  }
+  else if (preset === 'last7') {
+    const from = new Date(today)
+    from.setDate(today.getDate() - 6)
+    dateFrom.value = iso(from)
+    dateTo.value = iso(today)
+  }
+  else if (preset === 'last30') {
+    const from = new Date(today)
+    from.setDate(today.getDate() - 29)
+    dateFrom.value = iso(from)
+    dateTo.value = iso(today)
+  }
+  else if (preset === 'thisMonth') {
+    const from = new Date(today.getFullYear(), today.getMonth(), 1)
+    dateFrom.value = iso(from)
+    dateTo.value = iso(today)
+  }
+}
 
 // -------- response --------
 const data = ref<any>(null)
@@ -56,6 +83,14 @@ const leaderboard = computed<any[]>(() => data.value?.leaderboard ?? [])
 const distribution = computed<any>(() => data.value?.distribution)
 const lateArrivals = computed<any[]>(() => summary.value?.punctuality?.late_arrivals ?? [])
 const perShift = computed<any[]>(() => data.value?.shifts ?? [])
+const filteredPerShift = computed<any[]>(() => {
+  if (!statusFilter.value) return perShift.value
+  return perShift.value.filter((s: any) => s.status === statusFilter.value)
+})
+const expandedShiftId = ref<number | null>(null)
+function toggleShiftDetails(id: number) {
+  expandedShiftId.value = expandedShiftId.value === id ? null : id
+}
 const router = useRouter()
 
 function openHandover(shiftId: number) {
@@ -71,7 +106,7 @@ const paymentMixSeries = computed(() => {
 
 const paymentMixOptions = computed(() => ({
   chart: { type: 'donut', toolbar: { show: false } },
-  labels: ['Cash', 'Uzcard', 'Humo', 'Payme', 'Mixed'],
+  labels: [t('payment_method_CASH'), t('payment_method_UZCARD'), t('payment_method_HUMO'), t('payment_method_PAYME'), t('payment_method_MIXED')],
   colors: ['#22c55e', '#3b82f6', '#f59e0b', '#06b6d4', '#a855f7'],
   legend: { position: 'bottom' },
   dataLabels: { enabled: true, formatter: (v: number) => `${v.toFixed(1)}%` },
@@ -149,6 +184,26 @@ function varianceColor(v: string | number) {
           style="min-inline-size:180px;"
           clearable
         />
+        <VSelect
+          v-model="statusFilter"
+          :items="[
+            { title: t('shift_status_ACTIVE'), value: 'ACTIVE' },
+            { title: t('shift_status_ENDED'), value: 'ENDED' },
+            { title: t('shift_status_COMPLETED'), value: 'COMPLETED' },
+            { title: t('shift_status_ABANDONED'), value: 'ABANDONED' },
+          ]"
+          :label="t('Filter by status')"
+          density="compact"
+          hide-details
+          style="min-inline-size:180px;"
+          clearable
+        />
+        <div class="d-flex flex-wrap align-center" style="gap:6px;">
+          <VChip size="small" variant="tonal" @click="setRangePreset('today')">{{ t('Today') }}</VChip>
+          <VChip size="small" variant="tonal" @click="setRangePreset('last7')">{{ t('Last 7 days') }}</VChip>
+          <VChip size="small" variant="tonal" @click="setRangePreset('last30')">{{ t('Last 30 days') }}</VChip>
+          <VChip size="small" variant="tonal" @click="setRangePreset('thisMonth')">{{ t('This month') }}</VChip>
+        </div>
       </VCardText>
     </VCard>
 
@@ -443,7 +498,7 @@ function varianceColor(v: string | number) {
       <VCard v-if="perShift.length" class="mb-4">
         <VCardText>
           <div class="text-subtitle-1 font-weight-medium mb-2">
-            {{ t('Per-shift breakdown') }} ({{ perShift.length }})
+            {{ t('Per-shift breakdown') }} ({{ filteredPerShift.length }})
           </div>
           <VTable density="compact">
             <thead>
@@ -453,10 +508,15 @@ function varianceColor(v: string | number) {
                 <th>{{ t('Date') }}</th>
                 <th class="text-end">{{ t('Duration') }}</th>
                 <th class="text-end">{{ t('Orders') }}</th>
+                <th>{{ t('By type') }}</th>
+                <th class="text-end">{{ t('Units') }}</th>
+                <th class="text-end">{{ t('Lines') }}</th>
                 <th class="text-end">{{ t('Revenue') }}</th>
                 <th class="text-end">{{ t('Cash') }}</th>
                 <th class="text-end">{{ t('Card') }}</th>
                 <th class="text-end">{{ t('AOV') }}</th>
+                <th class="text-end">{{ t('Discount') }} %</th>
+                <th class="text-end">{{ t('Avg discount') }} %</th>
                 <th class="text-end">{{ t('Prep') }}</th>
                 <th class="text-end">{{ t('Late') }}</th>
                 <th class="text-end">{{ t('Variance') }}</th>
@@ -464,50 +524,102 @@ function varianceColor(v: string | number) {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="s in perShift" :key="s.shift_id">
-                <td class="font-weight-medium">{{ s.user_name }}</td>
-                <td>
-                  <VChip class="status-pill" size="x-small" :color="s.status === 'COMPLETED' ? 'success' : (s.status === 'ENDED' ? 'warning' : 'default')" variant="tonal">
-                    {{ t(`shift_status_${s.status}`) }}
-                  </VChip>
-                </td>
-                <td>{{ formatDate(s.start_time) }}</td>
-                <td class="text-end">{{ Math.round((s.duration_minutes ?? 0) / 60) }}h</td>
-                <td class="text-end">{{ s.orders?.total ?? 0 }}</td>
-                <td class="text-end font-weight-medium">{{ formatCurrency(s.money?.revenue ?? 0) }}</td>
-                <td class="text-end">{{ formatCurrency(s.money?.cash ?? 0) }}</td>
-                <td class="text-end">{{ formatCurrency(s.money?.card ?? 0) }}</td>
-                <td class="text-end">{{ formatCurrency(s.money?.avg_order_value ?? 0) }}</td>
-                <td class="text-end">{{ Math.round((s.speed?.avg_prep_seconds ?? 0) / 60) }}m</td>
-                <td class="text-end">
-                  <span v-if="s.punctuality?.is_late" class="text-warning">+{{ s.punctuality.late_minutes }}m</span>
-                  <span v-else class="text-success">✓</span>
-                </td>
-                <td class="text-end">
-                  <VChip
-                    v-if="s.reconciliation"
-                    size="x-small"
-                    :color="varianceColor(s.reconciliation.difference)"
-                    variant="tonal"
-                  >
-                    {{ formatCurrency(s.reconciliation.difference) }}
-                  </VChip>
-                  <span v-else class="text-disabled">—</span>
-                </td>
-                <td class="text-end">
-                  <VBtn
-                    icon
-                    variant="text"
-                    size="x-small"
-                    @click="openHandover(s.shift_id)"
-                  >
-                    <VIcon icon="bx-link-external" size="16" />
-                    <VTooltip activator="parent" location="top">
-                      {{ t('Open handover') }}
-                    </VTooltip>
-                  </VBtn>
-                </td>
-              </tr>
+              <template v-for="s in filteredPerShift" :key="s.shift_id">
+                <tr>
+                  <td class="font-weight-medium">{{ s.user_name }}</td>
+                  <td>
+                    <VChip class="status-pill" size="x-small" :color="s.status === 'COMPLETED' ? 'success' : (s.status === 'ENDED' ? 'warning' : 'default')" variant="tonal">
+                      {{ t(`shift_status_${s.status}`) }}
+                    </VChip>
+                  </td>
+                  <td>{{ formatDate(s.start_time) }}</td>
+                  <td class="text-end">{{ Math.round((s.duration_minutes ?? 0) / 60) }}h</td>
+                  <td class="text-end">{{ s.orders?.total ?? 0 }}</td>
+                  <td>
+                    <div class="d-flex flex-wrap" style="gap:2px;">
+                      <VChip size="x-small" color="primary" variant="tonal" :title="t('order_type_HALL')">H {{ s.orders?.by_type?.HALL ?? 0 }}</VChip>
+                      <VChip size="x-small" color="info" variant="tonal" :title="t('order_type_DELIVERY')">D {{ s.orders?.by_type?.DELIVERY ?? 0 }}</VChip>
+                      <VChip size="x-small" color="warning" variant="tonal" :title="t('order_type_PICKUP')">P {{ s.orders?.by_type?.PICKUP ?? 0 }}</VChip>
+                    </div>
+                  </td>
+                  <td class="text-end">{{ s.items?.units_sold ?? 0 }}</td>
+                  <td class="text-end">{{ s.items?.line_items ?? 0 }}</td>
+                  <td class="text-end font-weight-medium">{{ formatCurrency(s.money?.revenue ?? 0) }}</td>
+                  <td class="text-end">{{ formatCurrency(s.money?.cash ?? 0) }}</td>
+                  <td class="text-end">{{ formatCurrency(s.money?.card ?? 0) }}</td>
+                  <td class="text-end">{{ formatCurrency(s.money?.avg_order_value ?? 0) }}</td>
+                  <td class="text-end">{{ s.discounts?.discount_rate_pct ?? 0 }}%</td>
+                  <td class="text-end">{{ s.discounts?.avg_discount_pct ?? 0 }}%</td>
+                  <td class="text-end">{{ Math.round((s.speed?.avg_prep_seconds ?? 0) / 60) }}m</td>
+                  <td class="text-end">
+                    <span v-if="s.punctuality?.is_late" class="text-warning">+{{ s.punctuality.late_minutes }}m</span>
+                    <span v-else class="text-success">✓</span>
+                  </td>
+                  <td class="text-end">
+                    <VChip
+                      v-if="s.reconciliation"
+                      size="x-small"
+                      :color="varianceColor(s.reconciliation.difference)"
+                      variant="tonal"
+                    >
+                      {{ formatCurrency(s.reconciliation.difference) }}
+                    </VChip>
+                    <span v-else class="text-disabled">—</span>
+                  </td>
+                  <td class="text-end" style="white-space:nowrap;">
+                    <VBtn
+                      icon
+                      variant="text"
+                      size="x-small"
+                      @click="toggleShiftDetails(s.shift_id)"
+                    >
+                      <VIcon :icon="expandedShiftId === s.shift_id ? 'bx-chevron-up' : 'bx-chevron-down'" size="16" />
+                      <VTooltip activator="parent" location="top">
+                        {{ t('Details') }}
+                      </VTooltip>
+                    </VBtn>
+                    <VBtn
+                      icon
+                      variant="text"
+                      size="x-small"
+                      @click="openHandover(s.shift_id)"
+                    >
+                      <VIcon icon="bx-link-external" size="16" />
+                      <VTooltip activator="parent" location="top">
+                        {{ t('Open handover') }}
+                      </VTooltip>
+                    </VBtn>
+                  </td>
+                </tr>
+                <tr v-if="expandedShiftId === s.shift_id">
+                  <td colspan="18">
+                    <div class="d-flex flex-wrap" style="gap:24px; padding:8px 4px;">
+                      <div style="min-width:220px;">
+                        <div class="text-subtitle-2 mb-1">{{ t('Payment mix') }}</div>
+                        <div v-for="(v, k) in (s.money?.payment_mix ?? {})" :key="k" class="d-flex justify-space-between text-body-2">
+                          <span class="text-disabled">{{ t(`payment_method_${k}`) }}</span>
+                          <span>{{ formatCurrency(v) }}</span>
+                        </div>
+                      </div>
+                      <div style="min-width:220px;">
+                        <div class="text-subtitle-2 mb-1">{{ t('Attendance') }}</div>
+                        <div class="d-flex justify-space-between text-body-2">
+                          <span class="text-disabled">{{ t('Scheduled start') }}</span>
+                          <span>{{ s.punctuality?.scheduled_start ? formatDate(s.punctuality.scheduled_start) : '—' }}</span>
+                        </div>
+                        <div class="d-flex justify-space-between text-body-2">
+                          <span class="text-disabled">{{ t('Check-in') }}</span>
+                          <span>{{ s.punctuality?.attendance?.check_in ? formatDate(s.punctuality.attendance.check_in) : '—' }}</span>
+                        </div>
+                        <div class="d-flex justify-space-between text-body-2">
+                          <span class="text-disabled">{{ t('Check-out') }}</span>
+                          <span>{{ s.punctuality?.attendance?.check_out ? formatDate(s.punctuality.attendance.check_out) : '—' }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </VTable>
         </VCardText>

@@ -53,6 +53,8 @@ const headers = [
   { title: t('Position'), key: 'position', sortable: false },
   { title: t('Department'), key: 'department', sortable: false },
   { title: t('Contract'), key: 'contract_type', sortable: false },
+  { title: t('Phone'), key: 'phone', sortable: false },
+  { title: t('Pay schedule'), key: 'payment_frequency', sortable: false },
   { title: t('Base salary'), key: 'base_salary', sortable: false },
   { title: t('Hire date'), key: 'hire_date', sortable: false },
   { title: t('Status'), key: 'is_active', sortable: false },
@@ -323,7 +325,7 @@ async function doDelete() {
         />
         <VSelect
           v-model="contractTypeFilter"
-          :items="contractTypes"
+          :items="contractTypes.map(v => ({ title: t(`contract_type_${v}`), value: v }))"
           :placeholder="t('Contract')"
           density="compact"
           hide-details
@@ -373,8 +375,14 @@ async function doDelete() {
         </template>
         <template #item.contract_type="{ item }">
           <VChip size="x-small" class="status-pill" color="info" variant="tonal">
-            {{ item.raw.contract_type }}
+            {{ item.raw.contract_type ? t(`contract_type_${item.raw.contract_type}`) : '—' }}
           </VChip>
+        </template>
+        <template #item.phone="{ item }">
+          {{ item.raw.phone || '—' }}
+        </template>
+        <template #item.payment_frequency="{ item }">
+          {{ item.raw.payment_frequency ? t(`payment_frequency_${item.raw.payment_frequency}`) : '—' }}
         </template>
         <template #item.base_salary="{ item }">
           <span class="num-tabular">{{ formatCurrency(item.raw.base_salary) }}</span>
@@ -436,10 +444,10 @@ async function doDelete() {
               <VTextField v-model="form.hire_date" type="date" :label="t('Hire date')" required />
             </VCol>
             <VCol cols="12" sm="6">
-              <VSelect v-model="form.contract_type" :items="contractTypes" :label="t('Contract type')" />
+              <VSelect v-model="form.contract_type" :items="contractTypes.map(v => ({ title: t(`contract_type_${v}`), value: v }))" :label="t('Contract type')" />
             </VCol>
             <VCol cols="12" sm="6">
-              <VSelect v-model="form.payment_frequency" :items="paymentFreqs" :label="t('Payment frequency')" />
+              <VSelect v-model="form.payment_frequency" :items="paymentFreqs.map(v => ({ title: t(`payment_frequency_${v}`), value: v }))" :label="t('Payment frequency')" />
             </VCol>
             <VCol cols="12" sm="6">
               <VTextField v-model.number="form.base_salary" :label="t('Base salary')" type="number" min="0" />

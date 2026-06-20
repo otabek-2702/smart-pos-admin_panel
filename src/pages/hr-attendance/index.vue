@@ -13,6 +13,15 @@ const page = ref(1)
 const itemsPerPage = ref(20)
 const dateFrom = ref('')
 const dateTo = ref('')
+const dateFilter = ref('')
+const statusFilter = ref<string | undefined>(undefined)
+const employeeFilter = ref<string | undefined>(undefined)
+const employees = ref<any[]>([])
+
+const statusOptions = ['PRESENT', 'ABSENT', 'LATE', 'HALF_DAY', 'ON_LEAVE'].map(v => ({
+  title: te(`attendance_status_${v}`) ? t(`attendance_status_${v}`) : v,
+  value: v,
+}))
 
 const headers = [
   { title: t('Date'), key: 'date', sortable: false },
@@ -20,7 +29,9 @@ const headers = [
   { title: t('Check In'), key: 'check_in', sortable: false },
   { title: t('Check Out'), key: 'check_out', sortable: false },
   { title: t('Status'), key: 'status', sortable: false },
-  { title: t('Hours'), key: 'hours_worked', sortable: false },
+  { title: t('Hours'), key: 'work_hours', sortable: false },
+  { title: t('Overtime'), key: 'overtime_hours', sortable: false },
+  { title: t('Source'), key: 'source', sortable: false },
 ]
 
 const statusColor: Record<string, string> = {
@@ -38,6 +49,12 @@ async function load() {
       params.date_from = dateFrom.value
     if (dateTo.value)
       params.date_to = dateTo.value
+    if (dateFilter.value)
+      params.date = dateFilter.value
+    if (statusFilter.value)
+      params.status = statusFilter.value
+    if (employeeFilter.value)
+      params.employee_id = employeeFilter.value
     const res = await axios.get('/attendance/', { params })
     const d = res.data?.data ?? res.data
 
@@ -52,8 +69,20 @@ async function load() {
   }
 }
 
-onMounted(load)
-watch([page, itemsPerPage, dateFrom, dateTo], load)
+async function loadEmployees() {
+  try {
+    const res = await axios.get('/employees/', { params: { per_page: 500 } })
+    const d = res.data?.data ?? res.data
+    employees.value = (d?.employees ?? d?.items ?? d?.results ?? []).map((e: any) => ({
+      title: `${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}`.trim() || e.user?.email || e.id,
+      value: e.id ?? e.uuid,
+    }))
+  }
+  catch {}
+}
+
+onMounted(() => { load(); loadEmployees() })
+watch([page, itemsPerPage, dateFrom, dateTo, dateFilter, statusFilter, employeeFilter], load)
 </script>
 
 <template>
@@ -84,6 +113,33 @@ watch([page, itemsPerPage, dateFrom, dateTo], load)
           density="compact"
           hide-details
           style="max-inline-size:170px;"
+          clearable
+        />
+        <VTextField
+          v-model="dateFilter"
+          type="date"
+          :label="t('On date')"
+          density="compact"
+          hide-details
+          style="max-inline-size:170px;"
+          clearable
+        />
+        <VSelect
+          v-model="statusFilter"
+          :items="statusOptions"
+          :label="t('Status')"
+          density="compact"
+          hide-details
+          style="max-inline-size:180px;"
+          clearable
+        />
+        <VSelect
+          v-model="employeeFilter"
+          :items="employees"
+          :label="t('Employee')"
+          density="compact"
+          hide-details
+          style="max-inline-size:220px;"
           clearable
         />
       </div>
@@ -128,8 +184,20 @@ watch([page, itemsPerPage, dateFrom, dateTo], load)
             {{ te(`attendance_status_${item.raw.status}`) ? t(`attendance_status_${item.raw.status}`) : item.raw.status }}
           </VChip>
         </template>
-        <template #item.hours_worked="{ item }">
-          <span class="num-tabular">{{ item.raw.hours_worked ?? '—' }}</span>
+        <template #item.work_hours="{ item }">
+          <span class="num-tabular">{{ item.raw.work_hours ?? '—' }}</span>
+        </template>
+        <template #item.overtime_hours="{ item }">
+          <span class="num-tabular">{{ item.raw.overtime_hours ?? '—' }}</span>
+        </template>
+        <template #item.source="{ item }">
+          <span v-if="item.raw.notes">
+            <VTooltip activator="parent" location="top">{{ item.raw.notes }}</VTooltip>
+            {{ item.raw.source ? (te(`attendance_source_${item.raw.source}`) ? t(`attendance_source_${item.raw.source}`) : item.raw.source) : '—' }}
+          </span>
+          <span v-else>
+            {{ item.raw.source ? (te(`attendance_source_${item.raw.source}`) ? t(`attendance_source_${item.raw.source}`) : item.raw.source) : '—' }}
+          </span>
         </template>
       </VDataTableServer>
     </VCard>

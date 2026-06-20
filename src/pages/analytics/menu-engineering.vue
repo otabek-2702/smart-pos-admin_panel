@@ -22,6 +22,15 @@ const data = ref<any>(null)
 const page = ref(1)
 const itemsPerPage = ref(20)
 const classFilter = ref<string | undefined>(undefined)
+const searchQuery = ref('')
+
+const cogsFractionValid = computed(() => cogsFraction.value >= 0.05 && cogsFraction.value <= 0.95)
+
+function applyPreset(days: number) {
+  dateFrom.value = isoDay(-days)
+  dateTo.value = isoDay(0)
+  load()
+}
 
 const classColor: Record<string, string> = {
   Star: 'success',
@@ -38,6 +47,10 @@ const classIcon: Record<string, string> = {
 }
 
 async function load() {
+  if (!cogsFractionValid.value) {
+    notify(t('COGS fraction must be between 0.05 and 0.95'), 'error')
+    return
+  }
   loading.value = true
   try {
     const res = await axios.get('/analytics/menu-engineering', {
@@ -60,10 +73,13 @@ onMounted(load)
 const summary = computed(() => data.value?.summary ?? null)
 
 const items = computed(() => {
-  const all = data.value?.items ?? []
-  if (!classFilter.value)
-    return all
-  return all.filter((i: any) => i.class === classFilter.value)
+  let all = data.value?.items ?? []
+  if (classFilter.value)
+    all = all.filter((i: any) => i.class === classFilter.value)
+  const q = searchQuery.value.trim().toLowerCase()
+  if (q)
+    all = all.filter((i: any) => String(i.product_name ?? '').toLowerCase().includes(q))
+  return all
 })
 
 const paginated = computed(() => {
@@ -114,14 +130,50 @@ const headers = computed(() => [
           :label="t('COGS fraction')"
           type="number"
           step="0.05"
+          min="0.05"
+          max="0.95"
+          density="compact"
+          :hide-details="cogsFractionValid"
+          :error="!cogsFractionValid"
+          :hint="!cogsFractionValid ? t('COGS fraction must be between 0.05 and 0.95') : ''"
+          persistent-hint
+          style="max-inline-size:200px;"
+        />
+        <VBtn
+          variant="outlined"
+          size="small"
+          @click="applyPreset(0)"
+        >
+          {{ t('Today') }}
+        </VBtn>
+        <VBtn
+          variant="outlined"
+          size="small"
+          @click="applyPreset(7)"
+        >
+          {{ t('Last 7 days') }}
+        </VBtn>
+        <VBtn
+          variant="outlined"
+          size="small"
+          @click="applyPreset(30)"
+        >
+          {{ t('Last 30 days') }}
+        </VBtn>
+        <VTextField
+          v-model="searchQuery"
+          :label="t('Search products')"
+          prepend-inner-icon="bx-search"
           density="compact"
           hide-details
-          style="max-inline-size:160px;"
+          clearable
+          style="max-inline-size:240px;"
         />
         <VBtn
           color="primary"
           prepend-icon="bx-search-alt"
           :loading="loading"
+          :disabled="!cogsFractionValid"
           @click="load"
         >
           {{ t('Analyze') }}
@@ -156,7 +208,7 @@ const headers = computed(() => [
             >
               <VIcon :icon="classIcon[key]" size="20" />
             </div>
-            <div class="kpi-card__label">{{ t(key as string) }}</div>
+            <div class="kpi-card__label">{{ t(`menu_class_${(key as string).toUpperCase()}`) }}</div>
           </div>
           <div class="kpi-card__value num-tabular">{{ klass }}</div>
         </div>
@@ -172,7 +224,7 @@ const headers = computed(() => [
           closable
           @click:close="classFilter = undefined"
         >
-          {{ t('Class') }}: {{ t(classFilter as string) }}
+          {{ t('Class') }}: {{ t(`menu_class_${(classFilter as string).toUpperCase()}`) }}
         </VChip>
         <span
           v-if="summary"
@@ -205,7 +257,7 @@ const headers = computed(() => [
             variant="tonal"
             :prepend-icon="classIcon[item.raw.class]"
           >
-            {{ t(item.raw.class) }}
+            {{ t(`menu_class_${String(item.raw.class).toUpperCase()}`) }}
           </VChip>
         </template>
         <template #item.price="{ item }">

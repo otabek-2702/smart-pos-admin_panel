@@ -8,6 +8,14 @@ const categories = ref<any[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const newCat = ref({ name: '', sort_order: 0 })
+const search = ref('')
+
+const filteredCategories = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  if (!q)
+    return categories.value
+  return categories.value.filter(c => String(c?.name ?? '').toLowerCase().includes(q))
+})
 
 async function load() {
   loading.value = true
@@ -67,6 +75,17 @@ onMounted(load)
       <VCardText>
         <div class="d-flex gap-2 mb-4">
           <VTextField
+            v-model="search"
+            :placeholder="t('Search categories...')"
+            density="compact"
+            hide-details
+            prepend-inner-icon="bx-search"
+            clearable
+            style="max-inline-size:280px;"
+          />
+        </div>
+        <div class="d-flex gap-2 mb-4">
+          <VTextField
             v-model="newCat.name"
             :label="t('Name')"
             density="compact"
@@ -97,20 +116,24 @@ onMounted(load)
               <th class="text-end" style="inline-size:60px;">#</th>
               <th>{{ t('Name') }}</th>
               <th class="text-end">{{ t('Sort order') }}</th>
-              <th>{{ t('Created') }}</th>
+              <th>{{ t('Active') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="c in categories"
+              v-for="c in filteredCategories"
               :key="c.id"
             >
               <td class="text-end num-tabular">{{ c.id }}</td>
               <td class="font-weight-medium">{{ c.name }}</td>
               <td class="text-end num-tabular">{{ c.sort_order ?? 0 }}</td>
-              <td class="text-caption text-disabled">{{ c.created_at ?? '—' }}</td>
+              <td>
+                <span class="badge" :class="c.is_active === false ? 't-neutral' : 't-success'">
+                  {{ t(`active_${c.is_active !== false}`) }}
+                </span>
+              </td>
             </tr>
-            <tr v-if="!categories.length && !loading">
+            <tr v-if="!filteredCategories.length && !loading">
               <td colspan="4" class="text-center text-disabled py-4">
                 {{ t('No categories yet') }}
               </td>

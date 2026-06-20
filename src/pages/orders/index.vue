@@ -38,6 +38,16 @@ const paymentFilter = ref<string | undefined>(undefined)
 const search = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
+// New filters mirroring BE /orders query params
+const orderTypeFilter = ref<string | undefined>(undefined)
+const cashierFilter = ref<string | undefined>(undefined)
+const categoryFilter = ref<string[]>([])
+const includeDeleted = ref(false)
+// Lookups for cashier / category selects
+const cashierOptions = ref<{ value: string, label: string }[]>([])
+const categoryOptions = ref<{ value: string, label: string }[]>([])
+const statusPickerOpen = ref(false)
+const categoryPickerOpen = ref(false)
 
 const expanded = ref<Set<number | string>>(new Set())
 const selected = ref<Set<number | string>>(new Set())
@@ -67,6 +77,7 @@ const debouncedSearch = useDebounceFn(() => {
 
 const orderStatuses = ['OPEN', 'PREPARING', 'READY', 'COMPLETED', 'CANCELED']
 const paymentStatuses = ['PAID', 'UNPAID']
+const orderTypes = ['HALL', 'DELIVERY', 'PICKUP']
 
 // Status tone map mirrored from the design bundle
 const STATUS_TONE: Record<string, string> = {
@@ -96,6 +107,14 @@ async function loadOrders() {
       params.date_from = dateFrom.value
     if (dateTo.value)
       params.date_to = dateTo.value
+    if (orderTypeFilter.value)
+      params.order_type = orderTypeFilter.value
+    if (cashierFilter.value)
+      params.cashier_id = cashierFilter.value
+    if (categoryFilter.value.length)
+      params.category_ids = categoryFilter.value.join(',')
+    if (includeDeleted.value)
+      params.include_deleted = true
 
     const res = await axios.get('/orders', { params })
     const d = res.data?.data
@@ -120,13 +139,41 @@ async function loadStats() {
   catch { /* ignore */ }
 }
 
+async function loadCashiers() {
+  try {
+    const res = await axios.get('/users', { params: { role: 'CASHIER', per_page: 100 } })
+    const d = res.data?.data ?? res.data
+    const list: any[] = d?.users ?? []
+    cashierOptions.value = list.map((u: any) => ({
+      value: String(u.id),
+      label: [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email || String(u.id),
+    }))
+  }
+  catch { /* ignore */ }
+}
+
+async function loadCategoriesLookup() {
+  try {
+    const res = await axios.get('/categories', { params: { per_page: 100 } })
+    const d = res.data?.data ?? res.data
+    const list: any[] = d?.categories ?? d?.items ?? []
+    categoryOptions.value = list.map((c: any) => ({
+      value: String(c.id),
+      label: c.name ?? String(c.id),
+    }))
+  }
+  catch { /* ignore */ }
+}
+
 onMounted(() => {
   loadOrders()
   loadStats()
+  loadCashiers()
+  loadCategoriesLookup()
 })
 
 watch([page, itemsPerPage], loadOrders)
-watch([statusFilter, paymentFilter, dateFrom, dateTo], () => {
+watch([statusFilter, paymentFilter, dateFrom, dateTo, orderTypeFilter, cashierFilter, categoryFilter, includeDeleted], () => {
   page.value = 1
   loadOrders()
 })
@@ -312,7 +359,8 @@ const rangeEnd = computed(() => Math.min(page.value * itemsPerPage.value, totalO
 
 // ---- filter chips ----
 const hasFilters = computed(() =>
-  !!(search.value || statusFilter.value.length || paymentFilter.value || dateFrom.value || dateTo.value),
+  !!(search.value || statusFilter.value.length || paymentFilter.value || dateFrom.value || dateTo.value
+    || orderTypeFilter.value || cashierFilter.value || categoryFilter.value.length || includeDeleted.value),
 )
 function clearAll() {
   search.value = ''
@@ -320,6 +368,17 @@ function clearAll() {
   paymentFilter.value = undefined
   dateFrom.value = ''
   dateTo.value = ''
+  orderTypeFilter.value = undefined
+  cashierFilter.value = undefined
+  categoryFilter.value = []
+  includeDeleted.value = false
+}
+function cashierLabel(id: string | undefined) {
+  if (!id) return ''
+  return cashierOptions.value.find(o => o.value === id)?.label ?? id
+}
+function categoryLabel(id: string) {
+  return categoryOptions.value.find(o => o.value === id)?.label ?? id
 }
 
 // ---- formatters ----
@@ -336,11 +395,15 @@ const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'id', label: '#', sortable: true },
   { key: 'type', label: t('Type') },
   { key: 'info', label: t('Info') },
+  { key: 'customer', label: t('Customer') },
+  { key: 'cashier', label: t('Cashier') },
   { key: 'status', label: t('Status'), sortable: true },
   { key: 'payment', label: t('Payment') },
+  { key: 'payment_method', label: t('Payment method') },
   { key: 'total', label: t('Total'), sortable: true, align: 'right' },
   { key: 'items', label: t('Items'), align: 'right' },
   { key: 'at', label: t('Date'), sortable: true, align: 'right' },
+  { key: 'paid_at', label: t('Paid at'), align: 'right' },
 ])
 
 // Bridge our internal sort state to DataTable's sort prop
@@ -446,32 +509,131 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
           />
         </div>
 
-        <div style="width: 200px;">
-          <Select
-            :model-value="statusFilter[0] ?? ''"
-            icon="filter"
-            :placeholder="t('Filter by Status')"
-            :options="orderStatuses.map(s => ({ value: s, label: t(s) }))"
-            @update:model-value="(v: string) => statusFilter = v ? [v] : []"
-          />
+        <!-- Multi-status filter (popover with checkboxes) -->
+        <div style="width: 200px; position: relative;">
+          <div
+            class="control control--select"
+            style="cursor: pointer;"
+            tabindex="0"
+            @click="statusPickerOpen = !statusPickerOpen"
+            @keydown.enter.prevent="statusPickerOpen = !statusPickerOpen"
+          >
+            <DesignIcon name="filter" :size="18" />
+            <span
+              :style="{ color: statusFilter.length ? 'var(--text)' : 'var(--text-tertiary)', flex: 1, paddingInline: '4px' }"
+            >
+              {{ statusFilter.length
+                ? statusFilter.map(s => t(`order_status_${s}`)).join(', ')
+                : t('Filter by Status') }}
+            </span>
+            <DesignIcon name="chevdown" :size="18" class="chev" />
+          </div>
+          <div
+            v-if="statusPickerOpen"
+            class="card"
+            style="position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:50; padding:8px; max-height:260px; overflow:auto;"
+          >
+            <label
+              v-for="s in orderStatuses"
+              :key="s"
+              class="row"
+              style="gap:8px; padding:6px 4px; cursor:pointer;"
+            >
+              <Checkbox
+                :model-value="statusFilter.includes(s)"
+                @update:model-value="(v: boolean) => {
+                  if (v && !statusFilter.includes(s)) statusFilter = [...statusFilter, s]
+                  else if (!v) statusFilter = statusFilter.filter(x => x !== s)
+                }"
+              />
+              <span>{{ t(`order_status_${s}`) }}</span>
+            </label>
+          </div>
         </div>
 
         <div style="width: 180px;">
           <Select
             :model-value="paymentFilter ?? ''"
             :placeholder="t('Payment Status')"
-            :options="paymentStatuses.map(p => ({ value: p, label: t(p) }))"
+            :options="paymentStatuses.map(p => ({ value: p, label: t(`payment_status_${p}`) }))"
             @update:model-value="(v: string) => paymentFilter = v ? v : undefined"
           />
         </div>
 
+        <!-- Order type (HALL / DELIVERY / PICKUP) -->
+        <div style="width: 160px;">
+          <Select
+            :model-value="orderTypeFilter ?? ''"
+            :placeholder="t('Order type')"
+            :options="orderTypes.map(o => ({ value: o, label: t(`order_type_${o}`) }))"
+            @update:model-value="(v: string) => orderTypeFilter = v ? v : undefined"
+          />
+        </div>
+
+        <!-- Cashier -->
+        <div style="width: 180px;">
+          <Select
+            :model-value="cashierFilter ?? ''"
+            :placeholder="t('All cashiers')"
+            :options="cashierOptions"
+            @update:model-value="(v: string) => cashierFilter = v ? v : undefined"
+          />
+        </div>
+
+        <!-- Category multi-select (popover) -->
+        <div style="width: 200px; position: relative;">
+          <div
+            class="control control--select"
+            style="cursor: pointer;"
+            tabindex="0"
+            @click="categoryPickerOpen = !categoryPickerOpen"
+            @keydown.enter.prevent="categoryPickerOpen = !categoryPickerOpen"
+          >
+            <span
+              :style="{ color: categoryFilter.length ? 'var(--text)' : 'var(--text-tertiary)', flex: 1, paddingInline: '4px' }"
+            >
+              {{ categoryFilter.length
+                ? categoryFilter.map(id => categoryLabel(id)).join(', ')
+                : t('All categories') }}
+            </span>
+            <DesignIcon name="chevdown" :size="18" class="chev" />
+          </div>
+          <div
+            v-if="categoryPickerOpen"
+            class="card"
+            style="position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:50; padding:8px; max-height:260px; overflow:auto;"
+          >
+            <label
+              v-for="c in categoryOptions"
+              :key="c.value"
+              class="row"
+              style="gap:8px; padding:6px 4px; cursor:pointer;"
+            >
+              <Checkbox
+                :model-value="categoryFilter.includes(c.value)"
+                @update:model-value="(v: boolean) => {
+                  if (v && !categoryFilter.includes(c.value)) categoryFilter = [...categoryFilter, c.value]
+                  else if (!v) categoryFilter = categoryFilter.filter(x => x !== c.value)
+                }"
+              />
+              <span>{{ c.label }}</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Include deleted switch -->
+        <label class="row" style="gap:8px; cursor:pointer;">
+          <Switch v-model="includeDeleted" />
+          <span style="font-size:13px;">{{ t('Include deleted') }}</span>
+        </label>
+
         <div class="row" style="gap: 8px; margin-left: auto;">
           <div class="control control--sm" style="width: 160px;">
-            <input v-model="dateFrom" type="date" :aria-label="t('From')">
+            <input v-model="dateFrom" type="date" :aria-label="t('Date from')">
           </div>
           <span class="tertiary">→</span>
           <div class="control control--sm" style="width: 160px;">
-            <input v-model="dateTo" type="date" :aria-label="t('To')">
+            <input v-model="dateTo" type="date" :aria-label="t('Date to')">
           </div>
         </div>
       </div>
@@ -489,28 +651,56 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
           </span>
 
           <span v-for="s in statusFilter" :key="s" class="chip">
-            <span>{{ t('Status') }}: <b>{{ t(s) }}</b></span>
+            <span>{{ t('Status') }}: <b>{{ t(`order_status_${s}`) }}</b></span>
             <span class="chip__x" @click="statusFilter = statusFilter.filter(x => x !== s)">
               <DesignIcon name="close" :size="13" />
             </span>
           </span>
 
           <span v-if="paymentFilter" class="chip">
-            <span>{{ t('Payment') }}: <b>{{ t(paymentFilter) }}</b></span>
+            <span>{{ t('Payment') }}: <b>{{ t(`payment_status_${paymentFilter}`) }}</b></span>
             <span class="chip__x" @click="paymentFilter = undefined">
               <DesignIcon name="close" :size="13" />
             </span>
           </span>
 
+          <span v-if="orderTypeFilter" class="chip">
+            <span>{{ t('Type') }}: <b>{{ t(`order_type_${orderTypeFilter}`) }}</b></span>
+            <span class="chip__x" @click="orderTypeFilter = undefined">
+              <DesignIcon name="close" :size="13" />
+            </span>
+          </span>
+
+          <span v-if="cashierFilter" class="chip">
+            <span>{{ t('Cashier') }}: <b>{{ cashierLabel(cashierFilter) }}</b></span>
+            <span class="chip__x" @click="cashierFilter = undefined">
+              <DesignIcon name="close" :size="13" />
+            </span>
+          </span>
+
+          <span v-for="cid in categoryFilter" :key="`cat-${cid}`" class="chip">
+            <span>{{ t('Category') }}: <b>{{ categoryLabel(cid) }}</b></span>
+            <span class="chip__x" @click="categoryFilter = categoryFilter.filter(x => x !== cid)">
+              <DesignIcon name="close" :size="13" />
+            </span>
+          </span>
+
+          <span v-if="includeDeleted" class="chip">
+            <span>{{ t('Include deleted') }}</span>
+            <span class="chip__x" @click="includeDeleted = false">
+              <DesignIcon name="close" :size="13" />
+            </span>
+          </span>
+
           <span v-if="dateFrom" class="chip">
-            <span>{{ t('From') }}: <b>{{ dateFrom }}</b></span>
+            <span>{{ t('Date from') }}: <b>{{ dateFrom }}</b></span>
             <span class="chip__x" @click="dateFrom = ''">
               <DesignIcon name="close" :size="13" />
             </span>
           </span>
 
           <span v-if="dateTo" class="chip">
-            <span>{{ t('To') }}: <b>{{ dateTo }}</b></span>
+            <span>{{ t('Date to') }}: <b>{{ dateTo }}</b></span>
             <span class="chip__x" @click="dateTo = ''">
               <DesignIcon name="close" :size="13" />
             </span>
@@ -548,7 +738,7 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
         <!-- Type -->
         <template #cell.type="{ row: o }">
           <Badge :tone="(tone(o.order_type) as any)">
-            {{ t(o.order_type) }}
+            {{ o.order_type ? t(`order_type_${o.order_type}`) : '—' }}
           </Badge>
         </template>
 
@@ -557,18 +747,41 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
           <span class="cell-muted">{{ infoOf(o) }}</span>
         </template>
 
+        <!-- Customer -->
+        <template #cell.customer="{ row: o }">
+          <span class="cell-muted">{{ o.user?.name ?? '—' }}</span>
+        </template>
+
+        <!-- Cashier -->
+        <template #cell.cashier="{ row: o }">
+          <span class="cell-muted">{{ o.cashier?.name ?? '—' }}</span>
+        </template>
+
         <!-- Status with dot -->
         <template #cell.status="{ row: o }">
           <Badge :tone="(tone(o.status) as any)" dot>
-            {{ t(o.status) }}
+            {{ o.status ? t(`order_status_${o.status}`) : '—' }}
           </Badge>
         </template>
 
         <!-- Payment -->
         <template #cell.payment="{ row: o }">
           <Badge :tone="o.is_paid ? 'success' : 'error'">
-            {{ o.is_paid ? t('PAID') : t('UNPAID') }}
+            {{ t(`payment_status_${o.is_paid ? 'PAID' : 'UNPAID'}`) }}
           </Badge>
+        </template>
+
+        <!-- Payment method -->
+        <template #cell.payment_method="{ row: o }">
+          <Badge v-if="o.is_paid && o.payment_method" tone="info">
+            {{ t(`payment_method_${o.payment_method}`) }}
+          </Badge>
+          <span v-else class="cell-muted">—</span>
+        </template>
+
+        <!-- Paid at -->
+        <template #cell.paid_at="{ row: o }">
+          <span class="mono cell-muted nowrap">{{ o.paid_at ? formatDate(o.paid_at) : '—' }}</span>
         </template>
 
         <!-- Total -->

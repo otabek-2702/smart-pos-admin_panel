@@ -11,6 +11,8 @@ const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
 const typeFilter = ref<string | undefined>(undefined)
+const parentFilter = ref<number | undefined>(undefined)
+const treeView = ref(false)
 
 const dialog = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
@@ -55,6 +57,10 @@ async function loadCategories() {
       params.search = search.value
     if (typeFilter.value)
       params.type = typeFilter.value
+    if (parentFilter.value)
+      params.parent_id = parentFilter.value
+    if (treeView.value)
+      params.tree = 'true'
 
     const res = await axios.get('/categories/', { params })
     const d = res.data?.data ?? res.data
@@ -72,7 +78,7 @@ async function loadCategories() {
 
 onMounted(loadCategories)
 watch([page, itemsPerPage], loadCategories)
-watch([search, typeFilter], () => { page.value = 1; loadCategories() })
+watch([search, typeFilter, parentFilter, treeView], () => { page.value = 1; loadCategories() })
 
 function openCreate() {
   dialogMode.value = 'create'
@@ -170,12 +176,28 @@ const parentOptions = computed(() =>
         />
         <VSelect
           v-model="typeFilter"
-          :items="categoryTypes"
+          :items="categoryTypes.map(v => ({ title: t(`category_type_${v}`), value: v }))"
           :placeholder="t('All Types')"
           density="compact"
           style="min-inline-size: 160px;"
           hide-details
           clearable
+        />
+        <VSelect
+          v-model="parentFilter"
+          :items="parentOptions"
+          :placeholder="t('All Parents')"
+          density="compact"
+          style="min-inline-size: 180px;"
+          hide-details
+          clearable
+        />
+        <VSwitch
+          v-model="treeView"
+          :label="t('Tree view')"
+          density="compact"
+          hide-details
+          color="primary"
         />
         <VSpacer />
         <VBtn
@@ -265,7 +287,7 @@ const parentOptions = computed(() =>
             size="small"
             variant="tonal"
           >
-            {{ item.raw.type_display ?? item.raw.type }}
+            {{ t(`category_type_${item.raw.type}`) }}
           </VChip>
         </template>
         <template #item.parent="{ item }">
@@ -365,7 +387,7 @@ const parentOptions = computed(() =>
             >
               <VSelect
                 v-model="form.type"
-                :items="categoryTypes"
+                :items="categoryTypes.map(v => ({ title: t(`category_type_${v}`), value: v }))"
                 :label="t('Type')"
                 required
               />

@@ -83,20 +83,42 @@ function fullName(u: any): string {
 const dateFrom = ref('')
 const dateTo = ref('')
 const cashierId = ref<number | ''>('')
-const statusF = ref<'' | 'Active' | 'Awaiting cash' | 'Reconciled'>('')
+// status uses BE Shift.Status enum directly: ACTIVE | ENDED | COMPLETED | ABANDONED
+const statusF = ref<'' | 'ACTIVE' | 'ENDED' | 'COMPLETED' | 'ABANDONED'>('')
+const templateId = ref<number | ''>('')
+const staffRole = ref<'CASHIER' | 'MANAGER' | 'ALL'>('CASHIER')
 const liveOnly = ref(false)
 
 const cashiers = ref<any[]>([])
+const templates = ref<any[]>([])
 
 async function loadCashiers() {
   try {
-    const res = await axios.get('/users', { params: { role: 'CASHIER', per_page: 200 } })
+    const params: any = { per_page: 200 }
+    if (staffRole.value !== 'ALL') params.role = staffRole.value
+    const res = await axios.get('/users', { params })
     const d = res.data?.data ?? res.data
     cashiers.value = d?.users ?? []
   }
   catch {
     cashiers.value = []
   }
+}
+
+async function loadTemplates() {
+  try {
+    const res = await axios.get('/shift-templates', { params: { per_page: 200 } })
+    const d = res.data?.data ?? res.data
+    templates.value = Array.isArray(d) ? d : (d?.shift_templates ?? d?.templates ?? d?.items ?? [])
+  }
+  catch {
+    templates.value = []
+  }
+}
+
+function templateName(tpl: any): string {
+  if (!tpl || typeof tpl !== 'object') return '—'
+  return tpl.name || `#${tpl.id}`
 }
 
 // ============================================================
@@ -108,10 +130,19 @@ const loading = ref(true)
 async function loadShifts() {
   loading.value = true
   try {
+    // client-side swap if from > to to avoid a confusing empty result
+    if (dateFrom.value && dateTo.value && dateFrom.value > dateTo.value) {
+      const tmp = dateFrom.value
+      dateFrom.value = dateTo.value
+      dateTo.value = tmp
+      notify(t('Swapped date range (from was after to)'), 'warning')
+    }
     const params: any = { page: 1, per_page: 100 }
     if (dateFrom.value) params.date_from = dateFrom.value
     if (dateTo.value) params.date_to = dateTo.value
     if (cashierId.value) params.user_id = cashierId.value
+    if (statusF.value) params.status = statusF.value
+    if (templateId.value) params.shift_template_id = templateId.value
 
     const res = await axios.get('/shifts', { params })
     const d = res.data?.data ?? res.data
@@ -126,8 +157,9 @@ async function loadShifts() {
   }
 }
 
-onMounted(() => { loadCashiers(); loadShifts() })
-watch([dateFrom, dateTo, cashierId], () => { loadShifts() })
+onMounted(() => { loadCashiers(); loadTemplates(); loadShifts() })
+watch([dateFrom, dateTo, cashierId, statusF, templateId], () => { loadShifts() })
+watch(staffRole, () => { loadCashiers() })
 
 // ============================================================
 // Shape & derived helpers
@@ -156,6 +188,25 @@ function varianceOf(s: any): number {
   if (r.counted_cash !== undefined) return num(r.counted_cash) - expectedCash(s)
   return 0
 }
+// Returns [{ method, amount }] sorted desc, excluding zero entries.
+// Used to surface per-tender breakdown (CASH/UZCARD/HUMO/PAYME/MIXED) in the card.
+function paymentMixRows(s: any): { method: string, amount: number }[] {
+  const mix = s.payment_mix || {}
+  const out: { method: string, amount: number }[] = []
+  for (const k of Object.keys(mix)) {
+    const amt = num((mix as any)[k]?.amount)
+    if (amt > 0) out.push({ method: k, amount: amt })
+  }
+  out.sort((a, b) => b.amount - a.amount)
+  return out
+}
+
+// Per-card UI state for the "show per-method breakdown" expander.
+const expandedMix = ref<Record<number, boolean>>({})
+function toggleMix(id: number) {
+  expandedMix.value = { ...expandedMix.value, [id]: !expandedMix.value[id] }
+}
+
 function cardPayments(s: any): number {
   // anything that isn't CASH in payment_mix
   const mix = s.payment_mix || {}
@@ -182,13 +233,10 @@ function netOf(s: any): number {
 const filtered = computed(() => {
   return shifts.value.filter((s) => {
     if (cashierId.value && s.user?.id !== cashierId.value) return false
-    if (liveOnly.value && !(s.is_live_stats || s.status === 'ACTIVE')) return false
-    if (statusF.value) {
-      const st = shiftState(s)
-      if (statusF.value === 'Active' && st !== 'active') return false
-      if (statusF.value === 'Awaiting cash' && st !== 'awaiting') return false
-      if (statusF.value === 'Reconciled' && st !== 'reconciled') return false
-    }
+    // liveOnly is a UI shortcut for status === ACTIVE
+    if (liveOnly.value && s.status !== 'ACTIVE') return false
+    // status filter is delegated to BE; no client-side narrowing here.
+    if (templateId.value && s.shift_template?.id !== templateId.value) return false
     if (dateFrom.value && s.start_time && new Date(s.start_time) < new Date(dateFrom.value)) return false
     if (dateTo.value && s.start_time && new Date(s.start_time) > new Date(`${dateTo.value}T23:59`)) return false
     return true
@@ -221,7 +269,11 @@ const activeFilters = computed(() => {
     const u = cashiers.value.find((c: any) => c.id === cashierId.value)
     arr.push({ k: 'c', label: t('Cashier'), val: u ? fullName(u) : `#${cashierId.value}`, clear: () => (cashierId.value = '') })
   }
-  if (statusF.value) arr.push({ k: 's', label: t('Status'), val: t(statusF.value), clear: () => (statusF.value = '') })
+  if (statusF.value) arr.push({ k: 's', label: t('Status'), val: t(`shift_status_${statusF.value}`), clear: () => (statusF.value = '') })
+  if (templateId.value) {
+    const tpl = templates.value.find((x: any) => x.id === templateId.value)
+    arr.push({ k: 'tpl', label: t('Template'), val: tpl ? templateName(tpl) : `#${templateId.value}`, clear: () => (templateId.value = '') })
+  }
   if (liveOnly.value) arr.push({ k: 'l', label: t('Live only'), val: t('On'), clear: () => (liveOnly.value = false) })
   if (dateFrom.value) arr.push({ k: 'f', label: t('Date from'), val: dateFrom.value, clear: () => (dateFrom.value = '') })
   if (dateTo.value) arr.push({ k: 't', label: t('Date to'), val: dateTo.value, clear: () => (dateTo.value = '') })
@@ -230,6 +282,7 @@ const activeFilters = computed(() => {
 function clearAllFilters() {
   cashierId.value = ''
   statusF.value = ''
+  templateId.value = ''
   liveOnly.value = false
   dateFrom.value = ''
   dateTo.value = ''
@@ -330,25 +383,29 @@ async function confirmReceive() {
   let success = false
   let endpointMissing = false
   try {
-    // POST to backend reconciliation endpoint
+    // POST to backend reconciliation endpoint — BE expects `actual_cash` + `notes`
+    // (it recomputes variance server-side and ignores any client-sent variance).
     await axios.post(`/shifts/${s.id}/reconcile`, {
-      counted_cash: countedParsed.value,
-      variance,
-      note: note.value || undefined,
+      actual_cash: countedParsed.value,
+      notes: note.value || undefined,
     })
     success = true
     notify(`${t('Cash received from')} ${fullName(s.user)} · ${fmtMoney(countedParsed.value!)} UZS`, variance === 0 ? 'success' : variance > 0 ? 'info' : 'warning')
   }
   catch (e: any) {
     const status = e?.response?.status
+    const beMsg = e?.response?.data?.message || ''
     if (status === 404) {
       // Treat as a graceful fallback — endpoint not deployed yet.
       endpointMissing = true
       notify(`${t('Recorded locally — backend endpoint not available')} (${fmtMoney(countedParsed.value!)} UZS)`, 'warning')
     }
+    else if (status === 400 && /ended/i.test(beMsg) && s.status !== 'ENDED') {
+      notify(t('Shift must be ended before reconciling'), 'error')
+    }
     else {
       // Real backend error — surface as error and do NOT optimistically update.
-      const msg = e?.response?.data?.message || e?.message || t('Failed to record cash handover')
+      const msg = beMsg || e?.message || t('Failed to record cash handover')
       notify(msg, 'error')
     }
   }
@@ -360,9 +417,12 @@ async function confirmReceive() {
           reconciliation: {
             ...(x.reconciliation || {}),
             counted_cash: countedParsed.value,
+            actual_cash: countedParsed.value,
             variance,
+            difference: variance,
             reported_by_user: { first_name: 'Manager' },
-            note: note.value || undefined,
+            notes: note.value || undefined,
+            created_at: new Date().toISOString(),
           },
         }
       : x)
@@ -372,13 +432,15 @@ async function confirmReceive() {
 }
 
 // ============================================================
-// Status options for the filter select
+// Status options for the filter select — use BE Shift.Status enum values directly.
+// A separate "Awaiting cash" UX state is derived (status === ENDED) and surfaced
+// via translation key shift_status_AWAITING_CASH in the badge logic below.
 // ============================================================
-const statusOptions = [
-  { value: '', label: '__placeholder__' },
-  { value: 'Active', label: 'Active' },
-  { value: 'Awaiting cash', label: 'Awaiting cash' },
-  { value: 'Reconciled', label: 'Reconciled' },
+const statusOptions: { value: '' | 'ACTIVE' | 'ENDED' | 'COMPLETED' | 'ABANDONED' }[] = [
+  { value: 'ACTIVE' },
+  { value: 'ENDED' },
+  { value: 'COMPLETED' },
+  { value: 'ABANDONED' },
 ]
 
 // ============================================================
@@ -629,18 +691,61 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               <option value="">
                 {{ t('All statuses') }}
               </option>
-              <option value="Active" style="color:var(--text);">
-                {{ t('Active') }}
-              </option>
-              <option value="Awaiting cash" style="color:var(--text);">
-                {{ t('Awaiting cash') }}
-              </option>
-              <option value="Reconciled" style="color:var(--text);">
-                {{ t('Reconciled') }}
+              <option v-for="o in statusOptions" :key="o.value" :value="o.value" style="color:var(--text);">
+                {{ t(`shift_status_${o.value}`) }}
               </option>
             </select>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chev"><polyline points="6 9 12 15 18 9" /></svg>
           </div>
+        </div>
+
+        <!-- Shift template select -->
+        <div style="flex:1 1 190px; min-width:0;">
+          <div class="control control--select">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);flex:0 0 18px;">
+              <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            <select v-model="templateId" :style="{ color: templateId ? 'var(--text)' : 'var(--text-tertiary)' }">
+              <option :value="''">
+                {{ t('All templates') }}
+              </option>
+              <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id" style="color:var(--text);">
+                {{ templateName(tpl) }}
+              </option>
+            </select>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chev"><polyline points="6 9 12 15 18 9" /></svg>
+          </div>
+        </div>
+
+        <!-- Staff role toggle (which roles populate the cashier dropdown) -->
+        <div class="row" style="gap:6px;flex:0 0 auto;">
+          <button
+            type="button"
+            class="badge"
+            :class="staffRole === 'CASHIER' ? 't-primary' : 't-neutral'"
+            :title="t('Show cashiers only in the staff dropdown')"
+            @click="staffRole = 'CASHIER'"
+          >
+            {{ t('role_CASHIER') }}
+          </button>
+          <button
+            type="button"
+            class="badge"
+            :class="staffRole === 'MANAGER' ? 't-primary' : 't-neutral'"
+            :title="t('Show managers only in the staff dropdown')"
+            @click="staffRole = 'MANAGER'"
+          >
+            {{ t('role_MANAGER') }}
+          </button>
+          <button
+            type="button"
+            class="badge"
+            :class="staffRole === 'ALL' ? 't-primary' : 't-neutral'"
+            :title="t('Show every user who can run a till')"
+            @click="staffRole = 'ALL'"
+          >
+            {{ t('All staff') }}
+          </button>
         </div>
 
         <!-- Date range -->
@@ -745,15 +850,15 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               {{ fullName(s.user) }}
             </div>
             <div class="tertiary" style="font-size:12px;">
-              {{ t('Shift') }} #{{ s.id }} · {{ s.shift_template?.name || s.shift_template?.title || s.shift_template || '—' }}
+              {{ t('Shift') }} #{{ s.id }} · {{ s.shift_template?.name || '—' }}
             </div>
           </div>
-          <!-- status badge -->
-          <span v-if="shiftState(s) === 'active'" class="badge badge--dot t-success">{{ t('ACTIVE') }}</span>
-          <span v-else-if="shiftState(s) === 'awaiting'" class="badge badge--dot t-warning">{{ t('AWAITING CASH') }}</span>
+          <!-- status badge: keep the BE Shift.Status as truth, plus the derived AWAITING_CASH UX state -->
+          <span v-if="shiftState(s) === 'active'" class="badge badge--dot t-success">{{ t(`shift_status_${s.status}`) }}</span>
+          <span v-else-if="shiftState(s) === 'awaiting'" class="badge badge--dot t-warning">{{ t('shift_status_AWAITING_CASH') }}</span>
           <span v-else class="badge t-neutral">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><polyline points="9 12 11 14 15 10" /></svg>
-            {{ t('RECONCILED') }}
+            {{ t(`shift_status_${s.status}`) }}
           </span>
         </div>
 
@@ -846,6 +951,23 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
             </span>
             <span class="mono" style="font-weight:600;font-size:13px;">{{ fmtMoney(cardPayments(s)) }}</span>
           </div>
+          <!-- Per-method breakdown toggle (CASH/UZCARD/HUMO/PAYME/MIXED) -->
+          <div v-if="paymentMixRows(s).length > 0" style="padding:2px 0 5px 23px;">
+            <button
+              type="button"
+              class="chip--clear"
+              style="font-size:11px;padding:2px 8px;"
+              @click="toggleMix(s.id)"
+            >
+              {{ expandedMix[s.id] ? t('Hide per-method breakdown') : t('Show per-method breakdown') }}
+            </button>
+          </div>
+          <div v-if="expandedMix[s.id]" style="padding:2px 0 6px 23px;">
+            <div v-for="m in paymentMixRows(s)" :key="m.method" class="row between" style="padding:3px 0;">
+              <span class="tertiary" style="font-size:12px;">{{ t(`payment_method_${m.method}`) }}</span>
+              <span class="mono" style="font-weight:600;font-size:12px;">{{ fmtMoney(m.amount) }}</span>
+            </div>
+          </div>
           <div class="row between" style="padding:5px 0;">
             <span class="row" style="gap:8px;color:var(--text-secondary);font-size:13px;">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);">
@@ -867,10 +989,20 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
             </span>
           </div>
 
-          <div v-if="shiftState(s) === 'reconciled'" class="row between" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border-strong);font-size:12px;">
-            <span class="tertiary">
-              {{ t('Counted') }} {{ fmtMoney(reportedCash(s)) }} · {{ t('received by') }} {{ reportedBy(s) }}
-            </span>
+          <div v-if="shiftState(s) === 'reconciled'" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border-strong);">
+            <div class="row between" style="font-size:12px;">
+              <span class="tertiary">
+                {{ t('Counted') }} {{ fmtMoney(reportedCash(s)) }} · {{ t('received by') }} {{ reportedBy(s) }}
+              </span>
+            </div>
+            <div v-if="s.reconciliation?.created_at" class="row between" style="font-size:11px;margin-top:3px;">
+              <span class="tertiary">{{ t('Reconciled at') }}</span>
+              <span class="mono tertiary">{{ fmtDateTime(s.reconciliation.created_at) }}</span>
+            </div>
+            <div v-if="s.reconciliation?.notes" style="font-size:11px;margin-top:4px;">
+              <span class="tertiary">{{ t('Reconciliation notes') }}:</span>
+              <span style="color:var(--text-secondary);"> {{ s.reconciliation.notes }}</span>
+            </div>
           </div>
         </div>
 

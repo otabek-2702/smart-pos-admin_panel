@@ -11,8 +11,10 @@ const total = ref(0)
 const loading = ref(false)
 const page = ref(1)
 const itemsPerPage = ref(10)
-const search = ref('')
 const statusFilter = ref<string | undefined>(undefined)
+const fromLocationFilter = ref<number | undefined>(undefined)
+const toLocationFilter = ref<number | undefined>(undefined)
+const typeFilter = ref<string | undefined>(undefined)
 
 const locationsList = ref<any[]>([])
 const itemsList = ref<any[]>([])
@@ -50,10 +52,14 @@ async function loadTransfers() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value)
-      params.search = search.value
     if (statusFilter.value)
       params.status = statusFilter.value
+    if (fromLocationFilter.value)
+      params.from_location_id = fromLocationFilter.value
+    if (toLocationFilter.value)
+      params.to_location_id = toLocationFilter.value
+    if (typeFilter.value)
+      params.type = typeFilter.value
 
     const res = await axios.get('/transfers/', { params })
     const d = res.data?.data ?? res.data
@@ -90,14 +96,7 @@ async function loadMeta() {
 
 onMounted(() => { loadTransfers(); loadMeta() })
 watch([page, itemsPerPage], loadTransfers)
-watch([statusFilter], () => { page.value = 1; loadTransfers() })
-
-const debouncedSearch = useDebounceFn(() => {
-  page.value = 1
-  loadTransfers()
-}, 400)
-
-watch(search, debouncedSearch)
+watch([statusFilter, fromLocationFilter, toLocationFilter, typeFilter], () => { page.value = 1; loadTransfers() })
 
 const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.name, value: l.id })))
 const itemOptions = computed(() => itemsList.value.map(i => ({ title: `${i.name} (${i.sku ?? '—'})`, value: i.id })))
@@ -165,19 +164,37 @@ function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.s
   <div>
     <VCard>
       <VCardText class="d-flex flex-wrap gap-3 align-center">
-        <VTextField
-          v-model="search"
-          :placeholder="t('Search transfers...')"
-          prepend-inner-icon="bx-search"
+        <VSelect
+          v-model="statusFilter"
+          :items="statuses.map(s => ({ title: t(`transfer_status_${s}`), value: s }))"
+          :placeholder="t('All Statuses')"
           density="compact"
-          style="min-inline-size: 240px;"
+          style="min-inline-size: 180px;"
           hide-details
           clearable
         />
         <VSelect
-          v-model="statusFilter"
-          :items="statuses"
-          :placeholder="t('All Statuses')"
+          v-model="fromLocationFilter"
+          :items="locationOptions"
+          :placeholder="t('From Location')"
+          density="compact"
+          style="min-inline-size: 180px;"
+          hide-details
+          clearable
+        />
+        <VSelect
+          v-model="toLocationFilter"
+          :items="locationOptions"
+          :placeholder="t('To Location')"
+          density="compact"
+          style="min-inline-size: 180px;"
+          hide-details
+          clearable
+        />
+        <VSelect
+          v-model="typeFilter"
+          :items="transferTypes.map(v => ({ title: t(`transfer_type_${v}`), value: v }))"
+          :placeholder="t('All Types')"
           density="compact"
           style="min-inline-size: 180px;"
           hide-details
@@ -489,7 +506,7 @@ function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.s
             >
               <VSelect
                 v-model="form.transfer_type"
-                :items="transferTypes"
+                :items="transferTypes.map(v => ({ title: t(`transfer_type_${v}`), value: v }))"
                 :label="t('Type')"
               />
             </VCol>

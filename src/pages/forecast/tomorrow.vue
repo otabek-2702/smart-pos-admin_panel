@@ -31,7 +31,7 @@ onMounted(load)
 
 const predictions = computed(() => data.value?.predictions ?? [])
 const reason = computed(() => data.value?.reason)
-const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.predicted_quantity ?? 0), 1))
+const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.suggested_qty ?? p.predicted_quantity ?? 0), 1))
 </script>
 
 <template>
@@ -40,6 +40,18 @@ const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.pr
       <div style="min-width:0;">
         <h1 class="page-head__title">{{ t('Demand Forecast') }}</h1>
         <div class="page-head__subtitle">{{ t('What to prep tomorrow morning, based on last 30 days') }}</div>
+        <div
+          v-if="data?.tomorrow"
+          class="page-head__subtitle"
+        >
+          {{ t('Forecast for {date}', { date: data.tomorrow }) }}
+        </div>
+        <div
+          v-if="data?.window_days"
+          class="page-head__subtitle"
+        >
+          {{ t('Based on last {n} days', { n: data.window_days }) }}
+        </div>
       </div>
       <div class="page-head__actions">
         <VBtn

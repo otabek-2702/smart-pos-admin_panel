@@ -4,7 +4,7 @@ import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
-const { formatCurrency } = useFormatters()
+const { formatCurrency, formatDate } = useFormatters()
 
 const items = ref<any[]>([])
 const total = ref(0)
@@ -12,6 +12,12 @@ const loading = ref(false)
 const page = ref(1)
 const itemsPerPage = ref(20)
 const summary = ref<any>(null)
+
+// ---------- filters ----------
+const statusFilter = ref<string | undefined>(undefined)
+const periodFilter = ref<string>('') // YYYY-MM
+const employeeFilter = ref<number | undefined>(undefined)
+const employeeOptions = ref<any[]>([])
 
 const generateDialog = ref(false)
 const generatePeriod = ref('')
@@ -21,8 +27,12 @@ const headers = [
   { title: t('Employee'), key: 'employee', sortable: false },
   { title: t('Period'), key: 'period', sortable: false },
   { title: t('Base'), key: 'base_salary', sortable: false },
+  { title: t('Bonus'), key: 'bonus', sortable: false },
+  { title: t('Deduction'), key: 'deduction', sortable: false },
   { title: t('Net'), key: 'net_salary', sortable: false },
   { title: t('Status'), key: 'status', sortable: false },
+  { title: t('Payment method'), key: 'payment_method', sortable: false },
+  { title: t('Paid at'), key: 'paid_at', sortable: false },
   { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
 ]
 
@@ -35,7 +45,19 @@ const statusColor: Record<string, string> = {
 async function load() {
   loading.value = true
   try {
-    const res = await axios.get('/salaries/', { params: { page: page.value, per_page: itemsPerPage.value } })
+    const params: any = { page: page.value, per_page: itemsPerPage.value }
+    if (statusFilter.value)
+      params.status = statusFilter.value
+    if (employeeFilter.value)
+      params.employee_id = employeeFilter.value
+    if (periodFilter.value) {
+      const [y, m] = periodFilter.value.split('-')
+      if (y)
+        params.year = Number(y)
+      if (m)
+        params.month = Number(m)
+    }
+    const res = await axios.get('/salaries/', { params })
     const d = res.data?.data ?? res.data
 
     items.value = d?.salaries ?? d?.items ?? []
@@ -49,6 +71,15 @@ async function load() {
   }
 }
 
+async function loadEmployees() {
+  try {
+    const res = await axios.get('/employees/', { params: { per_page: 200 } })
+    const d = res.data?.data ?? res.data
+    employeeOptions.value = d?.employees ?? d?.items ?? []
+  }
+  catch { /* ignore */ }
+}
+
 async function loadSummary() {
   try {
     const res = await axios.get('/salaries/summary/')
@@ -58,8 +89,9 @@ async function loadSummary() {
   catch { /* ignore */ }
 }
 
-onMounted(() => { load(); loadSummary() })
+onMounted(() => { load(); loadSummary(); loadEmployees() })
 watch([page, itemsPerPage], load)
+watch([statusFilter, periodFilter, employeeFilter], () => { page.value = 1; load() })
 
 const approveAllDialog = ref(false)
 const approveAllPeriod = ref('')
@@ -98,10 +130,24 @@ async function approveOne(s: any) {
   }
 }
 
-async function payOne(s: any) {
+// ---------- pay dialog ----------
+const payDialog = ref(false)
+const paying = ref<any>(null)
+const payMethod = ref<'CASH' | 'UZCARD' | 'HUMO' | 'PAYME' | 'BANK_TRANSFER'>('CASH')
+
+function openPay(s: any) {
+  paying.value = s
+  payMethod.value = 'CASH'
+  payDialog.value = true
+}
+
+async function payOne() {
+  if (!paying.value)
+    return
   try {
-    await axios.post(`/salaries/${s.id}/pay/`)
+    await axios.post(`/salaries/${paying.value.id}/pay/`, { payment_method: payMethod.value })
     notify(t('Paid'))
+    payDialog.value = false
     await Promise.all([load(), loadSummary()])
   }
   catch (e: any) {
@@ -274,6 +320,40 @@ async function generate() {
       </div>
     </div>
 
+    <div class="toolbar mb-3">
+      <VSelect
+        v-model="statusFilter"
+        :items="[
+          { title: t('salary_status_PENDING'), value: 'PENDING' },
+          { title: t('salary_status_APPROVED'), value: 'APPROVED' },
+          { title: t('salary_status_PAID'), value: 'PAID' },
+        ]"
+        :placeholder="t('All statuses')"
+        density="compact"
+        style="min-inline-size:180px;max-inline-size:220px;"
+        hide-details
+        clearable
+      />
+      <VTextField
+        v-model="periodFilter"
+        type="month"
+        :placeholder="t('Period')"
+        density="compact"
+        style="min-inline-size:160px;max-inline-size:200px;"
+        hide-details
+        clearable
+      />
+      <VSelect
+        v-model="employeeFilter"
+        :items="employeeOptions.map((e: any) => ({ title: `${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}`.trim() || e.user?.email || `#${e.id}`, value: e.id }))"
+        :placeholder="t('All employees')"
+        density="compact"
+        style="min-inline-size:200px;max-inline-size:260px;"
+        hide-details
+        clearable
+      />
+    </div>
+
     <VRow class="mb-4">
       <VCol
         cols="6"
@@ -403,6 +483,12 @@ async function generate() {
         <template #item.base_salary="{ item }">
           <span class="num-tabular">{{ formatCurrency(item.raw.base_amount ?? 0) }}</span>
         </template>
+        <template #item.bonus="{ item }">
+          <span class="num-tabular text-success">{{ formatCurrency(item.raw.bonus ?? item.raw.bonus_amount ?? 0) }}</span>
+        </template>
+        <template #item.deduction="{ item }">
+          <span class="num-tabular text-error">{{ formatCurrency(item.raw.deduction ?? item.raw.deduction_amount ?? 0) }}</span>
+        </template>
         <template #item.net_salary="{ item }">
           <span class="font-weight-medium num-tabular">{{ formatCurrency(item.raw.net_amount ?? 0) }}</span>
         </template>
@@ -413,8 +499,16 @@ async function generate() {
             :color="statusColor[item.raw.status] ?? 'default'"
             variant="tonal"
           >
-            {{ item.raw.status }}
+            {{ t(`salary_status_${item.raw.status}`) }}
           </VChip>
+        </template>
+        <template #item.payment_method="{ item }">
+          <span v-if="item.raw.payment_method">{{ t(`payment_method_${item.raw.payment_method}`) }}</span>
+          <span v-else class="text-disabled">—</span>
+        </template>
+        <template #item.paid_at="{ item }">
+          <span v-if="item.raw.paid_at">{{ formatDate(item.raw.paid_at) }}</span>
+          <span v-else class="text-disabled">—</span>
         </template>
         <template #item.actions="{ item }">
           <div
@@ -463,7 +557,7 @@ async function generate() {
               variant="text"
               size="small"
               color="success"
-              @click="payOne(item.raw)"
+              @click="openPay(item.raw)"
             >
               <VIcon
                 icon="bx-dollar"
@@ -543,7 +637,7 @@ async function generate() {
               :color="statusColor[itemSalary.status] ?? 'default'"
               variant="tonal"
             >
-              {{ itemSalary.status }}
+              {{ t(`salary_status_${itemSalary.status}`) }}
             </VChip>
           </div>
 
@@ -780,6 +874,54 @@ async function generate() {
             @click="approveAll"
           >
             {{ t('Approve All') }}
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <VDialog
+      v-model="payDialog"
+      max-width="420"
+      persistent
+    >
+      <VCard :title="t('Pay Salary')">
+        <VCardText>
+          <div class="text-body-2 mb-1">
+            {{ t('Employee') }}:
+            <strong>{{ paying?.employee?.user?.first_name }} {{ paying?.employee?.user?.last_name }}</strong>
+          </div>
+          <div class="text-body-2 mb-3">
+            {{ t('Net') }}: <strong>{{ formatCurrency(paying?.net_amount ?? 0) }}</strong>
+          </div>
+          <VSelect
+            v-model="payMethod"
+            :items="[
+              { title: t('payment_method_CASH'), value: 'CASH' },
+              { title: t('payment_method_UZCARD'), value: 'UZCARD' },
+              { title: t('payment_method_HUMO'), value: 'HUMO' },
+              { title: t('payment_method_PAYME'), value: 'PAYME' },
+              { title: t('payment_method_BANK_TRANSFER'), value: 'BANK_TRANSFER' },
+            ]"
+            :label="t('Payment method')"
+            autofocus
+          />
+          <div class="text-caption text-disabled mt-2">
+            {{ t('CASH debits the drawer; cards settle externally') }}
+          </div>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn
+            variant="text"
+            @click="payDialog = false"
+          >
+            {{ t('Cancel') }}
+          </VBtn>
+          <VBtn
+            color="success"
+            @click="payOne"
+          >
+            {{ t('Pay') }}
           </VBtn>
         </VCardActions>
       </VCard>

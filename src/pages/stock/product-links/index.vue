@@ -10,6 +10,19 @@ const loading = ref(false)
 const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
+const typeFilter = ref<string | undefined>(undefined)
+const activeFilter = ref<string | undefined>(undefined)
+
+const typeFilterItems = computed(() => [
+  { title: t('link_type_RECIPE'), value: 'RECIPE' },
+  { title: t('link_type_DIRECT_ITEM'), value: 'DIRECT_ITEM' },
+  { title: t('link_type_COMPONENT_BASED'), value: 'COMPONENT_BASED' },
+])
+
+const activeFilterItems = computed(() => [
+  { title: t('active_true'), value: 'true' },
+  { title: t('active_false'), value: 'false' },
+])
 
 const linkTypes = ref<any[]>([])
 const deductStatuses = ref<any[]>([])
@@ -56,8 +69,10 @@ async function loadLinks() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value)
-      params.search = search.value
+    if (typeFilter.value)
+      params.type = typeFilter.value
+    if (activeFilter.value !== undefined)
+      params.active = activeFilter.value
 
     const res = await axios.get('/product-links/', { params })
     const d = res.data?.data ?? res.data
@@ -103,7 +118,7 @@ async function loadOptions() {
 
 onMounted(() => { loadLinks(); loadOptions() })
 watch([page, itemsPerPage], loadLinks)
-watch(search, () => { page.value = 1; loadLinks() })
+watch([typeFilter, activeFilter], () => { page.value = 1; loadLinks() })
 
 function openLink() {
   form.value = {
@@ -169,17 +184,21 @@ async function doUnlink() {
 }
 
 const linkTypeItems = computed(() =>
-  [{ title: t('Recipe'), value: 'RECIPE' }, { title: t('Direct Item'), value: 'DIRECT_ITEM' }],
+  [
+    { title: t('link_type_RECIPE'), value: 'RECIPE' },
+    { title: t('link_type_DIRECT_ITEM'), value: 'DIRECT_ITEM' },
+    { title: t('link_type_COMPONENT_BASED'), value: 'COMPONENT_BASED' },
+  ],
 )
 
 const deductStatusItems = computed(() =>
   deductStatuses.value.length
-    ? deductStatuses.value.map((s: any) => ({ title: s.label, value: s.value }))
+    ? deductStatuses.value.map((s: any) => ({ title: t(`deduct_on_${s.value}`), value: s.value }))
     : [
-      { title: t('Order Created'), value: 'CREATED' },
-      { title: t('Preparing'), value: 'PREPARING' },
-      { title: t('Ready'), value: 'READY' },
-      { title: t('Paid'), value: 'PAID' },
+      { title: t('deduct_on_CREATED'), value: 'CREATED' },
+      { title: t('deduct_on_PREPARING'), value: 'PREPARING' },
+      { title: t('deduct_on_READY'), value: 'READY' },
+      { title: t('deduct_on_PAID'), value: 'PAID' },
     ],
 )
 </script>
@@ -188,12 +207,21 @@ const deductStatusItems = computed(() =>
   <div>
     <VCard>
       <VCardText class="d-flex flex-wrap gap-3 align-center">
-        <VTextField
-          v-model="search"
-          :placeholder="t('Search product links...')"
-          prepend-inner-icon="bx-search"
+        <VSelect
+          v-model="typeFilter"
+          :items="typeFilterItems"
+          :label="t('Link Type')"
           density="compact"
-          style="min-inline-size: 240px;"
+          style="min-inline-size: 200px;"
+          hide-details
+          clearable
+        />
+        <VSelect
+          v-model="activeFilter"
+          :items="activeFilterItems"
+          :label="t('Status')"
+          density="compact"
+          style="min-inline-size: 180px;"
           hide-details
           clearable
         />
@@ -279,7 +307,7 @@ const deductStatusItems = computed(() =>
             variant="tonal"
             class="status-pill"
           >
-            {{ item.raw.link_type_display ?? item.raw.link_type }}
+            {{ item.raw.link_type ? t(`link_type_${item.raw.link_type}`) : '—' }}
           </VChip>
         </template>
         <template #item.linked_to="{ item }">
@@ -292,7 +320,7 @@ const deductStatusItems = computed(() =>
             variant="tonal"
             class="status-pill"
           >
-            {{ item.raw.deduct_on_status_display ?? item.raw.deduct_on_status }}
+            {{ item.raw.deduct_on_status ? t(`deduct_on_${item.raw.deduct_on_status}`) : '—' }}
           </VChip>
         </template>
         <template #item.actions="{ item }">

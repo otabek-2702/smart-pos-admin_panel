@@ -11,6 +11,8 @@ const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
 const typeFilter = ref<string | undefined>(undefined)
+const parentFilter = ref<number | undefined>(undefined)
+const treeView = ref(false)
 
 const dialog = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
@@ -54,11 +56,13 @@ const headers = [
 async function loadLocations() {
   loading.value = true
   try {
-    const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value)
-      params.search = search.value
+    const params: any = {}
     if (typeFilter.value)
       params.type = typeFilter.value
+    if (parentFilter.value)
+      params.parent_id = parentFilter.value
+    if (treeView.value)
+      params.tree = 'true'
 
     const res = await axios.get('/locations/', { params })
     const d = res.data?.data ?? res.data
@@ -76,7 +80,10 @@ async function loadLocations() {
 
 onMounted(loadLocations)
 watch([page, itemsPerPage], loadLocations)
-watch([search, typeFilter], () => { page.value = 1; loadLocations() })
+watch([search, typeFilter, parentFilter, treeView], () => { page.value = 1; loadLocations() })
+
+const typeFilterItems = computed(() => locationTypes.map(v => ({ title: t(`location_type_${v}`), value: v })))
+const parentFilterItems = computed(() => locations.value.map(l => ({ title: l.name, value: l.id })))
 
 function openCreate() {
   dialogMode.value = 'create'
@@ -164,23 +171,30 @@ const parentOptions = computed(() =>
   <div>
     <VCard>
       <VCardText class="d-flex flex-wrap gap-3 align-center">
-        <VTextField
-          v-model="search"
-          :placeholder="t('Search locations...')"
-          prepend-inner-icon="bx-search"
-          density="compact"
-          style="min-inline-size: 220px;"
-          hide-details
-          clearable
-        />
         <VSelect
           v-model="typeFilter"
-          :items="locationTypes"
+          :items="typeFilterItems"
           :placeholder="t('All Types')"
           density="compact"
           style="min-inline-size: 160px;"
           hide-details
           clearable
+        />
+        <VSelect
+          v-model="parentFilter"
+          :items="parentFilterItems"
+          :placeholder="t('All Parents')"
+          density="compact"
+          style="min-inline-size: 180px;"
+          hide-details
+          clearable
+        />
+        <VSwitch
+          v-model="treeView"
+          :label="t('Tree view')"
+          density="compact"
+          hide-details
+          color="primary"
         />
         <VSpacer />
         <VBtn
@@ -201,6 +215,7 @@ const parentOptions = computed(() =>
       >
         <template #bottom>
           <DataTableFooter
+            v-if="!treeView"
             v-model:page="page"
             v-model:items-per-page="itemsPerPage"
             :total-items="total"
@@ -276,7 +291,7 @@ const parentOptions = computed(() =>
             size="small"
             variant="tonal"
           >
-            {{ item.raw.type_display ?? item.raw.type }}
+            {{ t(`location_type_${item.raw.type}`) }}
           </VChip>
         </template>
         <template #item.parent="{ item }">
@@ -413,7 +428,7 @@ const parentOptions = computed(() =>
             >
               <VSelect
                 v-model="form.type"
-                :items="locationTypes"
+                :items="typeFilterItems"
                 :label="t('Type')"
                 required
               />

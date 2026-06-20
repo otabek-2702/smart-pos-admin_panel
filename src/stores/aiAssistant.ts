@@ -1,81 +1,181 @@
 /* ============================================================
-   ALPHA POS — AI Assistant store (Pinia)
-   MUST live above the router so generation keeps running on
-   navigation. Pinia is registered in src/main.ts before the
-   router, so any in-flight send() Promise continues even if the
-   user leaves /ai-assistant; messages/sending/context survive.
+   ALPHA POS — AI Assistant store (Pinia, above-router)
+   1:1 port of .tmp-alpha-design/alpha-design-source/aichat.jsx
+   AIProvider. Generation runs in this store, so it keeps streaming
+   when the user navigates to other pages. Browser notifications
+   fire when a reply finishes and the user isn't watching the chat.
    ============================================================ */
+import { defineStore } from 'pinia'
 import { stockApi } from '@/plugins/axios'
-import { getStoredUserData } from '@/utils/storage'
 
-export interface Message {
-  id: number
-  role: 'user' | 'bot'
-  text: string
-  timestamp: number
-  intent?: string
-  suggestions?: string[]
-}
+const STORE_KEY = 'alphapos-ai-chats-v1'
+const NOTIFY_KEY = 'alphapos-ai-notify-v1'
 
-export interface Suggestion {
-  query: string
-  reason: string
-  priority: 'high' | 'medium' | 'low'
-}
-
-export interface QuickAction {
+export interface ChatMessage {
   id: string
-  label: string
-  icon: string
-  query: string
+  role: 'user' | 'assistant'
+  content: string
+  ts: number
+  streaming?: boolean
 }
 
-export const useAiAssistantStore = defineStore('aiAssistant', () => {
-  // --- State ---------------------------------------------------------------
-  const messages = ref<Message[]>([])
-  const input = ref<string>('')
-  const sending = ref<boolean>(false)
-  const chatContext = ref<any>(null)
+export interface Chat {
+  id: string
+  title: string
+  messages: ChatMessage[]
+  updatedAt: number
+}
+
+export interface QuickAction { id: string; label: string; icon: string; query: string }
+export interface Suggestion { query: string; reason: string; priority: 'high' | 'medium' | 'low' }
+
+function uid(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+}
+function nowTs(): number {
+  return Date.now()
+}
+
+function loadChats(): Chat[] {
+  try {
+    const raw = localStorage.getItem(STORE_KEY)
+
+    if (raw) {
+      const p = JSON.parse(raw) as Chat[]
+
+      if (p?.length) {
+        // sanitize: no generation survives a reload, so clear stale streaming
+        // flags and drop empty assistant placeholders left mid-flight.
+        return p.map(c => ({
+          ...c,
+          messages: (c.messages || [])
+            .filter(m => !(m.role === 'assistant' && m.streaming && !m.content))
+            .map(m => m.streaming ? { ...m, streaming: false } : m),
+        }))
+      }
+    }
+  }
+  catch { /* noop */ }
+
+  return []
+}
+
+function loadNotify(): boolean {
+  try { return localStorage.getItem(NOTIFY_KEY) === '1' }
+  catch { return false }
+}
+
+export const useAIAssistantStore = defineStore('aiAssistant', () => {
+  const chats = ref<Chat[]>(loadChats())
+  const activeId = ref<string | null>(chats.value[0]?.id ?? null)
+  const generating = ref<string | null>(null)
+  const notify = ref<boolean>(loadNotify())
+  const permission = ref<NotificationPermission | 'unsupported'>(
+    typeof Notification !== 'undefined' ? Notification.permission : 'unsupported',
+  )
+
+  // Keep the old quick-actions + suggestions metadata for the empty-state.
   const quickActions = ref<QuickAction[]>([])
   const suggestions = ref<Suggestion[]>([])
-  const loadingMeta = ref<boolean>(false)
-  const metaLoadFailed = ref<boolean>(false)
+  const loadingMeta = ref(false)
 
-  // Build minimal user payload so backend can address user by name and
-  // tailor permissions-aware responses. Re-read on every send so a relogin
-  // mid-session picks up the new identity without a page reload.
-  function userPayload() {
-    const u: any = getStoredUserData() || {}
+  const chatVisible = ref(false)
+  let stopRequested = false
 
-    return {
-      id: u.id,
-      first_name: u.first_name,
-      last_name: u.last_name,
-      role: u.role,
+  watch(chats, val => {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(val.slice(0, 40))) }
+    catch { /* noop */ }
+  }, { deep: true })
+  watch(notify, on => {
+    try { localStorage.setItem(NOTIFY_KEY, on ? '1' : '0') }
+    catch { /* noop */ }
+  })
+
+  function setChatVisible(v: boolean) {
+    chatVisible.value = v
+  }
+
+  function fireNotification(_chatId: string, title: string, body: string) {
+    const onPage = chatVisible.value && (typeof document === 'undefined' || !document.hidden)
+
+    if (onPage)
+      return
+    if (notify.value && permission.value === 'granted' && typeof Notification !== 'undefined') {
+      try {
+        const n = new Notification(`Alpha POS · ${title}`, { body, tag: `ai-${_chatId}` })
+
+        n.onclick = () => {
+          try { window.focus() }
+          catch { /* noop */ }
+          window.dispatchEvent(new CustomEvent('ai-open-chat', { detail: _chatId }))
+          n.close()
+        }
+
+        return
+      }
+      catch { /* noop */ }
     }
   }
 
-  function currentLocale(): string {
-    try {
-      return localStorage.getItem('appLocale') || 'uz'
+  async function requestPermission(): Promise<NotificationPermission | 'unsupported'> {
+    if (typeof Notification === 'undefined') {
+      permission.value = 'unsupported'
+
+      return 'unsupported'
     }
-    catch {
-      return 'uz'
+    if (Notification.permission === 'granted') {
+      permission.value = 'granted'
+
+      return 'granted'
     }
+    const p = await Notification.requestPermission()
+
+    permission.value = p
+
+    return p
   }
 
-  // --- Actions -------------------------------------------------------------
+  function toggleNotify() {
+    notify.value = !notify.value
+    if (notify.value)
+      requestPermission()
+  }
 
-  // Fetch starter suggestions + quick-action buttons in parallel. Called on
-  // page mount and again whenever the locale changes so labels re-localize.
+  function newChat(): string {
+    const c: Chat = { id: uid(), title: 'New chat', messages: [], updatedAt: nowTs() }
+
+    chats.value = [c, ...chats.value]
+    activeId.value = c.id
+
+    return c.id
+  }
+
+  function selectChat(id: string) {
+    activeId.value = id
+  }
+
+  function deleteChat(id: string) {
+    const next = chats.value.filter(c => c.id !== id)
+
+    chats.value = next
+    if (activeId.value === id)
+      activeId.value = next[0]?.id ?? null
+  }
+
+  function renameChat(id: string, title: string) {
+    chats.value = chats.value.map(c => c.id === id ? { ...c, title } : c)
+  }
+
+  function stop() {
+    stopRequested = true
+  }
+
   async function loadMeta() {
     loadingMeta.value = true
-    metaLoadFailed.value = false
     try {
-      const params = { locale: currentLocale() }
       const [sRes, qRes] = await Promise.all([
-        stockApi.get('/ai/suggestions/', { params }),
-        stockApi.get('/ai/quick-actions/', { params }),
+        stockApi.get('/ai/suggestions/'),
+        stockApi.get('/ai/quick-actions/'),
       ])
 
       suggestions.value = sRes.data?.suggestions ?? []
@@ -84,107 +184,181 @@ export const useAiAssistantStore = defineStore('aiAssistant', () => {
     catch {
       suggestions.value = []
       quickActions.value = []
-      metaLoadFailed.value = true
     }
-    finally {
-      loadingMeta.value = false
+    finally { loadingMeta.value = false }
+  }
+
+  function streamWords(convoId: string, msgId: string, fullText: string) {
+    const words = fullText.split(/(\s+)/)
+    let i = 0
+
+    stopRequested = false
+
+    const step = () => {
+      if (stopRequested) {
+        finalize(convoId, msgId, false)
+
+        return
+      }
+      i += 1
+      const partial = words.slice(0, i).join('')
+
+      chats.value = chats.value.map(c => c.id !== convoId
+        ? c
+        : ({
+            ...c,
+            messages: c.messages.map(m => m.id === msgId ? { ...m, content: partial } : m),
+          }))
+      if (i < words.length) {
+        const tok = words[i] || ''
+        const delay = /\n/.test(tok) ? 90 : 16 + Math.random() * 34
+
+        window.setTimeout(step, delay)
+      }
+      else {
+        finalize(convoId, msgId, true)
+      }
+    }
+
+    step()
+  }
+
+  function finalize(convoId: string, msgId: string, complete: boolean) {
+    chats.value = chats.value.map(c => c.id !== convoId
+      ? c
+      : ({
+          ...c,
+          updatedAt: nowTs(),
+          messages: c.messages.map(m => m.id === msgId ? { ...m, streaming: false } : m),
+        }))
+    generating.value = null
+
+    if (complete) {
+      let title = 'AI reply ready'
+      let body = ''
+      const c = chats.value.find(x => x.id === convoId)
+
+      if (c) {
+        title = c.title
+        const a = c.messages.find(m => m.id === msgId)
+
+        body = a ? a.content.replace(/[*#]/g, '').slice(0, 90) : ''
+      }
+      setTimeout(() => fireNotification(convoId, title, body), 0)
     }
   }
 
-  // `text` is the payload sent to the backend (raw English query for
-  // backend matching). `displayedText` is what shows in the chat bubble —
-  // when caller passes the localized label, the user-bubble matches the
-  // button they clicked instead of the English backend string.
-  async function send(text?: string, displayedText?: string) {
-    const query = (text ?? input.value).trim()
-    if (!query || sending.value)
+  function getUserPayload() {
+    try {
+      const raw = localStorage.getItem('userData')
+
+      if (!raw)
+        return null
+      const u = JSON.parse(raw)
+
+      return { id: u.id, first_name: u.first_name, role: u.role }
+    }
+    catch { return null }
+  }
+
+  async function send(rawText: string, displayedText?: string) {
+    const text = (rawText || '').trim()
+
+    if (!text || generating.value)
       return
 
-    const bubbleText = (displayedText ?? text ?? input.value).trim() || query
+    let convoId = activeId.value
+    let convoIdx = chats.value.findIndex(c => c.id === convoId)
 
-    messages.value.push({
-      id: Date.now(),
-      role: 'user',
-      text: bubbleText,
-      timestamp: Date.now(),
-    })
-    input.value = ''
-    sending.value = true
+    if (convoIdx === -1 || convoId === null) {
+      const c: Chat = { id: uid(), title: 'New chat', messages: [], updatedAt: nowTs() }
 
+      convoId = c.id
+      chats.value = [c, ...chats.value]
+      convoIdx = 0
+    }
+
+    const userVisible = displayedText ?? text
+    const userMsg: ChatMessage = { id: uid(), role: 'user', content: userVisible, ts: nowTs() }
+    const aMsg: ChatMessage = { id: uid(), role: 'assistant', content: '', ts: nowTs(), streaming: true }
+
+    chats.value = chats.value.map((c, i) => i !== convoIdx
+      ? c
+      : ({
+          ...c,
+          title: (c.title === 'New chat' || !c.messages.some(m => m.role === 'user'))
+            ? (userVisible.length > 42 ? `${userVisible.slice(0, 42)}…` : userVisible)
+            : c.title,
+          messages: [...c.messages, userMsg, aMsg],
+          updatedAt: nowTs(),
+        }))
+    activeId.value = convoId
+    generating.value = convoId
+
+    // Real BE call, then stream the result word-by-word for the typing UX.
     try {
+      const locale = localStorage.getItem('appLocale') || 'uz'
+      const user = getUserPayload()
       const res = await stockApi.post('/ai/query/', {
-        query,
-        context: chatContext.value,
-        locale: currentLocale(),
-        user: userPayload(),
+        query: text,
+        context: null,
+        locale,
+        user,
       })
+      const reply = res.data?.response || 'No response'
 
-      const d = res.data ?? {}
-
-      chatContext.value = d.context ?? chatContext.value
-
-      // Refresh the empty-state suggestion list with whatever the backend
-      // returns alongside the answer — keeps follow-ups in sync with the
-      // current conversation thread.
-      if (Array.isArray(d.suggestions))
-        suggestions.value = d.suggestions as Suggestion[]
-
-      messages.value.push({
-        id: Date.now() + 1,
-        role: 'bot',
-        text: d.response || 'No response',
-        intent: d.intent,
-        suggestions: d.suggestions ?? [],
-        timestamp: Date.now(),
-      })
+      streamWords(convoId!, aMsg.id, reply)
     }
     catch (e: any) {
-      // Map backend error codes to friendly bubbles. The page layer can
-      // re-translate via te()/t() if a matching key exists; raw English
-      // strings here mean unknown locales still get something readable.
       const code = e?.response?.data?.error
-      const status = e?.response?.status
-      let friendly = e?.response?.data?.message || 'Request failed. Please try again.'
+      const friendly = (code === 'llm_sdk_missing' || code === 'llm_key_missing')
+        ? 'AI service unavailable. The LLM key is not configured.'
+        : (e?.response?.data?.message || code || 'Request failed. Please try again.')
 
-      if (code === 'llm_sdk_missing' || code === 'llm_key_missing')
-        friendly = 'AI service unavailable'
-      else if (status === 429)
-        friendly = 'Too many requests. Please slow down.'
-      else if (code)
-        friendly = 'error_' + code
-
-      messages.value.push({
-        id: Date.now() + 1,
-        role: 'bot',
-        text: friendly,
-        timestamp: Date.now(),
-      })
-    }
-    finally {
-      sending.value = false
+      chats.value = chats.value.map(c => c.id !== convoId
+        ? c
+        : ({
+            ...c,
+            messages: c.messages.map(m => m.id === aMsg.id ? { ...m, content: friendly, streaming: false } : m),
+          }))
+      generating.value = null
     }
   }
 
-  // Wipe the visible thread AND the rolling backend context so the next
-  // query starts a fresh conversation (no stale entity/intent carryover).
   function clearChat() {
-    messages.value = []
-    chatContext.value = null
+    if (!activeId.value)
+      return
+    deleteChat(activeId.value)
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('ai-open-chat', ((ev: CustomEvent) => {
+      if (ev.detail) {
+        activeId.value = ev.detail as string
+        window.dispatchEvent(new CustomEvent('ai-goto-page'))
+      }
+    }) as EventListener)
   }
 
   return {
-    // state
-    messages,
-    input,
-    sending,
-    chatContext,
+    chats,
+    activeId,
+    generating,
+    notify,
+    permission,
     quickActions,
     suggestions,
     loadingMeta,
-    metaLoadFailed,
-    // actions
-    loadMeta,
+    setChatVisible,
+    requestPermission,
+    toggleNotify,
+    newChat,
+    selectChat,
+    deleteChat,
+    renameChat,
+    stop,
     send,
     clearChat,
+    loadMeta,
   }
 })

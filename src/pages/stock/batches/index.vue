@@ -13,9 +13,13 @@ const search = ref('')
 const statusFilter = ref<string | undefined>(undefined)
 const locationFilter = ref<number | undefined>(undefined)
 const expiryFilter = ref<string | undefined>(undefined)
+const stockItemFilter = ref<number | undefined>(undefined)
+const includeZeroStock = ref(false)
+const expiringWithinDays = ref<number | undefined>(undefined)
 
 const locationsList = ref<any[]>([])
-const statusOptions = ref<any[]>([])
+const stockItemsList = ref<any[]>([])
+const statusOptions = computed(() => ['AVAILABLE', 'RESERVED', 'QUARANTINE', 'EXPIRED', 'CONSUMED'].map(v => ({ title: t(`batch_status_${v}`), value: v })))
 
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDateShort } = useFormatters()
@@ -38,7 +42,10 @@ const headers = [
   { title: t('Batch #'), key: 'batch_number', sortable: false },
   { title: t('Item'), key: 'item', sortable: false },
   { title: t('Location'), key: 'location', sortable: false },
+  { title: t('Received date'), key: 'received_date', sortable: false },
+  { title: t('Initial qty'), key: 'initial_quantity', sortable: false },
   { title: t('Current Qty'), key: 'current_quantity', sortable: false },
+  { title: t('Reserved qty'), key: 'reserved_quantity', sortable: false },
   { title: t('Available'), key: 'available_quantity', sortable: false },
   { title: t('Unit Cost'), key: 'unit_cost', sortable: false },
   { title: t('Status'), key: 'status', sortable: false },
@@ -64,19 +71,22 @@ async function loadBatches() {
       params.status = statusFilter.value
     if (locationFilter.value)
       params.location_id = locationFilter.value
+    if (stockItemFilter.value)
+      params.stock_item_id = stockItemFilter.value
+    if (includeZeroStock.value)
+      params.has_stock_only = 'false'
+    if (expiringWithinDays.value && Number(expiringWithinDays.value) > 0)
+      params.expiring_within_days = Number(expiringWithinDays.value)
     if (expiryFilter.value === 'expiring_soon')
-      params.expiring_days = 7
+      params.expiring_within_days = 7
     else if (expiryFilter.value === 'expired')
-      params.expired = true
+      params.expired_only = true
 
     const res = await axios.get('/batches/', { params })
     const d = res.data?.data ?? res.data
 
     batches.value = d?.batches ?? []
     total.value = d.pagination?.total_items ?? d.pagination?.total ?? batches.value.length
-
-    if (d.statuses && statusOptions.value.length === 0)
-      statusOptions.value = d.statuses.map((s: any) => ({ title: s.label, value: s.value }))
   }
   catch {
     notify(t('Failed to load batches'), 'error')
@@ -96,11 +106,22 @@ async function loadLocations() {
   catch { /* ignore */ }
 }
 
-onMounted(() => { loadBatches(); loadLocations() })
+async function loadStockItems() {
+  try {
+    const res = await axios.get('/items/', { params: { per_page: 500 } })
+    const d = res.data?.data ?? res.data
+
+    stockItemsList.value = d?.items ?? d?.results ?? []
+  }
+  catch { /* ignore */ }
+}
+
+onMounted(() => { loadBatches(); loadLocations(); loadStockItems() })
 watch([page, itemsPerPage], loadBatches)
-watch([search, statusFilter, locationFilter, expiryFilter], () => { page.value = 1; loadBatches() })
+watch([search, statusFilter, locationFilter, expiryFilter, stockItemFilter, includeZeroStock, expiringWithinDays], () => { page.value = 1; loadBatches() })
 
 const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.name, value: l.id })))
+const stockItemOptions = computed(() => stockItemsList.value.map((i: any) => ({ title: i.name, value: i.id })))
 </script>
 
 <template>
@@ -142,6 +163,32 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
           style="min-inline-size: 200px;"
           hide-details
           clearable
+        />
+        <VAutocomplete
+          v-model="stockItemFilter"
+          :items="stockItemOptions"
+          :placeholder="t('All Items')"
+          density="compact"
+          style="min-inline-size: 200px;"
+          hide-details
+          clearable
+        />
+        <VTextField
+          v-model.number="expiringWithinDays"
+          type="number"
+          :placeholder="t('Expiring within (days)')"
+          density="compact"
+          style="min-inline-size: 180px;"
+          hide-details
+          clearable
+          min="0"
+        />
+        <VSwitch
+          v-model="includeZeroStock"
+          :label="t('Include zero-stock batches')"
+          density="compact"
+          hide-details
+          color="primary"
         />
         <VSpacer />
         <VBtn
@@ -199,6 +246,24 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
             <td class="sk-cell">
               <div
                 class="sk-box"
+                style="width:80px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:60px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
                 style="width:60px;height:13px;border-radius:4px;"
               />
             </td>
@@ -244,8 +309,17 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
         <template #item.location="{ item }">
           {{ item.raw.location_name ?? '—' }}
         </template>
+        <template #item.received_date="{ item }">
+          <span class="text-body-2">{{ item.raw.received_date ? formatDateShort(item.raw.received_date) : '—' }}</span>
+        </template>
+        <template #item.initial_quantity="{ item }">
+          <span class="num-tabular">{{ formatQty(item.raw.initial_quantity) }}</span>
+        </template>
         <template #item.current_quantity="{ item }">
           <span class="num-tabular">{{ formatQty(item.raw.current_quantity) }}</span>
+        </template>
+        <template #item.reserved_quantity="{ item }">
+          <span class="num-tabular">{{ formatQty(item.raw.reserved_quantity) }}</span>
         </template>
         <template #item.available_quantity="{ item }">
           <span :class="['num-tabular', Number(item.raw.available_quantity) <= 0 ? 'text-error font-weight-medium' : '']">
@@ -262,7 +336,7 @@ const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.
             variant="tonal"
             class="status-pill"
           >
-            {{ item.raw.status_display ?? item.raw.status }}
+            {{ item.raw.status ? t(`batch_status_${item.raw.status}`) : '—' }}
           </VChip>
         </template>
         <template #item.expiry_date="{ item }">

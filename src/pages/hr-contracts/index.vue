@@ -14,6 +14,12 @@ const itemsPerPage = ref(20)
 
 const employees = ref<any[]>([])
 
+const statusFilter = ref<string | undefined>(undefined)
+const employeeFilter = ref<number | undefined>(undefined)
+const expiringCount = ref<number | null>(null)
+
+const statusOptions = ['DRAFT', 'ACTIVE', 'EXPIRED', 'TERMINATED', 'RENEWED']
+
 const dialog = ref(false)
 const editing = ref<any>(null)
 const saving = ref(false)
@@ -44,10 +50,12 @@ const form = ref({
 })
 
 const headers = [
+  { title: t('Contract #'), key: 'contract_number', sortable: false },
   { title: t('Employee'), key: 'employee', sortable: false },
   { title: t('Contract Type'), key: 'contract_type', sortable: false },
   { title: t('Start'), key: 'start_date', sortable: false },
   { title: t('End'), key: 'end_date', sortable: false },
+  { title: t('Probation ends'), key: 'probation_end_date', sortable: false },
   { title: t('Salary'), key: 'salary', sortable: false },
   { title: t('Status'), key: 'status', sortable: false },
   { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
@@ -64,7 +72,13 @@ const statusColor: Record<string, string> = {
 async function load() {
   loading.value = true
   try {
-    const res = await axios.get('/contracts/', { params: { page: page.value, per_page: itemsPerPage.value } })
+    const params: any = { page: page.value, per_page: itemsPerPage.value }
+    if (statusFilter.value)
+      params.status = statusFilter.value
+    if (employeeFilter.value)
+      params.employee_id = employeeFilter.value
+
+    const res = await axios.get('/contracts/', { params })
     const d = res.data?.data ?? res.data
 
     items.value = d?.contracts ?? d?.items ?? []
@@ -88,8 +102,31 @@ async function loadEmployees() {
   catch { /* ignore */ }
 }
 
-onMounted(() => { load(); loadEmployees() })
+async function loadExpiring() {
+  try {
+    const res = await axios.get('/contracts/expiring/', { params: { days: 30 } })
+    const d = res.data?.data ?? res.data
+    const list = d?.contracts ?? d?.items ?? []
+
+    expiringCount.value = d?.count ?? d?.pagination?.total_items ?? list.length
+  }
+  catch { /* ignore */ }
+}
+
+onMounted(() => { load(); loadEmployees(); loadExpiring() })
 watch([page, itemsPerPage], load)
+watch([statusFilter, employeeFilter], () => {
+  page.value = 1
+  load()
+})
+
+const contractTypeOptions = computed(() =>
+  contractTypes.map(v => ({ title: t(`contract_kind_${v}`), value: v })),
+)
+
+const statusFilterOptions = computed(() =>
+  statusOptions.map(v => ({ title: t(`contract_status_${v}`), value: v })),
+)
 
 const employeeOptions = computed(() =>
   employees.value.map((e: any) => ({
@@ -266,7 +303,39 @@ async function doRenew() {
           {{ t('Employment contracts — draft, activate, renew or terminate') }}
         </div>
       </div>
-      <div class="page-head__actions">
+      <div
+        class="page-head__actions"
+        style="flex-wrap:wrap;gap:8px;align-items:center;"
+      >
+        <VSelect
+          v-model="statusFilter"
+          :items="statusFilterOptions"
+          :label="t('Status')"
+          :placeholder="t('All statuses')"
+          clearable
+          hide-details
+          density="compact"
+          style="min-width:180px;max-width:220px;"
+        />
+        <VSelect
+          v-model="employeeFilter"
+          :items="employeeOptions"
+          :label="t('Employee')"
+          :placeholder="t('All employees')"
+          clearable
+          hide-details
+          density="compact"
+          style="min-width:200px;max-width:260px;"
+        />
+        <VChip
+          v-if="expiringCount !== null"
+          color="warning"
+          variant="tonal"
+          size="small"
+          prepend-icon="bx-time"
+        >
+          {{ t('Expiring soon (30 days)') }}: {{ expiringCount }}
+        </VChip>
         <VBtn
           color="primary"
           prepend-icon="bx-plus"
@@ -306,6 +375,12 @@ async function doRenew() {
             <td class="sk-cell">
               <div
                 class="sk-box"
+                style="width:90px;height:13px;border-radius:4px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
                 style="width:140px;height:13px;border-radius:4px;"
               />
             </td>
@@ -313,6 +388,12 @@ async function doRenew() {
               <div
                 class="sk-box"
                 style="width:80px;height:22px;border-radius:12px;"
+              />
+            </td>
+            <td class="sk-cell">
+              <div
+                class="sk-box"
+                style="width:80px;height:13px;border-radius:4px;"
               />
             </td>
             <td class="sk-cell">
@@ -357,6 +438,9 @@ async function doRenew() {
           </tr>
         </template>
 
+        <template #item.contract_number="{ item }">
+          {{ item.raw.contract_number ?? '—' }}
+        </template>
         <template #item.employee="{ item }">
           {{ item.raw.employee?.user?.first_name }} {{ item.raw.employee?.user?.last_name }}
         </template>
@@ -367,7 +451,7 @@ async function doRenew() {
             color="info"
             variant="tonal"
           >
-            {{ item.raw.contract_type }}
+            {{ t(`contract_kind_${item.raw.contract_type}`) }}
           </VChip>
         </template>
         <template #item.start_date="{ item }">
@@ -375,6 +459,9 @@ async function doRenew() {
         </template>
         <template #item.end_date="{ item }">
           {{ item.raw.end_date ? formatDate(item.raw.end_date) : '—' }}
+        </template>
+        <template #item.probation_end_date="{ item }">
+          {{ item.raw.probation_end_date ? formatDate(item.raw.probation_end_date) : '—' }}
         </template>
         <template #item.salary="{ item }">
           <span class="num-tabular">{{ formatCurrency(item.raw.salary_amount ?? item.raw.salary ?? item.raw.base_salary ?? 0) }}</span>
@@ -386,7 +473,19 @@ async function doRenew() {
             :color="statusColor[item.raw.status] ?? 'default'"
             variant="tonal"
           >
-            {{ item.raw.status }}
+            {{ t(`contract_status_${item.raw.status}`) }}
+            <VTooltip
+              v-if="item.raw.status === 'TERMINATED' && (item.raw.termination_date || item.raw.termination_reason)"
+              activator="parent"
+              location="top"
+            >
+              <div v-if="item.raw.termination_date">
+                {{ formatDate(item.raw.termination_date) }}
+              </div>
+              <div v-if="item.raw.termination_reason">
+                {{ item.raw.termination_reason }}
+              </div>
+            </VTooltip>
           </VChip>
         </template>
         <template #item.actions="{ item }">
@@ -516,7 +615,7 @@ async function doRenew() {
             >
               <VSelect
                 v-model="form.contract_type"
-                :items="contractTypes"
+                :items="contractTypeOptions"
                 :label="t('Contract Type')"
               />
             </VCol>

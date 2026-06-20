@@ -1127,5 +1127,4 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
 meta:
   action: manage
   subject: all
-  layout: design
 </route>

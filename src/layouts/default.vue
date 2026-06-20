@@ -2,10 +2,24 @@
 import DesignSidebar from '@/layouts/components/DesignSidebar.vue'
 import DesignTopbar from '@/layouts/components/DesignTopbar.vue'
 
+/* ============================================================
+   Alpha POS — default layout
+   Mirrors App() shell from
+   .tmp-alpha-design/alpha-design-source/App.shell.jsx:
+     <div class="app">
+       <Sidebar collapsed ... />
+       <div class="main">
+         <Topbar showDate dateRange ... />
+         <main>{Page}</main>
+       </div>
+     </div>
+   ============================================================ */
+
 const collapsed = ref(false)
 const dateRange = ref('14d')
 
-// Apply data-theme attr on mount so the design's [data-theme="dark"] CSS rules kick in.
+// Apply data-theme attr on mount so design-shell.css [data-theme="dark"]
+// rules kick in immediately on first paint.
 onMounted(() => {
   const saved = localStorage.getItem('alphapos-theme')
   if (saved === 'light' || saved === 'dark')
@@ -34,7 +48,7 @@ onMounted(() => {
 
 <style>
 /* NOT scoped — page-shell wraps the routed page, so its rule must apply
-   regardless of which page is rendered. Same selector lives globally. */
+   regardless of which page is rendered. */
 main.page-shell {
   flex: 1;
   /* Generous breathing room: 32px top/bottom · 40px left/right. */

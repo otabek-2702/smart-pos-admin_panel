@@ -4,6 +4,7 @@ type Tone = 'success' | 'warning' | 'error' | 'info' | 'primary' | 'neutral'
 interface Props {
   tone?: Tone
   dot?: boolean
+  className?: string
 }
 
 withDefaults(defineProps<Props>(), {
@@ -15,7 +16,7 @@ withDefaults(defineProps<Props>(), {
 <template>
   <span
     class="badge"
-    :class="[`t-${tone}`, { 'badge--dot': dot }]"
+    :class="[`t-${tone}`, { 'badge--dot': dot }, className]"
   >
     <slot />
   </span>

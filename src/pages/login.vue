@@ -32,29 +32,6 @@ const setLocale = (code: string) => {
   localStorage.setItem('appLocale', code)
 }
 
-// Sets a synthetic admin session in localStorage so every router guard
-// passes and the panel renders. API calls will still fail (no backend), so
-// pages will show their loading / empty states — useful for previewing
-// the UI while the backend is moving or unreachable.
-function demoLogin() {
-  const demoUser = {
-    id: 0,
-    uuid: 'demo',
-    email: 'demo@local',
-    first_name: 'Demo',
-    last_name: 'User',
-    role: 'ADMIN',
-    status: 'ACTIVE',
-    permissions: ['*'],
-  }
-
-  localStorage.setItem('accessToken', JSON.stringify('demo-token'))
-  localStorage.setItem('userData', JSON.stringify(demoUser))
-  localStorage.setItem('userAbilities', JSON.stringify([{ action: 'manage', subject: 'all' }]))
-  ability.update([{ action: 'manage', subject: 'all' }])
-  router.replace('/')
-}
-
 const login = async () => {
   isLoading.value = true
   errorMsg.value = ''
@@ -210,16 +187,6 @@ const login = async () => {
                   :loading="isLoading"
                 >
                   {{ t('login_btn') }}
-                </VBtn>
-                <VBtn
-                  block
-                  variant="tonal"
-                  color="warning"
-                  class="mt-2"
-                  prepend-icon="bx-fast-forward"
-                  @click="demoLogin"
-                >
-                  {{ t('Skip — preview without backend') }}
                 </VBtn>
               </VCol>
             </VRow>

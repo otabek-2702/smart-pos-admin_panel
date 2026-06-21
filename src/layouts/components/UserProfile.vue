@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import axios from '@/plugins/axios'
+import { fmtDateTime } from '@/components/design/utils/format'
 import { initialAbility } from '@/plugins/casl/ability'
 import { useAppAbility } from '@/plugins/casl/useAppAbility'
 import { getStoredUserData } from '@/utils/storage'
@@ -130,7 +131,7 @@ const logout = async () => {
               {{ t('Last Login') }}
             </VListItemTitle>
             <VListItemSubtitle class="text-caption">
-              {{ new Date(userData.last_login_at).toLocaleString() }}
+              {{ fmtDateTime(userData.last_login_at) }}
             </VListItemSubtitle>
           </VListItem>
 

@@ -89,7 +89,7 @@ const avgOrderValue = computed(() => {
             v-if="today"
             class="kpi-card__value"
           >
-            {{ formatCurrency(today.revenue ?? 0) }}<span class="kpi-card__unit">UZS</span>
+            {{ formatCurrency(today.revenue ?? 0) }}<span class="kpi-card__unit">{{ t('currency_short') }}</span>
           </div>
           <div
             v-else
@@ -145,7 +145,7 @@ const avgOrderValue = computed(() => {
             v-if="today"
             class="kpi-card__value"
           >
-            {{ formatCurrency(avgOrderValue) }}<span class="kpi-card__unit">UZS</span>
+            {{ formatCurrency(avgOrderValue) }}<span class="kpi-card__unit">{{ t('currency_short') }}</span>
           </div>
           <div
             v-else
@@ -289,7 +289,7 @@ const avgOrderValue = computed(() => {
               <div
                 v-for="(p, idx) in topProducts"
                 :key="p.product_id"
-                class="d-flex align-center gap-3 py-2"
+                class="d-flex align-center gap-3 py-2 flex-wrap dash-list-row"
                 style="border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);"
               >
                 <VAvatar
@@ -352,7 +352,7 @@ const avgOrderValue = computed(() => {
               <div
                 v-for="s in clockedIn"
                 :key="s.shift_id"
-                class="d-flex align-center gap-3 py-2"
+                class="d-flex align-center gap-3 py-2 flex-wrap dash-list-row"
                 style="border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);cursor:pointer;"
                 @click="router.push('/shifts')"
               >
@@ -411,6 +411,35 @@ const avgOrderValue = computed(() => {
     </VRow>
   </div>
 </template>
+
+<style scoped>
+.dash-list-row {
+  min-width: 0;
+}
+
+.dash-list-row .flex-grow-1 {
+  min-width: 0;
+  word-break: break-word;
+}
+
+@media (max-width: 600px) {
+  .kpi-card__value {
+    font-size: 1.25rem;
+  }
+
+  .dash-list-row > span,
+  .dash-list-row > .text-body-2 {
+    inline-size: 100%;
+    text-align: end;
+  }
+}
+
+@media (max-width: 400px) {
+  .dash-list-row {
+    gap: 8px !important;
+  }
+}
+</style>
 
 <route lang="yaml">
 meta:

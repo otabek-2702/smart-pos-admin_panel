@@ -58,7 +58,7 @@ export function fmtPct(n: number | null | undefined, digits = 1): string {
   if (n === null || n === undefined || Number.isNaN(n))
     return '—'
 
-  return n.toFixed(digits).replace(/\.?0+$/, '') + '%'
+  return n.toFixed(digits).replace(/\.0$/, '') + '%'
 }
 
 export function fmtDelta(n: number | null | undefined, digits?: number): string {
@@ -105,3 +105,20 @@ export function fmtDateTime(d: Date | string | number | null | undefined): strin
 }
 
 export { NB }
+
+/**
+ * Aggregate object mirroring the original `window.Fmt` from format.uz.js so
+ * ported JSX-style call sites (e.g. `Fmt.money(n)`) keep working unchanged.
+ */
+export const Fmt = {
+  NB,
+  num: fmtNum,
+  abbr: fmtAbbr,
+  money: fmtMoney,
+  moneyAbbr: fmtMoneyAbbr,
+  pct: fmtPct,
+  delta: fmtDelta,
+  date: fmtDate,
+  dateTime: fmtDateTime,
+  time: fmtTime,
+} as const

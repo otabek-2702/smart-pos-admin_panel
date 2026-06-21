@@ -1,6 +1,17 @@
 <script setup lang="ts">
-import DataTableFooter from '@core/components/DataTableFooter.vue'
 import axios from '@/plugins/axios'
+import Badge from '@/components/design/Badge.vue'
+import Button from '@/components/design/Button.vue'
+import Card from '@/components/design/Card.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import Field from '@/components/design/Field.vue'
+import IconAction from '@/components/design/IconAction.vue'
+import Input from '@/components/design/Input.vue'
+import Kpi from '@/components/design/Kpi.vue'
+import Modal from '@/components/design/Modal.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
+import Select from '@/components/design/Select.vue'
+import Switch from '@/components/design/Switch.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -10,6 +21,8 @@ const totalCategories = ref(0)
 const loading = ref(false)
 const stats = ref<any>(null)
 const search = ref('')
+const statusFilter = ref<string>('')
+const includeDeleted = ref(false)
 const page = ref(1)
 const itemsPerPage = ref(10)
 
@@ -113,6 +126,10 @@ async function loadCategories() {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
     if (search.value)
       params.search = search.value
+    if (statusFilter.value)
+      params.status = statusFilter.value
+    if (includeDeleted.value)
+      params.include_deleted = true
     const res = await axios.get('/categories', { params })
     const d = res.data?.data
 
@@ -143,6 +160,7 @@ onMounted(() => {
 
 watch(search, debouncedSearch)
 watch([page, itemsPerPage], loadCategories)
+watch([statusFilter, includeDeleted], () => { page.value = 1; loadCategories() })
 
 // ---- drag & drop ----
 function onDragStart(e: DragEvent, index: number) {
@@ -283,417 +301,688 @@ async function deleteCategory() {
     notify(e?.response?.data?.message ?? t('Error deleting category'), 'error')
   }
 }
+
+// ---- helpers / formatters ----
+async function copySlug(slug: string) {
+  try {
+    await navigator.clipboard.writeText(slug)
+    notify(t('Slug copied'))
+  }
+  catch {
+    notify(t('Error'), 'error')
+  }
+}
+
+// ---- KPI data ----
+const kpiTotal = computed(() => ({
+  label: t('Total'),
+  value: stats.value ? (stats.value.total_categories ?? null) : null,
+  icon: 'tag',
+  tone: 'primary' as const,
+  sub: t('Categories'),
+}))
+const kpiActive = computed(() => ({
+  label: t('category_status_ACTIVE'),
+  value: stats.value ? (stats.value.active_categories ?? null) : null,
+  icon: 'checkcircle',
+  tone: 'success' as const,
+}))
+const kpiInactive = computed(() => ({
+  label: t('category_status_INACTIVE'),
+  value: stats.value ? (stats.value.inactive_categories ?? null) : null,
+  icon: 'pause',
+  tone: 'warning' as const,
+}))
+
+// ---- Status filter options ----
+const statusOptions = computed(() => [
+  { value: 'ACTIVE', label: t('category_status_ACTIVE') },
+  { value: 'INACTIVE', label: t('category_status_INACTIVE') },
+])
+
+// Map raw BE status to design Badge tone
+function statusTone(s: string): 'success' | 'neutral' {
+  return s === 'ACTIVE' ? 'success' : 'neutral'
+}
+
+// ---- Pagination (chip-and-page pattern from products/index.vue) ----
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCategories.value / itemsPerPage.value)))
+const pageStart = computed(() => totalCategories.value === 0 ? 0 : (page.value - 1) * itemsPerPage.value + 1)
+const pageEnd = computed(() => Math.min(totalCategories.value, page.value * itemsPerPage.value))
+
+const pageList = computed<(number | '…')[]>(() => {
+  const tp = totalPages.value
+  const cp = page.value
+  const arr: (number | '…')[] = []
+  if (tp <= 7) {
+    for (let i = 1; i <= tp; i++) arr.push(i)
+    return arr
+  }
+  const add = (n: number | '…') => arr.push(n)
+  add(1)
+  if (cp > 4) add('…')
+  const start = Math.max(2, cp - 1)
+  const end = Math.min(tp - 1, cp + 1)
+  for (let i = start; i <= end; i++) add(i)
+  if (cp < tp - 3) add('…')
+  add(tp)
+  return arr
+})
+
+function goPage(p: number | '…') {
+  if (p === '…' || p === page.value || p < 1 || p > totalPages.value)
+    return
+  page.value = p
+}
+
+// ---- Active filter chips ----
+const activeFilters = computed(() => {
+  const list: { k: string; label: string; val: string; clear: () => void }[] = []
+  if (search.value)
+    list.push({ k: 'q', label: t('Search'), val: search.value, clear: () => { search.value = '' } })
+  if (statusFilter.value)
+    list.push({ k: 's', label: t('Status'), val: t(`category_status_${statusFilter.value}`), clear: () => { statusFilter.value = '' } })
+  if (includeDeleted.value)
+    list.push({ k: 'd', label: t('Include deleted'), val: t('Yes'), clear: () => { includeDeleted.value = false } })
+  return list
+})
+
+function clearAllFilters() {
+  search.value = ''
+  statusFilter.value = ''
+  includeDeleted.value = false
+}
 </script>
 
 <template>
-  <div class="categories-page">
-    <div class="page-head">
-      <div style="min-width:0;">
-        <h1 class="page-head__title">
-          {{ t('Categories') }}
-        </h1>
-        <div class="page-head__subtitle">
-          {{ t('Group products into POS categories') }}
-        </div>
-      </div>
-      <div class="page-head__actions">
-        <VBtn
-          prepend-icon="bx-plus"
+  <div class="page categories-page">
+    <!-- Page header -->
+    <PageHeader
+      :title="t('Categories')"
+      :subtitle="t('Group products into POS categories')"
+    >
+      <template #actions>
+        <Button
+          variant="primary"
+          icon="plus"
           @click="openCreate"
         >
           {{ t('Add Category') }}
-        </VBtn>
-      </div>
-    </div>
-
-    <!-- Stats row — compact, always shown -->
-    <VRow class="mb-3 flex-0-0">
-      <VCol cols="4">
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-primary">
-              <VIcon
-                icon="bx-category"
-                size="20"
-              />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Total') }}
-            </div>
-          </div>
-          <div class="kpi-card__value num-tabular">
-            <template v-if="stats">
-              {{ stats.total_categories ?? '—' }}
-            </template>
-            <span
-              v-else
-              class="sk-box"
-              style="display:inline-block;width:36px;height:20px;border-radius:4px;"
-            />
-          </div>
-        </div>
-      </VCol>
-      <VCol cols="4">
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-success">
-              <VIcon
-                icon="bx-check-circle"
-                size="20"
-              />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Active') }}
-            </div>
-          </div>
-          <div class="kpi-card__value num-tabular">
-            <template v-if="stats">
-              {{ stats.active_categories ?? '—' }}
-            </template>
-            <span
-              v-else
-              class="sk-box"
-              style="display:inline-block;width:36px;height:20px;border-radius:4px;"
-            />
-          </div>
-        </div>
-      </VCol>
-      <VCol cols="4">
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-warning">
-              <VIcon
-                icon="bx-minus-circle"
-                size="20"
-              />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Inactive') }}
-            </div>
-          </div>
-          <div class="kpi-card__value num-tabular">
-            <template v-if="stats">
-              {{ stats.inactive_categories ?? '—' }}
-            </template>
-            <span
-              v-else
-              class="sk-box"
-              style="display:inline-block;width:36px;height:20px;border-radius:4px;"
-            />
-          </div>
-        </div>
-      </VCol>
-    </VRow>
-
-    <!-- Toolbar — always shown -->
-    <div class="d-flex flex-wrap gap-3 align-center mb-4">
-      <VTextField
-        v-model="search"
-        :placeholder="t('Search')"
-        prepend-inner-icon="bx-search"
-        density="compact"
-        style="max-inline-size: 240px;"
-        hide-details
-        clearable
-      />
-      <VSpacer />
-    </div>
-
-    <!-- Category card grid -->
-    <div class="category-grid mb-4">
-      <!-- Skeleton cards on initial load -->
-      <template v-if="loading && categories.length === 0">
-        <div
-          v-for="n in 8"
-          :key="`sk-${n}`"
-          class="category-card"
-          style="pointer-events:none;"
-        >
-          <div class="sk-box category-card__stripe" />
-          <div class="category-card__body">
-            <div class="sk-box category-card__icon" />
-            <div
-              class="sk-box mt-2"
-              style="width:80%;height:13px;border-radius:4px;"
-            />
-            <div
-              class="sk-box mt-2"
-              style="width:52px;height:18px;border-radius:8px;"
-            />
-          </div>
-        </div>
+        </Button>
       </template>
+    </PageHeader>
 
-      <template v-else>
-        <VCard
-          v-for="(cat, index) in categories"
-          :key="cat.id"
-          class="category-card"
-          flat
-          :class="{
-            'is-dragging': draggedIndex === index,
-            'is-drag-over': dragOverIndex === index && draggedIndex !== index,
-          }"
-          draggable="true"
-          @dragstart="onDragStart($event, index)"
-          @dragover="onDragOver($event, index)"
-          @dragleave="onDragLeave"
-          @drop.prevent="onDrop(index)"
-          @dragend="onDragEnd"
-          @click="openEdit(cat)"
-        >
-          <div
-            class="category-card__stripe"
-            :style="{ background: cardColor(cat) }"
+    <!-- KPI strip -->
+    <div
+      class="grid cols-4"
+      style="margin-bottom: var(--sp-5);"
+    >
+      <Kpi :data="kpiTotal" />
+      <Kpi :data="kpiActive" />
+      <Kpi :data="kpiInactive" />
+    </div>
+
+    <!-- Toolbar -->
+    <Card>
+      <div class="toolbar toolbar--wrap">
+        <div class="tb-search">
+          <Input
+            v-model="search"
+            icon="search"
+            :placeholder="t('Search')"
           />
-          <div class="category-card__body">
+        </div>
+
+        <div class="tb-status">
+          <Select
+            v-model="statusFilter"
+            icon="filter"
+            :placeholder="t('All Category Statuses')"
+            :options="statusOptions"
+          />
+        </div>
+
+        <div
+          class="row tb-switch"
+          style="gap:10px;align-items:center;"
+        >
+          <Switch v-model="includeDeleted" />
+          <span style="font-size:13px;color:var(--text-secondary);font-weight:500;">
+            {{ t('Show deleted categories') }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Filter chips -->
+      <div
+        v-if="activeFilters.length > 0"
+        class="toolbar"
+        style="padding-top:0;"
+      >
+        <div class="chips">
+          <span
+            class="tertiary"
+            style="font-size:13px;margin-right:2px;"
+          >{{ t('Filters') }}:</span>
+          <span
+            v-for="f in activeFilters"
+            :key="f.k"
+            class="chip"
+          >
+            <span>{{ f.label }}: <b>{{ f.val }}</b></span>
+            <span
+              class="chip__x"
+              @click="f.clear()"
+            >
+              <DesignIcon
+                name="close"
+                :size="13"
+              />
+            </span>
+          </span>
+          <button
+            class="chip--clear"
+            @click="clearAllFilters"
+          >
+            {{ t('Clear all') }}
+          </button>
+        </div>
+      </div>
+
+      <div class="card__divider" />
+
+      <!-- Card grid -->
+      <div
+        class="category-grid"
+        style="padding: var(--sp-4);"
+      >
+        <!-- Skeleton cards on initial load -->
+        <template v-if="loading && categories.length === 0">
+          <div
+            v-for="n in 8"
+            :key="`sk-${n}`"
+            class="category-card"
+            style="pointer-events:none;"
+          >
+            <div class="sk-box category-card__stripe" />
+            <div class="category-card__body">
+              <div class="sk-box category-card__icon" />
+              <div
+                class="sk-box"
+                style="width:80%;height:13px;border-radius:4px;margin-top:8px;"
+              />
+              <div
+                class="sk-box"
+                style="width:52px;height:18px;border-radius:8px;margin-top:8px;"
+              />
+            </div>
+          </div>
+        </template>
+
+        <template v-else-if="categories.length > 0">
+          <div
+            v-for="(cat, index) in categories"
+            :key="cat.id"
+            class="category-card"
+            :class="{
+              'is-dragging': draggedIndex === index,
+              'is-drag-over': dragOverIndex === index && draggedIndex !== index,
+            }"
+            draggable="true"
+            @dragstart="onDragStart($event, index)"
+            @dragover="onDragOver($event, index)"
+            @dragleave="onDragLeave"
+            @drop.prevent="onDrop(index)"
+            @dragend="onDragEnd"
+            @click="openEdit(cat)"
+          >
             <div
-              class="category-card__icon"
+              class="category-card__stripe"
               :style="{ background: cardColor(cat) }"
             />
-            <div class="d-flex align-center justify-space-between mt-2 gap-1">
-              <span class="category-card__name">{{ cat.name }}</span>
-              <VIcon
-                icon="bx-grid-vertical"
-                size="16"
-                class="drag-hint"
+            <div class="category-card__body">
+              <div
+                class="category-card__icon"
+                :style="{ background: cardColor(cat) }"
               />
+              <div
+                class="row"
+                style="gap:4px;align-items:center;justify-content:space-between;margin-top:8px;"
+              >
+                <span class="category-card__name">{{ cat.name }}</span>
+                <DesignIcon
+                  name="grid"
+                  :size="16"
+                  class="drag-hint"
+                />
+              </div>
+              <p
+                v-if="cat.description"
+                class="category-card__desc"
+              >
+                {{ cat.description }}
+              </p>
+              <div
+                class="row"
+                style="gap:6px;align-items:center;justify-content:space-between;margin-top:8px;"
+              >
+                <Badge
+                  :tone="statusTone(cat.status)"
+                  dot
+                >
+                  {{ t(`category_status_${cat.status}`) }}
+                </Badge>
+                <span
+                  v-if="cat.sort_order !== undefined && cat.sort_order !== null"
+                  class="mono category-card__order"
+                >#{{ cat.sort_order }}</span>
+              </div>
             </div>
-            <VChip
-              class="mt-2 status-pill"
-              size="x-small"
-              :color="cat.status === 'ACTIVE' ? 'success' : 'default'"
-              variant="tonal"
-              label
-            >
-              {{ cat.status === 'ACTIVE' ? t('Active') : t('Inactive') }}
-            </VChip>
           </div>
-        </VCard>
+        </template>
 
         <!-- Empty state -->
         <div
-          v-if="categories.length === 0"
+          v-else
           class="category-grid__empty"
         >
-          <VIcon
-            icon="bx-category"
-            size="56"
-            color="disabled"
-          />
-          <p class="text-disabled mt-3">
-            {{ t('No categories found') }}
-          </p>
-        </div>
-      </template>
-    </div>
-
-    <VCard style="margin-block-start: auto; padding-block-start: 8px;">
-      <DataTableFooter
-        v-model:page="page"
-        v-model:items-per-page="itemsPerPage"
-        :total-items="totalCategories"
-      />
-    </VCard>
-
-    <!-- Create/Edit Dialog -->
-    <VDialog
-      :model-value="dialogOpen"
-      max-width="480"
-      @update:model-value="tryCloseDialog"
-    >
-      <VCard :title="editingCategory ? t('Edit Category') : t('Add Category')">
-        <DialogCloseBtn @click="dialogOpen = false" />
-        <VCardText class="pb-2">
-          <!-- POS Preview -->
-          <div class="pos-preview mb-4">
-            <span class="text-caption text-disabled d-block mb-2">{{ t('POS Preview') }}</span>
-            <div class="pos-preview__bar">
-              <div
-                class="pos-category-btn pos-category-btn--active"
-                :style="{ backgroundColor: form.color || '#9e9e9e' }"
-              >
-                {{ form.name || t('Name') }}
-              </div>
-              <div class="pos-category-btn pos-category-btn--dim">
-                {{ t('Other') }}
-              </div>
-              <div class="pos-category-btn pos-category-btn--dim">
-                {{ t('Other') }}
-              </div>
+          <div class="statefill">
+            <div class="statefill__icon">
+              <DesignIcon
+                name="tag"
+                :size="24"
+              />
             </div>
-
-            <div class="pos-preview__products mt-3">
-              <div
-                class="pos-product-card"
-                :style="{ backgroundColor: form.color || '#9e9e9e' }"
+            <div class="statefill__title">
+              {{ t('No categories found') }}
+            </div>
+            <div
+              v-if="activeFilters.length > 0"
+              style="margin-top:12px;"
+            >
+              <Button
+                variant="secondary"
+                @click="clearAllFilters"
               >
-                <div class="pos-product-card__name">
-                  {{ t('Product') }} 1
-                </div>
-                <div class="pos-product-card__price">
-                  25 000 so'm
-                </div>
-              </div>
-              <div
-                class="pos-product-card"
-                :style="{ backgroundColor: form.color || '#9e9e9e' }"
-              >
-                <div class="pos-product-card__name">
-                  {{ t('Product') }} 2
-                </div>
-                <div class="pos-product-card__price">
-                  18 000 so'm
-                </div>
-              </div>
-              <div
-                class="pos-product-card"
-                :style="{ backgroundColor: form.color || '#9e9e9e' }"
-              >
-                <div class="pos-product-card__name">
-                  {{ t('Product') }} 3
-                </div>
-                <div class="pos-product-card__price">
-                  32 000 so'm
-                </div>
-              </div>
+                {{ t('Clear filters') }}
+              </Button>
             </div>
           </div>
+        </div>
+      </div>
 
-          <VRow>
-            <VCol cols="12">
-              <VTextField
-                v-model="form.name"
-                :label="t('Name')"
-                density="compact"
-                autofocus
-              />
-            </VCol>
-            <VCol cols="12">
-              <VTextField
-                v-model="form.description"
-                :label="t('Description')"
-                density="compact"
-              />
-            </VCol>
-
-            <!-- Color picker -->
-            <VCol cols="12">
-              <div class="d-flex align-center gap-3">
-                <VMenu
-                  v-model="colorMenuOpen"
-                  :close-on-content-click="false"
-                  location="bottom start"
-                >
-                  <template #activator="{ props: menuProps }">
-                    <div
-                      v-bind="menuProps"
-                      class="color-dot"
-                      :style="{ background: form.color || 'rgba(var(--v-theme-on-surface), 0.12)' }"
-                    />
-                  </template>
-                  <VColorPicker
-                    v-model="baseColor"
-                    mode="hex"
-                    :modes="['hex']"
-                    show-swatches
-                    elevation="0"
-                  />
-                </VMenu>
-                <span
-                  v-if="form.color"
-                  class="text-body-2 text-medium-emphasis"
-                >{{ form.color.toUpperCase() }}</span>
-                <span
-                  v-else
-                  class="text-body-2 text-disabled"
-                >{{ t('No Color') }}</span>
-                <VSpacer />
-                <VBtn
-                  v-if="form.color"
-                  icon
-                  variant="text"
-                  size="x-small"
-                  @click="form.color = ''; colorMode = 'none'"
-                >
-                  <VIcon
-                    icon="bx-x"
-                    size="18"
-                  />
-                </VBtn>
-              </div>
-            </VCol>
-
-            <!-- Intensity -->
-            <VCol
-              v-if="form.color"
-              cols="12"
+      <!-- Pagination -->
+      <div
+        v-if="totalCategories > 0"
+        class="pagination"
+      >
+        <div
+          class="row"
+          style="gap: 8px; align-items: center;"
+        >
+          <span>{{ t('Rows per page') }}:</span>
+          <div
+            class="control control--select control--sm"
+            style="width: 84px;"
+          >
+            <select v-model.number="itemsPerPage">
+              <option :value="10">
+                10
+              </option>
+              <option :value="25">
+                25
+              </option>
+              <option :value="50">
+                50
+              </option>
+              <option :value="100">
+                100
+              </option>
+            </select>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
             >
-              <span class="text-caption text-disabled d-block mb-1">{{ t('Intensity') }}</span>
-              <div class="d-flex gap-2">
-                <button
-                  v-for="opt in intensityOptions"
-                  :key="opt.value"
-                  type="button"
-                  class="intensity-btn"
-                  :class="{ 'intensity-btn--active': intensity === opt.value }"
-                  :style="{ backgroundColor: applyIntensity(baseColor, opt.value) }"
-                  @click="intensity = opt.value"
-                >
-                  {{ opt.label }}
-                </button>
-              </div>
-            </VCol>
-          </VRow>
-        </VCardText>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
+        </div>
+        <span class="pagination__spacer" />
+        <span class="muted">
+          {{ pageStart }}–{{ pageEnd }} {{ t('of') }} {{ totalCategories }}
+        </span>
+        <div class="pglist">
+          <button
+            class="pgbtn"
+            :disabled="page <= 1"
+            @click="goPage(page - 1)"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <button
+            v-for="(p, i) in pageList"
+            :key="`pg-${i}-${p}`"
+            class="pgbtn"
+            :class="{ 'is-active': p === page }"
+            :disabled="p === '…'"
+            @click="goPage(p)"
+          >
+            {{ p }}
+          </button>
+          <button
+            class="pgbtn"
+            :disabled="page >= totalPages"
+            @click="goPage(page + 1)"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </Card>
 
-        <VCardActions class="justify-space-between pb-4 px-4">
-          <VBtn
-            v-if="editingCategory"
-            color="error"
-            variant="text"
-            prepend-icon="bx-trash"
-            @click="confirmDelete(editingCategory); dialogOpen = false"
+    <!-- Create/Edit Modal -->
+    <Modal
+      :open="dialogOpen"
+      :title="editingCategory ? t('Edit Category') : t('Add Category')"
+      :width="500"
+      @close="tryCloseDialog(false)"
+    >
+      <!-- POS Preview -->
+      <div class="pos-preview">
+        <span
+          class="muted"
+          style="display:block;font-size:12px;margin-bottom:8px;"
+        >{{ t('POS Preview') }}</span>
+        <div class="pos-preview__bar">
+          <div
+            class="pos-category-btn pos-category-btn--active"
+            :style="{ backgroundColor: form.color || '#9e9e9e' }"
           >
-            {{ t('Delete') }}
-          </VBtn>
-          <VSpacer />
-          <VBtn
-            :loading="dialogLoading"
-            @click="saveCategory"
+            {{ form.name || t('Name') }}
+          </div>
+          <div class="pos-category-btn pos-category-btn--dim">
+            {{ t('Other') }}
+          </div>
+          <div class="pos-category-btn pos-category-btn--dim">
+            {{ t('Other') }}
+          </div>
+        </div>
+
+        <div class="pos-preview__products">
+          <div
+            class="pos-product-card"
+            :style="{ backgroundColor: form.color || '#9e9e9e' }"
           >
-            {{ t('Save') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+            <div class="pos-product-card__name">
+              {{ t('Product') }} 1
+            </div>
+            <div class="pos-product-card__price">
+              {{ t('category_sample_price_1') }}
+            </div>
+          </div>
+          <div
+            class="pos-product-card"
+            :style="{ backgroundColor: form.color || '#9e9e9e' }"
+          >
+            <div class="pos-product-card__name">
+              {{ t('Product') }} 2
+            </div>
+            <div class="pos-product-card__price">
+              {{ t('category_sample_price_2') }}
+            </div>
+          </div>
+          <div
+            class="pos-product-card"
+            :style="{ backgroundColor: form.color || '#9e9e9e' }"
+          >
+            <div class="pos-product-card__name">
+              {{ t('Product') }} 3
+            </div>
+            <div class="pos-product-card__price">
+              {{ t('category_sample_price_3') }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="form-grid"
+        style="margin-top: var(--sp-4);"
+      >
+        <Field
+          :label="t('Name')"
+          class="span-2"
+        >
+          <Input
+            v-model="form.name"
+            :placeholder="t('Name')"
+          />
+        </Field>
+
+        <Field
+          :label="t('Description')"
+          class="span-2"
+        >
+          <Input
+            v-model="form.description"
+            :placeholder="t('Description')"
+          />
+        </Field>
+
+        <!-- Slug (read-only, edit mode only) -->
+        <Field
+          v-if="editingCategory && editingCategory.slug"
+          :label="t('Slug')"
+          class="span-2"
+        >
+          <div
+            class="row"
+            style="gap:8px;align-items:center;"
+          >
+            <div
+              class="control is-disabled"
+              style="flex:1;"
+            >
+              <DesignIcon
+                name="tag"
+                :size="16"
+              />
+              <input
+                :value="editingCategory.slug"
+                disabled
+                class="mono"
+              >
+            </div>
+            <IconAction
+              icon="copy"
+              tone="primary"
+              :title="t('Copy slug')"
+              @click="copySlug(editingCategory.slug)"
+            />
+          </div>
+        </Field>
+
+        <!-- Color picker -->
+        <Field
+          :label="t('Color')"
+          class="span-2"
+        >
+          <div
+            class="row"
+            style="gap:12px;align-items:center;flex-wrap:wrap;"
+          >
+            <VMenu
+              v-model="colorMenuOpen"
+              :close-on-content-click="false"
+              location="bottom start"
+            >
+              <template #activator="{ props: menuProps }">
+                <div
+                  v-bind="menuProps"
+                  class="color-dot"
+                  :style="{ background: form.color || 'var(--surface-inset)' }"
+                />
+              </template>
+              <VColorPicker
+                v-model="baseColor"
+                mode="hex"
+                :modes="['hex']"
+                show-swatches
+                elevation="0"
+              />
+            </VMenu>
+            <span
+              v-if="form.color"
+              class="mono"
+              style="font-size:13px;color:var(--text-secondary);"
+            >{{ form.color.toUpperCase() }}</span>
+            <span
+              v-else
+              style="font-size:13px;color:var(--text-tertiary);"
+            >{{ t('No Color') }}</span>
+            <span style="flex:1;" />
+            <IconAction
+              v-if="form.color"
+              icon="close"
+              :title="t('Clear')"
+              @click="form.color = ''; colorMode = 'none'"
+            />
+          </div>
+        </Field>
+
+        <!-- Intensity -->
+        <Field
+          v-if="form.color"
+          :label="t('Intensity')"
+          class="span-2"
+        >
+          <div
+            class="row"
+            style="gap:8px;flex-wrap:wrap;"
+          >
+            <button
+              v-for="opt in intensityOptions"
+              :key="opt.value"
+              type="button"
+              class="intensity-btn"
+              :class="{ 'intensity-btn--active': intensity === opt.value }"
+              :style="{ backgroundColor: applyIntensity(baseColor, opt.value) }"
+              @click="intensity = opt.value"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </Field>
+      </div>
+
+      <template #footer>
+        <Button
+          v-if="editingCategory"
+          variant="danger"
+          icon="trash"
+          @click="confirmDelete(editingCategory); dialogOpen = false"
+        >
+          {{ t('Delete') }}
+        </Button>
+        <span style="flex:1;" />
+        <Button
+          variant="ghost"
+          :disabled="dialogLoading"
+          @click="dialogOpen = false"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="check"
+          :loading="dialogLoading"
+          :disabled="dialogLoading"
+          @click="saveCategory"
+        >
+          {{ t('Save') }}
+        </Button>
+      </template>
+    </Modal>
 
     <!-- Delete Confirm -->
-    <VDialog
-      v-model="deleteDialog"
-      max-width="400"
+    <Modal
+      :open="deleteDialog"
+      :title="t('Delete Category')"
+      :subtitle="t('This action cannot be undone')"
+      :width="440"
+      @close="deleteDialog = false"
     >
-      <VCard :title="t('Delete Category')">
-        <VCardText>{{ t('Are you sure you want to delete this category?') }}</VCardText>
-        <VCardActions class="justify-end">
-          <VBtn
-            variant="tonal"
-            color="secondary"
-            @click="deleteDialog = false"
+      <div
+        class="row"
+        style="gap:14px;align-items:flex-start;"
+      >
+        <div
+          class="kpi__icon t-error"
+          style="width:44px;height:44px;flex:0 0 44px;"
+        >
+          <DesignIcon
+            name="alert"
+            :size="22"
+          />
+        </div>
+        <div>
+          <p style="margin:0;font-weight:600;">
+            {{ deletingCategory?.name }}
+          </p>
+          <p
+            class="muted"
+            style="margin:6px 0 0;font-size:14px;"
           >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="error"
-            @click="deleteCategory"
-          >
-            {{ t('Delete') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+            {{ t('Are you sure you want to delete this category?') }}
+          </p>
+        </div>
+      </div>
 
-    <!-- Snackbar -->
+      <template #footer>
+        <Button
+          variant="ghost"
+          @click="deleteDialog = false"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="danger"
+          icon="trash"
+          @click="deleteCategory"
+        >
+          {{ t('Delete') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Snackbar (page-level notify pattern) -->
     <VSnackbar
       v-model="snackbar"
       :color="snackbarColor"
@@ -705,16 +994,6 @@ async function deleteCategory() {
 </template>
 
 <style scoped>
-/* ── Page layout ── */
-.categories-page {
-  display: flex;
-  flex-direction: column;
-  /* Old Sneat offset was 64+56+40 (navbar + page padding + footer). Under the
-     design layout the outer .page-shell already pads, so subtract only the
-     topbar + outer vertical padding. */
-  min-height: calc(100vh - var(--topbar-h, 64px) - var(--sp-6, 24px) - var(--sp-6, 24px));
-}
-
 /* ── Card grid ── */
 .category-grid {
   display: grid;
@@ -723,15 +1002,17 @@ async function deleteCategory() {
 }
 
 .category-card {
-  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   overflow: hidden;
   cursor: grab;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
   user-select: none;
 }
 
 .category-card:hover {
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
   transform: translateY(-3px);
 }
 
@@ -745,8 +1026,8 @@ async function deleteCategory() {
 }
 
 .category-card.is-drag-over {
-  border-color: rgb(var(--v-theme-primary));
-  box-shadow: 0 0 0 2px rgb(var(--v-theme-primary));
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary);
   transform: translateY(-2px);
 }
 
@@ -763,9 +1044,6 @@ async function deleteCategory() {
   width: 42px;
   height: 42px;
   border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
 }
 
@@ -777,26 +1055,46 @@ async function deleteCategory() {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  color: var(--text);
+}
+
+.category-card__desc {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.category-card__order {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  background: var(--surface-inset);
+  padding: 2px 6px;
+  border-radius: var(--r-xs);
+  font-variant-numeric: tabular-nums;
 }
 
 .drag-hint {
   opacity: 0.3;
   flex-shrink: 0;
+  color: var(--text-tertiary);
 }
 
 .category-grid__empty {
   grid-column: 1 / -1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 64px 0;
+  padding: 32px 0;
 }
 
 /* ── POS Preview ── */
 .pos-preview {
-  background: rgba(var(--v-theme-on-surface), 0.04);
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  border-radius: 10px;
+  background: var(--surface-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
   padding: 14px;
 }
 
@@ -819,14 +1117,15 @@ async function deleteCategory() {
 }
 
 .pos-category-btn--dim {
-  background: rgba(var(--v-theme-on-surface), 0.1);
-  color: rgba(var(--v-theme-on-surface), 0.4);
+  background: var(--surface-2);
+  color: var(--text-tertiary);
 }
 
 /* ── POS Product preview ── */
 .pos-preview__products {
   display: flex;
   gap: 8px;
+  margin-top: 10px;
 }
 
 .pos-product-card {
@@ -859,12 +1158,13 @@ async function deleteCategory() {
   border-radius: 50%;
   cursor: pointer;
   position: relative;
+  border: 1px solid var(--border);
   transition: box-shadow 0.15s;
   flex-shrink: 0;
 }
 
 .color-dot:hover {
-  box-shadow: 0 0 0 3px rgba(var(--v-theme-on-surface), 0.15);
+  box-shadow: 0 0 0 3px var(--surface-2);
 }
 
 /* ── Intensity buttons ── */
@@ -884,8 +1184,46 @@ async function deleteCategory() {
 }
 
 .intensity-btn--active {
-  border-color: rgb(var(--v-theme-primary));
-  box-shadow: 0 0 0 2px rgba(var(--v-theme-primary), 0.3);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-weak);
+}
+
+/* ── Toolbar ── */
+.toolbar--wrap {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tb-search {
+  flex: 1;
+  max-width: 300px;
+  min-width: 220px;
+}
+
+.tb-status {
+  width: 200px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 900px) {
+  .tb-search,
+  .tb-status {
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 100%;
+  }
+  .tb-switch { flex: 1 1 100%; }
+}
+@media (max-width: 720px) {
+  .grid.cols-4 { grid-template-columns: 1fr; }
+  .category-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+}
+@media (max-width: 480px) {
+  .pos-preview__products { flex-wrap: wrap; }
+  .pos-product-card { flex: 1 1 calc(50% - 4px); }
 }
 </style>
 

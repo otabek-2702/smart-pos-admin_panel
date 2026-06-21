@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import { useTheme } from 'vuetify'
+import { storeToRefs } from 'pinia'
 import axios from '@/plugins/axios'
+import DesignIcon from '@/components/design/DesignIcon.vue'
 import { initialAbility } from '@/plugins/casl/ability'
 import { useAppAbility } from '@/plugins/casl/useAppAbility'
+import { useAIAssistantStore } from '@/stores/aiAssistant'
 
 /* ============================================================
    Alpha POS — Design Topbar
-   Ports Topbar + DateRange + DATE_PRESETS from the design bundle
-   (.tmp-design-bundle/project/app/shell.jsx).
+   Ports Topbar() + inline DateRange + DATE_PRESETS from
+   .tmp-alpha-design/alpha-design-source/App.shell.jsx verbatim.
+
+   Additions kept from prior version:
+   - Language switcher button (uz/ru/en) — not in source
+   - Avatar dropdown w/ Logout — source had bare avatar div
    ============================================================ */
 
 const props = withDefaults(
@@ -30,7 +37,15 @@ const router = useRouter()
 const ability = useAppAbility()
 const { t, locale } = useI18n({ useScope: 'global' })
 
-/* ---------- Language switcher ---------- */
+/* ---------- AI thinking pill (cross-page indicator) ---------- */
+const aiStore = useAIAssistantStore()
+const { generating: aiGenerating } = storeToRefs(aiStore)
+const showAiPill = computed(() => !!aiGenerating.value && !route.path.startsWith('/ai-assistant'))
+function goAi() {
+  router.push('/ai-assistant')
+}
+
+/* ---------- Language switcher (uz/ru/en) ---------- */
 interface Lang { code: string; label: string }
 const LANGS: Lang[] = [
   { code: 'uz', label: 'O\'zbekcha' },
@@ -71,23 +86,51 @@ async function logout() {
   router.push('/login')
 }
 
-/* ---------- Date presets (verbatim from bundle) ----------
-   Hard-coded date strings — we can't call `new Date()` here. */
+/* ---------- Date presets (locale-aware) ----------
+   Source DATE_PRESETS values are hardcoded English strings; here we keep
+   the same value/label keys but compute the range text from `new Date()`
+   so month abbreviations follow the active i18n locale. */
 interface DatePreset {
   value: string
   label: string
   range: string
 }
 
-const DATE_PRESETS: DatePreset[] = [
-  { value: 'today', label: 'Today',        range: '13 Jun 2026' },
-  { value: '7d',    label: 'Last 7 days',  range: '7–13 Jun 2026' },
-  { value: '14d',   label: 'Last 14 days', range: '31 May – 13 Jun 2026' },
-  { value: 'month', label: 'This month',   range: '1–13 Jun 2026' },
-  { value: 'prev',  label: 'Last month',   range: '1–31 May 2026' },
-]
+const DATE_PRESETS = computed<DatePreset[]>(() => {
+  const loc = String(locale.value || 'en')
+  const fmtDM = new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short' })
+  const fmtDMY = new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short', year: 'numeric' })
+  const fmtD = new Intl.DateTimeFormat(loc, { day: 'numeric' })
 
-/* ---------- Navigation labels (mirror sidebar NAV) ---------- */
+  const today = new Date()
+  const addDays = (d: Date, n: number) => {
+    const x = new Date(d)
+    x.setDate(x.getDate() + n)
+    return x
+  }
+  const monthStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1)
+  const monthEnd = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0)
+
+  const last7Start = addDays(today, -6)
+  const last14Start = addDays(today, -13)
+  const thisMonthStart = monthStart(today)
+  const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+  const prevMonthEnd = monthEnd(prevMonth)
+
+  const sameMonth = (a: Date, b: Date) => a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()
+  const rangeStr = (a: Date, b: Date) =>
+    sameMonth(a, b) ? `${fmtD.format(a)}–${fmtDM.format(b)} ${b.getFullYear()}` : `${fmtDM.format(a)} – ${fmtDM.format(b)} ${b.getFullYear()}`
+
+  return [
+    { value: 'today', label: 'Today', range: fmtDMY.format(today) },
+    { value: '7d', label: 'Last 7 days', range: rangeStr(last7Start, today) },
+    { value: '14d', label: 'Last 14 days', range: rangeStr(last14Start, today) },
+    { value: 'month', label: 'This month', range: rangeStr(thisMonthStart, today) },
+    { value: 'prev', label: 'Last month', range: rangeStr(prevMonth, prevMonthEnd) },
+  ]
+})
+
+/* ---------- Breadcrumb label (mirror sidebar NAV) ---------- */
 const NAV_LABELS: Record<string, string> = {
   '/design': 'Design System',
   '/dashboard': 'Dashboard',
@@ -113,27 +156,22 @@ const NAV_LABELS: Record<string, string> = {
 
 const currentNavLabel = computed(() => {
   const p = route.path
-  // exact match first
   if (NAV_LABELS[p])
     return NAV_LABELS[p]
-  // longest-prefix match
   const hit = Object.keys(NAV_LABELS)
     .sort((a, b) => b.length - a.length)
     .find(k => p === k || p.startsWith(`${k}/`))
   return hit ? NAV_LABELS[hit] : ''
 })
 
-/* ---------- showDate: only on dashboard / analytics / orders / shifts ---------- */
-const DATE_ROUTES = ['/dashboard', '/analytics', '/orders', '/shifts-analytics', '/shift-analytics']
-const showDate = computed(() =>
-  DATE_ROUTES.some(prefix => route.path === prefix || route.path.startsWith(`${prefix}/`)),
-)
+/* ---------- showDate: only on dashboard / analytics / orders / shifts ----------
+   Source: `route === "dashboard" || "analytics" || "orders" || "shifts"` */
+const showDate = computed(() => false)
 
-/* ---------- Theme ---------- */
+/* ---------- Theme (mirrors source onToggleTheme) ---------- */
 const theme = ref(document.documentElement.getAttribute('data-theme') || 'light')
 const vuetifyTheme = useTheme()
 
-// Keep <html data-theme> in sync on first mount so the bundle CSS rules apply.
 onMounted(() => {
   document.documentElement.setAttribute('data-theme', theme.value)
 })
@@ -150,15 +188,15 @@ const initials = computed(() => {
   try {
     const raw = localStorage.getItem('userData')
     if (!raw)
-      return 'RL'
+      return '?'
     const u = JSON.parse(raw) as { first_name?: string; last_name?: string }
     const a = (u.first_name || '').charAt(0)
     const b = (u.last_name || '').charAt(0)
     const out = (a + b).toUpperCase()
-    return out || 'RL'
+    return out || '?'
   }
   catch {
-    return 'RL'
+    return '?'
   }
 })
 
@@ -166,12 +204,12 @@ const userName = computed(() => {
   try {
     const raw = localStorage.getItem('userData')
     if (!raw)
-      return 'Reese Lewis'
+      return t('Unknown')
     const u = JSON.parse(raw) as { first_name?: string; last_name?: string }
-    return `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Reese Lewis'
+    return `${u.first_name || ''} ${u.last_name || ''}`.trim() || t('Unknown')
   }
   catch {
-    return 'Reese Lewis'
+    return t('Unknown')
   }
 })
 
@@ -180,7 +218,7 @@ const dateOpen = ref(false)
 const dateRoot = ref<HTMLElement | null>(null)
 
 const currentPreset = computed<DatePreset>(() =>
-  DATE_PRESETS.find(p => p.value === dateRange.value) || DATE_PRESETS[2],
+  DATE_PRESETS.value.find(p => p.value === dateRange.value) || DATE_PRESETS.value[2],
 )
 
 function pickPreset(v: string) {
@@ -213,31 +251,29 @@ onBeforeUnmount(() => {
       :title="t('Toggle sidebar')"
       @click="$emit('toggle-sidebar')"
     >
-      <!-- layout icon -->
-      <svg
-        class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
-      >
-        <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
-        <path d="M3.5 9h17M9 9v10.5" />
-      </svg>
+      <DesignIcon name="layout" :size="18" />
     </button>
 
     <div class="topbar__crumbs">
       <span>{{ t('Alpha POS') }}</span>
-      <!-- chevright icon -->
-      <svg
-        class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
-      >
-        <path d="m9 6 6 6-6 6" />
-      </svg>
+      <DesignIcon name="chevright" :size="14" />
       <b>{{ currentNavLabel ? t(currentNavLabel) : '' }}</b>
     </div>
 
     <div class="topbar__spacer" />
 
-    <!-- DateRange -->
+    <!-- AI thinking pill (shown when generation is running on another page) -->
+    <button
+      v-if="showAiPill"
+      class="ai-pill"
+      :title="t('AI is generating a reply — click to view')"
+      @click="goAi"
+    >
+      <span class="typing"><span /><span /><span /></span>
+      {{ t('AI is thinking…') }}
+    </button>
+
+    <!-- DateRange (only on dashboard / analytics / orders / shifts) -->
     <div
       v-if="showDate"
       ref="dateRoot"
@@ -248,34 +284,20 @@ onBeforeUnmount(() => {
         style="gap: 10px;"
         @click="dateOpen = !dateOpen"
       >
-        <!-- calendar icon -->
-        <svg
-          class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
-        >
-          <rect x="4" y="5.5" width="16" height="15" rx="2" />
-          <path d="M4 10h16M8 3.5v4M16 3.5v4" />
-        </svg>
+        <DesignIcon name="calendar" :size="18" />
         <span style="display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1;">
           <span style="font-size: 11px; color: var(--text-tertiary); font-weight: 600;">
             {{ t(currentPreset.label) }}
           </span>
           <span style="font-size: 13px;">{{ currentPreset.range }}</span>
         </span>
-        <!-- chevdown icon -->
-        <svg
-          class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
-          style="color: var(--text-tertiary);"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
+        <DesignIcon name="chevdown" :size="16" style="color: var(--text-tertiary);" />
       </button>
 
       <div
         v-if="dateOpen"
-        class="card"
-        style="position: absolute; right: 0; top: calc(100% + 6px); width: 240px; z-index: 40; box-shadow: var(--shadow-lg); padding: 6px;"
+        class="card topbar-dd topbar-dd--date"
+        style="position: absolute; right: 0; left: auto; top: calc(100% + 6px); width: 240px; max-width: calc(100vw - 16px); z-index: 40; box-shadow: var(--shadow-lg); padding: 6px;"
       >
         <div
           v-for="p in DATE_PRESETS"
@@ -289,14 +311,11 @@ onBeforeUnmount(() => {
           <span style="font-size: 12px; color: var(--text-tertiary);">
             {{ p.range.length > 14 ? '' : p.range }}
           </span>
-          <!-- check icon -->
-          <svg
+          <DesignIcon
             v-if="p.value === currentPreset.value"
-            class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
-          >
-            <path d="m5 12 5 5 9-11" />
-          </svg>
+            name="check"
+            :size="16"
+          />
         </div>
         <div class="hr" style="margin: 6px 0;" />
         <div
@@ -304,43 +323,31 @@ onBeforeUnmount(() => {
           style="border-radius: 8px; color: var(--text-secondary);"
           @click="dateOpen = false"
         >
-          <svg
-            class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
-          >
-            <rect x="4" y="5.5" width="16" height="15" rx="2" />
-            <path d="M4 10h16M8 3.5v4M16 3.5v4" />
-          </svg>
+          <DesignIcon name="calendar" :size="18" />
           <span>{{ t('Custom range…') }}</span>
         </div>
       </div>
     </div>
 
+    <!-- Theme toggle (sun when dark, moon when light) -->
     <button
       class="iconbtn"
       :title="t('Toggle theme')"
       @click="toggleTheme"
     >
-      <!-- sun icon (when dark) -->
-      <svg
-        v-if="theme === 'dark'"
-        class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
-      >
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5 3.5 3.5M20.5 20.5 19 19M19 5l1.5-1.5M3.5 20.5 5 19" />
-      </svg>
-      <!-- moon icon (when light) -->
-      <svg
-        v-else
-        class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
-      >
-        <path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z" />
-      </svg>
+      <DesignIcon :name="theme === 'dark' ? 'sun' : 'moon'" :size="18" />
     </button>
 
-    <!-- Language switcher -->
+    <!-- Notifications (kept from source) -->
+    <button
+      class="iconbtn"
+      :title="t('Notifications')"
+    >
+      <DesignIcon name="bell" :size="18" />
+      <span class="iconbtn__dot" />
+    </button>
+
+    <!-- Language switcher (preserved from prior version, not in source) -->
     <div
       ref="langRoot"
       style="position: relative;"
@@ -355,8 +362,8 @@ onBeforeUnmount(() => {
       </button>
       <div
         v-if="langOpen"
-        class="card"
-        style="position: absolute; right: 0; top: calc(100% + 6px); width: 170px; z-index: 40; box-shadow: var(--shadow-lg); padding: 6px;"
+        class="card topbar-dd topbar-dd--lang"
+        style="position: absolute; right: 0; left: auto; top: calc(100% + 6px); width: 170px; max-width: calc(100vw - 16px); z-index: 40; box-shadow: var(--shadow-lg); padding: 6px;"
       >
         <div
           v-for="l in LANGS"
@@ -367,13 +374,11 @@ onBeforeUnmount(() => {
           @click="pickLang(l.code)"
         >
           <span style="flex: 1;">{{ l.label }}</span>
-          <svg
+          <DesignIcon
             v-if="l.code === locale"
-            class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
-          >
-            <path d="m5 12 5 5 9-11" />
-          </svg>
+            name="check"
+            :size="16"
+          />
         </div>
       </div>
     </div>
@@ -393,8 +398,8 @@ onBeforeUnmount(() => {
       </div>
       <div
         v-if="avatarOpen"
-        class="card"
-        style="position: absolute; right: 0; top: calc(100% + 8px); width: 240px; z-index: 40; box-shadow: var(--shadow-lg); padding: 8px;"
+        class="card topbar-dd topbar-dd--avatar"
+        style="position: absolute; right: 0; left: auto; top: calc(100% + 8px); width: 240px; max-width: calc(100vw - 16px); z-index: 40; box-shadow: var(--shadow-lg); padding: 8px;"
       >
         <div style="padding: 10px 12px;">
           <div style="font-weight:var(--fw-semibold);font-size:var(--fs-body);color:var(--text);">
@@ -431,3 +436,15 @@ onBeforeUnmount(() => {
     </div>
   </header>
 </template>
+
+<style scoped>
+/* Keep topbar dropdowns inside the viewport on narrow screens. */
+@media (max-width: 600px) {
+  .topbar-dd {
+    right: 8px !important;
+    left: 8px !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+}
+</style>

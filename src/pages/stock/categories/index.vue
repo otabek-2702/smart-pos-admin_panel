@@ -1,8 +1,27 @@
 <script setup lang="ts">
+/* ============================================================
+   ALPHA POS — Stock Categories
+   Design-system primitives only (no Vuetify on the page itself)
+   - Filters: search, type, parent, tree view
+   - DataTable with controlled pagination + row actions
+   - Modal create/edit + delete confirmation
+   ============================================================ */
 import { stockApi as axios } from '@/plugins/axios'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
+import Badge from '@/components/design/Badge.vue'
+import Button from '@/components/design/Button.vue'
+import DataTable, { type DataTableColumn } from '@/components/design/DataTable.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import Field from '@/components/design/Field.vue'
+import IconAction from '@/components/design/IconAction.vue'
+import Input from '@/components/design/Input.vue'
+import Modal from '@/components/design/Modal.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
+import Select from '@/components/design/Select.vue'
+import StateFill from '@/components/design/StateFill.vue'
+import Switch from '@/components/design/Switch.vue'
 
 const { t } = useI18n({ useScope: 'global' })
+const { notify } = useNotify()
 
 const categories = ref<any[]>([])
 const total = ref(0)
@@ -11,6 +30,8 @@ const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
 const typeFilter = ref<string | undefined>(undefined)
+const parentFilter = ref<number | undefined>(undefined)
+const treeView = ref(false)
 
 const dialog = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
@@ -21,11 +42,11 @@ const selectedItem = ref<any>(null)
 
 const categoryTypes = ['RAW_MATERIAL', 'SEMI_FINISHED', 'FINISHED_GOOD', 'PACKAGING']
 
-const typeColor: Record<string, string> = {
+const typeTone: Record<string, 'success' | 'warning' | 'primary' | 'neutral'> = {
   RAW_MATERIAL: 'success',
   SEMI_FINISHED: 'warning',
   FINISHED_GOOD: 'primary',
-  PACKAGING: 'secondary',
+  PACKAGING: 'neutral',
 }
 
 const form = ref({
@@ -36,17 +57,6 @@ const form = ref({
   is_active: true,
 })
 
-const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
-
-const headers = [
-  { title: t('Name'), key: 'name', sortable: false },
-  { title: t('Type'), key: 'type', sortable: false },
-  { title: t('Parent'), key: 'parent', sortable: false },
-  { title: t('Sort'), key: 'sort_order', sortable: false },
-  { title: t('Status'), key: 'is_active', sortable: false },
-  { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
-]
-
 async function loadCategories() {
   loading.value = true
   try {
@@ -55,6 +65,10 @@ async function loadCategories() {
       params.search = search.value
     if (typeFilter.value)
       params.type = typeFilter.value
+    if (parentFilter.value)
+      params.parent_id = parentFilter.value
+    if (treeView.value)
+      params.tree = 'true'
 
     const res = await axios.get('/categories/', { params })
     const d = res.data?.data ?? res.data
@@ -72,10 +86,11 @@ async function loadCategories() {
 
 onMounted(loadCategories)
 watch([page, itemsPerPage], loadCategories)
-watch([search, typeFilter], () => { page.value = 1; loadCategories() })
+watch([search, typeFilter, parentFilter, treeView], () => { page.value = 1; loadCategories() })
 
 function openCreate() {
   dialogMode.value = 'create'
+  selectedItem.value = null
   form.value = { name: '', type: 'RAW_MATERIAL', parent_id: null, sort_order: 0, is_active: true }
   dialog.value = true
 }
@@ -94,6 +109,7 @@ function openEdit(item: any) {
 }
 
 async function save() {
+  if (saving.value) return
   saving.value = true
   try {
     const payload: any = { ...form.value }
@@ -121,6 +137,7 @@ function confirmDelete(item: any) {
 }
 
 async function doDelete() {
+  if (deleting.value) return
   deleting.value = true
   try {
     await axios.delete(`/categories/${selectedItem.value.id}/`)
@@ -151,308 +168,371 @@ async function toggleActive(item: any) {
 const parentOptions = computed(() =>
   categories.value
     .filter(c => selectedItem.value ? c.id !== selectedItem.value.id : true)
-    .map(c => ({ title: c.name, value: c.id })),
+    .map(c => ({ value: String(c.id), label: c.name })),
 )
+
+const formParentOptions = computed(() =>
+  categories.value
+    .filter(c => selectedItem.value ? c.id !== selectedItem.value.id : true)
+    .map(c => ({ value: String(c.id), label: `${c.name} (${t(`category_type_${c.type}`)})` })),
+)
+
+const typeOptions = computed(() =>
+  categoryTypes.map(v => ({ value: v, label: t(`category_type_${v}`) })),
+)
+
+// ---- DataTable columns ----
+const columns = computed<DataTableColumn<any>[]>(() => [
+  { key: 'name', label: t('col_name'), sortable: true },
+  { key: 'type', label: t('col_type'), sortable: true },
+  { key: 'parent', label: t('col_parent') },
+  { key: 'sort_order', label: t('col_sort_order'), sortable: true, align: 'right' },
+  { key: 'is_active', label: t('col_is_active') },
+])
+
+const dtPagination = computed(() => ({
+  page: page.value,
+  perPage: itemsPerPage.value,
+  total: total.value,
+  onPage: (p: number) => { page.value = p },
+  onPerPage: (n: number) => { itemsPerPage.value = n; page.value = 1 },
+}))
+
+const hasFilters = computed(() =>
+  !!(search.value || typeFilter.value || parentFilter.value || treeView.value),
+)
+
+function clearAll() {
+  search.value = ''
+  typeFilter.value = undefined
+  parentFilter.value = undefined
+  treeView.value = false
+}
 </script>
 
 <template>
-  <div>
-    <VCard>
-      <VCardText class="d-flex flex-wrap gap-3 align-center">
-        <VTextField
-          v-model="search"
-          :placeholder="t('Search categories...')"
-          prepend-inner-icon="bx-search"
-          density="compact"
-          style="min-inline-size: 240px;"
-          hide-details
-          clearable
-        />
-        <VSelect
-          v-model="typeFilter"
-          :items="categoryTypes"
-          :placeholder="t('All Types')"
-          density="compact"
-          style="min-inline-size: 160px;"
-          hide-details
-          clearable
-        />
-        <VSpacer />
-        <VBtn
-          prepend-icon="bx-plus"
+  <div class="page">
+    <!-- Page header -->
+    <PageHeader
+      :title="t('stock_categories_title')"
+      :subtitle="t('stock_categories_subtitle')"
+    >
+      <template #actions>
+        <Button
+          variant="primary"
+          icon="plus"
           @click="openCreate"
         >
           {{ t('Add Category') }}
-        </VBtn>
-      </VCardText>
+        </Button>
+      </template>
+    </PageHeader>
 
-      <VDataTableServer
-        :headers="headers"
-        :items="categories"
-        :items-length="total"
+    <!-- Main card -->
+    <div class="card">
+      <!-- Toolbar (flex-wrap, collapses gracefully under 900px) -->
+      <div class="toolbar tb-wrap">
+        <div class="tb-search">
+          <Input
+            v-model="search"
+            icon="search"
+            :placeholder="t('Search categories...')"
+            :aria-label="t('Search categories...')"
+          />
+        </div>
+
+        <div class="tb-select">
+          <Select
+            :model-value="typeFilter ?? ''"
+            :placeholder="t('All Types')"
+            :options="typeOptions"
+            @update:model-value="(v: string) => typeFilter = v ? v : undefined"
+          />
+        </div>
+
+        <div class="tb-select">
+          <Select
+            :model-value="parentFilter != null ? String(parentFilter) : ''"
+            :placeholder="t('All Parents')"
+            :options="parentOptions"
+            @update:model-value="(v: string) => parentFilter = v ? Number(v) : undefined"
+          />
+        </div>
+
+        <label class="tb-switch">
+          <Switch v-model="treeView" />
+          <span>{{ t('Tree view') }}</span>
+        </label>
+      </div>
+
+      <!-- Active filter chips -->
+      <div v-if="hasFilters" class="toolbar" style="padding-top: 0;">
+        <div class="chips">
+          <span class="tertiary" style="font-size: 13px; margin-right: 2px;">{{ t('Filters') }}:</span>
+
+          <span v-if="search" class="chip">
+            <span>{{ t('Search categories...') }}: <b>{{ search }}</b></span>
+            <span class="chip__x" @click="search = ''"><DesignIcon name="close" :size="13" /></span>
+          </span>
+
+          <span v-if="typeFilter" class="chip">
+            <span>{{ t('col_type') }}: <b>{{ t(`category_type_${typeFilter}`) }}</b></span>
+            <span class="chip__x" @click="typeFilter = undefined"><DesignIcon name="close" :size="13" /></span>
+          </span>
+
+          <span v-if="parentFilter" class="chip">
+            <span>{{ t('col_parent') }}: <b>{{ parentOptions.find(o => o.value === String(parentFilter))?.label }}</b></span>
+            <span class="chip__x" @click="parentFilter = undefined"><DesignIcon name="close" :size="13" /></span>
+          </span>
+
+          <span v-if="treeView" class="chip">
+            <span>{{ t('Tree view') }}</span>
+            <span class="chip__x" @click="treeView = false"><DesignIcon name="close" :size="13" /></span>
+          </span>
+
+          <button class="chip--clear" @click="clearAll">
+            {{ t('Clear all') }}
+          </button>
+        </div>
+      </div>
+
+      <div class="card__divider" />
+
+      <!-- DataTable -->
+      <DataTable
+        :columns="columns"
+        :rows="categories"
+        row-key="id"
         :loading="loading"
-        :items-per-page="itemsPerPage"
-        :page="page"
+        :pagination="dtPagination"
+        :per-page-options="[10, 25, 50, 100]"
       >
-        <template #bottom>
-          <DataTableFooter
-            v-model:page="page"
-            v-model:items-per-page="itemsPerPage"
-            :total-items="total"
+        <!-- Name -->
+        <template #cell.name="{ row }">
+          <span class="cell-strong">{{ row.name }}</span>
+        </template>
+
+        <!-- Type -->
+        <template #cell.type="{ row }">
+          <Badge :tone="(typeTone[row.type] ?? 'neutral') as any">
+            {{ row.type ? t(`category_type_${row.type}`) : '—' }}
+          </Badge>
+        </template>
+
+        <!-- Parent -->
+        <template #cell.parent="{ row }">
+          <span class="cell-muted">{{ row.parent?.name ?? '—' }}</span>
+        </template>
+
+        <!-- Sort order -->
+        <template #cell.sort_order="{ row }">
+          <span class="mono cell-muted">{{ row.sort_order ?? 0 }}</span>
+        </template>
+
+        <!-- Active status -->
+        <template #cell.is_active="{ row }">
+          <Badge :tone="row.is_active ? 'success' : 'neutral'" dot>
+            {{ row.is_active ? t('status_active') : t('status_inactive') }}
+          </Badge>
+        </template>
+
+        <!-- Inline row actions -->
+        <template #row-actions="{ row }">
+          <IconAction
+            icon="edit"
+            :title="t('Edit')"
+            @click.stop="openEdit(row)"
+          />
+          <IconAction
+            :icon="row.is_active ? 'pause' : 'play'"
+            :tone="row.is_active ? 'warning' : 'success'"
+            :title="row.is_active ? t('Deactivate') : t('Activate')"
+            @click.stop="toggleActive(row)"
+          />
+          <IconAction
+            icon="trash"
+            tone="danger"
+            :title="t('Delete')"
+            @click.stop="confirmDelete(row)"
           />
         </template>
 
-        <template
-          v-if="loading && categories.length === 0"
-          #body
+        <!-- Empty state -->
+        <template #empty>
+          <StateFill
+            icon="inbox"
+            :title="t('stock_categories_empty_title')"
+            :sub="t('stock_categories_empty_sub')"
+          >
+            <div v-if="hasFilters" style="margin-top: 12px;">
+              <Button variant="secondary" @click="clearAll">
+                {{ t('Clear filters') }}
+              </Button>
+            </div>
+          </StateFill>
+        </template>
+      </DataTable>
+    </div>
+
+    <!-- Create / Edit modal -->
+    <Modal
+      :open="dialog"
+      :width="540"
+      :title="dialogMode === 'create' ? t('Add Category') : t('Edit Category')"
+      @close="dialog = false"
+    >
+      <div class="modal-grid">
+        <div class="span-2">
+          <Field :label="t('Name')">
+            <Input v-model="form.name" />
+          </Field>
+        </div>
+
+        <Field :label="t('Type')">
+          <Select v-model="form.type" :options="typeOptions" />
+        </Field>
+
+        <Field :label="t('Sort Order')">
+          <Input v-model.number="form.sort_order" type="number" min="0" />
+        </Field>
+
+        <div class="span-2">
+          <Field :label="t('Parent Category')" :hint="t('stock_categories_parent_hint')">
+            <Select
+              :model-value="form.parent_id != null ? String(form.parent_id) : ''"
+              :placeholder="t('None')"
+              :options="formParentOptions"
+              @update:model-value="(v: string) => form.parent_id = v ? Number(v) : null"
+            />
+          </Field>
+        </div>
+
+        <Field v-if="dialogMode === 'edit'" :label="t('Active')">
+          <Switch v-model="form.is_active" />
+        </Field>
+      </div>
+
+      <template #footer>
+        <Button variant="ghost" :disabled="saving" @click="dialog = false">
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          :loading="saving"
+          :disabled="!form.name || saving"
+          @click="save"
         >
-          <tr
-            v-for="n in itemsPerPage"
-            :key="n"
-            class="sk-row"
-          >
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:120px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:90px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:100px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:30px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:60px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td
-              class="sk-cell"
-              style="text-align:end;"
-            >
-              <div class="d-flex justify-end gap-1">
-                <div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:6px;"
-                /><div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:6px;"
-                />
-              </div>
-            </td>
-          </tr>
-        </template>
+          {{ t('Save') }}
+        </Button>
+      </template>
+    </Modal>
 
-        <template #item.type="{ item }">
-          <VChip
-            class="status-pill"
-            :color="typeColor[item.raw.type] ?? 'default'"
-            size="small"
-            variant="tonal"
-          >
-            {{ item.raw.type_display ?? item.raw.type }}
-          </VChip>
-        </template>
-        <template #item.parent="{ item }">
-          {{ item.raw.parent?.name ?? '—' }}
-        </template>
-        <template #item.is_active="{ item }">
-          <VChip
-            class="status-pill"
-            :color="item.raw.is_active ? 'success' : 'default'"
-            size="small"
-            variant="tonal"
-          >
-            {{ item.raw.is_active ? t('Active') : t('Inactive') }}
-          </VChip>
-        </template>
-        <template #item.actions="{ item }">
-          <div
-            class="d-flex justify-end"
-            style="gap:2px;"
-          >
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              @click="openEdit(item.raw)"
-            >
-              <VIcon
-                size="18"
-                icon="bx-edit"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Edit') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              :color="item.raw.is_active ? 'warning' : 'success'"
-              @click="toggleActive(item.raw)"
-            >
-              <VIcon
-                size="18"
-                :icon="item.raw.is_active ? 'bx-pause' : 'bx-play'"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ item.raw.is_active ? t('Deactivate') : t('Activate') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              color="error"
-              @click="confirmDelete(item.raw)"
-            >
-              <VIcon
-                size="18"
-                icon="bx-trash"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Delete') }}
-              </VTooltip>
-            </VBtn>
-          </div>
-        </template>
-      </VDataTableServer>
-    </VCard>
-
-    <VDialog
-      v-model="dialog"
-      max-width="480"
-      persistent
+    <!-- Confirm delete -->
+    <Modal
+      :open="deleteDialog"
+      :width="440"
+      :title="t('Delete Category')"
+      @close="deleteDialog = false"
     >
-      <VCard :title="dialogMode === 'create' ? t('Add Category') : t('Edit Category')">
-        <VCardText>
-          <VRow>
-            <VCol cols="12">
-              <VTextField
-                v-model="form.name"
-                :label="t('Name')"
-                required
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VSelect
-                v-model="form.type"
-                :items="categoryTypes"
-                :label="t('Type')"
-                required
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model.number="form.sort_order"
-                :label="t('Sort Order')"
-                type="number"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VSelect
-                v-model="form.parent_id"
-                :items="parentOptions"
-                :label="t('Parent Category')"
-                :placeholder="t('None')"
-                clearable
-              />
-            </VCol>
-            <VCol
-              v-if="dialogMode === 'edit'"
-              cols="12"
-            >
-              <VSwitch
-                v-model="form.is_active"
-                :label="t('Active')"
-                color="success"
-              />
-            </VCol>
-          </VRow>
-        </VCardText>
-        <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            color="default"
-            @click="dialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            :loading="saving"
-            @click="save"
-          >
-            {{ t('Save') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      <div class="row del-row">
+        <div
+          class="kpi__icon t-error del-ic"
+        >
+          <DesignIcon name="alert" :size="22" />
+        </div>
+        <div>
+          <p style="margin: 0; font-weight: 600;">
+            {{ selectedItem?.name }}
+          </p>
+          <p class="muted" style="margin: 6px 0 0; font-size: 14px;">
+            {{ t('stock_categories_delete_confirm') }}
+          </p>
+        </div>
+      </div>
 
-    <VDialog
-      v-model="deleteDialog"
-      max-width="400"
-    >
-      <VCard :title="t('Delete Category')">
-        <VCardText>{{ t('Are you sure you want to delete') }} <strong>{{ selectedItem?.name }}</strong>?</VCardText>
-        <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            color="default"
-            @click="deleteDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="error"
-            :loading="deleting"
-            @click="doDelete"
-          >
-            {{ t('Delete') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-
-    <VSnackbar
-      v-model="snackbar"
-      :color="snackbarColor"
-      :timeout="3000"
-    >
-      {{ snackbarMsg }}
-    </VSnackbar>
+      <template #footer>
+        <Button variant="ghost" :disabled="deleting" @click="deleteDialog = false">
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="danger"
+          :loading="deleting"
+          :disabled="deleting"
+          @click="doDelete"
+        >
+          {{ t('Delete') }}
+        </Button>
+      </template>
+    </Modal>
   </div>
 </template>
+
+<style scoped>
+.row {
+  display: flex;
+  align-items: center;
+}
+
+/* Toolbar layout — flex-wrap with min widths that collapse to 100% on mobile */
+.toolbar.tb-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.tb-search {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.tb-select {
+  flex: 0 1 200px;
+  min-width: 160px;
+}
+.tb-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Modal grid responsive — 2 cols on desktop, 1 col on mobile */
+.modal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-4);
+}
+.modal-grid .span-2 {
+  grid-column: span 2;
+}
+
+/* Delete confirmation icon + content row */
+.del-row {
+  gap: 14px;
+  align-items: flex-start;
+}
+.del-ic {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+}
+
+@media (max-width: 900px) {
+  .tb-search,
+  .tb-select {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .modal-grid {
+    grid-template-columns: 1fr;
+  }
+  .modal-grid .span-2 {
+    grid-column: span 1;
+  }
+}
+</style>
 
 <route lang="yaml">
 name: stock-categories

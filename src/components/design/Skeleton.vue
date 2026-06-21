@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import type { CSSProperties } from 'vue'
+
 interface Props {
   w?: string | number
   h?: string | number
   r?: string | number
+  style?: CSSProperties
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -10,17 +13,21 @@ const props = withDefaults(defineProps<Props>(), {
   h: 16,
 })
 
-const style = computed(() => ({
+const mergedStyle = computed<CSSProperties>(() => ({
   width: typeof props.w === 'number' ? `${props.w}px` : props.w,
   height: typeof props.h === 'number' ? `${props.h}px` : props.h,
-  borderRadius: props.r === undefined ? undefined : (typeof props.r === 'number' ? `${props.r}px` : props.r),
+  borderRadius:
+    props.r === undefined
+      ? undefined
+      : typeof props.r === 'number' ? `${props.r}px` : props.r,
+  ...(props.style || {}),
 }))
 </script>
 
 <template>
   <div
     class="skel"
-    :style="style"
+    :style="mergedStyle"
   />
 </template>
 

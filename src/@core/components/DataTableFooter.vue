@@ -40,7 +40,7 @@ const pageCount = computed(() => Math.ceil(props.totalItems / props.itemsPerPage
         density="compact"
         variant="solo"
         hide-details
-        style="width: 75px;"
+        style="width: 96px;"
         @update:model-value="emit('update:page', 1)"
       />
     </div>

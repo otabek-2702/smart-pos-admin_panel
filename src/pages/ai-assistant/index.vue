@@ -1,409 +1,470 @@
 <script setup lang="ts">
-import { stockApi as axios } from '@/plugins/axios'
-import { getStoredUserData } from '@/utils/storage'
+/* ============================================================
+   ALPHA POS — AI Assistant page
+   1:1 port of .tmp-alpha-design/alpha-design-source/AIChat.jsx.
 
-const { t, te } = useI18n({ useScope: 'global' })
+   Layout: history sidebar (left, 300px) + thread (right) + composer.
+   Generation runs in the Pinia store (src/stores/aiAssistant.ts),
+   so it persists across page navigation.
+   ============================================================ */
+import { storeToRefs } from 'pinia'
+import { useAIAssistantStore } from '@/stores/aiAssistant'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import Button from '@/components/design/Button.vue'
+import Input from '@/components/design/Input.vue'
+import { Fmt } from '@/components/design/utils/format'
 
-interface Message {
-  id: number
-  role: 'user' | 'bot'
-  text: string
-  intent?: string
-  suggestions?: string[]
-  timestamp: number
-}
+const { t } = useI18n({ useScope: 'global' })
 
-interface Suggestion {
-  query: string
-  reason: string
-  priority: 'high' | 'medium' | 'low'
-}
+const store = useAIAssistantStore()
+const { chats, activeId, generating, notify, permission } = storeToRefs(store)
 
-interface QuickAction {
-  id: string
-  label: string
-  icon: string
-  query: string
-}
+const draft = ref('')
+const query = ref('')
+const scrollRef = ref<HTMLElement | null>(null)
+const taRef = ref<HTMLTextAreaElement | null>(null)
 
-const messages = ref<Message[]>([])
-const input = ref('')
-const sending = ref(false)
-const chatContext = ref<any>(null)
-const suggestions = ref<Suggestion[]>([])
-const quickActions = ref<QuickAction[]>([])
-const loadingMeta = ref(false)
-const logRef = ref<HTMLElement | null>(null)
-const userData = ref<any>(getStoredUserData())
+const active = computed(() => chats.value.find(c => c.id === activeId.value) || null)
+const messages = computed(() => active.value?.messages ?? [])
+const isGenerating = computed(() => generating.value === activeId.value)
 
-const userInitial = computed(() => {
-  const name = userData.value?.first_name || userData.value?.email || 'U'
+const filtered = computed(() => {
+  const q = query.value.toLowerCase()
 
-  return String(name).charAt(0).toUpperCase()
+  return chats.value
+    .slice()
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .filter(c => !q || c.title.toLowerCase().includes(q))
 })
 
-const priorityColor: Record<string, string> = {
-  high: 'error',
-  medium: 'warning',
-  low: 'info',
-}
-
-const iconFor: Record<string, string> = {
-  'warning': 'bx-error',
-  'clock': 'bx-time',
-  'chart': 'bx-bar-chart-alt-2',
-  'fire': 'bx-trending-up',
-  'truck': 'bx-package',
-  'crystal-ball': 'bx-bulb',
-}
-
-function scrollToBottom() {
-  nextTick(() => {
-    const el = logRef.value
-    if (el)
-      el.scrollTop = el.scrollHeight
-  })
-}
-
-async function loadMeta() {
-  loadingMeta.value = true
-  try {
-    const [sRes, qRes] = await Promise.all([
-      axios.get('/ai/suggestions/'),
-      axios.get('/ai/quick-actions/'),
-    ])
-
-    suggestions.value = sRes.data?.suggestions ?? []
-    quickActions.value = qRes.data?.actions ?? []
-  }
-  catch {
-    suggestions.value = []
-    quickActions.value = []
-  }
-  finally {
-    loadingMeta.value = false
-  }
-}
-
-async function send(text?: string) {
-  const query = (text ?? input.value).trim()
-  if (!query || sending.value)
-    return
-
-  messages.value.push({
-    id: Date.now(),
-    role: 'user',
-    text: query,
-    timestamp: Date.now(),
-  })
-  input.value = ''
-  sending.value = true
-  scrollToBottom()
-
-  try {
-    const res = await axios.post('/ai/query/', {
-      query,
-      context: chatContext.value,
-    })
-
-    const d = res.data ?? {}
-
-    chatContext.value = d.context ?? chatContext.value
-    messages.value.push({
-      id: Date.now() + 1,
-      role: 'bot',
-      text: d.response || t('No response'),
-      intent: d.intent,
-      suggestions: d.suggestions ?? [],
-      timestamp: Date.now(),
-    })
-  }
-  catch (e: any) {
-    const code = e?.response?.data?.error
-    const friendly = (code === 'llm_sdk_missing' || code === 'llm_key_missing')
-      ? t('AI service unavailable')
-      : (e?.response?.data?.message || code || t('Request failed. Please try again.'))
-
-    messages.value.push({
-      id: Date.now() + 1,
-      role: 'bot',
-      text: friendly,
-      timestamp: Date.now(),
-    })
-  }
-  finally {
-    sending.value = false
-    scrollToBottom()
-  }
-}
-
-function clearChat() {
-  messages.value = []
-  chatContext.value = null
-}
-
-function formatTime(ts: number) {
-  const d = new Date(ts)
-
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
+const SUGGESTIONS = [
+  { icon: 'wallet', text: 'How were sales today?', i18n: 'How were sales today?' },
+  { icon: 'star', text: 'What are my top products?', i18n: 'What are my top products?' },
+  { icon: 'coins', text: 'Break down today\'s payments', i18n: 'Break down today\'s payments' },
+  { icon: 'box', text: 'What is running low on stock?', i18n: 'What is running low on stock?' },
+]
 
 onMounted(() => {
-  loadMeta()
+  store.setChatVisible(true)
+  const onVis = () => store.setChatVisible(!document.hidden)
+
+  document.addEventListener('visibilitychange', onVis)
+  onBeforeUnmount(() => {
+    document.removeEventListener('visibilitychange', onVis)
+    store.setChatVisible(false)
+  })
 })
+
+watch([() => messages.value.length, () => messages.value[messages.value.length - 1]?.content, activeId], async () => {
+  await nextTick()
+  const el = scrollRef.value
+
+  if (el)
+    el.scrollTop = el.scrollHeight
+})
+
+watch(draft, async () => {
+  await nextTick()
+  const ta = taRef.value
+
+  if (!ta)
+    return
+  ta.style.height = 'auto'
+  ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`
+})
+
+function submit() {
+  const text = draft.value.trim()
+
+  if (!text || isGenerating.value)
+    return
+  store.send(text)
+  draft.value = ''
+}
+
+function onKey(e: KeyboardEvent) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    submit()
+  }
+}
+
+function relTime(ts: number): string {
+  const d = Date.now() - ts
+  const m = Math.round(d / 60000)
+
+  if (m < 1)
+    return t('just now')
+  if (m < 60)
+    return `${m}${t('time_minute_short')} ${t('ago')}`
+  const h = Math.round(m / 60)
+
+  if (h < 24)
+    return `${h}${t('time_hour_short')} ${t('ago')}`
+  const days = Math.round(h / 24)
+
+  if (days < 7)
+    return `${days}${t('time_day_short')} ${t('ago')}`
+
+  return Fmt.date(ts)
+}
+
+function previewOf(c: any): string {
+  const last = c.messages[c.messages.length - 1]
+
+  if (!last)
+    return t('Empty conversation')
+
+  return (last.role === 'assistant' ? last.content : last.content)
+    .replace(/[*#\-]/g, '')
+    .slice(0, 48)
+}
+
+// ---- markdown-lite (bold, bullets, numbered, paragraphs) ----
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+function mdInline(s: string): string {
+  return escapeHtml(s)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+}
+interface Block { t: 'p' | 'ul' | 'ol'; text?: string; items?: string[] }
+function parseMd(text: string): Block[] {
+  const lines = (text || '').split('\n')
+  const blocks: Block[] = []
+  let list: string[] | null = null
+  let listType: 'ul' | 'ol' | null = null
+  const flush = () => {
+    if (list && listType) {
+      blocks.push({ t: listType, items: list })
+      list = null
+      listType = null
+    }
+  }
+
+  for (const ln of lines) {
+    const bullet = ln.match(/^\s*-\s+(.*)$/)
+    const num = ln.match(/^\s*\d+\.\s+(.*)$/)
+
+    if (bullet) {
+      if (listType !== 'ul') {
+        flush()
+        list = []
+        listType = 'ul'
+      }
+      list!.push(bullet[1])
+    }
+    else if (num) {
+      if (listType !== 'ol') {
+        flush()
+        list = []
+        listType = 'ol'
+      }
+      list!.push(num[1])
+    }
+    else {
+      flush()
+      if (ln.trim())
+        blocks.push({ t: 'p', text: ln })
+    }
+  }
+  flush()
+
+  return blocks
+}
+
+const copied = ref<Record<string, boolean>>({})
+function copyMsg(id: string, text: string) {
+  try { navigator.clipboard.writeText(text) }
+  catch { /* noop */ }
+  copied.value = { ...copied.value, [id]: true }
+  setTimeout(() => {
+    copied.value = { ...copied.value, [id]: false }
+  }, 1400)
+}
+
+function regen(idx: number) {
+  const prev = messages.value[idx - 1]
+
+  if (prev && prev.role === 'user')
+    store.send(prev.content)
+}
+
+const notifyBlocked = computed(() => permission.value === 'denied')
+const notifyOn = computed(() => notify.value && permission.value === 'granted')
+
+const histOpen = ref(false)
+function selectChat(id: string) {
+  store.selectChat(id)
+  histOpen.value = false
+}
 </script>
 
 <template>
-  <div class="ai-chat-page">
-    <VCard class="ai-chat-card d-flex flex-column">
-      <div class="chat-header d-flex align-center pa-4">
-        <VAvatar
-          size="40"
-          color="primary"
-          variant="tonal"
+  <div class="aiwrap" :class="{ 'hist-open': histOpen }">
+    <div
+      class="aihist-scrim"
+      @click="histOpen = false"
+    />
+    <!-- ===== History sidebar ===== -->
+    <aside class="aihist">
+      <div class="aihist__top">
+        <Button
+          variant="primary"
+          icon="plus"
+          style="width: 100%;"
+          @click="store.newChat()"
         >
-          <VIcon
-            icon="bx-bot"
-            size="22"
-          />
-        </VAvatar>
-        <div class="ms-3 flex-grow-1">
-          <div class="text-h6">
-            {{ t('AI Assistant') }}
+          {{ t('New chat') }}
+        </Button>
+      </div>
+      <div class="aihist__search">
+        <Input
+          v-model="query"
+          icon="search"
+          :placeholder="t('Search chats…')"
+        />
+      </div>
+      <div class="aihist__list">
+        <div class="aihist__label">
+          {{ t('Recent') }}
+        </div>
+        <div
+          v-if="filtered.length === 0"
+          class="aihist__empty"
+        >
+          {{ t('No chats found') }}
+        </div>
+        <div
+          v-for="c in filtered"
+          :key="c.id"
+          class="histitem"
+          :class="{ 'is-active': c.id === activeId }"
+          @click="selectChat(c.id)"
+        >
+          <div class="histitem__icon">
+            <DesignIcon name="inbox" :size="15" />
           </div>
-          <div class="text-caption text-medium-emphasis">
-            {{ t('Ask about stock, orders, and inventory') }}
+          <div class="histitem__main">
+            <div class="histitem__title">
+              {{ c.title }}
+            </div>
+            <div class="histitem__preview">
+              {{ previewOf(c) }}
+            </div>
+          </div>
+          <div class="histitem__meta">
+            <span class="histitem__time">{{ relTime(c.updatedAt) }}</span>
+            <span
+              v-if="generating === c.id"
+              class="histitem__live"
+            >
+              <span class="typing"><span /><span /><span /></span>
+            </span>
+          </div>
+          <button
+            class="histitem__del"
+            :title="t('Delete chat')"
+            @click.stop="store.deleteChat(c.id)"
+          >
+            <DesignIcon name="trash" :size="15" />
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ===== Thread ===== -->
+    <section class="aithread">
+      <div class="aithread__head">
+        <div class="row" style="gap: 10px; min-width: 0;">
+          <button
+            class="aihist__toggle"
+            :title="t('Show chats')"
+            @click="histOpen = true"
+          >
+            <DesignIcon name="menu" :size="18" />
+          </button>
+          <div class="msg__avatar" style="flex: 0 0 34px; width: 34px; height: 34px;">
+            <DesignIcon name="sparkle" :size="17" />
+          </div>
+          <div style="min-width: 0;">
+            <div style="font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              {{ active ? active.title : t('AI Assistant') }}
+            </div>
+            <div class="tertiary" style="font-size: 12px; white-space: nowrap;">
+              {{ isGenerating ? t('Thinking…') : t('POS analyst · always-on') }}
+            </div>
           </div>
         </div>
-        <VBtn
-          icon
-          variant="text"
-          size="small"
-          :disabled="!messages.length"
-          @click="clearChat"
-        >
-          <VIcon
-            icon="bx-trash"
-            size="20"
-          />
-          <VTooltip
-            activator="parent"
-            location="top"
+        <div class="row" style="gap: 10px;">
+          <button
+            class="notifbtn"
+            :class="{ 'is-on': notifyOn, 'is-blocked': notifyBlocked }"
+            :title="notifyBlocked
+              ? t('Notifications blocked in browser settings')
+              : (notifyOn ? t('Background notifications on') : t('Notify me when replies finish off-page'))"
+            @click="store.toggleNotify()"
           >
-            {{ t('Clear chat') }}
-          </VTooltip>
-        </VBtn>
+            <DesignIcon :name="notifyOn ? 'bell' : 'belloff'" :size="16" />
+            <span>{{ notifyBlocked ? t('Blocked') : (notifyOn ? t('Notifications on') : t('Notify me')) }}</span>
+          </button>
+        </div>
       </div>
 
-      <VDivider />
-
-      <div
-        ref="logRef"
-        class="chat-log flex-grow-1 pa-4"
-      >
-        <div
-          v-if="!messages.length"
-          class="empty-state d-flex flex-column align-center justify-center h-100 text-center"
-        >
-          <VAvatar
-            size="80"
-            color="primary"
-            variant="tonal"
-            class="mb-4"
-          >
-            <VIcon
-              icon="bx-bot"
-              size="40"
-            />
-          </VAvatar>
-          <div class="text-h5 mb-2">
-            {{ t('How can I help you today?') }}
-          </div>
-          <div class="text-body-2 text-medium-emphasis mb-6">
-            {{ t('Ask anything about your stock, batches, or orders.') }}
-          </div>
-
+      <div ref="scrollRef" class="aithread__scroll">
+        <div class="aithread__inner">
+          <!-- ===== Empty state ===== -->
           <div
-            v-if="quickActions.length"
-            class="quick-actions d-flex flex-wrap justify-center gap-2 mb-6"
+            v-if="!active || messages.length === 0"
+            class="aiempty"
           >
-            <VBtn
-              v-for="qa in quickActions"
-              :key="qa.id"
-              variant="outlined"
-              size="small"
-              :prepend-icon="iconFor[qa.icon] || 'bx-star'"
-              @click="send(qa.query)"
-            >
-              {{ t(qa.label) }}
-            </VBtn>
-          </div>
-
-          <div
-            v-if="suggestions.length"
-            class="suggestions w-100"
-            style="max-width: 600px;"
-          >
-            <div class="text-overline text-medium-emphasis mb-2">
-              {{ t('Suggestions') }}
+            <div class="aiempty__badge">
+              <DesignIcon name="sparkle" :size="26" />
             </div>
-            <VCard
-              v-for="(s, i) in suggestions"
-              :key="i"
-              class="mb-2 suggestion-card"
-              variant="outlined"
-              @click="send(s.query)"
+            <h2 class="aiempty__title">
+              {{ t('How can I help with your POS today?') }}
+            </h2>
+            <p class="aiempty__sub">
+              {{ t('Ask about sales, products, payments, shifts or stock. I read from your live data.') }}
+            </p>
+            <div class="aiempty__chips">
+              <button
+                v-for="s in SUGGESTIONS"
+                :key="s.text"
+                class="promptchip"
+                @click="store.send(t(s.i18n))"
+              >
+                <DesignIcon :name="s.icon" :size="16" />
+                <span>{{ t(s.i18n) }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- ===== Messages ===== -->
+          <template v-else>
+            <template
+              v-for="(m, i) in messages"
+              :key="m.id"
             >
-              <div class="d-flex align-center pa-3">
-                <VChip
-                  class="status-pill me-3"
-                  size="x-small"
-                  :color="priorityColor[s.priority] || 'default'"
-                  variant="tonal"
-                >
-                  {{ t(s.priority) }}
-                </VChip>
-                <div class="flex-grow-1 text-start">
-                  <div class="text-body-2 font-weight-medium">
-                    {{ te(s.query) ? t(s.query) : s.query }}
+              <!-- user bubble -->
+              <div
+                v-if="m.role === 'user'"
+                class="msg msg--user"
+              >
+                <div class="msg__bubble">
+                  {{ m.content }}
+                </div>
+              </div>
+              <!-- ai bubble -->
+              <div
+                v-else
+                class="msg msg--ai"
+              >
+                <div class="msg__avatar">
+                  <DesignIcon name="sparkle" :size="17" />
+                </div>
+                <div class="msg__col">
+                  <div class="msg__bubble">
+                    <template v-if="m.streaming && !m.content">
+                      <span class="typing"><span /><span /><span /></span>
+                    </template>
+                    <template v-else>
+                      <div class="md">
+                        <template
+                          v-for="(b, bi) in parseMd(m.content)"
+                          :key="bi"
+                        >
+                          <p
+                            v-if="b.t === 'p'"
+                            v-html="mdInline(b.text || '')"
+                          />
+                          <ul v-else-if="b.t === 'ul'">
+                            <li
+                              v-for="(it, j) in b.items || []"
+                              :key="j"
+                              v-html="mdInline(it)"
+                            />
+                          </ul>
+                          <ol v-else>
+                            <li
+                              v-for="(it, j) in b.items || []"
+                              :key="j"
+                              v-html="mdInline(it)"
+                            />
+                          </ol>
+                        </template>
+                      </div>
+                    </template>
+                    <span
+                      v-if="m.streaming && m.content"
+                      class="caret"
+                    />
                   </div>
-                  <div class="text-caption text-medium-emphasis">
-                    {{ te(s.reason) ? t(s.reason) : s.reason }}
+                  <div
+                    v-if="!m.streaming"
+                    class="msg__tools"
+                  >
+                    <button
+                      class="msg__tool"
+                      @click="copyMsg(m.id, m.content)"
+                    >
+                      <DesignIcon
+                        :name="copied[m.id] ? 'check' : 'copy'"
+                        :size="14"
+                      />
+                      {{ copied[m.id] ? t('Copied') : t('Copy') }}
+                    </button>
+                    <button
+                      v-if="i === messages.length - 1 && !isGenerating"
+                      class="msg__tool"
+                      @click="regen(i)"
+                    >
+                      <DesignIcon name="retry" :size="14" />
+                      {{ t('Regenerate') }}
+                    </button>
                   </div>
                 </div>
-                <VIcon
-                  icon="bx-chevron-right"
-                  size="18"
-                />
               </div>
-            </VCard>
+            </template>
+          </template>
+        </div>
+      </div>
+
+      <!-- ===== Composer ===== -->
+      <div class="composer">
+        <div class="composer__inner">
+          <div class="composer__box">
+            <textarea
+              ref="taRef"
+              v-model="draft"
+              class="composer__ta"
+              rows="1"
+              :placeholder="t('Message the assistant…')"
+              @keydown="onKey"
+            />
+            <button
+              v-if="isGenerating"
+              class="composer__send is-stop"
+              :title="t('Stop generating')"
+              @click="store.stop()"
+            >
+              <DesignIcon name="stop" :size="16" />
+            </button>
+            <button
+              v-else
+              class="composer__send"
+              :class="{ 'is-ready': draft.trim() }"
+              :disabled="!draft.trim()"
+              :title="t('Send')"
+              @click="submit"
+            >
+              <DesignIcon name="send" :size="17" />
+            </button>
           </div>
         </div>
-
-        <template v-else>
-          <div
-            v-for="m in messages"
-            :key="m.id"
-            class="msg-row d-flex mb-4"
-            :class="m.role === 'user' ? 'justify-end' : 'justify-start'"
-          >
-            <VAvatar
-              v-if="m.role === 'bot'"
-              size="36"
-              color="primary"
-              variant="tonal"
-              class="me-2 flex-shrink-0"
-            >
-              <VIcon
-                icon="bx-bot"
-                size="20"
-              />
-            </VAvatar>
-
-            <div class="msg-bubble-wrap">
-              <div
-                class="msg-bubble"
-                :class="m.role === 'user' ? 'bubble-user' : 'bubble-bot'"
-              >
-                <div
-                  class="msg-text"
-                  v-text="m.text"
-                />
-              </div>
-              <div
-                class="msg-meta text-caption text-medium-emphasis mt-1"
-                :class="m.role === 'user' ? 'text-end' : 'text-start'"
-              >
-                <span
-                  v-if="m.intent"
-                  class="me-2"
-                >{{ m.intent }}</span>
-                <span>{{ formatTime(m.timestamp) }}</span>
-              </div>
-              <div
-                v-if="m.suggestions?.length"
-                class="msg-suggestions mt-2 d-flex flex-wrap gap-2"
-              >
-                <VChip
-                  v-for="(sg, i) in m.suggestions"
-                  :key="i"
-                  size="small"
-                  variant="outlined"
-                  class="cursor-pointer"
-                  @click="send(sg)"
-                >
-                  {{ sg }}
-                </VChip>
-              </div>
-            </div>
-
-            <VAvatar
-              v-if="m.role === 'user'"
-              size="36"
-              color="secondary"
-              variant="tonal"
-              class="ms-2 flex-shrink-0"
-            >
-              <span class="text-body-2 font-weight-medium">{{ userInitial }}</span>
-            </VAvatar>
-          </div>
-
-          <div
-            v-if="sending"
-            class="msg-row d-flex justify-start mb-4"
-          >
-            <VAvatar
-              size="36"
-              color="primary"
-              variant="tonal"
-              class="me-2"
-            >
-              <VIcon
-                icon="bx-bot"
-                size="20"
-              />
-            </VAvatar>
-            <div class="msg-bubble bubble-bot typing">
-              <span class="dot" />
-              <span class="dot" />
-              <span class="dot" />
-            </div>
-          </div>
-        </template>
       </div>
-
-      <VDivider />
-
-      <div class="chat-input pa-4">
-        <VForm @submit.prevent="() => send()">
-          <VTextField
-            v-model="input"
-            :placeholder="t('Type your message...')"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-            :disabled="sending"
-            autofocus
-          >
-            <template #append-inner>
-              <VBtn
-                color="primary"
-                :loading="sending"
-                :disabled="!input.trim()"
-                size="small"
-                icon
-                @click="() => send()"
-              >
-                <VIcon
-                  icon="bx-send"
-                  size="18"
-                />
-              </VBtn>
-            </template>
-          </VTextField>
-        </VForm>
-      </div>
-    </VCard>
+    </section>
   </div>
 </template>
 
@@ -413,97 +474,31 @@ meta:
   subject: all
 </route>
 
-<style scoped lang="scss">
-.ai-chat-page {
-  // Fill the design layout's page-shell content area. Parent main.page-shell
-  // is flex:1 + flex-column so block-size:100% gives a definite height.
-  block-size: 100%;
-  inline-size: 100%;
-  min-block-size: calc(100vh - var(--topbar-h, 64px) - var(--sp-7, 32px) * 2);
-  display: flex;
-  flex-direction: column;
+<style scoped>
+.aithread__head {
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-.ai-chat-card {
-  flex: 1;
-  min-block-size: 0;
-  overflow: hidden;
-}
-
-// VTextField append-inner doesn't always vertical-center the action button on
-// density="comfortable". Pin send button to the input's vertical midline.
-.chat-input :deep(.v-field__append-inner) {
-  align-items: center;
-  padding-block: 0;
-}
-
-.chat-log {
-  overflow-y: auto;
-  scroll-behavior: smooth;
-}
-
-.empty-state {
-  min-block-size: 100%;
-}
-
-.suggestion-card {
-  cursor: pointer;
-  transition: background-color 0.15s;
-
-  &:hover {
-    background-color: rgba(var(--v-theme-primary), 0.06);
+@media (max-width: 900px) {
+  .aiwrap {
+    display: block;
   }
-}
 
-.msg-row {
-  align-items: flex-end;
-}
-
-.msg-bubble-wrap {
-  max-inline-size: 70%;
-}
-
-.msg-bubble {
-  padding: 0.625rem 0.875rem;
-  border-radius: 14px;
-  word-break: break-word;
-  white-space: pre-wrap;
-}
-
-.bubble-user {
-  background-color: rgb(var(--v-theme-primary));
-  color: rgb(var(--v-theme-on-primary));
-  border-end-end-radius: 4px;
-}
-
-.bubble-bot {
-  background-color: rgba(var(--v-theme-on-surface), 0.06);
-  color: rgb(var(--v-theme-on-surface));
-  border-end-start-radius: 4px;
-}
-
-.typing {
-  display: inline-flex;
-  gap: 4px;
-
-  .dot {
-    inline-size: 7px;
-    block-size: 7px;
-    border-radius: 50%;
-    background-color: rgba(var(--v-theme-on-surface), 0.4);
-    animation: blink 1.2s infinite ease-in-out;
-
-    &:nth-child(2) { animation-delay: 0.2s; }
-    &:nth-child(3) { animation-delay: 0.4s; }
+  .aihist {
+    inline-size: 100%;
+    max-block-size: 220px;
+    border-inline-end: none;
+    border-block-end: 1px solid var(--border, rgba(0, 0, 0, 0.08));
   }
-}
 
-@keyframes blink {
-  0%, 80%, 100% { opacity: 0.3; }
-  40% { opacity: 1; }
-}
+  .aithread__head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 
-.gap-2 {
-  gap: 0.5rem;
+  .aiempty__chips {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

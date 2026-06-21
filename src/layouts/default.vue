@@ -1,11 +1,19 @@
 <script setup lang="ts">
 import DesignSidebar from '@/layouts/components/DesignSidebar.vue'
 import DesignTopbar from '@/layouts/components/DesignTopbar.vue'
+import MobileTabBar from '@/layouts/components/MobileTabBar.vue'
 
 const collapsed = ref(false)
+const drawerOpen = ref(false)
 const dateRange = ref('14d')
 
-// Apply data-theme attr on mount so the design's [data-theme="dark"] CSS rules kick in.
+function onToggleSidebar() {
+  if (window.innerWidth <= 768)
+    drawerOpen.value = !drawerOpen.value
+  else
+    collapsed.value = !collapsed.value
+}
+
 onMounted(() => {
   const saved = localStorage.getItem('alphapos-theme')
   if (saved === 'light' || saved === 'dark')
@@ -14,12 +22,21 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="app">
-    <DesignSidebar :collapsed="collapsed" />
+  <div class="app" :class="{ 'drawer-open': drawerOpen }">
+    <DesignSidebar
+      :collapsed="collapsed"
+      :open="drawerOpen"
+      @close="drawerOpen = false"
+      @nav-go="drawerOpen = false"
+    />
+    <div
+      class="nav-scrim"
+      @click="drawerOpen = false"
+    />
     <div class="main">
       <DesignTopbar
         v-model:date-range="dateRange"
-        @toggle-sidebar="collapsed = !collapsed"
+        @toggle-sidebar="onToggleSidebar"
       />
       <main class="page-shell">
         <RouterView v-slot="{ Component }">
@@ -29,27 +46,24 @@ onMounted(() => {
         </RouterView>
       </main>
     </div>
+    <MobileTabBar
+      :drawer-open="drawerOpen"
+      @more="drawerOpen = !drawerOpen"
+    />
   </div>
 </template>
 
 <style>
-/* NOT scoped — page-shell wraps the routed page, so its rule must apply
-   regardless of which page is rendered. Same selector lives globally. */
 main.page-shell {
   flex: 1;
-  /* Generous breathing room: 32px top/bottom · 40px left/right. */
-  padding: var(--sp-7, 32px) var(--sp-8, 40px);
+  padding: var(--sp-5, 20px) var(--sp-6, 24px);
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
-/* Pages built with their own .page wrapper (dashboard, shifts-analytics)
-   already provide padding + max-width; cancel the outer padding so they
-   don't double up. */
 main.page-shell > .page {
   padding: 0;
-  max-width: 1440px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .fade-enter-active, .fade-leave-active { transition: opacity .15s; }

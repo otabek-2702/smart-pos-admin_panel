@@ -12,6 +12,20 @@ const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
 const categoryFilter = ref<number | undefined>(undefined)
+const categoryFilterMulti = ref<number[]>([])
+const sortBy = ref<string>('')
+const includeDeleted = ref(false)
+const popularFirst = ref(true)
+
+const sortOptions = computed(() => [
+  { value: '', title: t('product_sort_default') },
+  { value: 'name', title: t('product_sort_name_asc') },
+  { value: '-name', title: t('product_sort_name_desc') },
+  { value: 'price', title: t('product_sort_price_asc') },
+  { value: '-price', title: t('product_sort_price_desc') },
+  { value: '-created_at', title: t('product_sort_created_desc') },
+  { value: 'created_at', title: t('product_sort_created_asc') },
+])
 
 const categoriesList = ref<any[]>([])
 
@@ -38,6 +52,7 @@ const dialogLoading = ref(false)
 // Confirm delete
 const deleteDialog = ref(false)
 const deletingProduct = ref<any>(null)
+const deleteBusy = ref(false)
 
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 
@@ -114,6 +129,14 @@ async function loadProducts() {
       params.search = search.value
     if (categoryFilter.value)
       params.category_ids = categoryFilter.value
+    if (categoryFilterMulti.value.length > 0)
+      params.category_ids = categoryFilterMulti.value.join(',')
+    if (sortBy.value)
+      params.order_by = sortBy.value
+    if (includeDeleted.value)
+      params.include_deleted = true
+    if (!popularFirst.value)
+      params.popular = false
 
     const res = await axios.get('/products', { params })
     const d = res.data?.data
@@ -143,7 +166,11 @@ onMounted(() => {
   loadCategories()
 })
 
-watch([page, itemsPerPage], loadProducts)
+watch(page, loadProducts)
+watch(itemsPerPage, () => {
+  page.value = 1
+  loadProducts()
+})
 
 const debouncedSearch = useDebounceFn(() => {
   page.value = 1
@@ -153,6 +180,26 @@ const debouncedSearch = useDebounceFn(() => {
 watch(search, debouncedSearch)
 
 watch(categoryFilter, () => {
+  page.value = 1
+  loadProducts()
+})
+
+watch(categoryFilterMulti, () => {
+  page.value = 1
+  loadProducts()
+}, { deep: true })
+
+watch(sortBy, () => {
+  page.value = 1
+  loadProducts()
+})
+
+watch(includeDeleted, () => {
+  page.value = 1
+  loadProducts()
+})
+
+watch(popularFirst, () => {
   page.value = 1
   loadProducts()
 })
@@ -167,6 +214,11 @@ function tryCloseDialog() {
 
     return
   }
+  dialogOpen.value = false
+}
+
+// Always closes the dialog without dirty checks. Used by the X button & Cancel.
+function forceClose() {
   dialogOpen.value = false
 }
 
@@ -225,14 +277,31 @@ async function saveProduct() {
   }
 }
 
+const deleteConfirmBtn = ref<HTMLButtonElement | null>(null)
+
 function confirmDelete(product: any) {
   deletingProduct.value = product
   deleteDialog.value = true
+  nextTick(() => {
+    deleteConfirmBtn.value?.focus()
+  })
+}
+
+async function restoreProduct(product: any) {
+  try {
+    await axios.post(`/products/${product.id}/restore`)
+    notify(t('Product restored'))
+    await loadProducts()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error restoring product'), 'error')
+  }
 }
 
 async function deleteProduct() {
   if (!deletingProduct.value)
     return
+  deleteBusy.value = true
   try {
     await axios.delete(`/products/${deletingProduct.value.id}`)
     notify(t('Product deleted'))
@@ -241,6 +310,9 @@ async function deleteProduct() {
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting product'), 'error')
+  }
+  finally {
+    deleteBusy.value = false
   }
 }
 
@@ -258,12 +330,52 @@ const activeFilters = computed(() => {
       clear: () => { categoryFilter.value = undefined },
     })
   }
+  if (categoryFilterMulti.value.length > 0) {
+    const names = categoryFilterMulti.value
+      .map((id: number) => categoriesList.value.find((c: any) => c.id === id)?.name ?? String(id))
+      .join(', ')
+    list.push({
+      k: 'cm',
+      label: t('Categories'),
+      val: names,
+      clear: () => { categoryFilterMulti.value = [] },
+    })
+  }
+  if (sortBy.value) {
+    const opt = sortOptions.value.find((s: any) => s.value === sortBy.value)
+    list.push({
+      k: 'sort',
+      label: t('Sort by'),
+      val: opt?.title ?? sortBy.value,
+      clear: () => { sortBy.value = '' },
+    })
+  }
+  if (includeDeleted.value) {
+    list.push({
+      k: 'inc-del',
+      label: t('Include deleted'),
+      val: t('On'),
+      clear: () => { includeDeleted.value = false },
+    })
+  }
+  if (!popularFirst.value) {
+    list.push({
+      k: 'pop',
+      label: t('Popular first'),
+      val: t('Off'),
+      clear: () => { popularFirst.value = true },
+    })
+  }
   return list
 })
 
 function clearAll() {
   search.value = ''
   categoryFilter.value = undefined
+  categoryFilterMulti.value = []
+  sortBy.value = ''
+  includeDeleted.value = false
+  popularFirst.value = true
 }
 
 // ---- Pagination ----
@@ -344,9 +456,12 @@ function goPage(p: number | '…') {
     <!-- ============== CARD ============== -->
     <div class="card">
       <!-- Toolbar -->
-      <div class="toolbar">
+      <div
+        class="toolbar products-toolbar"
+        style="flex-wrap:wrap;"
+      >
         <div
-          class="grow"
+          class="grow products-toolbar__search"
           style="max-width:280px;"
         >
           <div class="control">
@@ -379,7 +494,10 @@ function goPage(p: number | '…') {
           </div>
         </div>
 
-        <div style="width:220px;">
+        <div
+          class="products-toolbar__select"
+          style="width:220px;"
+        >
           <div class="control control--select">
             <svg
               class="ic"
@@ -420,6 +538,132 @@ function goPage(p: number | '…') {
             </svg>
           </div>
         </div>
+
+        <div
+          class="products-toolbar__select"
+          style="width:220px;"
+        >
+          <div class="control control--select">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M3 6h18" />
+              <path d="M7 12h10" />
+              <path d="M10 18h4" />
+            </svg>
+            <select v-model="sortBy">
+              <option
+                v-for="opt in sortOptions"
+                :key="opt.value"
+                :value="opt.value"
+              >
+                {{ opt.title }}
+              </option>
+            </select>
+            <svg
+              class="ic chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
+        </div>
+
+        <div
+          class="products-toolbar__select"
+          style="min-width:200px;"
+        >
+          <div
+            class="control control--select"
+            :title="t('Filter by multiple categories')"
+          >
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect
+                x="3"
+                y="3"
+                width="7"
+                height="7"
+              />
+              <rect
+                x="14"
+                y="3"
+                width="7"
+                height="7"
+              />
+              <rect
+                x="3"
+                y="14"
+                width="7"
+                height="7"
+              />
+              <rect
+                x="14"
+                y="14"
+                width="7"
+                height="7"
+              />
+            </svg>
+            <select
+              v-model="categoryFilterMulti"
+              multiple
+              size="1"
+              style="min-height:36px;"
+            >
+              <option
+                v-for="opt in categoryOptions"
+                :key="opt.value"
+                :value="opt.value"
+              >
+                {{ opt.title }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <label
+          class="row"
+          style="gap:8px;cursor:pointer;align-items:center;"
+          :title="t('Show soft-deleted products')"
+        >
+          <div
+            class="switch"
+            :class="{ 'is-on': includeDeleted }"
+            @click="includeDeleted = !includeDeleted"
+          />
+          <span style="font-size:13px;">{{ t('Include deleted') }}</span>
+        </label>
+
+        <label
+          class="row"
+          style="gap:8px;cursor:pointer;align-items:center;"
+          :title="t('Order best-sellers first')"
+        >
+          <div
+            class="switch"
+            :class="{ 'is-on': popularFirst }"
+            @click="popularFirst = !popularFirst"
+          />
+          <span style="font-size:13px;">{{ t('Popular first') }}</span>
+        </label>
       </div>
 
       <!-- Active filter chips -->
@@ -491,6 +735,7 @@ function goPage(p: number | '…') {
               <th>{{ t('Price') }}</th>
               <th>{{ t('Category') }}</th>
               <th>{{ t('Created') }}</th>
+              <th>{{ t('Updated') }}</th>
               <th class="num">
                 {{ t('Actions') }}
               </th>
@@ -544,6 +789,12 @@ function goPage(p: number | '…') {
                 </td>
                 <td>
                   <div
+                    class="skel"
+                    style="width:90px;height:13px;"
+                  />
+                </td>
+                <td>
+                  <div
                     class="row"
                     style="justify-content:flex-end;gap:4px;"
                   >
@@ -563,7 +814,7 @@ function goPage(p: number | '…') {
             <!-- Empty -->
             <tr v-else-if="!loading && products.length === 0">
               <td
-                colspan="6"
+                colspan="7"
                 style="padding:0;"
               >
                 <div class="statefill">
@@ -589,7 +840,7 @@ function goPage(p: number | '…') {
                     </svg>
                   </div>
                   <div class="statefill__title">
-                    {{ t('No products match your filters') }}
+                    {{ activeFilters.length > 0 ? t('No products match your filters') : t('No products yet') }}
                   </div>
                   <div
                     v-if="activeFilters.length > 0"
@@ -600,6 +851,39 @@ function goPage(p: number | '…') {
                       @click="clearAll"
                     >
                       {{ t('Clear all') }}
+                    </button>
+                  </div>
+                  <div
+                    v-else
+                    style="margin-top:12px;"
+                  >
+                    <button
+                      class="btn btn--primary btn--sm"
+                      @click="openCreate"
+                    >
+                      <svg
+                        class="ic"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <line
+                          x1="12"
+                          y1="5"
+                          x2="12"
+                          y2="19"
+                        />
+                        <line
+                          x1="5"
+                          y1="12"
+                          x2="19"
+                          y2="12"
+                        />
+                      </svg>
+                      {{ t('Add Product') }}
                     </button>
                   </div>
                 </div>
@@ -624,7 +908,10 @@ function goPage(p: number | '…') {
                     :style="{ background: categoryColorMap[p.category?.id] || 'var(--border-strong)' }"
                     style="width:10px;height:10px;border-radius:3px;flex:0 0 10px;"
                   />
-                  <span class="cell-strong">{{ p.name }}</span>
+                  <span
+                    class="cell-strong"
+                    :title="p.description || ''"
+                  >{{ p.name }}</span>
                   <span
                     v-if="p.is_instant"
                     class="badge t-warning"
@@ -641,7 +928,13 @@ function goPage(p: number | '…') {
                     >
                       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                     </svg>
-                    {{ t('Instant') }}
+                    {{ t('product_is_instant_label') }}
+                  </span>
+                  <span
+                    v-if="p.is_deleted"
+                    class="badge t-neutral"
+                  >
+                    {{ t('Deleted') }}
                   </span>
                 </div>
               </td>
@@ -667,48 +960,74 @@ function goPage(p: number | '…') {
                 <span class="mono cell-muted nowrap">{{ formatDate(p.created_at) }}</span>
               </td>
               <td>
+                <span class="mono cell-muted nowrap">{{ formatDate(p.updated_at) }}</span>
+              </td>
+              <td>
                 <div
                   class="row"
                   style="justify-content:flex-end;gap:2px;"
                 >
-                  <button
-                    class="iconaction is-primary"
-                    :title="t('Edit')"
-                    @click="openEdit(p)"
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="18"
-                      height="18"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
+                  <template v-if="p.is_deleted">
+                    <button
+                      class="iconaction is-primary"
+                      :title="t('Restore')"
+                      @click="restoreProduct(p)"
                     >
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5Z" />
-                    </svg>
-                  </button>
-                  <button
-                    class="iconaction is-danger"
-                    :title="t('Delete')"
-                    @click="confirmDelete(p)"
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="18"
-                      height="18"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="18"
+                        height="18"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <polyline points="1 4 1 10 7 10" />
+                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                      </svg>
+                    </button>
+                  </template>
+                  <template v-else>
+                    <button
+                      class="iconaction is-primary"
+                      :title="t('Edit')"
+                      @click="openEdit(p)"
                     >
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    </svg>
-                  </button>
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="18"
+                        height="18"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5Z" />
+                      </svg>
+                    </button>
+                    <button
+                      class="iconaction is-danger"
+                      :title="t('Delete')"
+                      @click="confirmDelete(p)"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="18"
+                        height="18"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    </button>
+                  </template>
                 </div>
               </td>
             </tr>
@@ -721,10 +1040,46 @@ function goPage(p: number | '…') {
         v-if="totalProducts > 0"
         class="pagination"
       >
-        <span class="muted">
-          {{ pageStart }}–{{ pageEnd }} {{ t('of') }} {{ totalProducts }}
-        </span>
+        <div
+          class="row"
+          style="gap: 8px; align-items: center;"
+        >
+          <span>{{ t('Rows per page') }}:</span>
+          <div
+            class="control control--select control--sm"
+            style="width: 84px;"
+          >
+            <select v-model.number="itemsPerPage">
+              <option :value="10">
+                10
+              </option>
+              <option :value="25">
+                25
+              </option>
+              <option :value="50">
+                50
+              </option>
+              <option :value="100">
+                100
+              </option>
+            </select>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
+        </div>
         <span class="pagination__spacer" />
+        <span class="muted">
+          {{ t('pagination_range', { start: pageStart, end: pageEnd, total: totalProducts }) }}
+        </span>
         <div class="pglist">
           <button
             class="pgbtn"
@@ -780,11 +1135,12 @@ function goPage(p: number | '…') {
     <div
       v-if="dialogOpen"
       class="overlay"
-      @click.self="tryCloseDialog"
+      @mousedown.self="tryCloseDialog"
     >
-      <div
+      <form
         class="modal"
-        style="max-width:560px;"
+        style="width:min(560px, 92vw); max-width:560px;"
+        @submit.prevent="saveProduct"
       >
         <div class="modal__head">
           <div style="flex:1;min-width:0;">
@@ -796,9 +1152,10 @@ function goPage(p: number | '…') {
             </div>
           </div>
           <button
+            type="button"
             class="iconaction"
             :title="t('Close')"
-            @click="tryCloseDialog"
+            @click="forceClose"
           >
             <svg
               viewBox="0 0 24 24"
@@ -842,7 +1199,7 @@ function goPage(p: number | '…') {
                   {{ form.name || t('Name') }}
                 </div>
                 <div class="pos-product-card__price">
-                  {{ form.price ? `${formatCurrency(form.price)} so'm` : '0 so\'m' }}
+                  {{ form.price ? `${formatCurrency(form.price)} ${t('currency_short')}` : `0 ${t('currency_short')}` }}
                 </div>
                 <div
                   v-if="form.color"
@@ -915,7 +1272,7 @@ function goPage(p: number | '…') {
               <div class="control control--select">
                 <select v-model="form.category_id">
                   <option :value="null">
-                    {{ t('All Categories') }}
+                    {{ t('Choose category') }}
                   </option>
                   <option
                     v-for="opt in categoryOptions"
@@ -992,17 +1349,18 @@ function goPage(p: number | '…') {
 
         <div class="modal__foot">
           <button
+            type="button"
             class="btn btn--ghost"
             :disabled="dialogLoading"
-            @click="tryCloseDialog"
+            @click="forceClose"
           >
             {{ t('Cancel') }}
           </button>
           <button
+            type="submit"
             class="btn btn--primary"
             :class="{ 'is-loading': dialogLoading }"
             :disabled="dialogLoading"
-            @click="saveProduct"
           >
             <svg
               class="ic"
@@ -1018,18 +1376,18 @@ function goPage(p: number | '…') {
             {{ t('Save') }}
           </button>
         </div>
-      </div>
+      </form>
     </div>
 
     <!-- ============== DELETE CONFIRM MODAL ============== -->
     <div
       v-if="deleteDialog"
       class="overlay"
-      @click.self="deleteDialog = false"
+      @mousedown.self="() => { if (!deleteBusy) deleteDialog = false }"
     >
       <div
         class="modal"
-        style="max-width:440px;"
+        style="width:min(440px, 92vw); max-width:440px;"
       >
         <div class="modal__head">
           <div style="flex:1;min-width:0;">
@@ -1040,6 +1398,7 @@ function goPage(p: number | '…') {
           <button
             class="iconaction"
             :title="t('Close')"
+            :disabled="deleteBusy"
             @click="deleteDialog = false"
           >
             <svg
@@ -1119,12 +1478,16 @@ function goPage(p: number | '…') {
         <div class="modal__foot">
           <button
             class="btn btn--ghost"
+            :disabled="deleteBusy"
             @click="deleteDialog = false"
           >
             {{ t('Cancel') }}
           </button>
           <button
+            ref="deleteConfirmBtn"
             class="btn btn--danger"
+            :class="{ 'is-loading': deleteBusy }"
+            :disabled="deleteBusy"
             @click="deleteProduct"
           >
             <svg
@@ -1238,6 +1601,38 @@ function goPage(p: number | '…') {
   background: var(--surface-inset);
   color: var(--text-secondary);
   border: 1px solid var(--border-strong);
+}
+
+/* ── Responsive toolbar / modals ── */
+.products-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.tablewrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 900px) {
+  .products-toolbar__search,
+  .products-toolbar__select {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .form-grid .span-2 {
+    grid-column: 1 / -1 !important;
+  }
 }
 </style>
 

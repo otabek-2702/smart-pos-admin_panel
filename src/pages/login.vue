@@ -21,38 +21,15 @@ const errorMsg = ref('')
 
 const boyWithRocket = useGenerateImageVariant(boyWithRocketLight, boyWithRocketDark)
 
-const languages = [
-  { code: 'uz', label: 'O\'zbek' },
-  { code: 'ru', label: 'Русский' },
-  { code: 'en', label: 'English' },
-]
+const languages = computed(() => [
+  { code: 'uz', label: t('lang_native_uz') },
+  { code: 'ru', label: t('lang_native_ru') },
+  { code: 'en', label: t('lang_native_en') },
+])
 
 const setLocale = (code: string) => {
   locale.value = code
   localStorage.setItem('appLocale', code)
-}
-
-// Sets a synthetic admin session in localStorage so every router guard
-// passes and the panel renders. API calls will still fail (no backend), so
-// pages will show their loading / empty states — useful for previewing
-// the UI while the backend is moving or unreachable.
-function demoLogin() {
-  const demoUser = {
-    id: 0,
-    uuid: 'demo',
-    email: 'demo@local',
-    first_name: 'Demo',
-    last_name: 'User',
-    role: 'ADMIN',
-    status: 'ACTIVE',
-    permissions: ['*'],
-  }
-
-  localStorage.setItem('accessToken', JSON.stringify('demo-token'))
-  localStorage.setItem('userData', JSON.stringify(demoUser))
-  localStorage.setItem('userAbilities', JSON.stringify([{ action: 'manage', subject: 'all' }]))
-  ability.update([{ action: 'manage', subject: 'all' }])
-  router.replace('/')
 }
 
 const login = async () => {
@@ -105,9 +82,9 @@ const login = async () => {
       <div class="position-relative w-100 pa-8">
         <div class="d-flex align-center justify-center w-100 h-100">
           <VImg
-            max-width="700"
             :src="boyWithRocket"
             class="auth-illustration"
+            :alt="t('login_illustration_alt')"
           />
         </div>
       </div>
@@ -126,7 +103,7 @@ const login = async () => {
         class="mt-12 mt-sm-0 pa-6 w-100"
       >
         <!-- Language switcher + API host -->
-        <div class="d-flex align-center justify-end gap-2 mb-2">
+        <div class="login-toolbar d-flex align-center justify-end flex-wrap gap-2 mb-2">
           <NavBarApiHost />
           <VBtnToggle
             :model-value="locale"
@@ -140,6 +117,7 @@ const login = async () => {
               :key="lang.code"
               :value="lang.code"
               size="small"
+              :aria-label="t('switch_language')"
               @click="setLocale(lang.code)"
             >
               {{ lang.label }}
@@ -211,16 +189,6 @@ const login = async () => {
                 >
                   {{ t('login_btn') }}
                 </VBtn>
-                <VBtn
-                  block
-                  variant="tonal"
-                  color="warning"
-                  class="mt-2"
-                  prepend-icon="bx-fast-forward"
-                  @click="demoLogin"
-                >
-                  {{ t('Skip — preview without backend') }}
-                </VBtn>
               </VCol>
             </VRow>
           </VForm>
@@ -242,11 +210,29 @@ const login = async () => {
 
 .auth-illustration {
   z-index: 1;
+  max-inline-size: 700px;
+  inline-size: 100%;
 }
 
 .auth-title {
   font-size: 28px;
   font-weight: 700;
+}
+
+@media (max-width: 1200px) {
+  .auth-illustration {
+    max-inline-size: 520px;
+  }
+}
+
+@media (max-width: 900px) {
+  .auth-title {
+    font-size: 22px;
+  }
+
+  .login-toolbar {
+    justify-content: flex-start !important;
+  }
 }
 </style>
 

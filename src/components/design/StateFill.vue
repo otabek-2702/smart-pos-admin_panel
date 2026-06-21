@@ -1,13 +1,17 @@
 <script setup lang="ts">
+import type { CSSProperties } from 'vue'
+import DesignIcon from './DesignIcon.vue'
+
 interface Props {
   icon?: string
   title: string
   sub?: string
   error?: boolean
+  style?: CSSProperties
 }
 
 withDefaults(defineProps<Props>(), {
-  icon: 'bx-inbox',
+  icon: 'inbox',
   error: false,
 })
 </script>
@@ -16,11 +20,12 @@ withDefaults(defineProps<Props>(), {
   <div
     class="statefill"
     :class="{ 'is-error': error }"
+    :style="style"
   >
     <div class="statefill__icon">
-      <VIcon
-        :icon="icon"
-        size="24"
+      <DesignIcon
+        :name="icon"
+        :size="24"
       />
     </div>
     <div class="statefill__title">
@@ -32,6 +37,7 @@ withDefaults(defineProps<Props>(), {
     >
       {{ sub }}
     </div>
+    <slot name="action" />
     <slot />
   </div>
 </template>

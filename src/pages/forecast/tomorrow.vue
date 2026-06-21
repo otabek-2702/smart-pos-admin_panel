@@ -31,7 +31,7 @@ onMounted(load)
 
 const predictions = computed(() => data.value?.predictions ?? [])
 const reason = computed(() => data.value?.reason)
-const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.predicted_quantity ?? 0), 1))
+const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.suggested_qty ?? p.predicted_quantity ?? 0), 1))
 </script>
 
 <template>
@@ -40,6 +40,18 @@ const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.pr
       <div style="min-width:0;">
         <h1 class="page-head__title">{{ t('Demand Forecast') }}</h1>
         <div class="page-head__subtitle">{{ t('What to prep tomorrow morning, based on last 30 days') }}</div>
+        <div
+          v-if="data?.tomorrow"
+          class="page-head__subtitle"
+        >
+          {{ t('Forecast for {date}', { date: data.tomorrow }) }}
+        </div>
+        <div
+          v-if="data?.window_days"
+          class="page-head__subtitle"
+        >
+          {{ t('Based on last {n} days', { n: data.window_days }) }}
+        </div>
       </div>
       <div class="page-head__actions">
         <VBtn
@@ -77,11 +89,11 @@ const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.pr
           <div
             v-for="n in 8"
             :key="n"
-            class="d-flex align-center gap-3 py-2"
+            class="forecast-row d-flex align-center gap-3 py-2"
           >
             <div
-              class="sk-box"
-              style="width:200px;height:14px;border-radius:4px;"
+              class="sk-box forecast-row__label-sk"
+              style="height:14px;border-radius:4px;"
             />
             <div
               class="sk-box flex-grow-1"
@@ -97,10 +109,10 @@ const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.pr
           <div
             v-for="p in predictions"
             :key="p.product_id"
-            class="d-flex align-center gap-3 py-2"
+            class="forecast-row d-flex align-center gap-3 py-2"
             style="border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);"
           >
-            <div style="min-width: 200px;">
+            <div class="forecast-row__label">
               <div class="text-body-2 font-weight-medium">
                 {{ p.product_name }}
               </div>
@@ -111,7 +123,7 @@ const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.pr
                 {{ t('Confidence') }}: {{ p.confidence }}
               </div>
             </div>
-            <div class="flex-grow-1">
+            <div class="flex-grow-1 forecast-row__bar">
               <VProgressLinear
                 :model-value="((p.predicted_quantity ?? 0) / maxQty) * 100"
                 :color="p.predicted_quantity > maxQty * 0.7 ? 'success' : p.predicted_quantity > maxQty * 0.3 ? 'info' : 'default'"
@@ -120,8 +132,7 @@ const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.pr
               />
             </div>
             <div
-              class="text-end"
-              style="min-width: 80px;"
+              class="text-end forecast-row__qty"
             >
               <span class="text-h6 font-weight-bold num-tabular">{{ p.predicted_quantity }}</span>
               <div class="text-caption text-disabled">
@@ -153,6 +164,41 @@ const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.pr
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.forecast-row__label {
+  min-width: 200px;
+}
+
+.forecast-row__label-sk {
+  width: 200px;
+}
+
+.forecast-row__qty {
+  min-width: 80px;
+}
+
+@media (max-width: 900px) {
+  .forecast-row {
+    flex-wrap: wrap;
+  }
+
+  .forecast-row__label,
+  .forecast-row__label-sk {
+    flex-basis: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .forecast-row__bar {
+    flex-basis: calc(100% - 96px);
+  }
+
+  .forecast-row__qty {
+    min-width: 72px;
+  }
+}
+</style>
 
 <route lang="yaml">
 meta:

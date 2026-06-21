@@ -42,9 +42,9 @@ async function save() {
 onMounted(load)
 
 const modules = computed(() => [
-  { key: 'hr_enabled', icon: 'bx-group', label: 'HR Module', description: 'Employees, salaries, expenses, attendance, leaves, contracts.' },
-  { key: 'stock_enabled', icon: 'bx-package', label: 'Stock Module', description: 'Inventory, recipes, suppliers, batches, purchase orders.' },
-  { key: 'waiter_enabled', icon: 'bx-restaurant', label: 'Waiter Mode', description: 'Enable waiter-specific role and order flow.' },
+  { key: 'hr_enabled', icon: 'bx-group', label: 'app_module_hr', description: 'app_module_hr_hint' },
+  { key: 'stock_enabled', icon: 'bx-package', label: 'app_module_stock', description: 'app_module_stock_hint' },
+  { key: 'waiter_enabled', icon: 'bx-restaurant', label: 'app_module_waiter', description: 'app_module_waiter_hint' },
 ])
 </script>
 

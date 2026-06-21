@@ -1,6 +1,16 @@
 <script setup lang="ts">
 import adminApi, { stockApi as axios } from '@/plugins/axios'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
+import Badge from '@/components/design/Badge.vue'
+import Button from '@/components/design/Button.vue'
+import DataTable, { type DataTableColumn } from '@/components/design/DataTable.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import Field from '@/components/design/Field.vue'
+import IconAction from '@/components/design/IconAction.vue'
+import Input from '@/components/design/Input.vue'
+import Modal from '@/components/design/Modal.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
+import Select from '@/components/design/Select.vue'
+import StateFill from '@/components/design/StateFill.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -10,6 +20,21 @@ const loading = ref(false)
 const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
+const typeFilter = ref<string | undefined>(undefined)
+const activeFilter = ref<string | undefined>(undefined)
+
+const typeFilterOptions = computed(() => [
+  { value: '', label: t('product_links_all_types') },
+  { value: 'RECIPE', label: t('link_type_RECIPE') },
+  { value: 'DIRECT_ITEM', label: t('link_type_DIRECT_ITEM') },
+  { value: 'COMPONENT_BASED', label: t('link_type_COMPONENT_BASED') },
+])
+
+const activeFilterOptions = computed(() => [
+  { value: '', label: t('product_links_all_statuses') },
+  { value: 'true', label: t('active_true') },
+  { value: 'false', label: t('active_false') },
+])
 
 const linkTypes = ref<any[]>([])
 const deductStatuses = ref<any[]>([])
@@ -36,28 +61,48 @@ const form = ref({
   deduct_on_status: 'PREPARING',
 })
 
-const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
+const { notify } = useNotify()
 
-const typeColor: Record<string, string> = {
+const typeTone: Record<string, 'primary' | 'info' | 'warning' | 'neutral'> = {
   RECIPE: 'primary',
   DIRECT_ITEM: 'info',
   COMPONENT_BASED: 'warning',
 }
 
-const headers = [
-  { title: t('Product'), key: 'product', sortable: false },
-  { title: t('Link Type'), key: 'link_type', sortable: false },
-  { title: t('Stock Item / Recipe'), key: 'linked_to', sortable: false },
-  { title: t('Deduct On'), key: 'deduct_on_status', sortable: false },
-  { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
-]
+const columns = computed<DataTableColumn<any>[]>(() => [
+  { key: 'product', label: t('Product') },
+  { key: 'link_type', label: t('Link Type') },
+  { key: 'linked_to', label: t('Stock Item / Recipe') },
+  { key: 'deduct_on_status', label: t('Deduct On') },
+])
+
+const dtPagination = computed(() => ({
+  page: page.value,
+  perPage: itemsPerPage.value,
+  total: total.value,
+  onPage: (p: number) => { page.value = p },
+  onPerPage: (n: number) => { itemsPerPage.value = n; page.value = 1 },
+}))
+
+const filteredLinks = computed(() => {
+  const q = (search.value ?? '').trim().toLowerCase()
+  if (!q)
+    return links.value
+  return links.value.filter((l: any) => {
+    const product = (l.product?.name ?? l.product_name ?? '').toLowerCase()
+    const linked = (l.recipe?.name ?? l.stock_item?.name ?? l.linked_name ?? '').toLowerCase()
+    return product.includes(q) || linked.includes(q)
+  })
+})
 
 async function loadLinks() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value)
-      params.search = search.value
+    if (typeFilter.value)
+      params.type = typeFilter.value
+    if (activeFilter.value !== undefined)
+      params.active = activeFilter.value
 
     const res = await axios.get('/product-links/', { params })
     const d = res.data?.data ?? res.data
@@ -91,10 +136,10 @@ async function loadOptions() {
     const itemD = itemRes.data?.data ?? itemRes.data
     const unitD = unitRes.data?.data ?? unitRes.data
 
-    products.value = (prodD?.products ?? prodD?.results ?? []).map((p: any) => ({ title: p.name, value: p.id }))
-    recipes.value = (recD?.recipes ?? recD?.results ?? []).map((r: any) => ({ title: r.name, value: r.id }))
-    stockItems.value = (itemD?.items ?? itemD?.results ?? []).map((i: any) => ({ title: i.name, value: i.id }))
-    units.value = (unitD?.units ?? unitD?.results ?? []).map((u: any) => ({ title: `${u.name} (${u.short_name})`, value: u.id }))
+    products.value = (prodD?.products ?? prodD?.results ?? []).map((p: any) => ({ value: String(p.id), label: p.name }))
+    recipes.value = (recD?.recipes ?? recD?.results ?? []).map((r: any) => ({ value: String(r.id), label: r.name }))
+    stockItems.value = (itemD?.items ?? itemD?.results ?? []).map((i: any) => ({ value: String(i.id), label: i.name }))
+    units.value = (unitD?.units ?? unitD?.results ?? []).map((u: any) => ({ value: String(u.id), label: `${u.name} (${u.short_name})` }))
   }
   catch {
     // silent — options will be empty
@@ -103,7 +148,24 @@ async function loadOptions() {
 
 onMounted(() => { loadLinks(); loadOptions() })
 watch([page, itemsPerPage], loadLinks)
-watch(search, () => { page.value = 1; loadLinks() })
+watch([typeFilter, activeFilter], () => { page.value = 1; loadLinks() })
+
+const linkTypeOptions = computed(() => [
+  { value: 'RECIPE', label: t('link_type_RECIPE') },
+  { value: 'DIRECT_ITEM', label: t('link_type_DIRECT_ITEM') },
+  { value: 'COMPONENT_BASED', label: t('link_type_COMPONENT_BASED') },
+])
+
+const deductStatusOptions = computed(() =>
+  deductStatuses.value.length
+    ? deductStatuses.value.map((s: any) => ({ value: s.value, label: t(`deduct_on_${s.value}`) }))
+    : [
+      { value: 'CREATED', label: t('deduct_on_CREATED') },
+      { value: 'PREPARING', label: t('deduct_on_PREPARING') },
+      { value: 'READY', label: t('deduct_on_READY') },
+      { value: 'PAID', label: t('deduct_on_PAID') },
+    ],
+)
 
 function openLink() {
   form.value = {
@@ -167,300 +229,287 @@ async function doUnlink() {
     unlinking.value = false
   }
 }
-
-const linkTypeItems = computed(() =>
-  [{ title: t('Recipe'), value: 'RECIPE' }, { title: t('Direct Item'), value: 'DIRECT_ITEM' }],
-)
-
-const deductStatusItems = computed(() =>
-  deductStatuses.value.length
-    ? deductStatuses.value.map((s: any) => ({ title: s.label, value: s.value }))
-    : [
-      { title: t('Order Created'), value: 'CREATED' },
-      { title: t('Preparing'), value: 'PREPARING' },
-      { title: t('Ready'), value: 'READY' },
-      { title: t('Paid'), value: 'PAID' },
-    ],
-)
 </script>
 
 <template>
-  <div>
-    <VCard>
-      <VCardText class="d-flex flex-wrap gap-3 align-center">
-        <VTextField
-          v-model="search"
-          :placeholder="t('Search product links...')"
-          prepend-inner-icon="bx-search"
-          density="compact"
-          style="min-inline-size: 240px;"
-          hide-details
-          clearable
-        />
-        <VSpacer />
-        <VBtn
-          prepend-icon="bx-link"
+  <div class="page">
+    <PageHeader
+      :title="t('product_links_title')"
+      :subtitle="t('product_links_subtitle')"
+    />
+
+    <div class="card">
+      <div
+        class="toolbar"
+        style="flex-wrap: wrap;"
+      >
+        <div
+          class="grow"
+          style="min-width: 220px; max-width: 280px;"
+        >
+          <Input
+            v-model="search"
+            icon="search"
+            :placeholder="t('product_links_search_placeholder')"
+            :aria-label="t('product_links_search_placeholder')"
+          />
+        </div>
+
+        <div
+          class="toolbar-select"
+          style="min-width: 180px;"
+        >
+          <Select
+            :model-value="typeFilter ?? ''"
+            :placeholder="t('product_links_all_types')"
+            :options="typeFilterOptions"
+            @update:model-value="(v: string) => typeFilter = v ? v : undefined"
+          />
+        </div>
+
+        <div
+          class="toolbar-select"
+          style="min-width: 160px;"
+        >
+          <Select
+            :model-value="activeFilter ?? ''"
+            :placeholder="t('product_links_all_statuses')"
+            :options="activeFilterOptions"
+            @update:model-value="(v: string) => activeFilter = v ? v : undefined"
+          />
+        </div>
+
+        <div style="flex: 1;" />
+
+        <Button
+          variant="primary"
+          icon="link"
           @click="openLink"
         >
           {{ t('Link Product') }}
-        </VBtn>
-      </VCardText>
+        </Button>
+      </div>
 
-      <VDataTableServer
-        :headers="headers"
-        :items="links"
-        :items-length="total"
+      <div class="card__divider" />
+
+      <DataTable
+        :columns="columns"
+        :rows="filteredLinks"
+        row-key="id"
         :loading="loading"
-        :items-per-page="itemsPerPage"
-        :page="page"
+        :pagination="dtPagination"
+        :per-page-options="[10, 25, 50, 100]"
       >
-        <template #bottom>
-          <DataTableFooter
-            v-model:page="page"
-            v-model:items-per-page="itemsPerPage"
-            :total-items="total"
+        <template #cell.product="{ row }">
+          <span class="cell-strong">{{ row.product?.name ?? row.product_name ?? '—' }}</span>
+        </template>
+
+        <template #cell.link_type="{ row }">
+          <Badge :tone="(typeTone[row.link_type] ?? 'neutral') as any">
+            {{ row.link_type ? t(`link_type_${row.link_type}`) : '—' }}
+          </Badge>
+        </template>
+
+        <template #cell.linked_to="{ row }">
+          <span>{{ row.recipe?.name ?? row.stock_item?.name ?? row.linked_name ?? '—' }}</span>
+        </template>
+
+        <template #cell.deduct_on_status="{ row }">
+          <Badge tone="info">
+            {{ row.deduct_on_status ? t(`deduct_on_${row.deduct_on_status}`) : '—' }}
+          </Badge>
+        </template>
+
+        <template #row-actions="{ row }">
+          <IconAction
+            icon="unlink"
+            tone="danger"
+            :title="t('Unlink')"
+            @click.stop="confirmUnlink(row)"
           />
         </template>
 
-        <template
-          v-if="loading && links.length === 0"
-          #body
-        >
-          <tr
-            v-for="n in itemsPerPage"
-            :key="n"
-            class="sk-row"
-          >
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:120px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:90px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:140px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:80px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td
-              class="sk-cell"
-              style="text-align:end;"
-            >
-              <div class="d-flex justify-end gap-1">
-                <div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:6px;"
-                />
-              </div>
-            </td>
-          </tr>
+        <template #empty>
+          <StateFill
+            icon="inbox"
+            :title="t('product_links_empty_title')"
+            :sub="t('product_links_empty_sub')"
+          />
         </template>
+      </DataTable>
+    </div>
 
-        <template #item.product="{ item }">
-          {{ item.raw.product?.name ?? item.raw.product_name ?? '—' }}
-        </template>
-        <template #item.link_type="{ item }">
-          <VChip
-            :color="typeColor[item.raw.link_type] ?? 'default'"
-            size="small"
-            variant="tonal"
-            class="status-pill"
-          >
-            {{ item.raw.link_type_display ?? item.raw.link_type }}
-          </VChip>
-        </template>
-        <template #item.linked_to="{ item }">
-          {{ item.raw.recipe?.name ?? item.raw.stock_item?.name ?? item.raw.linked_name ?? '—' }}
-        </template>
-        <template #item.deduct_on_status="{ item }">
-          <VChip
-            color="info"
-            size="small"
-            variant="tonal"
-            class="status-pill"
-          >
-            {{ item.raw.deduct_on_status_display ?? item.raw.deduct_on_status }}
-          </VChip>
-        </template>
-        <template #item.actions="{ item }">
-          <div
-            class="d-flex justify-end"
-            style="gap:2px;"
-          >
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              color="error"
-              @click="confirmUnlink(item.raw)"
-            >
-              <VIcon
-                size="18"
-                icon="bx-unlink"
+    <!-- ============ LINK PRODUCT MODAL ============ -->
+    <Modal
+      :open="dialog"
+      :width="540"
+      :title="t('Link Product')"
+      @close="dialog = false"
+    >
+      <div class="form-grid">
+        <div class="form-grid__full">
+          <Field :label="t('Product')">
+            <Select
+              :model-value="form.product_id != null ? String(form.product_id) : ''"
+              :options="products"
+              :placeholder="t('Select product')"
+              @update:model-value="(v: string) => form.product_id = v ? Number(v) : null"
+            />
+          </Field>
+        </div>
+
+        <Field :label="t('Link Type')">
+          <Select
+            v-model="form.link_type"
+            :options="linkTypeOptions"
+          />
+        </Field>
+
+        <Field :label="t('Deduct On')">
+          <Select
+            v-model="form.deduct_on_status"
+            :options="deductStatusOptions"
+          />
+        </Field>
+
+        <template v-if="form.link_type === 'RECIPE'">
+          <div class="form-grid__full">
+            <Field :label="t('Recipe')">
+              <Select
+                :model-value="form.recipe_id != null ? String(form.recipe_id) : ''"
+                :options="recipes"
+                :placeholder="t('Select recipe')"
+                @update:model-value="(v: string) => form.recipe_id = v ? Number(v) : null"
               />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Unlink') }}
-              </VTooltip>
-            </VBtn>
+            </Field>
           </div>
         </template>
-      </VDataTableServer>
-    </VCard>
 
-    <VDialog
-      v-model="dialog"
-      max-width="520"
-      persistent
-    >
-      <VCard :title="t('Link Product')">
-        <VCardText>
-          <VRow>
-            <VCol cols="12">
-              <VSelect
-                v-model="form.product_id"
-                :items="products"
-                :label="t('Product')"
-                :placeholder="t('Select product')"
-                required
+        <template v-if="form.link_type === 'DIRECT_ITEM'">
+          <div class="form-grid__full">
+            <Field :label="t('Stock Item')">
+              <Select
+                :model-value="form.stock_item_id != null ? String(form.stock_item_id) : ''"
+                :options="stockItems"
+                :placeholder="t('Select stock item')"
+                @update:model-value="(v: string) => form.stock_item_id = v ? Number(v) : null"
               />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VSelect
-                v-model="form.link_type"
-                :items="linkTypeItems"
-                :label="t('Link Type')"
-                required
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VSelect
-                v-model="form.deduct_on_status"
-                :items="deductStatusItems"
-                :label="t('Deduct On')"
-                required
-              />
-            </VCol>
-            <template v-if="form.link_type === 'RECIPE'">
-              <VCol cols="12">
-                <VSelect
-                  v-model="form.recipe_id"
-                  :items="recipes"
-                  :label="t('Recipe')"
-                  :placeholder="t('Select recipe')"
-                  required
-                />
-              </VCol>
-            </template>
-            <template v-if="form.link_type === 'DIRECT_ITEM'">
-              <VCol cols="12">
-                <VSelect
-                  v-model="form.stock_item_id"
-                  :items="stockItems"
-                  :label="t('Stock Item')"
-                  :placeholder="t('Select stock item')"
-                  required
-                />
-              </VCol>
-              <VCol
-                cols="12"
-                sm="6"
-              >
-                <VTextField
-                  v-model.number="form.quantity_per_sale"
-                  :label="t('Quantity per Sale')"
-                  type="number"
-                  step="0.01"
-                  :min="0.01"
-                />
-              </VCol>
-              <VCol
-                cols="12"
-                sm="6"
-              >
-                <VSelect
-                  v-model="form.unit_id"
-                  :items="units"
-                  :label="t('Unit')"
-                  :placeholder="t('Select unit')"
-                />
-              </VCol>
-            </template>
-          </VRow>
-        </VCardText>
-        <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            color="default"
-            @click="dialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            :loading="saving"
-            @click="save"
-          >
-            {{ t('Save') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+            </Field>
+          </div>
 
-    <VDialog
-      v-model="unlinkDialog"
-      max-width="400"
-    >
-      <VCard :title="t('Unlink Product')">
-        <VCardText>{{ t('Are you sure you want to unlink') }} <strong>{{ selectedItem?.product?.name ?? selectedItem?.product_name }}</strong>?</VCardText>
-        <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            color="default"
-            @click="unlinkDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="error"
-            :loading="unlinking"
-            @click="doUnlink"
-          >
-            {{ t('Unlink') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+          <Field :label="t('Quantity per Sale')">
+            <Input
+              v-model="form.quantity_per_sale"
+              type="number"
+              step="0.01"
+              min="0.01"
+            />
+          </Field>
 
-    <VSnackbar
-      v-model="snackbar"
-      :color="snackbarColor"
-      :timeout="3000"
+          <Field :label="t('Unit')">
+            <Select
+              :model-value="form.unit_id != null ? String(form.unit_id) : ''"
+              :options="units"
+              :placeholder="t('Select unit')"
+              @update:model-value="(v: string) => form.unit_id = v ? Number(v) : null"
+            />
+          </Field>
+        </template>
+      </div>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="saving"
+          @click="dialog = false"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          :loading="saving"
+          :disabled="!form.product_id || saving"
+          @click="save"
+        >
+          {{ t('Save') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- ============ UNLINK CONFIRM MODAL ============ -->
+    <Modal
+      :open="unlinkDialog"
+      :width="440"
+      :title="t('Unlink Product')"
+      @close="unlinkDialog = false"
     >
-      {{ snackbarMsg }}
-    </VSnackbar>
+      <div
+        class="row"
+        style="gap: 14px; align-items: flex-start;"
+      >
+        <div
+          class="kpi__icon t-error"
+          style="width: 44px; height: 44px; flex: 0 0 44px;"
+        >
+          <DesignIcon
+            name="alert"
+            :size="22"
+          />
+        </div>
+        <div>
+          <p style="margin: 0; font-weight: 600;">
+            {{ selectedItem?.product?.name ?? selectedItem?.product_name }}
+          </p>
+          <p
+            class="muted"
+            style="margin: 6px 0 0; font-size: 14px;"
+          >
+            {{ t('Are you sure you want to unlink') }}
+          </p>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="unlinking"
+          @click="unlinkDialog = false"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="danger"
+          :loading="unlinking"
+          :disabled="unlinking"
+          @click="doUnlink"
+        >
+          {{ t('Unlink') }}
+        </Button>
+      </template>
+    </Modal>
   </div>
 </template>
+
+<style scoped>
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-4);
+}
+.form-grid__full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .toolbar-select {
+    width: 100%;
+    min-width: 0 !important;
+  }
+}
+</style>
 
 <route lang="yaml">
 name: stock-product-links

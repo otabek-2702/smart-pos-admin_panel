@@ -1,12 +1,35 @@
 <script setup lang="ts">
+/* ============================================================
+   HR EMPLOYEES — staff directory, contracts and base pay
+   Plain HTML + design primitives (PageHeader / Card / DataTable /
+   Modal / Field / Input / Select / Switch / Badge / IconAction /
+   Kpi / DesignIcon). No Vuetify on this surface.
+   ============================================================ */
+import type { DataTableColumn } from '@/components/design/DataTable.vue'
 import { hrApi as axios } from '@/plugins/axios'
 import defaultAxios from '@/plugins/axios'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
+import Badge from '@/components/design/Badge.vue'
+import Button from '@/components/design/Button.vue'
+import Card from '@/components/design/Card.vue'
+import DataTable from '@/components/design/DataTable.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import Field from '@/components/design/Field.vue'
+import IconAction from '@/components/design/IconAction.vue'
+import Input from '@/components/design/Input.vue'
+import Kpi from '@/components/design/Kpi.vue'
+import Modal from '@/components/design/Modal.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
+import Select from '@/components/design/Select.vue'
+import Switch from '@/components/design/Switch.vue'
+import { fmtNum } from '@/components/design/utils/format'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
-const { formatCurrency, formatDate } = useFormatters()
+const { formatDate } = useFormatters()
 
+// ============================================================
+// State
+// ============================================================
 const employees = ref<any[]>([])
 const total = ref(0)
 const loading = ref(false)
@@ -14,15 +37,15 @@ const stats = ref<any>(null)
 const page = ref(1)
 const itemsPerPage = ref(20)
 const search = ref('')
-const departmentFilter = ref<number | null>(null)
-const contractTypeFilter = ref<string | undefined>(undefined)
-const activeFilter = ref<boolean | null>(null)
+const departmentFilter = ref<string>('')
+const contractTypeFilter = ref<string>('')
+const activeFilter = ref<string>('')
 
 const departments = ref<any[]>([])
 const users = ref<any[]>([])
 
-const contractTypes = ['FULL_TIME', 'PART_TIME', 'CONTRACT']
-const paymentFreqs = ['MONTHLY', 'WEEKLY', 'BI_WEEKLY']
+const contractTypes = ['FULL_TIME', 'PART_TIME', 'CONTRACT'] as const
+const paymentFreqs = ['MONTHLY', 'WEEKLY', 'BI_WEEKLY'] as const
 
 const dialog = ref(false)
 const editing = ref<any>(null)
@@ -48,17 +71,27 @@ const form = ref({
   is_active: true,
 })
 
-const headers = [
-  { title: t('Name'), key: 'name', sortable: false },
-  { title: t('Position'), key: 'position', sortable: false },
-  { title: t('Department'), key: 'department', sortable: false },
-  { title: t('Contract'), key: 'contract_type', sortable: false },
-  { title: t('Base salary'), key: 'base_salary', sortable: false },
-  { title: t('Hire date'), key: 'hire_date', sortable: false },
-  { title: t('Status'), key: 'is_active', sortable: false },
-  { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
-]
+// ============================================================
+// Tone maps
+// ============================================================
+const CONTRACT_TONE: Record<string, 'success' | 'warning' | 'info' | 'neutral'> = {
+  FULL_TIME: 'success',
+  PART_TIME: 'info',
+  CONTRACT: 'warning',
+}
 
+// ============================================================
+// Money formatter (UZS)
+// ============================================================
+function fmtMoney(n: number | string | null | undefined): string {
+  if (n === null || n === undefined || n === '' || Number.isNaN(Number(n)))
+    return '—'
+  return fmtNum(Number(n))
+}
+
+// ============================================================
+// API
+// ============================================================
 async function load() {
   loading.value = true
   try {
@@ -66,11 +99,11 @@ async function load() {
     if (search.value)
       params.search = search.value
     if (departmentFilter.value)
-      params.department_id = departmentFilter.value
+      params.department_id = Number(departmentFilter.value)
     if (contractTypeFilter.value)
       params.contract_type = contractTypeFilter.value
-    if (activeFilter.value !== null)
-      params.is_active = activeFilter.value
+    if (activeFilter.value !== '')
+      params.is_active = activeFilter.value === 'true'
     const res = await axios.get('/employees/', { params })
     const d = res.data?.data ?? res.data
 
@@ -120,6 +153,9 @@ const debounced = useDebounceFn(() => { page.value = 1; load() }, 400)
 watch(search, debounced)
 watch([departmentFilter, contractTypeFilter, activeFilter], () => { page.value = 1; load() })
 
+// ============================================================
+// Form helpers
+// ============================================================
 function resetForm() {
   form.value = {
     user_id: null,
@@ -168,16 +204,22 @@ function openEdit(e: any) {
   dialog.value = true
 }
 
+function closeDialog() {
+  if (saving.value)
+    return
+  dialog.value = false
+}
+
 async function save() {
   if (!form.value.user_id || !form.value.position || !form.value.hire_date) {
-    notify(t('User, position and hire date are required'), 'error')
+    notify(t('hr_employees_required_fields'), 'error')
 
     return
   }
   saving.value = true
   try {
     if (editing.value) {
-      const { user_id, ...payload } = form.value
+      const { user_id: _u, ...payload } = form.value
       await axios.put(`/employees/${editing.value.id}/`, payload)
       notify(t('Employee updated'))
     }
@@ -201,6 +243,18 @@ function confirmDelete(e: any) {
   deleteDialog.value = true
 }
 
+const deletingName = computed(() => {
+  const d = deleting.value
+  if (!d)
+    return ''
+  return `${d.user?.first_name ?? ''} ${d.user?.last_name ?? ''}`.trim() || d.user?.email || ''
+})
+
+function closeDelete() {
+  deleteDialog.value = false
+  deleting.value = null
+}
+
 async function doDelete() {
   if (!deleting.value)
     return
@@ -208,294 +262,643 @@ async function doDelete() {
     await axios.delete(`/employees/${deleting.value.id}/`)
     notify(t('Deleted'))
     deleteDialog.value = false
+    deleting.value = null
     await Promise.all([load(), loadStats()])
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
   }
 }
+
+// ============================================================
+// Options
+// ============================================================
+const departmentOptions = computed(() =>
+  departments.value.map((d: any) => ({ value: String(d.id), label: d.name })),
+)
+
+const contractOptions = computed(() =>
+  contractTypes.map(v => ({ value: v, label: t(`contract_type_${v}`) })),
+)
+
+const paymentFreqOptions = computed(() =>
+  paymentFreqs.map(v => ({ value: v, label: t(`payment_frequency_${v}`) })),
+)
+
+const activeOptions = computed(() => [
+  { value: 'true', label: t('Active') },
+  { value: 'false', label: t('Inactive') },
+])
+
+const userOptions = computed(() =>
+  users.value.map((u: any) => ({
+    value: String(u.id),
+    label: `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() + (u.email ? ` (${u.email})` : ''),
+  })),
+)
+
+// ============================================================
+// KPI cards
+// ============================================================
+const kpiTotal = computed(() => ({
+  label: t('hr_employees_kpi_total'),
+  value: stats.value ? Number(stats.value.total ?? 0) : null,
+  icon: 'group',
+  tone: 'primary' as const,
+}))
+const kpiActive = computed(() => ({
+  label: t('hr_employees_kpi_active'),
+  value: stats.value ? Number(stats.value.active ?? 0) : null,
+  icon: 'check',
+  tone: 'success' as const,
+}))
+const kpiDepartments = computed(() => ({
+  label: t('Departments'),
+  value: stats.value
+    ? Number(stats.value.departments ?? departments.value.length)
+    : (departments.value.length || null),
+  icon: 'building',
+  tone: 'info' as const,
+}))
+const kpiAvgSalary = computed(() => ({
+  label: t('hr_employees_kpi_avg_salary'),
+  value: stats.value ? Number(stats.value.avg_salary ?? 0) : null,
+  icon: 'wallet',
+  tone: 'warning' as const,
+  money: true,
+}))
+
+// ============================================================
+// Columns
+// ============================================================
+const columns: DataTableColumn<any>[] = [
+  { key: 'name', label: t('Name'), sortable: true, sortValue: (r: any) => `${r.user?.first_name ?? ''} ${r.user?.last_name ?? ''}`.trim() },
+  { key: 'position', label: t('Position'), sortable: true },
+  { key: 'department', label: t('Department'), sortable: true, sortValue: (r: any) => r.department?.name ?? '' },
+  { key: 'contract_type', label: t('hr_employees_col_contract'), sortable: true, width: 140 },
+  { key: 'phone', label: t('Phone'), sortable: false, width: 140 },
+  { key: 'payment_frequency', label: t('Pay schedule'), sortable: true, width: 140 },
+  { key: 'base_salary', label: t('hr_employees_col_base_salary'), sortable: true, align: 'right', width: 160 },
+  { key: 'hire_date', label: t('Hire Date'), sortable: true, width: 130 },
+  { key: 'is_active', label: t('Status'), sortable: true, width: 110 },
+]
+
+const tablePagination = computed(() => ({
+  page: page.value,
+  perPage: itemsPerPage.value,
+  total: total.value,
+  onPage: (n: number) => { page.value = n },
+  onPerPage: (n: number) => { itemsPerPage.value = n; page.value = 1 },
+}))
+
+// ============================================================
+// Filter chips
+// ============================================================
+const activeFilters = computed(() => {
+  const out: { k: string; label: string; val: string; clear: () => void }[] = []
+  if (departmentFilter.value) {
+    const dep = departments.value.find((d: any) => String(d.id) === departmentFilter.value)
+    out.push({
+      k: 'dep',
+      label: t('Department'),
+      val: dep?.name ?? departmentFilter.value,
+      clear: () => { departmentFilter.value = '' },
+    })
+  }
+  if (contractTypeFilter.value) {
+    out.push({
+      k: 'ct',
+      label: t('hr_employees_col_contract'),
+      val: t(`contract_type_${contractTypeFilter.value}`),
+      clear: () => { contractTypeFilter.value = '' },
+    })
+  }
+  if (activeFilter.value !== '') {
+    out.push({
+      k: 'st',
+      label: t('Status'),
+      val: activeFilter.value === 'true' ? t('Active') : t('Inactive'),
+      clear: () => { activeFilter.value = '' },
+    })
+  }
+  if (search.value) {
+    out.push({
+      k: 'q',
+      label: t('Search'),
+      val: search.value,
+      clear: () => { search.value = '' },
+    })
+  }
+  return out
+})
+
+function clearAllFilters() {
+  departmentFilter.value = ''
+  contractTypeFilter.value = ''
+  activeFilter.value = ''
+  search.value = ''
+}
+
+// ============================================================
+// ESC handler — close modals
+// ============================================================
+function onKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape')
+    return
+  if (deleteDialog.value) { closeDelete(); e.preventDefault(); return }
+  if (dialog.value) { closeDialog(); e.preventDefault() }
+}
+
+onMounted(() => { window.addEventListener('keydown', onKeydown) })
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 </script>
 
 <template>
-  <div>
-    <div class="page-head">
-      <div style="min-width:0;">
-        <h1 class="page-head__title">
-          {{ t('Employees') }}
-        </h1>
-        <div class="page-head__subtitle">
-          {{ t('Staff directory, contracts and base pay') }}
-        </div>
-      </div>
-      <div class="page-head__actions">
-        <VBtn
-          color="primary"
-          prepend-icon="bx-plus"
+  <div class="page">
+    <PageHeader
+      :title="t('Employees')"
+      :subtitle="t('hr_employees_subtitle')"
+    >
+      <template #actions>
+        <Button
+          variant="primary"
+          icon="plus"
           @click="openCreate"
         >
           {{ t('New Employee') }}
-        </VBtn>
-      </div>
+        </Button>
+      </template>
+    </PageHeader>
+
+    <!-- KPI strip -->
+    <div class="grid cols-4 hr-emp__kpis">
+      <Kpi :data="kpiTotal" />
+      <Kpi :data="kpiActive" />
+      <Kpi :data="kpiDepartments" />
+      <Kpi :data="kpiAvgSalary" />
     </div>
 
-    <VRow class="mb-4">
-      <VCol cols="6" sm="3">
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-primary">
-              <VIcon icon="bx-group" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Total') }}
-            </div>
-          </div>
-          <div class="kpi-card__value">
-            {{ stats?.total ?? '—' }}
-          </div>
+    <!-- Toolbar + table -->
+    <Card>
+      <div class="toolbar hr-emp__toolbar">
+        <div class="hr-emp__search">
+          <Input
+            v-model="search"
+            icon="search"
+            :placeholder="t('hr_employees_search_placeholder')"
+          />
         </div>
-      </VCol>
-      <VCol cols="6" sm="3">
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-success">
-              <VIcon icon="bx-user-check" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Active') }}
-            </div>
-          </div>
-          <div class="kpi-card__value">
-            {{ stats?.active ?? '—' }}
-          </div>
+        <div class="hr-emp__filter">
+          <Select
+            v-model="departmentFilter"
+            icon="building"
+            :placeholder="t('Department')"
+            :options="departmentOptions"
+          />
         </div>
-      </VCol>
-      <VCol cols="6" sm="3">
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-info">
-              <VIcon icon="bx-buildings" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Departments') }}
-            </div>
-          </div>
-          <div class="kpi-card__value">
-            {{ stats?.departments ?? departments.length }}
-          </div>
+        <div class="hr-emp__filter">
+          <Select
+            v-model="contractTypeFilter"
+            icon="filter"
+            :placeholder="t('hr_employees_col_contract')"
+            :options="contractOptions"
+          />
         </div>
-      </VCol>
-      <VCol cols="6" sm="3">
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-warning">
-              <VIcon icon="bx-money" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Avg salary') }}
-            </div>
-          </div>
-          <div class="kpi-card__value">
-            {{ formatCurrency(stats?.avg_salary ?? 0) }}<span class="kpi-card__unit">UZS</span>
-          </div>
+        <div class="hr-emp__filter">
+          <Select
+            v-model="activeFilter"
+            icon="check"
+            :placeholder="t('Status')"
+            :options="activeOptions"
+          />
         </div>
-      </VCol>
-    </VRow>
+      </div>
 
-    <VCard>
-      <VCardText class="d-flex align-center gap-3 py-3 flex-wrap">
-        <VTextField
-          v-model="search"
-          :placeholder="t('Search employees…')"
-          prepend-inner-icon="bx-search"
-          density="compact"
-          style="min-inline-size:200px;max-inline-size:280px;"
-          hide-details
-          clearable
-        />
-        <VSelect
-          v-model="departmentFilter"
-          :items="departments.map((d: any) => ({ title: d.name, value: d.id }))"
-          :placeholder="t('Department')"
-          density="compact"
-          hide-details
-          clearable
-          style="min-inline-size:180px;"
-        />
-        <VSelect
-          v-model="contractTypeFilter"
-          :items="contractTypes"
-          :placeholder="t('Contract')"
-          density="compact"
-          hide-details
-          clearable
-          style="min-inline-size:160px;"
-        />
-        <VSelect
-          v-model="activeFilter"
-          :items="[{ title: t('Active'), value: true }, { title: t('Inactive'), value: false }]"
-          :placeholder="t('Status')"
-          density="compact"
-          hide-details
-          clearable
-          style="min-inline-size:140px;"
-        />
-        <VSpacer />
-      </VCardText>
-
-      <VDataTableServer
-        :headers="headers"
-        :items="employees"
-        :items-length="total"
-        :loading="loading"
-        :items-per-page="itemsPerPage"
-        :page="page"
+      <!-- Filter chips -->
+      <div
+        v-if="activeFilters.length > 0"
+        class="toolbar"
+        style="padding-top:0;"
       >
-        <template #bottom>
-          <DataTableFooter
-            v-model:page="page"
-            v-model:items-per-page="itemsPerPage"
-            :total-items="total"
+        <div class="chips">
+          <span
+            class="tertiary"
+            style="font-size:13px;margin-right:2px;"
+          >{{ t('Filters') }}:</span>
+          <span
+            v-for="f in activeFilters"
+            :key="f.k"
+            class="chip"
+          >
+            <span>{{ f.label }}: <b>{{ f.val }}</b></span>
+            <span
+              class="chip__x"
+              @click="f.clear()"
+            >
+              <DesignIcon
+                name="close"
+                :size="13"
+              />
+            </span>
+          </span>
+          <button
+            class="chip--clear"
+            @click="clearAllFilters"
+          >
+            {{ t('Clear all') }}
+          </button>
+        </div>
+      </div>
+
+      <div class="card__divider" />
+
+      <DataTable
+        :columns="columns"
+        :rows="employees"
+        row-key="id"
+        :loading="loading"
+        :pagination="tablePagination"
+        :initial-sort="{ key: 'hire_date', dir: 'desc' }"
+      >
+        <template #cell.name="{ row }">
+          <div class="cell-strong">
+            {{ `${row.user?.first_name ?? ''} ${row.user?.last_name ?? ''}`.trim() || '—' }}
+          </div>
+          <div class="cell-muted" style="font-size:12px;">
+            {{ row.user?.email || '—' }}
+          </div>
+        </template>
+
+        <template #cell.position="{ row }">
+          <span>{{ row.position || '—' }}</span>
+        </template>
+
+        <template #cell.department="{ row }">
+          <span class="cell-muted">{{ row.department?.name ?? '—' }}</span>
+        </template>
+
+        <template #cell.contract_type="{ row }">
+          <Badge :tone="CONTRACT_TONE[row.contract_type] || 'neutral'">
+            {{ row.contract_type ? t(`contract_type_${row.contract_type}`) : '—' }}
+          </Badge>
+        </template>
+
+        <template #cell.phone="{ row }">
+          <span class="cell-muted">{{ row.phone || '—' }}</span>
+        </template>
+
+        <template #cell.payment_frequency="{ row }">
+          <span class="cell-muted">{{ row.payment_frequency ? t(`payment_frequency_${row.payment_frequency}`) : '—' }}</span>
+        </template>
+
+        <template #cell.base_salary="{ row }">
+          <span class="mono cell-strong">{{ fmtMoney(row.base_salary) }}</span>
+        </template>
+
+        <template #cell.hire_date="{ row }">
+          <span class="cell-muted">{{ row.hire_date ? formatDate(row.hire_date) : '—' }}</span>
+        </template>
+
+        <template #cell.is_active="{ row }">
+          <Badge :tone="row.is_active ? 'success' : 'neutral'">
+            {{ row.is_active ? t('Active') : t('Inactive') }}
+          </Badge>
+        </template>
+
+        <template #row-actions="{ row }">
+          <IconAction
+            icon="edit"
+            tone="primary"
+            :title="t('Edit')"
+            @click="openEdit(row)"
+          />
+          <IconAction
+            icon="trash"
+            tone="danger"
+            :title="t('Delete')"
+            @click="confirmDelete(row)"
           />
         </template>
-        <template #item.name="{ item }">
-          <div class="font-weight-medium">
-            {{ item.raw.user?.first_name }} {{ item.raw.user?.last_name }}
+
+        <template #empty>
+          <div class="statefill">
+            <div class="statefill__icon">
+              <DesignIcon
+                name="group"
+                :size="24"
+              />
+            </div>
+            <div class="statefill__title">
+              {{ t('hr_employees_empty_title') }}
+            </div>
+            <div class="statefill__sub">
+              {{ t('hr_employees_empty_sub') }}
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
+              <Button
+                v-if="activeFilters.length > 0"
+                variant="secondary"
+                @click="clearAllFilters"
+              >
+                {{ t('Clear filters') }}
+              </Button>
+              <Button
+                variant="primary"
+                icon="plus"
+                @click="openCreate"
+              >
+                {{ t('New Employee') }}
+              </Button>
+            </div>
           </div>
-          <div class="text-caption text-disabled">
-            {{ item.raw.user?.email }}
-          </div>
         </template>
-        <template #item.position="{ item }">
-          {{ item.raw.position }}
-        </template>
-        <template #item.department="{ item }">
-          {{ item.raw.department?.name ?? '—' }}
-        </template>
-        <template #item.contract_type="{ item }">
-          <VChip size="x-small" class="status-pill" color="info" variant="tonal">
-            {{ item.raw.contract_type }}
-          </VChip>
-        </template>
-        <template #item.base_salary="{ item }">
-          <span class="num-tabular">{{ formatCurrency(item.raw.base_salary) }}</span>
-        </template>
-        <template #item.hire_date="{ item }">
-          {{ formatDate(item.raw.hire_date) }}
-        </template>
-        <template #item.is_active="{ item }">
-          <VChip
-            size="small"
-            class="status-pill"
-            :color="item.raw.is_active ? 'success' : 'default'"
-            variant="tonal"
+      </DataTable>
+    </Card>
+
+    <!-- Create / Edit modal -->
+    <Modal
+      :open="dialog"
+      :title="editing ? t('Edit Employee') : t('New Employee')"
+      :subtitle="t('hr_employees_modal_sub')"
+      :width="760"
+      :close-on-backdrop="!saving"
+      :close-on-esc="!saving"
+      @close="closeDialog"
+    >
+      <form @submit.prevent="save">
+        <div class="form-grid">
+          <Field
+            :label="t('User')"
+            class="span-2"
           >
-            {{ item.raw.is_active ? t('Active') : t('Inactive') }}
-          </VChip>
-        </template>
-        <template #item.actions="{ item }">
-          <div class="d-flex justify-end" style="gap:2px;">
-            <VBtn icon variant="text" size="small" @click="openEdit(item.raw)">
-              <VIcon icon="bx-edit-alt" size="18" />
-              <VTooltip activator="parent" location="top">{{ t('Edit') }}</VTooltip>
-            </VBtn>
-            <VBtn icon variant="text" size="small" color="error" @click="confirmDelete(item.raw)">
-              <VIcon icon="bx-trash" size="18" />
-              <VTooltip activator="parent" location="top">{{ t('Delete') }}</VTooltip>
-            </VBtn>
-          </div>
-        </template>
-      </VDataTableServer>
-    </VCard>
+            <Select
+              :model-value="form.user_id !== null ? String(form.user_id) : ''"
+              :options="userOptions"
+              :placeholder="t('hr_employees_select_user')"
+              :disabled="!!editing"
+              @update:model-value="(v: string) => { form.user_id = v ? Number(v) : null }"
+            />
+          </Field>
 
-    <!-- Dialog -->
-    <VDialog v-model="dialog" max-width="760" persistent scrollable>
-      <VCard :title="editing ? t('Edit Employee') : t('New Employee')">
-        <VCardText style="max-height:70vh;overflow-y:auto;">
-          <VRow>
-            <VCol cols="12" sm="6">
-              <VSelect
-                v-model="form.user_id"
-                :items="users.map((u: any) => ({ title: `${u.first_name} ${u.last_name} (${u.email})`, value: u.id }))"
-                :label="t('User')"
-                :disabled="!!editing"
-                required
-              />
-            </VCol>
-            <VCol cols="12" sm="6">
-              <VSelect
-                v-model="form.department_id"
-                :items="departments.map((d: any) => ({ title: d.name, value: d.id }))"
-                :label="t('Department')"
-                clearable
-              />
-            </VCol>
-            <VCol cols="12" sm="6">
-              <VTextField v-model="form.position" :label="t('Position')" required />
-            </VCol>
-            <VCol cols="12" sm="6">
-              <VTextField v-model="form.hire_date" type="date" :label="t('Hire date')" required />
-            </VCol>
-            <VCol cols="12" sm="6">
-              <VSelect v-model="form.contract_type" :items="contractTypes" :label="t('Contract type')" />
-            </VCol>
-            <VCol cols="12" sm="6">
-              <VSelect v-model="form.payment_frequency" :items="paymentFreqs" :label="t('Payment frequency')" />
-            </VCol>
-            <VCol cols="12" sm="6">
-              <VTextField v-model.number="form.base_salary" :label="t('Base salary')" type="number" min="0" />
-            </VCol>
-            <VCol cols="12" sm="6">
-              <VTextField v-model="form.phone" :label="t('Phone')" />
-            </VCol>
-            <VCol cols="12">
-              <VTextField v-model="form.address" :label="t('Address')" />
-            </VCol>
-            <VCol cols="12" sm="6">
-              <VTextField v-model="form.emergency_contact_name" :label="t('Emergency contact')" />
-            </VCol>
-            <VCol cols="12" sm="6">
-              <VTextField v-model="form.emergency_contact_phone" :label="t('Emergency phone')" />
-            </VCol>
-            <VCol cols="12" sm="6">
-              <VTextField v-model="form.bank_account" :label="t('Bank account')" />
-            </VCol>
-            <VCol cols="12" sm="6">
-              <VTextField v-model="form.bank_name" :label="t('Bank name')" />
-            </VCol>
-            <VCol cols="12">
-              <VTextarea v-model="form.notes" :label="t('Notes')" rows="2" />
-            </VCol>
-            <VCol v-if="editing" cols="12">
-              <VSwitch v-model="form.is_active" :label="t('Active')" color="success" density="compact" />
-            </VCol>
-          </VRow>
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn variant="text" @click="dialog = false">{{ t('Cancel') }}</VBtn>
-          <VBtn color="primary" :loading="saving" @click="save">{{ t('Save') }}</VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+          <Field
+            :label="t('Department')"
+            class="span-2"
+          >
+            <Select
+              :model-value="form.department_id !== null ? String(form.department_id) : ''"
+              :options="departmentOptions"
+              :placeholder="t('Select Department')"
+              @update:model-value="(v: string) => { form.department_id = v ? Number(v) : null }"
+            />
+          </Field>
 
-    <VDialog v-model="deleteDialog" max-width="420">
-      <VCard :title="t('Delete employee?')">
-        <VCardText>
-          {{ t('This removes the employee profile (the underlying User stays).') }}
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn variant="text" @click="deleteDialog = false">{{ t('Cancel') }}</VBtn>
-          <VBtn color="error" @click="doDelete">{{ t('Delete') }}</VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+          <Field
+            :label="t('Position')"
+            class="span-2"
+          >
+            <Input
+              v-model="form.position"
+              :placeholder="t('hr_employees_position_placeholder')"
+            />
+          </Field>
 
-    <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">
+          <Field
+            :label="t('Hire Date')"
+            class="span-2"
+          >
+            <Input
+              v-model="form.hire_date"
+              type="date"
+              icon="calendar"
+            />
+          </Field>
+
+          <Field
+            :label="t('Contract Type')"
+            class="span-2"
+          >
+            <Select
+              v-model="form.contract_type"
+              :options="contractOptions"
+            />
+          </Field>
+
+          <Field
+            :label="t('Payment Frequency')"
+            class="span-2"
+          >
+            <Select
+              v-model="form.payment_frequency"
+              :options="paymentFreqOptions"
+            />
+          </Field>
+
+          <Field
+            :label="t('Base Salary')"
+            class="span-2"
+            :hint="t('currency_short')"
+          >
+            <Input
+              v-model="form.base_salary"
+              type="number"
+              icon="wallet"
+              placeholder="0"
+              inputmode="numeric"
+              min="0"
+            />
+          </Field>
+
+          <Field
+            :label="t('Phone')"
+            class="span-2"
+          >
+            <Input
+              v-model="form.phone"
+              icon="phone"
+              :placeholder="t('hr_employees_phone_placeholder')"
+            />
+          </Field>
+
+          <Field
+            :label="t('Address')"
+            class="span-4"
+          >
+            <Input
+              v-model="form.address"
+              :placeholder="t('hr_employees_address_placeholder')"
+            />
+          </Field>
+
+          <Field
+            :label="t('hr_employees_emergency_name')"
+            class="span-2"
+          >
+            <Input v-model="form.emergency_contact_name" />
+          </Field>
+
+          <Field
+            :label="t('hr_employees_emergency_phone')"
+            class="span-2"
+          >
+            <Input
+              v-model="form.emergency_contact_phone"
+              icon="phone"
+            />
+          </Field>
+
+          <Field
+            :label="t('hr_employees_bank_account')"
+            class="span-2"
+          >
+            <Input v-model="form.bank_account" />
+          </Field>
+
+          <Field
+            :label="t('hr_employees_bank_name')"
+            class="span-2"
+          >
+            <Input v-model="form.bank_name" />
+          </Field>
+
+          <Field
+            :label="t('Notes')"
+            class="span-4"
+          >
+            <textarea
+              v-model="form.notes"
+              class="control hr-emp__textarea"
+              rows="2"
+              :placeholder="t('hr_employees_notes_placeholder')"
+            />
+          </Field>
+
+          <Field
+            v-if="editing"
+            :label="t('Active')"
+            class="span-4"
+          >
+            <div class="hr-emp__switch-row">
+              <Switch v-model="form.is_active" />
+              <span class="cell-muted" style="font-size:13px;">
+                {{ form.is_active ? t('hr_employees_active_hint_on') : t('hr_employees_active_hint_off') }}
+              </span>
+            </div>
+          </Field>
+        </div>
+      </form>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="saving"
+          @click="closeDialog"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="check"
+          :loading="saving"
+          :disabled="saving"
+          @click="save"
+        >
+          {{ t('Save') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Delete confirmation modal -->
+    <Modal
+      :open="deleteDialog"
+      :title="t('hr_employees_delete_title')"
+      :subtitle="deletingName"
+      :width="440"
+      @close="closeDelete"
+    >
+      <p class="cell-muted" style="margin:0;">
+        {{ t('hr_employees_delete_body') }}
+      </p>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          @click="closeDelete"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="danger"
+          icon="trash"
+          @click="doDelete"
+        >
+          {{ t('Delete') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Toast -->
+    <VSnackbar
+      v-model="snackbar"
+      :color="snackbarColor"
+      :timeout="3000"
+    >
       {{ snackbarMsg }}
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.hr-emp__kpis {
+  margin-bottom: var(--sp-5);
+}
+
+.hr-emp__toolbar {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.hr-emp__search {
+  flex: 1 1 240px;
+  max-width: 320px;
+  min-width: 200px;
+}
+
+.hr-emp__filter {
+  flex: 0 1 200px;
+  min-width: 160px;
+}
+
+.hr-emp__textarea {
+  resize: vertical;
+  min-height: 64px;
+  padding: 10px 12px;
+}
+
+.hr-emp__switch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .hr-emp__kpis {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .hr-emp__search,
+  .hr-emp__filter {
+    flex: 1 1 100%;
+    max-width: none;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .hr-emp__kpis {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
 
 <route lang="yaml">
 meta:

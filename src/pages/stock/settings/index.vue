@@ -48,16 +48,17 @@ const form = ref({
 })
 
 const costingMethods = [
-  { title: 'FIFO', value: 'FIFO' },
-  { title: 'LIFO', value: 'LIFO' },
-  { title: 'AVG', value: 'AVG' },
+  { title: t('costing_FIFO'), value: 'FIFO' },
+  { title: t('costing_LIFO'), value: 'LIFO' },
+  { title: t('costing_AVERAGE'), value: 'AVERAGE' },
+  { title: t('costing_SPECIFIC'), value: 'SPECIFIC' },
 ]
 
 const orderStatuses = [
-  { title: t('Order Created'), value: 'CREATED' },
-  { title: t('Preparing'), value: 'PREPARING' },
-  { title: t('Ready'), value: 'READY' },
-  { title: t('Paid'), value: 'PAID' },
+  { title: t('deduct_on_CREATED'), value: 'CREATED' },
+  { title: t('deduct_on_PREPARING'), value: 'PREPARING' },
+  { title: t('deduct_on_READY'), value: 'READY' },
+  { title: t('deduct_on_PAID'), value: 'PAID' },
 ]
 
 async function loadSettings() {

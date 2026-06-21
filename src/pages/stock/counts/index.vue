@@ -1,8 +1,24 @@
 <script setup lang="ts">
+/* ============================================================
+   ALPHA POS — Stock Counts (Workflow)
+   Refactored to design primitives + design-shell.css.
+   - Toolbar filters wrap on mobile (.filter-cell drops to 100%)
+   - DataTable with row-action IconAction buttons
+   - Modal-based create, action confirm, and per-item record flow
+   - Inline counted/qty/notes inputs preserved (axios + computeds kept)
+   ============================================================ */
 import { stockApi as axios } from '@/plugins/axios'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
 import { useStateAction } from '@/composables/useStateAction'
 import { COUNT_STATUS_COLOR as statusColor } from '@/constants/statusColors'
+import Badge from '@/components/design/Badge.vue'
+import Button from '@/components/design/Button.vue'
+import DataTable, { type DataTableColumn } from '@/components/design/DataTable.vue'
+import Field from '@/components/design/Field.vue'
+import IconAction from '@/components/design/IconAction.vue'
+import Input from '@/components/design/Input.vue'
+import Modal from '@/components/design/Modal.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
+import Select from '@/components/design/Select.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -13,6 +29,7 @@ const page = ref(1)
 const itemsPerPage = ref(10)
 const statusFilter = ref<string | undefined>(undefined)
 const locationFilter = ref<number | undefined>(undefined)
+const typeFilter = ref<string | undefined>(undefined)
 
 const locationsList = ref<any[]>([])
 
@@ -31,15 +48,17 @@ const { formatDateShort } = useFormatters()
 const statuses = ['DRAFT', 'IN_PROGRESS', 'PENDING_APPROVAL', 'APPROVED', 'CANCELED']
 const countTypes = ['FULL', 'PARTIAL', 'CYCLE', 'SPOT']
 
-const headers = [
-  { title: t('Count #'), key: 'count_number', sortable: false },
-  { title: t('Location'), key: 'location_name', sortable: false },
-  { title: t('Type'), key: 'count_type', sortable: false },
-  { title: t('Status'), key: 'status', sortable: false },
-  { title: t('Items Counted'), key: 'items_counted', sortable: false },
-  { title: t('Date'), key: 'created_at', sortable: false },
-  { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
-]
+// Status tone for design Badge
+const STATUS_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'primary' | 'neutral'> = {
+  DRAFT: 'neutral',
+  IN_PROGRESS: 'info',
+  PENDING_APPROVAL: 'warning',
+  APPROVED: 'success',
+  CANCELED: 'error',
+}
+function statusTone(s: string) {
+  return STATUS_TONE[s] ?? (statusColor[s] === 'default' ? 'neutral' : (statusColor[s] as any)) ?? 'neutral'
+}
 
 async function loadCounts() {
   loading.value = true
@@ -49,6 +68,8 @@ async function loadCounts() {
       params.status = statusFilter.value
     if (locationFilter.value)
       params.location_id = locationFilter.value
+    if (typeFilter.value)
+      params.type = typeFilter.value
 
     const res = await axios.get('/counts/', { params })
     const d = res.data?.data ?? res.data
@@ -76,9 +97,11 @@ async function loadLocations() {
 
 onMounted(() => { loadCounts(); loadLocations() })
 watch([page, itemsPerPage], loadCounts)
-watch([statusFilter, locationFilter], () => { page.value = 1; loadCounts() })
+watch([statusFilter, locationFilter, typeFilter], () => { page.value = 1; loadCounts() })
 
-const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.name, value: l.id })))
+const locationOptions = computed(() =>
+  locationsList.value.map(l => ({ value: String(l.id), label: l.name })),
+)
 
 async function createCount() {
   saving.value = true
@@ -167,6 +190,10 @@ const filteredItems = computed(() => {
   return detailItems.value
 })
 
+const isCountEditable = computed(
+  () => detailCount.value?.status === 'DRAFT' || detailCount.value?.status === 'IN_PROGRESS',
+)
+
 async function recordItem(item: any) {
   if (!detailCount.value)
     return
@@ -211,503 +238,432 @@ async function recordItem(item: any) {
     recordingItemId.value = null
   }
 }
+
+function varianceTone(v: number): 'success' | 'warning' | 'error' {
+  if (v === 0) return 'success'
+  if (v < 0) return 'error'
+  return 'warning'
+}
+
+// ---------------- DataTable columns ----------------
+const columns = computed<DataTableColumn<any>[]>(() => [
+  { key: 'count_number', label: t('Count #') },
+  { key: 'location_name', label: t('Location') },
+  { key: 'count_type', label: t('Type') },
+  { key: 'status', label: t('Status') },
+  { key: 'items_counted', label: t('Items Counted'), align: 'right' },
+  { key: 'created_at', label: t('Date'), align: 'right' },
+])
+
+const dtPagination = computed(() => ({
+  page: page.value,
+  perPage: itemsPerPage.value,
+  total: total.value,
+  onPage: (p: number) => { page.value = p },
+  onPerPage: (n: number) => { itemsPerPage.value = n; page.value = 1 },
+}))
+
+const itemFilterOptions = computed(() => [
+  { value: 'all', label: t('All') },
+  { value: 'pending', label: t('Pending') },
+  { value: 'counted', label: t('Counted') },
+  { value: 'variance', label: t('Variance') },
+])
 </script>
 
 <template>
-  <div>
-    <VCard>
-      <VCardText class="d-flex flex-wrap gap-3 align-center">
-        <VSelect
-          v-model="statusFilter"
-          :items="statuses.map(s => ({ title: t(`count_status_${s}`), value: s }))"
-          :placeholder="t('All Statuses')"
-          density="compact"
-          style="min-inline-size: 200px;"
-          hide-details
-          clearable
-        />
-        <VSelect
-          v-model="locationFilter"
-          :items="locationOptions"
-          :placeholder="t('All Locations')"
-          density="compact"
-          style="min-inline-size: 200px;"
-          hide-details
-          clearable
-        />
-        <VSpacer />
-        <VBtn
-          prepend-icon="bx-plus"
+  <div class="page">
+    <!-- Page header -->
+    <PageHeader
+      :title="t('Stock Counts')"
+      :subtitle="t('stock_counts_subtitle')"
+    >
+      <template #actions>
+        <Button
+          variant="primary"
+          icon="plus"
           @click="createDialog = true"
         >
           {{ t('New Count') }}
-        </VBtn>
-      </VCardText>
+        </Button>
+      </template>
+    </PageHeader>
 
-      <VDataTableServer
-        :headers="headers"
-        :items="counts"
-        :items-length="total"
+    <!-- Filter card -->
+    <div class="card">
+      <div class="toolbar">
+        <div class="filter-cell">
+          <Select
+            :model-value="statusFilter ?? ''"
+            :placeholder="t('All Statuses')"
+            :options="statuses.map(s => ({ value: s, label: t(`count_status_${s}`) }))"
+            @update:model-value="(v: string) => statusFilter = v || undefined"
+          />
+        </div>
+        <div class="filter-cell">
+          <Select
+            :model-value="locationFilter !== undefined ? String(locationFilter) : ''"
+            :placeholder="t('All Locations')"
+            :options="locationOptions"
+            @update:model-value="(v: string) => locationFilter = v ? Number(v) : undefined"
+          />
+        </div>
+        <div class="filter-cell">
+          <Select
+            :model-value="typeFilter ?? ''"
+            :placeholder="t('All Types')"
+            :options="countTypes.map(v => ({ value: v, label: t(`count_type_${v}`) }))"
+            @update:model-value="(v: string) => typeFilter = v || undefined"
+          />
+        </div>
+        <div class="toolbar-spacer">
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="close"
+            :disabled="!statusFilter && !typeFilter && locationFilter === undefined"
+            @click="() => {
+              statusFilter = undefined
+              typeFilter = undefined
+              locationFilter = undefined
+            }"
+          >
+            {{ t('Clear filters') }}
+          </Button>
+        </div>
+      </div>
+
+      <div class="card__divider" />
+
+      <!-- DataTable -->
+      <DataTable
+        :columns="columns"
+        :rows="counts"
+        row-key="id"
         :loading="loading"
-        :items-per-page="itemsPerPage"
-        :page="page"
+        :pagination="dtPagination"
+        :per-page-options="[10, 25, 50, 100]"
+        :empty-title="t('stock_counts_empty_title')"
+        :empty-sub="t('stock_counts_empty_sub')"
+        empty-icon="inbox"
       >
-        <template #bottom>
-          <DataTableFooter
-            v-model:page="page"
-            v-model:items-per-page="itemsPerPage"
-            :total-items="total"
-          />
+        <template #cell.count_number="{ row: r }">
+          <span class="cell-strong mono">{{ r.count_number }}</span>
         </template>
 
-        <template
-          v-if="loading && counts.length === 0"
-          #body
+        <template #cell.location_name="{ row: r }">
+          <span class="cell-muted">{{ r.location_name ?? r.location?.name ?? '—' }}</span>
+        </template>
+
+        <template #cell.count_type="{ row: r }">
+          <Badge tone="info">
+            {{ r.count_type ? t(`count_type_${r.count_type}`) : '—' }}
+          </Badge>
+        </template>
+
+        <template #cell.status="{ row: r }">
+          <Badge :tone="statusTone(r.status)" dot>
+            {{ r.status ? t(`count_status_${r.status}`) : '—' }}
+          </Badge>
+        </template>
+
+        <template #cell.items_counted="{ row: r }">
+          <span class="mono num">{{ r.items_counted ?? r.count_items?.length ?? '—' }}</span>
+        </template>
+
+        <template #cell.created_at="{ row: r }">
+          <span class="mono cell-muted nowrap">{{ formatDateShort(r.created_at) }}</span>
+        </template>
+
+        <!-- Inline row actions -->
+        <template #row-actions="{ row: r }">
+          <IconAction
+            icon="menu"
+            :title="t('Open / record')"
+            @click="openDetail(r)"
+          />
+          <IconAction
+            v-if="canStart(r)"
+            icon="play"
+            tone="warning"
+            :title="t('Start')"
+            @click="openAction(r, 'start')"
+          />
+          <IconAction
+            v-if="canComplete(r)"
+            icon="check"
+            tone="primary"
+            :title="t('Complete')"
+            @click="openAction(r, 'complete')"
+          />
+          <IconAction
+            v-if="canApprove(r)"
+            icon="checkcircle"
+            tone="success"
+            :title="t('Approve')"
+            @click="openAction(r, 'approve')"
+          />
+          <IconAction
+            v-if="canCancel(r)"
+            icon="close"
+            tone="danger"
+            :title="t('Cancel')"
+            @click="openAction(r, 'cancel')"
+          />
+        </template>
+      </DataTable>
+    </div>
+
+    <!-- ============ CREATE modal ============ -->
+    <Modal
+      :open="createDialog"
+      :title="t('New Stock Count')"
+      :subtitle="t('stock_counts_create_subtitle')"
+      :width="440"
+      @close="createDialog = false"
+    >
+      <div class="form-grid">
+        <Field :label="t('Location')">
+          <Select
+            :model-value="form.location_id !== null ? String(form.location_id) : ''"
+            :placeholder="t('Select location')"
+            :options="locationOptions"
+            @update:model-value="(v: string) => form.location_id = v ? Number(v) : null"
+          />
+        </Field>
+
+        <Field :label="t('Count Type')">
+          <Select
+            :model-value="form.count_type"
+            :options="countTypes.map(c => ({ value: c, label: t(`count_type_${c}`) }))"
+            @update:model-value="(v: string) => form.count_type = v"
+          />
+        </Field>
+
+        <Field :label="t('Notes')">
+          <Input
+            :model-value="form.notes"
+            @update:model-value="(v: string) => form.notes = v"
+          />
+        </Field>
+      </div>
+
+      <template #footer>
+        <Button variant="ghost" @click="createDialog = false">
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          :loading="saving"
+          @click="createCount"
         >
-          <tr
-            v-for="n in itemsPerPage"
-            :key="n"
-            class="sk-row"
-          >
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:100px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:110px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:70px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:90px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:40px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:80px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td
-              class="sk-cell"
-              style="text-align:end;"
-            >
-              <div class="d-flex justify-end gap-1">
-                <div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:6px;"
-                /><div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:6px;"
+          {{ t('Create') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- ============ ACTION CONFIRM modal ============ -->
+    <Modal
+      :open="actionDialog"
+      :title="t(actionLabels[actionType] ?? actionType)"
+      :width="440"
+      @close="actionDialog = false"
+    >
+      <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
+        {{ t('Confirm action for count') }}
+        <strong class="mono">{{ actionItem?.count_number }}</strong>?
+      </p>
+
+      <template #footer>
+        <Button variant="ghost" @click="actionDialog = false">
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          :variant="actionType === 'cancel' ? 'danger' : 'primary'"
+          :loading="actioning"
+          @click="doAction"
+        >
+          {{ t('Confirm') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- ============ DETAIL + RECORD modal ============ -->
+    <Modal
+      :open="detailDialog"
+      :title="detailCount?.count_number ?? t('Count')"
+      :subtitle="detailCount ? `${detailCount.location?.name ?? detailCount.location_name ?? ''} · ${detailCount.count_type ? t(`count_type_${detailCount.count_type}`) : ''}` : ''"
+      :width="1100"
+      @close="detailDialog = false"
+    >
+      <!-- status pill -->
+      <div v-if="detailCount?.status" style="margin-bottom: 14px;">
+        <Badge :tone="statusTone(detailCount.status)" dot>
+          {{ t(`count_status_${detailCount.status}`) }}
+        </Badge>
+      </div>
+
+      <!-- summary strip -->
+      <div
+        v-if="detailSummary"
+        class="grid summary-grid"
+        style="margin-bottom: 16px;"
+      >
+        <div class="summary-cell">
+          <div class="kpi__label">{{ t('Total items') }}</div>
+          <div class="summary-val mono">{{ detailSummary.total_items }}</div>
+        </div>
+        <div class="summary-cell">
+          <div class="kpi__label" style="color: rgb(var(--v-theme-success-strong));">{{ t('Counted') }}</div>
+          <div class="summary-val mono">{{ detailSummary.counted_items }}</div>
+        </div>
+        <div class="summary-cell">
+          <div class="kpi__label" style="color: rgb(var(--v-theme-warning-strong));">{{ t('Pending') }}</div>
+          <div class="summary-val mono">{{ detailSummary.pending_items }}</div>
+        </div>
+        <div class="summary-cell">
+          <div class="kpi__label" style="color: rgb(var(--v-theme-error-strong));">{{ t('With variance') }}</div>
+          <div class="summary-val mono">{{ detailSummary.items_with_variance }}</div>
+        </div>
+      </div>
+
+      <!-- filter -->
+      <div style="margin-bottom: 12px; max-width: 240px;">
+        <Select
+          :model-value="itemFilter"
+          :options="itemFilterOptions"
+          @update:model-value="(v: string) => itemFilter = v as any"
+        />
+      </div>
+
+      <div v-if="detailLoading" class="cell-muted" style="margin-bottom: 8px;">
+        {{ t('Loading') }}…
+      </div>
+
+      <!-- items table -->
+      <div class="tablewrap">
+        <table class="dtable" style="background: var(--surface); border-radius: 10px; border: 1px solid var(--border); overflow: hidden;">
+          <thead>
+            <tr>
+              <th>{{ t('Item') }}</th>
+              <th class="num">{{ t('System qty') }}</th>
+              <th class="num" style="min-width: 160px;">{{ t('Counted qty') }}</th>
+              <th class="num">{{ t('Variance') }}</th>
+              <th style="min-width: 180px;">{{ t('Reason') }}</th>
+              <th>{{ t('Notes') }}</th>
+              <th class="num" />
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="i in filteredItems" :key="i.id">
+              <td class="cell-strong">{{ i.stock_item?.name ?? i.item?.name ?? '—' }}</td>
+              <td class="num mono">{{ i.system_quantity }} {{ i.stock_item?.unit?.short_name ?? '' }}</td>
+              <td class="num">
+                <Input
+                  :model-value="i._input ?? ''"
+                  type="number"
+                  step="0.01"
+                  :disabled="!isCountEditable"
+                  @update:model-value="(v: string) => i._input = v === '' ? null : Number(v)"
                 />
-              </div>
-            </td>
-          </tr>
-        </template>
+              </td>
+              <td class="num">
+                <Badge
+                  v-if="i.counted_quantity != null"
+                  :tone="varianceTone(Number(i.variance ?? 0))"
+                >
+                  <span class="mono">{{ i.variance ?? 0 }} ({{ i.variance_percentage ?? 0 }}%)</span>
+                </Badge>
+                <span v-else class="cell-muted">—</span>
+              </td>
+              <td>
+                <Select
+                  :model-value="i._reason_code_id !== null ? String(i._reason_code_id) : ''"
+                  :placeholder="t('Reason')"
+                  :options="varianceCodes.map((c: any) => ({ value: String(c.id), label: `${c.code} — ${c.name}` }))"
+                  :disabled="!isCountEditable"
+                  @update:model-value="(v: string) => i._reason_code_id = v ? Number(v) : null"
+                />
+              </td>
+              <td>
+                <Input
+                  :model-value="i._notes"
+                  :disabled="!isCountEditable"
+                  @update:model-value="(v: string) => i._notes = v"
+                />
+              </td>
+              <td class="num">
+                <IconAction
+                  icon="checkcircle"
+                  tone="primary"
+                  :title="t('Record')"
+                  :disabled="!isCountEditable || recordingItemId === i.id"
+                  @click="recordItem(i)"
+                />
+              </td>
+            </tr>
+            <tr v-if="!filteredItems.length && !detailLoading">
+              <td colspan="7" class="center cell-muted" style="padding: 24px 12px;">
+                {{ t('No items') }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-        <template #item.count_number="{ item }">
-          <span class="font-weight-medium">{{ item.raw.count_number }}</span>
-        </template>
-        <template #item.location_name="{ item }">
-          {{ item.raw.location_name ?? item.raw.location?.name ?? '—' }}
-        </template>
-        <template #item.count_type="{ item }">
-          <VChip
-            color="info"
-            size="small"
-            variant="tonal"
-            class="status-pill"
-          >
-            {{ t(`count_type_${item.raw.count_type}`) }}
-          </VChip>
-        </template>
-        <template #item.status="{ item }">
-          <VChip
-            :color="statusColor[item.raw.status] ?? 'default'"
-            size="small"
-            variant="tonal"
-            class="status-pill"
-          >
-            {{ t(`count_status_${item.raw.status}`) }}
-          </VChip>
-        </template>
-        <template #item.items_counted="{ item }">
-          <span class="num-tabular">{{ item.raw.items_counted ?? item.raw.count_items?.length ?? '—' }}</span>
-        </template>
-        <template #item.created_at="{ item }">
-          {{ formatDateShort(item.raw.created_at) }}
-        </template>
-        <template #item.actions="{ item }">
-          <div
-            class="d-flex justify-end"
-            style="gap:2px;"
-          >
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              @click="openDetail(item.raw)"
-            >
-              <VIcon
-                size="18"
-                icon="bx-list-ul"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Open / record') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="canStart(item.raw)"
-              icon
-              variant="text"
-              size="small"
-              color="warning"
-              @click="openAction(item.raw, 'start')"
-            >
-              <VIcon
-                size="18"
-                icon="bx-play"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Start') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="canComplete(item.raw)"
-              icon
-              variant="text"
-              size="small"
-              color="info"
-              @click="openAction(item.raw, 'complete')"
-            >
-              <VIcon
-                size="18"
-                icon="bx-check"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Complete') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="canApprove(item.raw)"
-              icon
-              variant="text"
-              size="small"
-              color="success"
-              @click="openAction(item.raw, 'approve')"
-            >
-              <VIcon
-                size="18"
-                icon="bx-check-double"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Approve') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="canCancel(item.raw)"
-              icon
-              variant="text"
-              size="small"
-              color="error"
-              @click="openAction(item.raw, 'cancel')"
-            >
-              <VIcon
-                size="18"
-                icon="bx-x"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Cancel') }}
-              </VTooltip>
-            </VBtn>
-          </div>
-        </template>
-      </VDataTableServer>
-    </VCard>
+      <template #footer>
+        <Button variant="ghost" @click="detailDialog = false">
+          {{ t('Close') }}
+        </Button>
+      </template>
+    </Modal>
 
-    <!-- Create Dialog -->
-    <VDialog
-      v-model="createDialog"
-      max-width="400"
-      persistent
-    >
-      <VCard :title="t('New Stock Count')">
-        <VCardText>
-          <VRow>
-            <VCol cols="12">
-              <VSelect
-                v-model="form.location_id"
-                :items="locationOptions"
-                :label="t('Location')"
-                required
-              />
-            </VCol>
-            <VCol cols="12">
-              <VSelect
-                v-model="form.count_type"
-                :items="countTypes.map(c => ({ title: t(`count_type_${c}`), value: c }))"
-                :label="t('Count Type')"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VTextField
-                v-model="form.notes"
-                :label="t('Notes')"
-              />
-            </VCol>
-          </VRow>
-        </VCardText>
-        <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            color="default"
-            @click="createDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            :loading="saving"
-            @click="createCount"
-          >
-            {{ t('Create') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-
-    <!-- Action Confirm -->
-    <VDialog
-      v-model="actionDialog"
-      max-width="400"
-    >
-      <VCard :title="t(actionLabels[actionType] ?? actionType)">
-        <VCardText>{{ t('Confirm action for count') }} <strong>{{ actionItem?.count_number }}</strong>?</VCardText>
-        <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            color="default"
-            @click="actionDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            :color="actionType === 'cancel' ? 'error' : 'primary'"
-            :loading="actioning"
-            @click="doAction"
-          >
-            {{ t('Confirm') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-
-    <!-- Count detail + record_count -->
-    <VDialog
-      v-model="detailDialog"
-      max-width="1100"
-      scrollable
-    >
-      <VCard>
-        <VCardText class="py-3 d-flex align-center justify-space-between">
-          <div>
-            <div class="text-h6">
-              {{ detailCount?.count_number ?? t('Count') }}
-            </div>
-            <div class="text-caption text-disabled">
-              {{ detailCount?.location?.name ?? detailCount?.location_name }} · {{ t(`count_type_${detailCount?.count_type}`) }}
-            </div>
-          </div>
-          <VChip
-            v-if="detailCount?.status"
-            :color="statusColor[detailCount.status] ?? 'default'"
-            variant="tonal"
-            class="status-pill"
-          >
-            {{ t(`count_status_${detailCount.status}`) }}
-          </VChip>
-        </VCardText>
-        <VDivider />
-        <VCardText style="max-height:75vh;overflow-y:auto;">
-          <!-- summary strip -->
-          <VRow
-            v-if="detailSummary"
-            class="mb-3"
-          >
-            <VCol cols="6" sm="3">
-              <div class="text-caption text-disabled">{{ t('Total items') }}</div>
-              <div class="text-h6">{{ detailSummary.total_items }}</div>
-            </VCol>
-            <VCol cols="6" sm="3">
-              <div class="text-caption text-success">{{ t('Counted') }}</div>
-              <div class="text-h6">{{ detailSummary.counted_items }}</div>
-            </VCol>
-            <VCol cols="6" sm="3">
-              <div class="text-caption text-warning">{{ t('Pending') }}</div>
-              <div class="text-h6">{{ detailSummary.pending_items }}</div>
-            </VCol>
-            <VCol cols="6" sm="3">
-              <div class="text-caption text-error">{{ t('With variance') }}</div>
-              <div class="text-h6">{{ detailSummary.items_with_variance }}</div>
-            </VCol>
-          </VRow>
-
-          <!-- filter chips -->
-          <VBtnToggle
-            v-model="itemFilter"
-            variant="outlined"
-            density="compact"
-            color="primary"
-            class="mb-3"
-            mandatory
-          >
-            <VBtn size="small" value="all">{{ t('All') }}</VBtn>
-            <VBtn size="small" value="pending">{{ t('Pending') }}</VBtn>
-            <VBtn size="small" value="counted">{{ t('Counted') }}</VBtn>
-            <VBtn size="small" value="variance">{{ t('Variance') }}</VBtn>
-          </VBtnToggle>
-
-          <VProgressLinear
-            v-if="detailLoading"
-            indeterminate
-            class="mb-2"
-          />
-
-          <VTable density="compact">
-            <thead>
-              <tr>
-                <th>{{ t('Item') }}</th>
-                <th class="text-end">{{ t('System qty') }}</th>
-                <th class="text-end" style="min-inline-size:160px;">{{ t('Counted qty') }}</th>
-                <th class="text-end">{{ t('Variance') }}</th>
-                <th style="min-inline-size:180px;">{{ t('Reason') }}</th>
-                <th>{{ t('Notes') }}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="i in filteredItems"
-                :key="i.id"
-              >
-                <td class="font-weight-medium">{{ i.stock_item?.name ?? i.item?.name ?? '—' }}</td>
-                <td class="text-end num-tabular">{{ i.system_quantity }} {{ i.stock_item?.unit?.short_name ?? '' }}</td>
-                <td class="text-end">
-                  <VTextField
-                    v-model.number="i._input"
-                    type="number"
-                    step="0.01"
-                    density="compact"
-                    hide-details
-                    :disabled="detailCount?.status !== 'DRAFT' && detailCount?.status !== 'IN_PROGRESS'"
-                  />
-                </td>
-                <td class="text-end">
-                  <VChip
-                    v-if="i.counted_quantity != null"
-                    size="x-small"
-                    :color="Number(i.variance ?? 0) === 0 ? 'success' : (Number(i.variance) < 0 ? 'error' : 'warning')"
-                    variant="tonal"
-                    class="status-pill num-tabular"
-                  >
-                    {{ i.variance ?? 0 }} ({{ i.variance_percentage ?? 0 }}%)
-                  </VChip>
-                  <span
-                    v-else
-                    class="text-disabled"
-                  >—</span>
-                </td>
-                <td>
-                  <VSelect
-                    v-model="i._reason_code_id"
-                    :items="varianceCodes.map((c: any) => ({ title: `${c.code} — ${c.name}`, value: c.id }))"
-                    density="compact"
-                    hide-details
-                    clearable
-                    :disabled="detailCount?.status !== 'DRAFT' && detailCount?.status !== 'IN_PROGRESS'"
-                  />
-                </td>
-                <td>
-                  <VTextField
-                    v-model="i._notes"
-                    density="compact"
-                    hide-details
-                    :disabled="detailCount?.status !== 'DRAFT' && detailCount?.status !== 'IN_PROGRESS'"
-                  />
-                </td>
-                <td>
-                  <VBtn
-                    icon
-                    variant="text"
-                    size="small"
-                    color="primary"
-                    :loading="recordingItemId === i.id"
-                    :disabled="detailCount?.status !== 'DRAFT' && detailCount?.status !== 'IN_PROGRESS'"
-                    @click="recordItem(i)"
-                  >
-                    <VIcon icon="bx-save" size="18" />
-                    <VTooltip activator="parent" location="top">{{ t('Record') }}</VTooltip>
-                  </VBtn>
-                </td>
-              </tr>
-              <tr v-if="!filteredItems.length && !detailLoading">
-                <td colspan="7" class="text-center text-disabled py-4">
-                  {{ t('No items') }}
-                </td>
-              </tr>
-            </tbody>
-          </VTable>
-        </VCardText>
-        <VDivider />
-        <VCardActions>
-          <VSpacer />
-          <VBtn variant="text" @click="detailDialog = false">
-            {{ t('Close') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-
-    <VSnackbar
-      v-model="snackbar"
-      :color="snackbarColor"
-      :timeout="3000"
+    <!-- Lightweight inline toast (kept for compatibility with useNotify) -->
+    <div
+      v-if="snackbar"
+      :class="['notify-snackbar', `tone-${snackbarColor}`]"
+      style="position: fixed; bottom: 24px; right: 24px; padding: 12px 18px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-md); z-index: 9999;"
     >
       {{ snackbarMsg }}
-    </VSnackbar>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.cell-strong { color: var(--text); font-weight: 600; }
+.cell-muted { color: var(--text-secondary); }
+.mono { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+.nowrap { white-space: nowrap; }
+.center { text-align: center; }
+.num { text-align: right; }
+.grid { display: grid; gap: 12px; }
+
+/* Toolbar filter cells: stay generous on desktop, drop to full width on mobile */
+.filter-cell { width: 220px; min-width: 0; }
+.toolbar-spacer { margin-left: auto; }
+
+/* Summary strip: 4 cols on desktop, 2 on tablet, 1 on phone */
+.summary-grid { grid-template-columns: repeat(4, 1fr); }
+.summary-cell { padding: 4px 0; }
+.summary-val { font-size: 22px; font-weight: 700; color: var(--text); }
+
+/* Create/detail modal form grid */
+.form-grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
+
+/* Detail items table horizontal-scrolls below 900px so 7 cols don't break layout */
+.tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 900px) {
+  .filter-cell { width: 100%; flex: 1 1 100%; }
+  .toolbar-spacer { margin-left: 0; width: 100%; }
+  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .summary-grid { grid-template-columns: 1fr; }
+  .summary-val { font-size: 18px; }
+}
+</style>
 
 <route lang="yaml">
 name: stock-counts

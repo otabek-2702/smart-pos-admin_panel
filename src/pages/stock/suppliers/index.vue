@@ -1,8 +1,26 @@
 <script setup lang="ts">
+/* ============================================================
+   ALPHA POS - Stock Suppliers
+   - Design-system primitives only (no Vuetify on the page itself)
+   - List / search / filter active
+   - Create / Edit / Delete / Pay / Ledger modals
+   ============================================================ */
 import { stockApi as axios } from '@/plugins/axios'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
+import Badge from '@/components/design/Badge.vue'
+import Button from '@/components/design/Button.vue'
+import DataTable, { type DataTableColumn } from '@/components/design/DataTable.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import Field from '@/components/design/Field.vue'
+import IconAction from '@/components/design/IconAction.vue'
+import Input from '@/components/design/Input.vue'
+import Modal from '@/components/design/Modal.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
+import Select from '@/components/design/Select.vue'
+import StateFill from '@/components/design/StateFill.vue'
 
 const { t } = useI18n({ useScope: 'global' })
+const { notify } = useNotify()
+const { formatCurrency, formatDate } = useFormatters()
 
 // List only returns: id, uuid, code(null), name, city, rating, is_active
 const suppliers = ref<any[]>([])
@@ -39,20 +57,6 @@ const form = ref({
   lead_time_days: 7,
 })
 
-const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
-
-// Only columns that the list API actually returns
-const headers = [
-  { title: t('Name'), key: 'name', sortable: false },
-  { title: t('Phone'), key: 'phone', sortable: false },
-  { title: t('Contact Person'), key: 'contact_person', sortable: false },
-  { title: t('City'), key: 'city', sortable: false },
-  { title: t('Rating'), key: 'rating', sortable: false },
-  { title: t('Outstanding Balance'), key: 'current_balance', sortable: false, align: 'end' as const },
-  { title: t('Status'), key: 'is_active', sortable: false },
-  { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
-]
-
 async function loadSuppliers() {
   loading.value = true
   try {
@@ -80,9 +84,15 @@ async function loadSuppliers() {
   }
 }
 
+const debouncedSearch = useDebounceFn(() => {
+  page.value = 1
+  loadSuppliers()
+}, 350)
+
 onMounted(loadSuppliers)
 watch([page, itemsPerPage], loadSuppliers)
-watch([search, activeFilter], () => { page.value = 1; loadSuppliers() })
+watch(activeFilter, () => { page.value = 1; loadSuppliers() })
+watch(search, () => debouncedSearch())
 
 async function openDetail(item: any) {
   detailItem.value = item
@@ -175,7 +185,6 @@ const payDialog = ref(false)
 const paying = ref<any>(null)
 const paySaving = ref(false)
 const payForm = ref({ amount: 0, source_account: 'BANK', commission: 0, note: '' })
-const { formatCurrency, formatDate } = useFormatters()
 
 function openPay(s: any) {
   paying.value = s
@@ -247,703 +256,615 @@ async function loadLedger() {
 
 watch(ledgerPage, loadLedger)
 
-const ledgerTypeColor: Record<string, string> = {
+const ledgerTypeTone: Record<string, 'warning' | 'success' | 'info' | 'neutral'> = {
   PURCHASE: 'warning',
   PAYMENT: 'success',
   RETURN: 'info',
-  ADJUSTMENT: 'secondary',
+  ADJUSTMENT: 'neutral',
 }
+
+// ---- DataTable columns ----
+const columns = computed<DataTableColumn<any>[]>(() => [
+  { key: 'name', label: t('supplier_col_name') },
+  { key: 'phone', label: t('supplier_col_phone') },
+  { key: 'contact_person', label: t('supplier_col_contact_person') },
+  { key: 'city', label: t('supplier_col_city') },
+  { key: 'rating', label: t('supplier_col_rating') },
+  { key: 'current_balance', label: t('supplier_col_outstanding'), align: 'right' },
+  { key: 'is_active', label: t('supplier_col_status') },
+])
+
+const dtPagination = computed(() => ({
+  page: page.value,
+  perPage: itemsPerPage.value,
+  total: total.value,
+  onPage: (p: number) => { page.value = p },
+  onPerPage: (n: number) => { itemsPerPage.value = n; page.value = 1 },
+}))
+
+const statusOptions = computed(() => [
+  { value: 'true', label: t('supplier_status_active') },
+  { value: 'false', label: t('supplier_status_inactive') },
+])
+
+const sourceOptions = computed(() => [
+  { value: 'BANK', label: t('pay_source_BANK') },
+  { value: 'SAFE', label: t('pay_source_SAFE') },
+])
 </script>
 
 <template>
-  <div>
-    <VCard>
-      <VCardText class="d-flex flex-wrap gap-3 align-center">
-        <VTextField
-          v-model="search"
-          :placeholder="t('Search suppliers...')"
-          prepend-inner-icon="bx-search"
-          density="compact"
-          style="min-inline-size: 240px;"
-          hide-details
-          clearable
-        />
-        <VSelect
-          v-model="activeFilter"
-          :items="[{ title: t('Active'), value: 'true' }, { title: t('Inactive'), value: 'false' }]"
-          :placeholder="t('All')"
-          density="compact"
-          style="min-inline-size: 160px;"
-          hide-details
-          clearable
-        />
-        <VSpacer />
-        <VBtn
-          prepend-icon="bx-plus"
+  <div class="page">
+    <!-- Page header -->
+    <PageHeader
+      :title="t('Suppliers')"
+      :subtitle="t('suppliers_subtitle')"
+    >
+      <template #actions>
+        <Button
+          variant="primary"
+          icon="plus"
           @click="openCreate"
         >
           {{ t('Add Supplier') }}
-        </VBtn>
-      </VCardText>
+        </Button>
+      </template>
+    </PageHeader>
 
-      <VDataTableServer
-        :headers="headers"
-        :items="suppliers"
-        :items-length="total"
-        :loading="loading"
-        :items-per-page="itemsPerPage"
-        :page="page"
-      >
-        <template #bottom>
-          <DataTableFooter
-            v-model:page="page"
-            v-model:items-per-page="itemsPerPage"
-            :total-items="total"
+    <!-- Main table card -->
+    <div class="card">
+      <!-- Toolbar -->
+      <div class="toolbar toolbar--wrap">
+        <div class="grow toolbar__search">
+          <Input
+            v-model="search"
+            icon="search"
+            :placeholder="t('Search suppliers...')"
+            :aria-label="t('Search suppliers...')"
           />
+        </div>
+
+        <div class="toolbar__status">
+          <Select
+            :model-value="activeFilter ?? ''"
+            :placeholder="t('All')"
+            :options="statusOptions"
+            @update:model-value="(v: string) => activeFilter = v ? v : undefined"
+          />
+        </div>
+      </div>
+
+      <div class="card__divider" />
+
+      <!-- DataTable -->
+      <DataTable
+        :columns="columns"
+        :rows="suppliers"
+        row-key="id"
+        :loading="loading"
+        :pagination="dtPagination"
+        :per-page-options="[10, 25, 50, 100]"
+      >
+        <!-- Name -->
+        <template #cell.name="{ row }">
+          <span class="cell-strong">{{ row.name }}</span>
         </template>
 
-        <template
-          v-if="loading && suppliers.length === 0"
-          #body
-        >
-          <tr
-            v-for="n in itemsPerPage"
-            :key="n"
-            class="sk-row"
-          >
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:140px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:110px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:120px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:90px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:60px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td
-              class="sk-cell"
-              style="text-align:end;"
-            >
-              <div
-                class="sk-box"
-                style="width:80px;height:13px;border-radius:4px;margin-inline-start:auto;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:60px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td
-              class="sk-cell"
-              style="text-align:end;"
-            >
-              <div class="d-flex justify-end gap-1">
-                <div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:6px;"
-                /><div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:6px;"
-                /><div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:6px;"
-                />
-              </div>
-            </td>
-          </tr>
+        <!-- Phone -->
+        <template #cell.phone="{ row }">
+          <span class="cell-muted">{{ row.phone || '—' }}</span>
         </template>
 
-        <template #item.phone="{ item }">
-          {{ item.raw.phone || '—' }}
+        <!-- Contact -->
+        <template #cell.contact_person="{ row }">
+          <span class="cell-muted">{{ row.contact_person || '—' }}</span>
         </template>
-        <template #item.contact_person="{ item }">
-          <span class="hide-sm">{{ item.raw.contact_person || '—' }}</span>
+
+        <!-- City -->
+        <template #cell.city="{ row }">
+          <span class="cell-muted">{{ row.city || '—' }}</span>
         </template>
-        <template #item.city="{ item }">
-          {{ item.raw.city || '—' }}
+
+        <!-- Rating -->
+        <template #cell.rating="{ row }">
+          <div class="row" style="gap: 4px;">
+            <DesignIcon
+              name="star"
+              :size="14"
+              style="color: rgb(var(--v-theme-warning-strong));"
+            />
+            <span>{{ row.rating ?? '—' }}</span>
+          </div>
         </template>
-        <template #item.current_balance="{ item }">
+
+        <!-- Outstanding balance -->
+        <template #cell.current_balance="{ row }">
           <span
-            class="num-tabular"
-            :class="Number(item.raw.current_balance) > 0 ? 'text-warning' : 'text-disabled'"
+            class="mono"
+            :style="{ color: Number(row.current_balance) > 0 ? 'rgb(var(--v-theme-warning-strong))' : 'var(--text-tertiary)' }"
           >
-            {{ formatCurrency(item.raw.current_balance ?? 0) }}
+            {{ formatCurrency(row.current_balance ?? 0) }}
           </span>
         </template>
-        <template #item.rating="{ item }">
-          <div class="d-flex align-center gap-1">
-            <VIcon
-              icon="bx-star"
-              size="14"
-              color="warning"
+
+        <!-- Status -->
+        <template #cell.is_active="{ row }">
+          <Badge :tone="row.is_active ? 'success' : 'neutral'" dot>
+            {{ row.is_active ? t('supplier_status_active') : t('supplier_status_inactive') }}
+          </Badge>
+        </template>
+
+        <!-- Inline row actions -->
+        <template #row-actions="{ row }">
+          <IconAction
+            icon="dollar"
+            tone="success"
+            :title="t('Pay supplier')"
+            @click.stop="openPay(row)"
+          />
+          <IconAction
+            icon="receipt"
+            :title="t('Ledger')"
+            @click.stop="openLedger(row)"
+          />
+          <IconAction
+            icon="eye"
+            :title="t('View')"
+            @click.stop="openDetail(row)"
+          />
+          <IconAction
+            icon="edit"
+            :title="t('Edit')"
+            @click.stop="openEdit(row)"
+          />
+          <IconAction
+            icon="trash"
+            tone="danger"
+            :title="t('Delete')"
+            @click.stop="confirmDelete(row)"
+          />
+        </template>
+
+        <!-- Empty state -->
+        <template #empty>
+          <StateFill
+            icon="package"
+            :title="t('suppliers_empty_title')"
+            :sub="t('suppliers_empty_sub')"
+          />
+        </template>
+      </DataTable>
+    </div>
+
+    <!-- Detail Modal -->
+    <Modal
+      :open="detailDialog"
+      :width="560"
+      :title="detailItem?.name ?? ''"
+      @close="detailDialog = false"
+    >
+      <div v-if="detailLoading" class="row" style="justify-content: center; padding: 16px 0;">
+        <DesignIcon name="refresh" :size="20" />
+        <span style="margin-left: 8px;" class="cell-muted">{{ t('Loading') }}</span>
+      </div>
+
+      <div v-if="detailItem" class="grid cols-2 detail-grid" style="gap: var(--sp-4);">
+        <div>
+          <div class="field__label">
+            {{ t('Contact') }}
+          </div>
+          <div>{{ detailItem.contact_person || '—' }}</div>
+        </div>
+        <div>
+          <div class="field__label">
+            {{ t('Phone') }}
+          </div>
+          <div>{{ detailItem.phone || '—' }}</div>
+        </div>
+        <div>
+          <div class="field__label">
+            {{ t('Email') }}
+          </div>
+          <div>{{ detailItem.email || '—' }}</div>
+        </div>
+        <div>
+          <div class="field__label">
+            {{ t('City') }}
+          </div>
+          <div>{{ detailItem.city || '—' }}</div>
+        </div>
+        <div>
+          <div class="field__label">
+            {{ t('Payment Terms') }}
+          </div>
+          <div>{{ detailItem.payment_terms_days ? `${detailItem.payment_terms_days} ${t('days')}` : '—' }}</div>
+        </div>
+        <div>
+          <div class="field__label">
+            {{ t('Lead Time') }}
+          </div>
+          <div>{{ detailItem.lead_time_days ? `${detailItem.lead_time_days} ${t('days')}` : '—' }}</div>
+        </div>
+        <div>
+          <div class="field__label">
+            {{ t('Balance') }}
+          </div>
+          <div>{{ detailItem.current_balance ?? '—' }}</div>
+        </div>
+        <div>
+          <div class="field__label">
+            {{ t('Rating') }}
+          </div>
+          <div class="row" style="gap: 4px;">
+            <DesignIcon
+              name="star"
+              :size="14"
+              style="color: rgb(var(--v-theme-warning-strong));"
             />
-            <span>{{ item.raw.rating ?? '—' }}</span>
+            {{ detailItem.rating ?? '—' }}
           </div>
-        </template>
-        <template #item.is_active="{ item }">
-          <VChip
-            class="status-pill"
-            :color="item.raw.is_active ? 'success' : 'default'"
-            size="small"
-            variant="tonal"
-          >
-            {{ item.raw.is_active ? t('Active') : t('Inactive') }}
-          </VChip>
-        </template>
-        <template #item.actions="{ item }">
-          <div
-            class="d-flex justify-end"
-            style="gap:2px;"
-          >
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              color="success"
-              @click="openPay(item.raw)"
-            >
-              <VIcon
-                size="18"
-                icon="bx-dollar-circle"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Pay supplier') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              @click="openLedger(item.raw)"
-            >
-              <VIcon
-                size="18"
-                icon="bx-receipt"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Ledger') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              @click="openDetail(item.raw)"
-            >
-              <VIcon
-                size="18"
-                icon="bx-show"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('View') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              @click="openEdit(item.raw)"
-            >
-              <VIcon
-                size="18"
-                icon="bx-edit"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Edit') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              color="error"
-              @click="confirmDelete(item.raw)"
-            >
-              <VIcon
-                size="18"
-                icon="bx-trash"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Delete') }}
-              </VTooltip>
-            </VBtn>
+        </div>
+        <div v-if="detailItem.items?.length" class="detail-grid__full" style="grid-column: span 2;">
+          <div class="field__label" style="margin-bottom: 6px;">
+            {{ t('Supplied Items') }} ({{ detailItem.item_count }})
           </div>
-        </template>
-      </VDataTableServer>
-    </VCard>
+          <div class="tablewrap">
+            <table class="dtable" style="background: var(--surface); border-radius: 10px; border: 1px solid var(--border); overflow: hidden;">
+              <thead>
+                <tr>
+                  <th>{{ t('Item') }}</th>
+                  <th class="num">
+                    {{ t('Price') }}
+                  </th>
+                  <th>{{ t('Unit') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="si in (detailItem.items as any[])" :key="si.id">
+                  <td>{{ si.stock_item_name }}</td>
+                  <td class="num mono">
+                    {{ si.price }}
+                  </td>
+                  <td>{{ si.unit_short }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
-    <!-- Detail Dialog -->
-    <VDialog
-      v-model="detailDialog"
-      max-width="560"
+      <template #footer>
+        <Button variant="ghost" @click="detailDialog = false">
+          {{ t('Close') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Create / Edit Modal -->
+    <Modal
+      :open="dialog"
+      :width="560"
+      :title="dialogMode === 'create' ? t('Add Supplier') : t('Edit Supplier')"
+      :close-on-backdrop="false"
+      @close="dialog = false"
     >
-      <VCard
-        v-if="detailItem"
-        :title="detailItem.name"
-      >
-        <VCardText>
-          <VProgressLinear
-            v-if="detailLoading"
-            indeterminate
-            class="mb-3"
+      <div class="grid cols-2 form-grid" style="gap: var(--sp-4);">
+        <div class="form-grid__full" style="grid-column: span 2;">
+          <Field :label="t('Name')">
+            <Input v-model="form.name" />
+          </Field>
+        </div>
+
+        <Field :label="t('Contact Person')">
+          <Input v-model="form.contact_person" />
+        </Field>
+
+        <Field :label="t('Phone')">
+          <Input v-model="form.phone" />
+        </Field>
+
+        <Field :label="t('Email')">
+          <Input v-model="form.email" type="email" />
+        </Field>
+
+        <Field :label="t('City')">
+          <Input v-model="form.city" />
+        </Field>
+
+        <div class="form-grid__full" style="grid-column: span 2;">
+          <Field :label="t('Address')">
+            <Input v-model="form.address" />
+          </Field>
+        </div>
+
+        <Field :label="t('Rating (1-5)')">
+          <Input
+            v-model="form.rating"
+            type="number"
+            min="1"
+            max="5"
           />
-          <VRow dense>
-            <VCol cols="6">
-              <div class="text-caption text-disabled">
-                {{ t('Contact') }}
-              </div>
-              <div>{{ detailItem.contact_person || '—' }}</div>
-            </VCol>
-            <VCol cols="6">
-              <div class="text-caption text-disabled">
-                {{ t('Phone') }}
-              </div>
-              <div>{{ detailItem.phone || '—' }}</div>
-            </VCol>
-            <VCol cols="6">
-              <div class="text-caption text-disabled">
-                {{ t('Email') }}
-              </div>
-              <div>{{ detailItem.email || '—' }}</div>
-            </VCol>
-            <VCol cols="6">
-              <div class="text-caption text-disabled">
-                {{ t('City') }}
-              </div>
-              <div>{{ detailItem.city || '—' }}</div>
-            </VCol>
-            <VCol cols="6">
-              <div class="text-caption text-disabled">
-                {{ t('Payment Terms') }}
-              </div>
-              <div>{{ detailItem.payment_terms_days ? `${detailItem.payment_terms_days} ${t('days')}` : '—' }}</div>
-            </VCol>
-            <VCol cols="6">
-              <div class="text-caption text-disabled">
-                {{ t('Lead Time') }}
-              </div>
-              <div>{{ detailItem.lead_time_days ? `${detailItem.lead_time_days} ${t('days')}` : '—' }}</div>
-            </VCol>
-            <VCol cols="6">
-              <div class="text-caption text-disabled">
-                {{ t('Balance') }}
-              </div>
-              <div>{{ detailItem.current_balance ?? '—' }}</div>
-            </VCol>
-            <VCol cols="6">
-              <div class="text-caption text-disabled">
-                {{ t('Rating') }}
-              </div>
-              <div class="d-flex align-center gap-1">
-                <VIcon
-                  icon="bx-star"
-                  size="14"
-                  color="warning"
-                />
-                {{ detailItem.rating ?? '—' }}
-              </div>
-            </VCol>
-            <template v-if="detailItem.items?.length">
-              <VCol
-                cols="12"
-                class="mt-2"
-              >
-                <div class="text-caption text-disabled mb-1">
-                  {{ t('Supplied Items') }} ({{ detailItem.item_count }})
-                </div>
-                <VTable density="compact">
-                  <thead><tr><th>{{ t('Item') }}</th><th>{{ t('Price') }}</th><th>{{ t('Unit') }}</th></tr></thead>
-                  <tbody>
-                    <tr
-                      v-for="si in (detailItem.items as any[])"
-                      :key="si.id"
-                    >
-                      <td>{{ si.stock_item_name }}</td>
-                      <td>{{ si.price }}</td>
-                      <td>{{ si.unit_short }}</td>
-                    </tr>
-                  </tbody>
-                </VTable>
-              </VCol>
-            </template>
-          </VRow>
-        </VCardText>
-        <VCardActions class="justify-end pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            @click="detailDialog = false"
-          >
-            {{ t('Close') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+        </Field>
 
-    <!-- Create / Edit Dialog -->
-    <VDialog
-      v-model="dialog"
-      max-width="560"
-      persistent
-    >
-      <VCard :title="dialogMode === 'create' ? t('Add Supplier') : t('Edit Supplier')">
-        <VCardText>
-          <VRow>
-            <VCol cols="12">
-              <VTextField
-                v-model="form.name"
-                :label="t('Name')"
-                required
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.contact_person"
-                :label="t('Contact Person')"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.phone"
-                :label="t('Phone')"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.email"
-                :label="t('Email')"
-                type="email"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.city"
-                :label="t('City')"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VTextField
-                v-model="form.address"
-                :label="t('Address')"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="4"
-            >
-              <VTextField
-                v-model.number="form.rating"
-                :label="t('Rating (1-5)')"
-                type="number"
-                :min="1"
-                :max="5"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="4"
-            >
-              <VTextField
-                v-model.number="form.payment_terms_days"
-                :label="t('Payment Terms (days)')"
-                type="number"
-                :min="0"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="4"
-            >
-              <VTextField
-                v-model.number="form.lead_time_days"
-                :label="t('Lead Time (days)')"
-                type="number"
-                :min="0"
-              />
-            </VCol>
-          </VRow>
-        </VCardText>
-        <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            color="default"
-            @click="dialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            :loading="saving"
-            @click="save"
-          >
-            {{ t('Save') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-
-    <!-- Delete Confirm -->
-    <VDialog
-      v-model="deleteDialog"
-      max-width="400"
-    >
-      <VCard :title="t('Delete Supplier')">
-        <VCardText>{{ t('Are you sure you want to delete') }} <strong>{{ selectedItem?.name }}</strong>?</VCardText>
-        <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            color="default"
-            @click="deleteDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="error"
-            :loading="deleting"
-            @click="doDelete"
-          >
-            {{ t('Delete') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-
-    <!-- Pay dialog -->
-    <VDialog
-      v-model="payDialog"
-      max-width="520"
-      persistent
-    >
-      <VCard :title="t('Pay supplier')">
-        <VCardText>
-          <div
-            v-if="paying"
-            class="text-body-2 mb-3"
-          >
-            {{ paying.name }}<span v-if="paying.current_balance"> · {{ t('Owed') }}: <strong class="text-warning num-tabular">{{ formatCurrency(paying.current_balance) }}</strong></span>
-          </div>
-          <VRow>
-            <VCol cols="12" sm="6">
-              <VTextField
-                v-model.number="payForm.amount"
-                :label="t('Amount')"
-                type="number"
-                min="0"
-                autofocus
-              />
-            </VCol>
-            <VCol cols="12" sm="6">
-              <VSelect
-                v-model="payForm.source_account"
-                :items="[
-                  { title: t('Bank (cards)'), value: 'BANK' },
-                  { title: t('Safe (cash)'), value: 'SAFE' },
-                ]"
-                :label="t('Source account')"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VTextField
-                v-model.number="payForm.commission"
-                :label="t('Commission / fee (optional)')"
-                type="number"
-                min="0"
-                :hint="t('Bank charge — debits same account')"
-                persistent-hint
-              />
-            </VCol>
-            <VCol cols="12">
-              <VTextField
-                v-model="payForm.note"
-                :label="t('Note')"
-              />
-            </VCol>
-          </VRow>
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn
-            variant="text"
-            @click="payDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="success"
-            :loading="paySaving"
-            @click="doPay"
-          >
-            {{ t('Pay') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
-
-    <!-- Ledger drawer -->
-    <VDialog
-      v-model="ledgerDialog"
-      max-width="900"
-      scrollable
-    >
-      <VCard>
-        <VCardText class="d-flex align-center justify-space-between py-3">
-          <div>
-            <div class="text-h6">
-              {{ ledgerSupplier?.name }} · {{ t('Ledger') }}
-            </div>
-            <div
-              v-if="ledgerBalance !== null"
-              class="text-caption"
-            >
-              {{ t('Current balance') }}: <strong class="num-tabular" :class="Number(ledgerBalance) > 0 ? 'text-warning' : 'text-success'">{{ formatCurrency(ledgerBalance) }}</strong>
-            </div>
-          </div>
-          <VBtn
-            icon
-            variant="text"
-            @click="loadLedger"
-          >
-            <VIcon icon="bx-refresh" />
-          </VBtn>
-        </VCardText>
-        <VDivider />
-        <VCardText style="max-height:70vh;overflow-y:auto;">
-          <VProgressLinear
-            v-if="ledgerLoading"
-            indeterminate
-            class="mb-3"
+        <Field :label="t('Payment Terms (days)')">
+          <Input
+            v-model="form.payment_terms_days"
+            type="number"
+            min="0"
           />
-          <VTable density="compact">
-            <thead>
-              <tr>
-                <th>{{ t('Date') }}</th>
-                <th>{{ t('Type') }}</th>
-                <th class="text-end">{{ t('Amount') }}</th>
-                <th class="text-end">{{ t('Balance after') }}</th>
-                <th>{{ t('Reference') }}</th>
-                <th>{{ t('Note') }}</th>
-                <th>{{ t('By') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="r in ledgerRows"
-                :key="r.id"
-              >
-                <td>{{ formatDate(r.created_at) }}</td>
-                <td>
-                  <VChip
-                    class="status-pill"
-                    size="x-small"
-                    :color="ledgerTypeColor[r.type] ?? 'default'"
-                    variant="tonal"
-                  >
-                    {{ r.type ? t(`supplier_tx_${r.type}`) : '—' }}
-                  </VChip>
-                </td>
-                <td
-                  class="text-end font-weight-medium num-tabular"
-                  :class="Number(r.amount ?? r.delta) > 0 ? 'text-warning' : 'text-success'"
-                >
-                  {{ formatCurrency(r.amount ?? r.delta ?? 0) }}
-                </td>
-                <td class="text-end num-tabular">{{ formatCurrency(r.balance_after ?? 0) }}</td>
-                <td>
-                  <span
-                    v-if="r.reference_type"
-                    class="text-caption text-disabled"
-                  >{{ t(`ref_${r.reference_type}`) }} #{{ r.reference_id }}</span>
-                  <span
-                    v-else
-                    class="text-disabled"
-                  >—</span>
-                </td>
-                <td class="text-body-2">{{ r.note || r.description || '—' }}</td>
-                <td class="text-body-2">{{ r.performed_by || '—' }}</td>
-              </tr>
-              <tr v-if="!ledgerRows.length && !ledgerLoading">
-                <td colspan="7" class="text-center text-disabled py-4">
-                  {{ t('No ledger entries') }}
-                </td>
-              </tr>
-            </tbody>
-          </VTable>
-        </VCardText>
-        <VDivider />
-        <VCardActions>
-          <DataTableFooter
-            v-model:page="ledgerPage"
-            v-model:items-per-page="ledgerPerPage"
-            :total-items="ledgerTotal"
-          />
-          <VSpacer />
-          <VBtn
-            variant="text"
-            @click="ledgerDialog = false"
-          >
-            {{ t('Close') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+        </Field>
 
-    <VSnackbar
-      v-model="snackbar"
-      :color="snackbarColor"
-      :timeout="3000"
+        <Field :label="t('Lead Time (days)')">
+          <Input
+            v-model="form.lead_time_days"
+            type="number"
+            min="0"
+          />
+        </Field>
+      </div>
+
+      <template #footer>
+        <Button variant="ghost" :disabled="saving" @click="dialog = false">
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          :loading="saving"
+          :disabled="!form.name || saving"
+          @click="save"
+        >
+          {{ t('Save') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Delete Confirm Modal -->
+    <Modal
+      :open="deleteDialog"
+      :width="440"
+      :title="t('Delete Supplier')"
+      :subtitle="t('supplier_delete_confirm')"
+      @close="deleteDialog = false"
     >
-      {{ snackbarMsg }}
-    </VSnackbar>
+      <div class="row" style="gap: 14px; align-items: flex-start;">
+        <div
+          class="kpi__icon t-error"
+          style="width: 44px; height: 44px; flex: 0 0 44px;"
+        >
+          <DesignIcon name="alert" :size="22" />
+        </div>
+        <div>
+          <p style="margin: 0; font-weight: 600;">
+            {{ selectedItem?.name }}
+          </p>
+          <p class="muted" style="margin: 6px 0 0; font-size: 14px;">
+            {{ t('supplier_delete_warning') }}
+          </p>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button variant="ghost" :disabled="deleting" @click="deleteDialog = false">
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="danger"
+          :loading="deleting"
+          :disabled="deleting"
+          @click="doDelete"
+        >
+          {{ t('Delete') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Pay Modal -->
+    <Modal
+      :open="payDialog"
+      :width="520"
+      :title="t('Pay supplier')"
+      :close-on-backdrop="false"
+      @close="payDialog = false"
+    >
+      <div v-if="paying" class="cell-muted" style="margin-bottom: var(--sp-3); font-size: 13px;">
+        <strong style="color: var(--text);">{{ paying.name }}</strong>
+        <span v-if="paying.current_balance">
+          · {{ t('Owed') }}:
+          <strong class="mono" style="color: rgb(var(--v-theme-warning-strong));">{{ formatCurrency(paying.current_balance) }}</strong>
+        </span>
+      </div>
+
+      <div class="grid cols-2 form-grid" style="gap: var(--sp-4);">
+        <Field :label="t('Amount')">
+          <Input
+            v-model="payForm.amount"
+            type="number"
+            min="0"
+            autofocus
+          />
+        </Field>
+
+        <Field :label="t('Source account')">
+          <Select
+            v-model="payForm.source_account"
+            :options="sourceOptions"
+          />
+        </Field>
+
+        <div class="form-grid__full" style="grid-column: span 2;">
+          <Field
+            :label="t('Commission / fee (optional)')"
+            :hint="t('pay_commission_hint')"
+          >
+            <Input
+              v-model="payForm.commission"
+              type="number"
+              min="0"
+            />
+          </Field>
+        </div>
+
+        <div class="form-grid__full" style="grid-column: span 2;">
+          <Field :label="t('Note')">
+            <Input v-model="payForm.note" />
+          </Field>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button variant="ghost" :disabled="paySaving" @click="payDialog = false">
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="dollar"
+          :loading="paySaving"
+          :disabled="paySaving"
+          @click="doPay"
+        >
+          {{ t('Pay') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Ledger Modal -->
+    <Modal
+      :open="ledgerDialog"
+      :width="900"
+      :title="`${ledgerSupplier?.name ?? ''} · ${t('Ledger')}`"
+      :subtitle="ledgerBalance !== null ? t('Current balance') + ': ' + formatCurrency(ledgerBalance) : undefined"
+      @close="ledgerDialog = false"
+    >
+      <div class="row" style="justify-content: flex-end; margin-bottom: var(--sp-3);">
+        <Button variant="ghost" size="sm" icon="refresh" @click="loadLedger">
+          {{ t('supplier_action_refresh') }}
+        </Button>
+      </div>
+
+      <div v-if="ledgerLoading" class="row" style="justify-content: center; padding: 16px 0;">
+        <DesignIcon name="refresh" :size="20" />
+        <span style="margin-left: 8px;" class="cell-muted">{{ t('Loading') }}</span>
+      </div>
+
+      <div v-else-if="ledgerRows.length === 0">
+        <StateFill
+          icon="receipt"
+          :title="t('No ledger entries')"
+        />
+      </div>
+
+      <div v-else class="tablewrap">
+        <table class="dtable" style="background: var(--surface); border-radius: 10px; border: 1px solid var(--border); overflow: hidden;">
+          <thead>
+            <tr>
+              <th>{{ t('Date') }}</th>
+              <th>{{ t('Type') }}</th>
+              <th class="num">
+                {{ t('Amount') }}
+              </th>
+              <th class="num">
+                {{ t('Balance after') }}
+              </th>
+              <th>{{ t('Reference') }}</th>
+              <th>{{ t('Note') }}</th>
+              <th>{{ t('By') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in ledgerRows" :key="r.id">
+              <td class="mono nowrap">
+                {{ formatDate(r.created_at) }}
+              </td>
+              <td>
+                <Badge :tone="ledgerTypeTone[r.type] ?? 'neutral'">
+                  {{ r.type ? t(`supplier_tx_${r.type}`) : '—' }}
+                </Badge>
+              </td>
+              <td
+                class="num mono"
+                :style="{ color: Number(r.amount ?? r.delta) > 0 ? 'rgb(var(--v-theme-warning-strong))' : 'rgb(var(--v-theme-success-strong))', fontWeight: 600 }"
+              >
+                {{ formatCurrency(r.amount ?? r.delta ?? 0) }}
+              </td>
+              <td class="num mono">
+                {{ formatCurrency(r.balance_after ?? 0) }}
+              </td>
+              <td>
+                <span v-if="r.reference_type" class="cell-muted" style="font-size: 12px;">
+                  {{ t(`ref_${r.reference_type}`) }} #{{ r.reference_id }}
+                </span>
+                <span v-else class="cell-muted">—</span>
+              </td>
+              <td class="cell-muted">
+                {{ r.note || r.description || '—' }}
+              </td>
+              <td class="cell-muted">
+                {{ r.performed_by || '—' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <template #footer>
+        <Button variant="ghost" @click="ledgerDialog = false">
+          {{ t('Close') }}
+        </Button>
+      </template>
+    </Modal>
   </div>
 </template>
+
+<style scoped>
+.row {
+  display: flex;
+  align-items: center;
+}
+
+.toolbar--wrap {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.toolbar__search {
+  max-inline-size: 320px;
+  min-inline-size: 220px;
+  flex: 1 1 240px;
+}
+
+.toolbar__status {
+  inline-size: 180px;
+}
+
+.tablewrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.field__label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-bottom: 2px;
+}
+
+@media (max-width: 900px) {
+  .toolbar__search,
+  .toolbar__status {
+    inline-size: 100%;
+    max-inline-size: none;
+    min-inline-size: 0;
+    flex: 1 1 100%;
+  }
+  .form-grid,
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-grid__full,
+  .detail-grid__full {
+    grid-column: span 1 !important;
+  }
+}
+</style>
 
 <route lang="yaml">
 name: stock-suppliers

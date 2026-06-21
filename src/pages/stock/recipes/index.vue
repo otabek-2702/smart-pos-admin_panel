@@ -1,10 +1,28 @@
 <script setup lang="ts">
+/* ============================================================
+   ALPHA POS — Stock / Recipes
+   Plain HTML + design classes (design-shell.css). Uses the
+   shared DataTable primitive with column definitions, design
+   Modal/Input/Select/Switch/Button/IconAction. Preserves all
+   axios calls, computed filters and search/filter refs.
+   ============================================================ */
 import RecipeDetailDialog from './RecipeDetailDialog.vue'
 import { stockApi as axios } from '@/plugins/axios'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
+import Badge from '@/components/design/Badge.vue'
+import Button from '@/components/design/Button.vue'
+import DataTable, { type DataTableColumn } from '@/components/design/DataTable.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import Field from '@/components/design/Field.vue'
+import IconAction from '@/components/design/IconAction.vue'
+import Input from '@/components/design/Input.vue'
+import Modal from '@/components/design/Modal.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
+import Select from '@/components/design/Select.vue'
+import Switch from '@/components/design/Switch.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 
+/* ---------------- state (preserved) ---------------- */
 const recipes = ref<any[]>([])
 const total = ref(0)
 const loading = ref(false)
@@ -33,7 +51,7 @@ const unitsList = ref<any[]>([])
 const recipeTypes = ['PRODUCTION', 'ASSEMBLY', 'PREPARATION', 'DISASSEMBLY']
 const difficultyLevels = ['EASY', 'MEDIUM', 'HARD']
 
-const typeColor: Record<string, string> = {
+const typeBadgeTone: Record<string, 'primary' | 'success' | 'warning' | 'error' | 'neutral'> = {
   PRODUCTION: 'primary',
   ASSEMBLY: 'success',
   PREPARATION: 'warning',
@@ -55,17 +73,7 @@ const form = ref({
 
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 
-const headers = [
-  { title: t('Code'), key: 'code', sortable: false },
-  { title: t('Name'), key: 'name', sortable: false },
-  { title: t('Type'), key: 'recipe_type', sortable: false },
-  { title: t('Output'), key: 'output', sortable: false },
-  { title: t('Qty'), key: 'output_quantity', sortable: false },
-  { title: t('Version'), key: 'version', sortable: false },
-  { title: t('Status'), key: 'is_active', sortable: false },
-  { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
-]
-
+/* ---------------- load (preserved) ---------------- */
 async function loadRecipes() {
   loading.value = true
   try {
@@ -118,13 +126,27 @@ watch([page, itemsPerPage], loadRecipes)
 watch([search, typeFilter], () => { page.value = 1; loadRecipes() })
 watch([outputItemFilter, productionLocationFilter, showInactive, showOldVersions], () => { page.value = 1; loadRecipes() })
 
-const itemOptions = computed(() => itemsList.value.map(i => ({ title: `${i.name} (${i.sku ?? '—'})`, value: i.id })))
-const unitOptions = computed(() => unitsList.value.map(u => ({ title: `${u.name} (${u.short_name})`, value: u.id })))
-const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.name, value: l.id })))
-const typeFilterOptions = computed(() => recipeTypes.map(v => ({ title: t(`recipe_type_${v}`), value: v })))
-const recipeTypeOptions = computed(() => recipeTypes.map(v => ({ title: t(`recipe_type_${v}`), value: v })))
-const difficultyOptions = computed(() => difficultyLevels.map(v => ({ title: t(`difficulty_${v}`), value: v })))
+/* ---------------- options (preserved) ---------------- */
+const itemOptions = computed(() =>
+  itemsList.value.map(i => ({ value: String(i.id), label: `${i.name} (${i.sku ?? '—'})` })),
+)
+const unitOptions = computed(() =>
+  unitsList.value.map(u => ({ value: String(u.id), label: `${u.name} (${u.short_name})` })),
+)
+const locationOptions = computed(() =>
+  locationsList.value.map(l => ({ value: String(l.id), label: l.name })),
+)
+const typeFilterOptions = computed(() =>
+  recipeTypes.map(v => ({ value: v, label: t(`recipe_type_${v}`) })),
+)
+const recipeTypeOptions = computed(() =>
+  recipeTypes.map(v => ({ value: v, label: t(`recipe_type_${v}`) })),
+)
+const difficultyOptions = computed(() =>
+  difficultyLevels.map(v => ({ value: v, label: t(`difficulty_${v}`) })),
+)
 
+/* ---------------- create / edit / delete / toggle ---------------- */
 function openCreate() {
   dialogMode.value = 'create'
   form.value = { name: '', code: '', recipe_type: 'PRODUCTION', output_item_id: null, output_quantity: 1, output_unit_id: null, estimated_time_minutes: null, difficulty_level: 'MEDIUM', notes: '', is_active: true }
@@ -216,423 +238,357 @@ async function toggleActive(item: any) {
     notify(e?.response?.data?.message ?? t('Error updating recipe'), 'error')
   }
 }
+
+/* ---------------- columns ---------------- */
+const columns = computed<DataTableColumn<any>[]>(() => [
+  { key: 'code', label: t('Code'), sortable: true },
+  { key: 'name', label: t('Name'), sortable: true },
+  { key: 'recipe_type', label: t('Type'), sortable: true },
+  { key: 'output', label: t('Output'), sortable: false },
+  { key: 'output_quantity', label: t('Qty'), sortable: false, align: 'right' },
+  { key: 'version', label: t('Version'), sortable: false },
+  { key: 'is_active', label: t('Status'), sortable: false },
+])
+
+/* ---------------- controlled pagination for DataTable ---------------- */
+const pagination = computed(() => ({
+  page: page.value,
+  perPage: itemsPerPage.value,
+  total: total.value,
+  onPage: (p: number) => { page.value = p },
+  onPerPage: (n: number) => { itemsPerPage.value = n; page.value = 1 },
+}))
+
+/* ---------------- form helpers (string<->number bridge for Select) ---------------- */
+const outputItemFilterStr = computed<string>({
+  get: () => outputItemFilter.value === undefined ? '' : String(outputItemFilter.value),
+  set: v => { outputItemFilter.value = v === '' ? undefined : Number(v) },
+})
+const productionLocationFilterStr = computed<string>({
+  get: () => productionLocationFilter.value === undefined ? '' : String(productionLocationFilter.value),
+  set: v => { productionLocationFilter.value = v === '' ? undefined : Number(v) },
+})
+const typeFilterStr = computed<string>({
+  get: () => typeFilter.value ?? '',
+  set: v => { typeFilter.value = v === '' ? undefined : v },
+})
+
+const formOutputItemStr = computed<string>({
+  get: () => form.value.output_item_id == null ? '' : String(form.value.output_item_id),
+  set: v => { form.value.output_item_id = v === '' ? null : Number(v) },
+})
+const formOutputUnitStr = computed<string>({
+  get: () => form.value.output_unit_id == null ? '' : String(form.value.output_unit_id),
+  set: v => { form.value.output_unit_id = v === '' ? null : Number(v) },
+})
 </script>
 
 <template>
-  <div>
-    <VCard>
-      <VCardText class="d-flex flex-wrap gap-3 align-center">
-        <VTextField
-          v-model="search"
-          :placeholder="t('Search recipes...')"
-          prepend-inner-icon="bx-search"
-          density="compact"
-          style="min-inline-size: 220px;"
-          hide-details
-          clearable
-        />
-        <VSelect
-          v-model="typeFilter"
-          :items="typeFilterOptions"
-          :placeholder="t('All Types')"
-          density="compact"
-          style="min-inline-size: 180px;"
-          hide-details
-          clearable
-        />
-        <VAutocomplete
-          v-model="outputItemFilter"
-          :items="itemOptions"
-          :placeholder="t('Output Item')"
-          density="compact"
-          style="min-inline-size: 220px;"
-          hide-details
-          clearable
-        />
-        <VSelect
-          v-model="productionLocationFilter"
-          :items="locationOptions"
-          :placeholder="t('Production Location')"
-          density="compact"
-          style="min-inline-size: 180px;"
-          hide-details
-          clearable
-        />
-        <VSwitch
-          v-model="showInactive"
-          :label="t('Show inactive')"
-          density="compact"
-          hide-details
-          color="primary"
-        />
-        <VSwitch
-          v-model="showOldVersions"
-          :label="t('Show old versions')"
-          density="compact"
-          hide-details
-          color="primary"
-        />
-        <VSpacer />
-        <VBtn
-          prepend-icon="bx-plus"
+  <div class="page">
+    <PageHeader
+      :title="t('recipes_title')"
+      :subtitle="t('recipes_subtitle')"
+    >
+      <template #actions>
+        <Button
+          variant="primary"
+          icon="plus"
           @click="openCreate"
         >
           {{ t('Add Recipe') }}
-        </VBtn>
-      </VCardText>
+        </Button>
+      </template>
+    </PageHeader>
 
-      <VDataTableServer
-        :headers="headers"
-        :items="recipes"
-        :items-length="total"
+    <div class="card">
+      <!-- Toolbar (flex-wrap built into .toolbar) -->
+      <div class="toolbar">
+        <div class="grow" style="min-width: 220px; max-width: 320px;">
+          <Input
+            v-model="search"
+            icon="search"
+            :placeholder="t('Search recipes...')"
+            :aria-label="t('Search recipes...')"
+          />
+        </div>
+
+        <div class="toolbar-field">
+          <Select
+            v-model="typeFilterStr"
+            :options="typeFilterOptions"
+            :placeholder="t('All Types')"
+            icon="filter"
+          />
+        </div>
+
+        <div class="toolbar-field">
+          <Select
+            v-model="outputItemFilterStr"
+            :options="itemOptions"
+            :placeholder="t('Output Item')"
+            icon="box"
+          />
+        </div>
+
+        <div class="toolbar-field">
+          <Select
+            v-model="productionLocationFilterStr"
+            :options="locationOptions"
+            :placeholder="t('Production Location')"
+            icon="pin"
+          />
+        </div>
+
+        <label class="toolbar-toggle">
+          <Switch v-model="showInactive" />
+          <span>{{ t('Show inactive') }}</span>
+        </label>
+
+        <label class="toolbar-toggle">
+          <Switch v-model="showOldVersions" />
+          <span>{{ t('Show old versions') }}</span>
+        </label>
+      </div>
+
+      <div class="card__divider" />
+
+      <!-- DataTable -->
+      <DataTable
+        :columns="columns"
+        :rows="recipes"
+        row-key="id"
         :loading="loading"
-        :items-per-page="itemsPerPage"
-        :page="page"
+        :pagination="pagination"
+        :per-page-options="[10, 20, 50]"
+        :empty-title="t('recipes_empty_title')"
+        :empty-sub="t('recipes_empty_body')"
+        empty-icon="recipe"
       >
-        <template #bottom>
-          <DataTableFooter
-            v-model:page="page"
-            v-model:items-per-page="itemsPerPage"
-            :total-items="total"
+        <!-- Code -->
+        <template #cell.code="{ row }">
+          <span class="cell-strong mono">{{ row.code ?? '—' }}</span>
+        </template>
+
+        <!-- Name -->
+        <template #cell.name="{ row }">
+          <span class="cell-strong">{{ row.name ?? '—' }}</span>
+        </template>
+
+        <!-- Type badge -->
+        <template #cell.recipe_type="{ row }">
+          <Badge :tone="typeBadgeTone[row.recipe_type] ?? 'neutral'">
+            {{ t(`recipe_type_${row.recipe_type}`) }}
+          </Badge>
+        </template>
+
+        <!-- Output item name -->
+        <template #cell.output="{ row }">
+          <span class="cell-muted">{{ row.output_item_name ?? '—' }}</span>
+        </template>
+
+        <!-- Qty + unit -->
+        <template #cell.output_quantity="{ row }">
+          <span class="num-tabular">{{ row.output_quantity }}</span>
+          <span class="cell-muted" style="margin-left:4px;">{{ row.output_unit ?? '' }}</span>
+        </template>
+
+        <!-- Version -->
+        <template #cell.version="{ row }">
+          <span class="cell-muted">{{ row.version ?? '—' }}</span>
+        </template>
+
+        <!-- Active -->
+        <template #cell.is_active="{ row }">
+          <Badge :tone="row.is_active ? 'success' : 'neutral'" dot>
+            {{ row.is_active ? t('Active') : t('Inactive') }}
+          </Badge>
+        </template>
+
+        <!-- Row actions -->
+        <template #row-actions="{ row }">
+          <IconAction
+            icon="eye"
+            :title="t('View Ingredients')"
+            @click="openDetail(row)"
+          />
+          <IconAction
+            icon="pencil"
+            :title="t('Edit')"
+            @click="openEdit(row)"
+          />
+          <IconAction
+            :icon="row.is_active ? 'pause' : 'play'"
+            :tone="row.is_active ? 'warning' : 'success'"
+            :title="row.is_active ? t('Deactivate') : t('Activate')"
+            @click="toggleActive(row)"
+          />
+          <IconAction
+            icon="trash"
+            tone="danger"
+            :title="t('Delete')"
+            @click="confirmDelete(row)"
           />
         </template>
-
-        <template
-          v-if="loading && recipes.length === 0"
-          #body
-        >
-          <tr
-            v-for="n in itemsPerPage"
-            :key="n"
-            class="sk-row"
-          >
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:70px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:130px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:100px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:110px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:40px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:30px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:60px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td
-              class="sk-cell"
-              style="text-align:end;"
-            >
-              <div class="d-flex justify-end gap-1">
-                <div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:6px;"
-                /><div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:6px;"
-                /><div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:6px;"
-                />
-              </div>
-            </td>
-          </tr>
-        </template>
-
-        <template #item.code="{ item }">
-          <span class="font-weight-medium text-body-2">{{ item.raw.code ?? '—' }}</span>
-        </template>
-        <template #item.recipe_type="{ item }">
-          <VChip
-            class="status-pill"
-            :color="typeColor[item.raw.recipe_type] ?? 'default'"
-            size="small"
-            variant="tonal"
-          >
-            {{ t(`recipe_type_${item.raw.recipe_type}`) }}
-          </VChip>
-        </template>
-        <template #item.output="{ item }">
-          {{ item.raw.output_item_name ?? '—' }}
-        </template>
-        <template #item.output_quantity="{ item }">
-          <span class="num-tabular">{{ item.raw.output_quantity }}</span> {{ item.raw.output_unit ?? '' }}
-        </template>
-        <template #item.is_active="{ item }">
-          <VChip
-            class="status-pill"
-            :color="item.raw.is_active ? 'success' : 'default'"
-            size="small"
-            variant="tonal"
-          >
-            {{ item.raw.is_active ? t('Active') : t('Inactive') }}
-          </VChip>
-        </template>
-        <template #item.actions="{ item }">
-          <div
-            class="d-flex justify-end"
-            style="gap:2px;"
-          >
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              @click="openDetail(item.raw)"
-            >
-              <VIcon
-                size="18"
-                icon="bx-show"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('View Ingredients') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              @click="openEdit(item.raw)"
-            >
-              <VIcon
-                size="18"
-                icon="bx-edit"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Edit') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              :color="item.raw.is_active ? 'warning' : 'success'"
-              @click="toggleActive(item.raw)"
-            >
-              <VIcon
-                size="18"
-                :icon="item.raw.is_active ? 'bx-pause' : 'bx-play'"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ item.raw.is_active ? t('Deactivate') : t('Activate') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              color="error"
-              @click="confirmDelete(item.raw)"
-            >
-              <VIcon
-                size="18"
-                icon="bx-trash"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Delete') }}
-              </VTooltip>
-            </VBtn>
-          </div>
-        </template>
-      </VDataTableServer>
-    </VCard>
+      </DataTable>
+    </div>
 
     <RecipeDetailDialog
       v-model="detailDialog"
       :recipe="detailItem"
     />
-    <!-- Create / Edit Dialog -->
-    <VDialog
-      v-model="dialog"
-      max-width="560"
-      persistent
-    >
-      <VCard :title="dialogMode === 'create' ? t('Add Recipe') : t('Edit Recipe')">
-        <VCardText>
-          <VRow>
-            <VCol
-              cols="12"
-              sm="8"
-            >
-              <VTextField
-                v-model="form.name"
-                :label="t('Name')"
-                required
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="4"
-            >
-              <VTextField
-                v-model="form.code"
-                :label="t('Code')"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VSelect
-                v-model="form.recipe_type"
-                :items="recipeTypeOptions"
-                :label="t('Type')"
-                required
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VSelect
-                v-model="form.difficulty_level"
-                :items="difficultyOptions"
-                :label="t('Difficulty')"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="8"
-            >
-              <VSelect
-                v-model="form.output_item_id"
-                :items="itemOptions"
-                :label="t('Output Item')"
-                clearable
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="4"
-            >
-              <VTextField
-                v-model.number="form.output_quantity"
-                :label="t('Output Qty')"
-                type="number"
-                step="0.01"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VSelect
-                v-model="form.output_unit_id"
-                :items="unitOptions"
-                :label="t('Output Unit')"
-                clearable
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model.number="form.estimated_time_minutes"
-                :label="t('Est. Time (min)')"
-                type="number"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VTextField
-                v-model="form.notes"
-                :label="t('Notes')"
-              />
-            </VCol>
-            <VCol
-              v-if="dialogMode === 'edit'"
-              cols="12"
-            >
-              <VSwitch
-                v-model="form.is_active"
-                :label="t('Active')"
-                color="success"
-              />
-            </VCol>
-          </VRow>
-        </VCardText>
-        <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            color="default"
-            @click="dialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            :loading="saving"
-            @click="save"
-          >
-            {{ t('Save') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
 
-    <VDialog
-      v-model="deleteDialog"
-      max-width="400"
+    <!-- ============ Create / Edit modal ============ -->
+    <Modal
+      :open="dialog"
+      :width="640"
+      :title="dialogMode === 'create' ? t('Add Recipe') : t('Edit Recipe')"
+      @close="dialog = false"
     >
-      <VCard :title="t('Delete Recipe')">
-        <VCardText>{{ t('Are you sure you want to delete') }} <strong>{{ selectedItem?.name }}</strong>?</VCardText>
-        <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            color="default"
-            @click="deleteDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="error"
-            :loading="deleting"
-            @click="doDelete"
-          >
-            {{ t('Delete') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      <div class="form-grid">
+        <div class="span-8">
+          <Field :label="t('Name')">
+            <Input v-model="form.name" :placeholder="t('Name')" />
+          </Field>
+        </div>
+        <div class="span-4">
+          <Field :label="t('Code')">
+            <Input v-model="form.code" :placeholder="t('Code')" />
+          </Field>
+        </div>
+
+        <div class="span-6">
+          <Field :label="t('Type')">
+            <Select
+              v-model="form.recipe_type"
+              :options="recipeTypeOptions"
+              icon="layers"
+            />
+          </Field>
+        </div>
+        <div class="span-6">
+          <Field :label="t('Difficulty')">
+            <Select
+              v-model="form.difficulty_level"
+              :options="difficultyOptions"
+              icon="bolt"
+            />
+          </Field>
+        </div>
+
+        <div class="span-8">
+          <Field :label="t('Output Item')">
+            <Select
+              v-model="formOutputItemStr"
+              :options="itemOptions"
+              :placeholder="t('Output Item')"
+              icon="box"
+            />
+          </Field>
+        </div>
+        <div class="span-4">
+          <Field :label="t('Output Qty')">
+            <Input
+              v-model="form.output_quantity"
+              type="number"
+              step="0.01"
+              :placeholder="t('Output Qty')"
+            />
+          </Field>
+        </div>
+
+        <div class="span-6">
+          <Field :label="t('Output Unit')">
+            <Select
+              v-model="formOutputUnitStr"
+              :options="unitOptions"
+              :placeholder="t('Output Unit')"
+              icon="ruler"
+            />
+          </Field>
+        </div>
+        <div class="span-6">
+          <Field :label="t('Est. Time (min)')">
+            <Input
+              v-model="form.estimated_time_minutes"
+              type="number"
+              :placeholder="t('Est. Time (min)')"
+            />
+          </Field>
+        </div>
+
+        <div class="span-12">
+          <Field :label="t('Notes')">
+            <Input v-model="form.notes" :placeholder="t('Notes')" />
+          </Field>
+        </div>
+
+        <div v-if="dialogMode === 'edit'" class="span-12">
+          <Field :label="t('Active')">
+            <label class="row" style="gap:10px; cursor:pointer; padding-top:4px;">
+              <Switch v-model="form.is_active" />
+              <span style="font-size:13px; color:var(--text-secondary);">
+                {{ form.is_active ? t('Active') : t('Inactive') }}
+              </span>
+            </label>
+          </Field>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button variant="ghost" :disabled="saving" @click="dialog = false">
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          :loading="saving"
+          :disabled="saving"
+          @click="save"
+        >
+          {{ t('Save') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- ============ Delete confirm modal ============ -->
+    <Modal
+      :open="deleteDialog"
+      :width="420"
+      :title="t('Delete Recipe')"
+      :subtitle="t('This action cannot be undone')"
+      @close="deleteDialog = false"
+    >
+      <div class="row" style="gap:14px; align-items:flex-start;">
+        <div
+          class="kpi__icon t-error"
+          style="width:44px; height:44px; flex:0 0 44px;"
+        >
+          <DesignIcon name="alert" :size="22" />
+        </div>
+        <div>
+          <p style="margin:0; font-weight:600;">
+            {{ selectedItem?.name }}
+          </p>
+          <p class="muted" style="margin:6px 0 0; font-size:14px; color:var(--text-secondary);">
+            {{ t('recipes_delete_body') }}
+          </p>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button variant="ghost" :disabled="deleting" @click="deleteDialog = false">
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="danger"
+          :loading="deleting"
+          :disabled="deleting"
+          @click="doDelete"
+        >
+          {{ t('Delete') }}
+        </Button>
+      </template>
+    </Modal>
+
     <VSnackbar
       v-model="snackbar"
       :color="snackbarColor"
@@ -642,6 +598,60 @@ async function toggleActive(item: any) {
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.row {
+  display: flex;
+  align-items: center;
+}
+
+/* Toolbar fields: fixed min on desktop, drop to 100% on mobile */
+.toolbar-field {
+  width: 200px;
+  min-width: 180px;
+}
+
+.toolbar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Form grid — 12-col on desktop, single column on mobile */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--sp-4);
+}
+.form-grid .span-4  { grid-column: span 4; }
+.form-grid .span-6  { grid-column: span 6; }
+.form-grid .span-8  { grid-column: span 8; }
+.form-grid .span-12 { grid-column: span 12; }
+
+@media (max-width: 900px) {
+  .toolbar-field {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-grid .span-4,
+  .form-grid .span-6,
+  .form-grid .span-8,
+  .form-grid .span-12 {
+    grid-column: auto;
+  }
+}
+</style>
 
 <route lang="yaml">
 name: stock-recipes

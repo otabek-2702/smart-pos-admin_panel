@@ -348,7 +348,7 @@ function parentNameOf(row: any) {
     </PageHeader>
 
     <!-- KPI strip -->
-    <div class="grid cols-4" style="margin-bottom: var(--sp-5);">
+    <div class="grid cols-4 kpi-grid" style="margin-bottom: var(--sp-5);">
       <Kpi
         :data="{
           label: t('kpi_total_locations'),
@@ -386,8 +386,8 @@ function parentNameOf(row: any) {
     <!-- Main table card -->
     <div class="card">
       <!-- Toolbar -->
-      <div class="toolbar">
-        <div class="grow" style="max-width: 280px;">
+      <div class="toolbar toolbar--wrap">
+        <div class="grow toolbar__search">
           <Input
             v-model="search"
             icon="search"
@@ -396,7 +396,7 @@ function parentNameOf(row: any) {
           />
         </div>
 
-        <div style="width: 180px;">
+        <div class="toolbar__type">
           <Select
             :model-value="typeFilter ?? ''"
             :placeholder="t('filter_type')"
@@ -405,7 +405,7 @@ function parentNameOf(row: any) {
           />
         </div>
 
-        <div style="width: 200px;">
+        <div class="toolbar__parent">
           <Select
             :model-value="parentFilter != null ? String(parentFilter) : ''"
             :placeholder="t('filter_parent')"
@@ -424,7 +424,7 @@ function parentNameOf(row: any) {
           <span style="font-size: 13px;">{{ t('filter_include_inactive') }}</span>
         </label>
 
-        <div class="row" style="gap: 8px; margin-left: auto;">
+        <div class="row toolbar__view" style="gap: 8px; margin-left: auto;">
           <Button
             :variant="treeView ? 'primary' : 'secondary'"
             size="sm"
@@ -605,8 +605,8 @@ function parentNameOf(row: any) {
       :title="dialogMode === 'create' ? t('modal_create_title') : t('modal_edit_title')"
       @close="dialog = false"
     >
-      <div class="grid cols-2" style="gap: var(--sp-4);">
-        <div style="grid-column: span 2;">
+      <div class="grid cols-2 modal-grid" style="gap: var(--sp-4);">
+        <div class="modal-grid__full" style="grid-column: span 2;">
           <Field :label="t('field_name')">
             <Input v-model="form.name" />
           </Field>
@@ -750,7 +750,7 @@ function parentNameOf(row: any) {
     <!-- Stock at location modal -->
     <Modal
       :open="stockModalOpen"
-      :width="900"
+      :width="720"
       :title="`${t('modal_stock_title')}: ${stockForLocation?.name ?? ''}`"
       :subtitle="stockForLocation?.type ? t(`location_type_${stockForLocation.type}`) : undefined"
       @close="stockModalOpen = false"
@@ -832,6 +832,63 @@ function parentNameOf(row: any) {
 .row {
   display: flex;
   align-items: center;
+}
+
+.toolbar--wrap {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.toolbar__search {
+  max-inline-size: 280px;
+  min-inline-size: 200px;
+}
+
+.toolbar__type {
+  inline-size: 180px;
+}
+
+.toolbar__parent {
+  inline-size: 200px;
+}
+
+.tablewrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 1100px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .toolbar__search,
+  .toolbar__type,
+  .toolbar__parent {
+    inline-size: 100%;
+    max-inline-size: none;
+    min-inline-size: 0;
+    flex: 1 1 100%;
+  }
+  .toolbar__view {
+    margin-left: 0 !important;
+    inline-size: 100%;
+    justify-content: flex-end;
+  }
+  .modal-grid {
+    grid-template-columns: 1fr;
+  }
+  .modal-grid__full {
+    grid-column: span 1 !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
 

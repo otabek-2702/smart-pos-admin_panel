@@ -1,8 +1,25 @@
 <script setup lang="ts">
+/* ============================================================
+   PURCHASE ORDERS — list, create, lifecycle actions
+   Refactored to design primitives: PageHeader, Card, DataTable,
+   Modal, Input, Select, Button, IconAction, Badge. All UI strings
+   are routed through t(). Toolbar wraps; filters drop to a single
+   column under 900px. Expanded row shows order line items.
+   ============================================================ */
+import type { DataTableColumn } from '@/components/design/DataTable.vue'
 import { stockApi as axios } from '@/plugins/axios'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
+import Badge from '@/components/design/Badge.vue'
+import Button from '@/components/design/Button.vue'
+import Card from '@/components/design/Card.vue'
+import DataTable from '@/components/design/DataTable.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import Field from '@/components/design/Field.vue'
+import IconAction from '@/components/design/IconAction.vue'
+import Input from '@/components/design/Input.vue'
+import Modal from '@/components/design/Modal.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
+import Select from '@/components/design/Select.vue'
 import { useStateAction } from '@/composables/useStateAction'
-import { PAYMENT_STATUS_COLOR as paymentColor, PURCHASE_ORDER_STATUS_COLOR as statusColor } from '@/constants/statusColors'
 import { getStoredUserData } from '@/utils/storage'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -13,9 +30,9 @@ const loading = ref(false)
 const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
-const statusFilter = ref<string | undefined>(undefined)
-const paymentFilter = ref<string | undefined>(undefined)
-const supplierFilter = ref<number | undefined>(undefined)
+const statusFilter = ref<string>('')
+const paymentFilter = ref<string>('')
+const supplierFilter = ref<string>('')
 const dateFrom = ref<string>('')
 const dateTo = ref<string>('')
 
@@ -27,8 +44,8 @@ const createDialog = ref(false)
 const saving = ref(false)
 
 const form = ref({
-  supplier_id: null as number | null,
-  delivery_location_id: null as number | null,
+  supplier_id: '' as string | number,
+  delivery_location_id: '' as string | number,
   order_date: new Date().toISOString().substring(0, 10),
   expected_date: '',
   currency: 'UZS',
@@ -38,18 +55,35 @@ const form = ref({
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDateShort } = useFormatters()
 
-const statuses = computed(() => ['DRAFT', 'SENT', 'CONFIRMED', 'PARTIAL', 'RECEIVED', 'CANCELED'].map(s => ({ title: t(`po_status_${s}`), value: s })))
-const paymentStatuses = computed(() => ['UNPAID', 'PARTIAL', 'PAID'].map(s => ({ title: t(`po_payment_${s}`), value: s })))
+// Status / payment tone maps for Badge
+const STATUS_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'primary' | 'neutral'> = {
+  DRAFT: 'neutral',
+  SENT: 'info',
+  CONFIRMED: 'primary',
+  PARTIAL: 'warning',
+  RECEIVED: 'success',
+  CANCELED: 'error',
+}
+const PAYMENT_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'primary' | 'neutral'> = {
+  UNPAID: 'error',
+  PARTIAL: 'warning',
+  PAID: 'success',
+}
 
-const headers = [
-  { title: '', key: 'data-table-expand', sortable: false, width: '40px' },
-  { title: t('Order #'), key: 'order_number', sortable: false },
-  { title: t('Supplier'), key: 'supplier_name', sortable: false },
-  { title: t('Status'), key: 'status', sortable: false },
-  { title: t('Payment'), key: 'payment_status', sortable: false },
-  { title: t('Total'), key: 'total', sortable: false },
-  { title: t('Date'), key: 'order_date', sortable: false },
-  { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
+const statusOptions = computed(() =>
+  ['DRAFT', 'SENT', 'CONFIRMED', 'PARTIAL', 'RECEIVED', 'CANCELED'].map(s => ({ value: s, label: t(`po_status_${s}`) })),
+)
+const paymentStatusOptions = computed(() =>
+  ['UNPAID', 'PARTIAL', 'PAID'].map(s => ({ value: s, label: t(`po_payment_${s}`) })),
+)
+
+const columns: DataTableColumn<any>[] = [
+  { key: 'order_number', label: t('po_col_order_number'), sortable: false },
+  { key: 'supplier_name', label: t('Supplier'), sortable: false },
+  { key: 'status', label: t('Status'), sortable: false, width: 140 },
+  { key: 'payment_status', label: t('Payment'), sortable: false, width: 130 },
+  { key: 'total', label: t('Total'), sortable: false, align: 'right', width: 140 },
+  { key: 'order_date', label: t('Date'), sortable: false, width: 130 },
 ]
 
 async function loadOrders() {
@@ -110,8 +144,8 @@ const debouncedSearch = useDebounceFn(() => {
 
 watch(search, debouncedSearch)
 
-const supplierOptions = computed(() => suppliersList.value.map(s => ({ title: s.name, value: s.id })))
-const locationOptions = computed(() => locationsList.value.map(l => ({ title: l.name, value: l.id })))
+const supplierOptions = computed(() => suppliersList.value.map(s => ({ value: String(s.id), label: s.name })))
+const locationOptions = computed(() => locationsList.value.map(l => ({ value: String(l.id), label: l.name })))
 
 async function createOrder() {
   if (!form.value.delivery_location_id) {
@@ -122,11 +156,18 @@ async function createOrder() {
   saving.value = true
   try {
     const userData = getStoredUserData()
-    const payload: any = { ...form.value, created_by_id: userData.id }
+    const payload: any = {
+      ...form.value,
+      supplier_id: form.value.supplier_id ? Number(form.value.supplier_id) : null,
+      delivery_location_id: form.value.delivery_location_id ? Number(form.value.delivery_location_id) : null,
+      created_by_id: userData.id,
+    }
     if (!payload.expected_date)
       delete payload.expected_date
     if (!payload.notes)
       delete payload.notes
+    if (!payload.supplier_id)
+      delete payload.supplier_id
     await axios.post('/purchase-orders/', payload)
     notify(t('Purchase order created'))
     createDialog.value = false
@@ -140,448 +181,407 @@ async function createOrder() {
   }
 }
 
-const actionLabels: Record<string, string> = {
-  send: 'Send to Supplier',
-  confirm: 'Confirm Order',
-  cancel: 'Cancel Order',
-  receive: 'Mark as Received',
+function openCreate() {
+  form.value = {
+    supplier_id: '',
+    delivery_location_id: '',
+    order_date: new Date().toISOString().substring(0, 10),
+    expected_date: '',
+    currency: 'UZS',
+    notes: '',
+  }
+  createDialog.value = true
 }
 
 const { actionDialog, actionItem, actionType, actioning, openAction, doAction } = useStateAction('/purchase-orders/', loadOrders, notify, t, axios)
+
+const actionTitle = computed(() => {
+  switch (actionType.value) {
+    case 'send': return t('po_action_send_title')
+    case 'confirm': return t('po_action_confirm_title')
+    case 'cancel': return t('po_action_cancel_title')
+    case 'receive': return t('po_action_receive_title')
+    default: return t('Confirm')
+  }
+})
 
 function canSend(item: any) { return item.status === 'DRAFT' }
 function canConfirm(item: any) { return item.status === 'SENT' }
 function canReceive(item: any) { return ['CONFIRMED', 'PARTIAL'].includes(item.status) }
 function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.status) }
+
+const pagination = computed(() => ({
+  page: page.value,
+  perPage: itemsPerPage.value,
+  total: total.value,
+  onPage: (n: number) => { page.value = n },
+  onPerPage: (n: number) => { itemsPerPage.value = n; page.value = 1 },
+}))
+
+// Esc closes whichever modal is open (handled by Modal closeOnEsc already, plus action modal)
 </script>
 
 <template>
-  <div>
-    <VCard>
-      <VCardText class="d-flex flex-wrap gap-3 align-center">
-        <VTextField
-          v-model="search"
-          :placeholder="t('Search orders...')"
-          prepend-inner-icon="bx-search"
-          density="compact"
-          style="min-inline-size: 240px;"
-          hide-details
-          clearable
-        />
-        <VSelect
-          v-model="statusFilter"
-          :items="statuses"
-          :placeholder="t('All Statuses')"
-          density="compact"
-          style="min-inline-size: 180px;"
-          hide-details
-          clearable
-        />
-        <VSelect
-          v-model="paymentFilter"
-          :items="paymentStatuses"
-          :placeholder="t('Payment Status')"
-          density="compact"
-          style="min-inline-size: 160px;"
-          hide-details
-          clearable
-        />
-        <VSelect
-          v-model="supplierFilter"
-          :items="supplierOptions"
-          :placeholder="t('All Suppliers')"
-          density="compact"
-          style="min-inline-size: 180px;"
-          hide-details
-          clearable
-        />
-        <VTextField
-          v-model="dateFrom"
-          :placeholder="t('Date From')"
-          :label="t('Date From')"
-          type="date"
-          density="compact"
-          style="min-inline-size: 160px;"
-          hide-details
-          clearable
-        />
-        <VTextField
-          v-model="dateTo"
-          :placeholder="t('Date To')"
-          :label="t('Date To')"
-          type="date"
-          density="compact"
-          style="min-inline-size: 160px;"
-          hide-details
-          clearable
-        />
-        <VSpacer />
-        <VBtn
-          prepend-icon="bx-plus"
-          @click="createDialog = true"
+  <div class="page">
+    <PageHeader
+      :title="t('Purchase Orders')"
+      :subtitle="t('po_page_subtitle')"
+    >
+      <template #actions>
+        <Button
+          variant="primary"
+          icon="plus"
+          @click="openCreate"
         >
           {{ t('New Order') }}
-        </VBtn>
-      </VCardText>
+        </Button>
+      </template>
+    </PageHeader>
 
-      <VDataTableServer
-        :headers="headers"
-        :items="orders"
-        :items-length="total"
+    <Card>
+      <!-- Toolbar — wraps; controls collapse to 1 column under 900px -->
+      <div class="po-toolbar">
+        <div class="po-tb-search">
+          <Input
+            v-model="search"
+            icon="search"
+            :placeholder="t('Search orders...')"
+          />
+        </div>
+        <div class="po-tb-cell">
+          <Select
+            v-model="statusFilter"
+            icon="filter"
+            :placeholder="t('All Statuses')"
+            :options="statusOptions"
+          />
+        </div>
+        <div class="po-tb-cell">
+          <Select
+            v-model="paymentFilter"
+            icon="wallet"
+            :placeholder="t('Payment Status')"
+            :options="paymentStatusOptions"
+          />
+        </div>
+        <div class="po-tb-cell">
+          <Select
+            v-model="supplierFilter"
+            icon="store"
+            :placeholder="t('All Suppliers')"
+            :options="supplierOptions"
+          />
+        </div>
+        <div class="po-tb-cell po-tb-date">
+          <Input
+            v-model="dateFrom"
+            icon="calendar"
+            type="date"
+            :placeholder="t('Date From')"
+          />
+        </div>
+        <div class="po-tb-cell po-tb-date">
+          <Input
+            v-model="dateTo"
+            icon="calendar"
+            type="date"
+            :placeholder="t('Date To')"
+          />
+        </div>
+      </div>
+
+      <div class="card__divider" />
+
+      <DataTable
+        :columns="columns"
+        :rows="orders"
+        row-key="id"
         :loading="loading"
-        :items-per-page="itemsPerPage"
-        :page="page"
-        expand-on-click
+        :pagination="pagination"
+        expandable
+        :empty-title="t('po_empty_title')"
+        :empty-sub="t('po_empty_sub')"
+        empty-icon="receipt"
       >
-        <template #bottom>
-          <DataTableFooter
-            v-model:page="page"
-            v-model:items-per-page="itemsPerPage"
-            :total-items="total"
+        <template #cell.order_number="{ row }">
+          <span class="cell-strong">{{ row.order_number }}</span>
+        </template>
+
+        <template #cell.supplier_name="{ row }">
+          <span>{{ row.supplier_name ?? row.supplier?.name ?? '—' }}</span>
+        </template>
+
+        <template #cell.status="{ row }">
+          <Badge :tone="STATUS_TONE[row.status] ?? 'neutral'">
+            {{ row.status ? t(`po_status_${row.status}`) : '—' }}
+          </Badge>
+        </template>
+
+        <template #cell.payment_status="{ row }">
+          <Badge
+            v-if="row.payment_status"
+            :tone="PAYMENT_TONE[row.payment_status] ?? 'neutral'"
+          >
+            {{ t(`po_payment_${row.payment_status}`) }}
+          </Badge>
+          <span
+            v-else
+            class="cell-muted"
+          >—</span>
+        </template>
+
+        <template #cell.total="{ row }">
+          <span class="mono num-tabular">{{ formatCurrency(row.total ?? row.subtotal ?? 0) }}</span>
+        </template>
+
+        <template #cell.order_date="{ row }">
+          <span>{{ row.order_date ? formatDateShort(row.order_date) : '—' }}</span>
+        </template>
+
+        <template #row-actions="{ row }">
+          <IconAction
+            v-if="canSend(row)"
+            icon="send"
+            tone="primary"
+            :title="t('po_action_send_title')"
+            @click="openAction(row, 'send')"
+          />
+          <IconAction
+            v-if="canConfirm(row)"
+            icon="check"
+            tone="success"
+            :title="t('po_action_confirm_title')"
+            @click="openAction(row, 'confirm')"
+          />
+          <IconAction
+            v-if="canReceive(row)"
+            icon="package"
+            tone="primary"
+            :title="t('po_action_receive_title')"
+            @click="openAction(row, 'receive')"
+          />
+          <IconAction
+            v-if="canCancel(row)"
+            icon="close"
+            tone="danger"
+            :title="t('po_action_cancel_title')"
+            @click="openAction(row, 'cancel')"
           />
         </template>
 
-        <template
-          v-if="loading && orders.length === 0"
-          #body
-        >
-          <tr
-            v-for="n in itemsPerPage"
-            :key="n"
-            class="sk-row"
-          >
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:20px;height:20px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:90px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:120px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:80px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:70px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:80px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:80px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td
-              class="sk-cell"
-              style="text-align:end;"
-            >
-              <div class="d-flex justify-end gap-1">
-                <div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:6px;"
-                /><div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:6px;"
-                />
-              </div>
-            </td>
-          </tr>
-        </template>
+        <!-- Expanded row: order metadata + line items -->
+        <template #expanded="{ row }">
+          <div class="po-expand">
+            <div class="po-expand__meta">
+              <span>
+                <span class="cell-muted">{{ t('Supplier') }}: </span>
+                <strong>{{ row.supplier_name ?? row.supplier?.name ?? '—' }}</strong>
+              </span>
+              <span>
+                <span class="cell-muted">{{ t('Location') }}: </span>
+                <strong>{{ typeof row.delivery_location === 'string' ? row.delivery_location : row.delivery_location?.name ?? '—' }}</strong>
+              </span>
+              <span v-if="row.expected_date">
+                <span class="cell-muted">{{ t('Expected') }}: </span>
+                <strong>{{ formatDateShort(row.expected_date) }}</strong>
+              </span>
+            </div>
 
-        <template #item.order_number="{ item }">
-          <span class="font-weight-medium">{{ item.raw.order_number }}</span>
-        </template>
-        <template #item.supplier_name="{ item }">
-          {{ item.raw.supplier_name ?? item.raw.supplier?.name ?? '—' }}
-        </template>
-        <template #item.status="{ item }">
-          <VChip
-            :color="statusColor[item.raw.status] ?? 'default'"
-            size="small"
-            variant="tonal"
-            class="status-pill"
-          >
-            {{ t(`po_status_${item.raw.status}`) }}
-          </VChip>
-        </template>
-        <template #item.payment_status="{ item }">
-          <VChip
-            v-if="item.raw.payment_status"
-            :color="paymentColor[item.raw.payment_status] ?? 'default'"
-            size="small"
-            variant="tonal"
-            class="status-pill"
-          >
-            {{ t(`po_payment_${item.raw.payment_status}`) }}
-          </VChip>
-          <span
-            v-else
-            class="text-disabled"
-          >—</span>
-        </template>
-        <template #item.total="{ item }">
-          <span class="num-tabular">{{ formatCurrency(item.raw.total ?? item.raw.subtotal ?? 0) }}</span>
-        </template>
-        <template #item.order_date="{ item }">
-          {{ formatDateShort(item.raw.order_date) }}
-        </template>
-        <template #item.actions="{ item }">
-          <div
-            class="d-flex justify-end"
-            style="gap:2px;"
-          >
-            <VBtn
-              v-if="canSend(item.raw)"
-              icon
-              variant="text"
-              size="small"
-              color="info"
-              @click.stop="openAction(item.raw, 'send')"
-            >
-              <VIcon
-                size="18"
-                icon="bx-send"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Send') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="canConfirm(item.raw)"
-              icon
-              variant="text"
-              size="small"
-              color="success"
-              @click.stop="openAction(item.raw, 'confirm')"
-            >
-              <VIcon
-                size="18"
-                icon="bx-check"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Confirm') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="canReceive(item.raw)"
-              icon
-              variant="text"
-              size="small"
-              color="primary"
-              @click.stop="openAction(item.raw, 'receive')"
-            >
-              <VIcon
-                size="18"
-                icon="bx-package"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Receive') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="canCancel(item.raw)"
-              icon
-              variant="text"
-              size="small"
-              color="error"
-              @click.stop="openAction(item.raw, 'cancel')"
-            >
-              <VIcon
-                size="18"
-                icon="bx-x"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Cancel') }}
-              </VTooltip>
-            </VBtn>
+            <div class="po-lines-wrap">
+              <table class="po-lines">
+                <thead>
+                  <tr>
+                    <th>{{ t('Item') }}</th>
+                    <th class="num">
+                      {{ t('Qty Ordered') }}
+                    </th>
+                    <th class="num">
+                      {{ t('Qty Received') }}
+                    </th>
+                    <th class="num">
+                      {{ t('Unit Price') }}
+                    </th>
+                    <th class="num">
+                      {{ t('Total') }}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="(li, idx) in ((row.items ?? row.line_items ?? []) as any[])"
+                    :key="idx"
+                  >
+                    <td>{{ li.item?.name ?? li.stock_item?.name ?? '—' }}</td>
+                    <td class="num mono">
+                      {{ li.quantity_ordered ?? li.quantity ?? '—' }}
+                    </td>
+                    <td class="num mono">
+                      {{ li.quantity_received ?? '—' }}
+                    </td>
+                    <td class="num mono">
+                      {{ formatCurrency(li.unit_price ?? li.price ?? 0) }}
+                    </td>
+                    <td class="num mono">
+                      {{ formatCurrency((li.unit_price ?? li.price ?? 0) * (li.quantity_ordered ?? li.quantity ?? 1)) }}
+                    </td>
+                  </tr>
+                  <tr v-if="!(row.items?.length ?? row.line_items?.length)">
+                    <td
+                      colspan="5"
+                      class="po-lines__empty"
+                    >
+                      {{ t('No items') }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </template>
+      </DataTable>
+    </Card>
 
-        <!-- Expanded row: order items -->
-        <template #expanded-row="{ item, columns }">
-          <tr>
-            <td :colspan="columns.length">
-              <div class="pa-3">
-                <div class="d-flex gap-4 mb-3 text-body-2 flex-wrap">
-                  <span><span class="text-disabled">{{ t('Supplier') }}: </span>{{ item.raw.supplier_name ?? item.raw.supplier?.name ?? '—' }}</span>
-                  <span><span class="text-disabled">{{ t('Location') }}: </span>{{ typeof item.raw.delivery_location === 'string' ? item.raw.delivery_location : item.raw.delivery_location?.name ?? '—' }}</span>
-                  <span v-if="item.raw.expected_date || item.raw.expected_date"><span class="text-disabled">{{ t('Expected') }}: </span>{{ formatDateShort(item.raw.expected_date ?? item.raw.expected_date) }}</span>
-                </div>
-                <VTable density="compact">
-                  <thead>
-                    <tr>
-                      <th>{{ t('Item') }}</th>
-                      <th>{{ t('Qty Ordered') }}</th>
-                      <th>{{ t('Qty Received') }}</th>
-                      <th>{{ t('Unit Price') }}</th>
-                      <th>{{ t('Total') }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="(li, idx) in ((item.raw.items ?? item.raw.line_items ?? []) as any[])"
-                      :key="idx"
-                    >
-                      <td>{{ li.item?.name ?? li.stock_item?.name ?? '—' }}</td>
-                      <td class="num-tabular">{{ li.quantity_ordered ?? li.quantity ?? '—' }}</td>
-                      <td class="num-tabular">{{ li.quantity_received ?? '—' }}</td>
-                      <td class="num-tabular">{{ formatCurrency(li.unit_price ?? li.price ?? 0) }}</td>
-                      <td class="num-tabular">{{ formatCurrency((li.unit_price ?? li.price ?? 0) * (li.quantity_ordered ?? li.quantity ?? 1)) }}</td>
-                    </tr>
-                    <tr v-if="!(item.raw.items?.length ?? item.raw.line_items?.length)">
-                      <td
-                        colspan="5"
-                        class="text-center text-disabled"
-                      >
-                        {{ t('No items') }}
-                      </td>
-                    </tr>
-                  </tbody>
-                </VTable>
-              </div>
-            </td>
-          </tr>
-        </template>
-      </VDataTableServer>
-    </VCard>
-
-    <!-- Create Dialog -->
-    <VDialog
-      v-model="createDialog"
-      max-width="480"
-      persistent
+    <!-- Create Modal -->
+    <Modal
+      :open="createDialog"
+      :title="t('New Purchase Order')"
+      :subtitle="t('po_create_subtitle')"
+      :width="560"
+      :close-on-backdrop="false"
+      @close="createDialog = false"
     >
-      <VCard :title="t('New Purchase Order')">
-        <VCardText>
-          <VRow>
-            <VCol cols="12">
-              <VSelect
-                v-model="form.supplier_id"
-                :items="supplierOptions"
-                :label="t('Supplier')"
-                required
-              />
-            </VCol>
-            <VCol cols="12">
-              <VSelect
-                v-model="form.delivery_location_id"
-                :items="locationOptions"
-                :label="t('Delivery Location *')"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.order_date"
-                :label="t('Order Date')"
-                type="date"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.expected_date"
-                :label="t('Expected Delivery')"
-                type="date"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="4"
-            >
-              <VTextField
-                v-model="form.currency"
-                :label="t('Currency')"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VTextField
-                v-model="form.notes"
-                :label="t('Notes')"
-              />
-            </VCol>
-          </VRow>
-        </VCardText>
-        <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            color="default"
-            @click="createDialog = false"
+      <form @submit.prevent="createOrder">
+        <div class="form-grid">
+          <Field
+            :label="t('Supplier')"
+            class="span-2"
           >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            :loading="saving"
-            @click="createOrder"
-          >
-            {{ t('Create') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+            <Select
+              v-model="form.supplier_id"
+              icon="store"
+              :placeholder="t('Select supplier')"
+              :options="supplierOptions"
+            />
+          </Field>
 
-    <!-- Action Confirm Dialog -->
-    <VDialog
-      v-model="actionDialog"
-      max-width="400"
+          <Field
+            :label="t('Delivery Location *')"
+            class="span-2"
+          >
+            <Select
+              v-model="form.delivery_location_id"
+              icon="store"
+              :placeholder="t('Select location')"
+              :options="locationOptions"
+            />
+          </Field>
+
+          <Field :label="t('Order Date')">
+            <Input
+              v-model="form.order_date"
+              icon="calendar"
+              type="date"
+            />
+          </Field>
+
+          <Field :label="t('Expected Delivery')">
+            <Input
+              v-model="form.expected_date"
+              icon="calendar"
+              type="date"
+            />
+          </Field>
+
+          <Field :label="t('Currency')">
+            <Input
+              v-model="form.currency"
+              :placeholder="t('Currency')"
+            />
+          </Field>
+
+          <Field
+            :label="t('Notes')"
+            class="span-2"
+          >
+            <Input
+              v-model="form.notes"
+              :placeholder="t('Notes')"
+            />
+          </Field>
+        </div>
+      </form>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="saving"
+          @click="createDialog = false"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="check"
+          :loading="saving"
+          :disabled="saving"
+          @click="createOrder"
+        >
+          {{ t('Create') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Action Confirm Modal -->
+    <Modal
+      :open="actionDialog"
+      :title="actionTitle"
+      :width="440"
+      @close="actionDialog = false"
     >
-      <VCard :title="t(actionLabels[actionType] ?? actionType)">
-        <VCardText>{{ t('Confirm action for order') }} <strong>{{ actionItem?.order_number }}</strong>?</VCardText>
-        <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            color="default"
-            @click="actionDialog = false"
+      <div class="row po-confirm">
+        <div
+          class="kpi__icon"
+          :class="actionType === 'cancel' ? 't-error' : 't-warning'"
+          style="width:44px;height:44px;flex:0 0 44px;"
+        >
+          <DesignIcon
+            :name="actionType === 'cancel' ? 'alert' : 'info'"
+            :size="22"
+          />
+        </div>
+        <div>
+          <p style="margin:0;">
+            {{ t('Confirm action for order') }}
+            <strong>{{ actionItem?.order_number }}</strong>
+          </p>
+          <p
+            class="cell-muted"
+            style="margin:6px 0 0;font-size:14px;"
           >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            :color="actionType === 'cancel' ? 'error' : 'primary'"
-            :loading="actioning"
-            @click="doAction"
-          >
-            {{ t('Confirm') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+            {{ actionTitle }}
+          </p>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="actioning"
+          @click="actionDialog = false"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          :variant="actionType === 'cancel' ? 'danger' : 'primary'"
+          icon="check"
+          :loading="actioning"
+          :disabled="actioning"
+          @click="doAction"
+        >
+          {{ t('Confirm') }}
+        </Button>
+      </template>
+    </Modal>
 
     <VSnackbar
       v-model="snackbar"
@@ -592,6 +592,103 @@ function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.s
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.po-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 16px;
+  align-items: center;
+}
+
+.po-tb-search {
+  flex: 1 1 240px;
+  min-width: 200px;
+  max-width: 320px;
+}
+
+.po-tb-cell {
+  flex: 1 1 180px;
+  min-width: 160px;
+  max-width: 220px;
+}
+
+.po-tb-date {
+  flex: 1 1 160px;
+  min-width: 150px;
+}
+
+.po-expand {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.po-expand__meta {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.po-lines-wrap {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.po-lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 480px;
+}
+
+.po-lines th,
+.po-lines td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgb(var(--v-theme-neutral-border));
+  text-align: left;
+}
+
+.po-lines th.num,
+.po-lines td.num {
+  text-align: right;
+}
+
+.po-lines__empty {
+  text-align: center !important;
+  padding: 16px;
+  color: rgb(var(--v-theme-text-secondary));
+}
+
+.po-confirm {
+  gap: 14px;
+  align-items: flex-start;
+  display: flex;
+}
+
+@media (max-width: 900px) {
+  .po-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .po-tb-search,
+  .po-tb-cell,
+  .po-tb-date {
+    flex: 1 1 100%;
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .po-expand__meta {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+</style>
 
 <route lang="yaml">
 name: stock-purchase-orders

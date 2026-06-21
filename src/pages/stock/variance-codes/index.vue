@@ -313,8 +313,8 @@ const countLabel = computed(() => t('variance_count_label', { n: total.value }))
 
     <div class="card">
       <!-- Toolbar -->
-      <div class="toolbar">
-        <div class="grow" style="max-width: 320px;">
+      <div class="toolbar" style="flex-wrap: wrap;">
+        <div class="grow toolbar-search">
           <Input
             v-model="search"
             icon="search"
@@ -323,7 +323,7 @@ const countLabel = computed(() => t('variance_count_label', { n: total.value }))
           />
         </div>
 
-        <div style="width: 200px;">
+        <div class="toolbar-select">
           <Select
             v-model="activeFilter"
             :options="activeFilterOptions"
@@ -331,7 +331,7 @@ const countLabel = computed(() => t('variance_count_label', { n: total.value }))
           />
         </div>
 
-        <div class="row" style="gap: 8px; margin-left: auto; font-size: 13px; color: var(--text-tertiary);">
+        <div class="row toolbar-count" style="gap: 8px; margin-left: auto; font-size: 13px; color: var(--text-tertiary);">
           {{ countLabel }}
         </div>
       </div>
@@ -361,8 +361,7 @@ const countLabel = computed(() => t('variance_count_label', { n: total.value }))
         <!-- Description -->
         <template #cell.description="{ row: c }">
           <span
-            class="cell-muted"
-            style="display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; max-width:340px;"
+            class="cell-muted desc-cell"
             :title="c.description ?? ''"
           >
             {{ c.description || '—' }}
@@ -432,9 +431,9 @@ const countLabel = computed(() => t('variance_count_label', { n: total.value }))
       :title="dialogMode === 'create' ? t('variance_create_title') : t('variance_edit_title')"
       @close="dialog = false"
     >
-      <div style="display:grid; grid-template-columns: repeat(12, 1fr); gap: var(--sp-4);">
+      <div class="form-grid">
         <!-- code -->
-        <div style="grid-column: span 6;">
+        <div class="col-6">
           <Field
             :label="t('variance_code')"
             :error="fieldErrors.code"
@@ -451,7 +450,7 @@ const countLabel = computed(() => t('variance_count_label', { n: total.value }))
         </div>
 
         <!-- name -->
-        <div style="grid-column: span 6;">
+        <div class="col-6">
           <Field
             :label="t('variance_name')"
             :error="fieldErrors.name"
@@ -466,7 +465,7 @@ const countLabel = computed(() => t('variance_count_label', { n: total.value }))
         </div>
 
         <!-- description -->
-        <div style="grid-column: span 12;">
+        <div class="col-12">
           <Field :label="t('variance_description')">
             <textarea
               v-model="form.description"
@@ -479,7 +478,7 @@ const countLabel = computed(() => t('variance_count_label', { n: total.value }))
         </div>
 
         <!-- requires_approval -->
-        <div :style="dialogMode === 'edit' ? 'grid-column: span 6;' : 'grid-column: span 12;'">
+        <div :class="dialogMode === 'edit' ? 'col-6' : 'col-12'">
           <Field
             :label="t('variance_requires_approval')"
             :hint="t('variance_requires_approval_hint')"
@@ -496,7 +495,7 @@ const countLabel = computed(() => t('variance_count_label', { n: total.value }))
         <!-- is_active (edit only) -->
         <div
           v-if="dialogMode === 'edit'"
-          style="grid-column: span 6;"
+          class="col-6"
         >
           <Field :label="t('variance_is_active')">
             <label class="row" style="gap: 10px; cursor: pointer; padding-top: 4px;">
@@ -544,7 +543,7 @@ const countLabel = computed(() => t('variance_count_label', { n: total.value }))
             {{ selectedItem?.code }} · {{ selectedItem?.name }}
           </p>
           <p class="muted" style="margin: 6px 0 0; font-size: 14px; color: var(--text-secondary);">
-            {{ t('Are you sure you want to delete') }}?
+            {{ t('variance_delete_confirm_q') }}
           </p>
         </div>
       </div>
@@ -616,6 +615,68 @@ const countLabel = computed(() => t('variance_count_label', { n: total.value }))
 .row {
   display: flex;
   align-items: center;
+}
+
+.toolbar-search {
+  max-width: 320px;
+}
+
+.toolbar-select {
+  width: 200px;
+}
+
+.desc-cell {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 340px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--sp-4);
+}
+
+.form-grid .col-6 {
+  grid-column: span 6;
+}
+
+.form-grid .col-12 {
+  grid-column: span 12;
+}
+
+@media (max-width: 900px) {
+  .toolbar-search {
+    max-width: 100%;
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .toolbar-select {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .toolbar-count {
+    margin-left: 0 !important;
+  }
+
+  .desc-cell {
+    max-width: 180px;
+  }
+}
+
+@media (max-width: 600px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid .col-6,
+  .form-grid .col-12 {
+    grid-column: span 1;
+  }
 }
 </style>
 

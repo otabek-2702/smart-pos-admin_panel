@@ -194,7 +194,7 @@ const unitOptions = computed(() =>
 const batchOptions = computed(() =>
   batchesList.value.map((b: any) => ({
     value: String(b.id),
-    label: b.batch_number ?? `Batch #${b.id}`,
+    label: b.batch_number ?? `${t('transfer_batch_label')} #${b.id}`,
   })),
 )
 
@@ -458,8 +458,8 @@ const confirmTitle = computed(() => {
 
     <!-- Filter card -->
     <div class="card">
-      <div class="toolbar">
-        <div style="width: 200px;">
+      <div class="toolbar" style="flex-wrap: wrap;">
+        <div class="filter-cell">
           <Select
             :model-value="statusFilter ?? ''"
             :placeholder="t('transfers_filter_status')"
@@ -467,7 +467,7 @@ const confirmTitle = computed(() => {
             @update:model-value="(v: string) => statusFilter = v || undefined"
           />
         </div>
-        <div style="width: 200px;">
+        <div class="filter-cell">
           <Select
             :model-value="typeFilter ?? ''"
             :placeholder="t('transfers_filter_type')"
@@ -475,7 +475,7 @@ const confirmTitle = computed(() => {
             @update:model-value="(v: string) => typeFilter = v || undefined"
           />
         </div>
-        <div style="width: 220px;">
+        <div class="filter-cell filter-cell--wide">
           <Select
             :model-value="fromLocationFilter !== undefined ? String(fromLocationFilter) : ''"
             :placeholder="t('transfers_filter_from_location')"
@@ -483,7 +483,7 @@ const confirmTitle = computed(() => {
             @update:model-value="(v: string) => fromLocationFilter = v ? Number(v) : undefined"
           />
         </div>
-        <div style="width: 220px;">
+        <div class="filter-cell filter-cell--wide">
           <Select
             :model-value="toLocationFilter !== undefined ? String(toLocationFilter) : ''"
             :placeholder="t('transfers_filter_to_location')"
@@ -491,7 +491,7 @@ const confirmTitle = computed(() => {
             @update:model-value="(v: string) => toLocationFilter = v ? Number(v) : undefined"
           />
         </div>
-        <div style="margin-left: auto;">
+        <div class="toolbar-spacer">
           <Button
             variant="ghost"
             size="sm"
@@ -700,8 +700,8 @@ const confirmTitle = computed(() => {
         <div
           v-for="it in (receiveDialog.row.items as any[])"
           :key="it.id"
-          class="row"
-          style="gap: 12px; align-items: center; margin-bottom: 10px;"
+          class="row receive-row"
+          style="gap: 12px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;"
         >
           <div style="flex: 1; min-width: 0;">
             <div class="cell-strong">{{ it.stock_item?.name ?? '—' }}</div>
@@ -711,7 +711,7 @@ const confirmTitle = computed(() => {
               <span v-if="it.unit_short" class="mono"> {{ it.unit_short }}</span>
             </div>
           </div>
-          <div style="width: 160px;">
+          <div class="receive-qty-cell">
             <Field :error="receivedInvalid(it) ? t('transfer_ext_received_lt_shipped') : ''">
               <Input
                 :model-value="getReceivedQty(it.id)"
@@ -1012,6 +1012,21 @@ const confirmTitle = computed(() => {
 .row { display: flex; align-items: center; }
 .grid { display: grid; }
 .cols-2 { grid-template-columns: 1fr 1fr; }
+
+/* Toolbar filter cells: stay generous on desktop, drop to full width on mobile */
+.filter-cell { width: 200px; min-width: 0; }
+.filter-cell--wide { width: 220px; }
+.toolbar-spacer { margin-left: auto; }
+.receive-qty-cell { width: 160px; }
+.tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 900px) {
+  .filter-cell,
+  .filter-cell--wide { width: 100%; flex: 1 1 100%; }
+  .toolbar-spacer { margin-left: 0; width: 100%; }
+  .cols-2 { grid-template-columns: 1fr; }
+  .receive-qty-cell { width: 100%; }
+}
 </style>
 
 <route lang="yaml">

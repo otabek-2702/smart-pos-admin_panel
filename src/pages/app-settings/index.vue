@@ -247,6 +247,8 @@ const modules = computed(() => [
     font-weight: var(--fw-semibold);
     color: rgb(var(--v-theme-on-surface));
     line-height: 1.3;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   &__hint {
@@ -254,11 +256,14 @@ const modules = computed(() => [
     font-size: var(--fs-sm);
     color: rgb(var(--v-theme-text-secondary));
     line-height: 1.4;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 }
 
 .save-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
@@ -271,6 +276,37 @@ const modules = computed(() => [
   padding: var(--sp-5);
   font-size: var(--fs-sm);
   line-height: 1.55;
+}
+
+@media (max-width: 768px) {
+  .card__head,
+  .save-bar,
+  .tip-body {
+    padding: var(--sp-4);
+  }
+
+  .setting-row {
+    gap: 10px;
+    padding: var(--sp-3) var(--sp-4);
+  }
+}
+
+@media (max-width: 420px) {
+  .setting-row {
+    flex-wrap: wrap;
+  }
+
+  .setting-row__body {
+    flex: 1 1 0;
+  }
+
+  .save-bar {
+    justify-content: stretch;
+  }
+
+  .save-bar > .v-btn {
+    flex: 1 1 100%;
+  }
 }
 </style>
 

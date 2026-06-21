@@ -732,9 +732,9 @@ function clearFilters() {
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .kpi-strip {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .modal-grid {
@@ -755,6 +755,12 @@ function clearFilters() {
 
   .tb-toggle {
     margin-left: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .kpi-strip {
+    grid-template-columns: 1fr;
   }
 }
 </style>

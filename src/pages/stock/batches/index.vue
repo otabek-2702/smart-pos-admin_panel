@@ -673,7 +673,7 @@ function clearAll() {
     <!-- Consume from batch modal -->
     <Modal
       :open="consumeDialog"
-      :width="540"
+      width="min(540px, 100%)"
       :title="t('batches_ext_consume_title')"
       :subtitle="t('batches_ext_consume_subtitle')"
       @close="consumeDialog = false"
@@ -745,7 +745,7 @@ function clearAll() {
     <!-- Auto-consume modal -->
     <Modal
       :open="autoConsumeDialog"
-      :width="600"
+      width="min(600px, 100%)"
       :title="t('batches_ext_auto_consume_title')"
       :subtitle="t('batches_ext_auto_consume_subtitle')"
       @close="autoConsumeDialog = false"
@@ -918,8 +918,8 @@ function clearAll() {
   font-weight: 600;
 }
 
-/* Responsive — collapse toolbar + modal grid + summary on mobile */
-@media (max-width: 900px) {
+/* Responsive — collapse toolbar at tablet, modal grid + summary at phone */
+@media (max-width: 1024px) {
   .tb-search,
   .tb-select {
     flex: 1 1 100%;
@@ -928,6 +928,8 @@ function clearAll() {
   .tb-switch {
     flex: 1 1 100%;
   }
+}
+@media (max-width: 768px) {
   .modal-grid {
     grid-template-columns: 1fr;
   }
@@ -936,6 +938,10 @@ function clearAll() {
   }
   .consume-summary {
     grid-template-columns: 1fr;
+  }
+  /* Ensure auto-consume result table can scroll horizontally inside modal */
+  .ac-result__table .dtable {
+    min-width: 360px;
   }
 }
 </style>

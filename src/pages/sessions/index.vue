@@ -600,7 +600,12 @@ onBeforeUnmount(() => {
 }
 
 /* Responsive collapse */
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
+  .sessions-ua {
+    max-width: 360px;
+  }
+}
+@media (max-width: 768px) {
   .sessions-toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -608,15 +613,21 @@ onBeforeUnmount(() => {
   .sessions-search {
     max-width: 100%;
     min-width: 0;
+    flex: 1 1 100%;
   }
   .sessions-switch {
     height: auto;
   }
   .sessions-ua {
-    max-width: 260px;
+    max-width: 220px;
   }
   .sessions-modal-row {
     flex-wrap: wrap;
+  }
+}
+@media (max-width: 420px) {
+  .sessions-ua {
+    max-width: 160px;
   }
 }
 </style>

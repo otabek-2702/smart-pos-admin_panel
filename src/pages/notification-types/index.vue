@@ -683,7 +683,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
   flex: 0 0 44px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .nt-toolbar {
     gap: 8px;
   }

@@ -903,9 +903,17 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
   width: 200px;
 }
 
-@media (max-width: 900px) {
+/* Canonical 1024px tablet — KPI 4-up may compact */
+@media (max-width: 1024px) {
   .kpi-strip {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Canonical 768px phone — KPI stays 2-up, toolbar stacks, modal collapses */
+@media (max-width: 768px) {
+  .kpi-strip {
+    grid-template-columns: repeat(2, 1fr) !important;
   }
   .plans-toolbar__search,
   .plans-toolbar__select--md,
@@ -914,6 +922,13 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
     width: 100%;
     max-width: 100%;
     flex: 1 1 100%;
+  }
+}
+
+/* Canonical 420px small phone — KPI collapses to single column */
+@media (max-width: 420px) {
+  .kpi-strip {
+    grid-template-columns: 1fr !important;
   }
 }
 </style>

@@ -532,6 +532,30 @@ function clearAll() {
     grid-column: span 1;
   }
 }
+
+/* Phone breakpoint — ensure modals collapse to viewport sheets and content remains readable */
+@media (max-width: 768px) {
+  /* Modal primitive already applies max-width:100% on phone, but reinforce
+     that hard-coded width props (540, 440) cannot overflow the viewport. */
+  :deep(.modal) {
+    max-width: 100% !important;
+  }
+  .del-row {
+    gap: 12px;
+  }
+  .del-ic {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+  }
+}
+
+@media (max-width: 420px) {
+  .del-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+}
 </style>
 
 <route lang="yaml">

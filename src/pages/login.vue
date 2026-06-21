@@ -234,6 +234,35 @@ const login = async () => {
     justify-content: flex-start !important;
   }
 }
+
+@media (max-width: 768px) {
+  .auth-card-v2 .v-card.pa-6 {
+    padding: 16px !important;
+  }
+
+  .auth-title {
+    font-size: 20px;
+  }
+
+  .login-toolbar {
+    gap: 4px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .auth-card-v2 .v-card.pa-6 {
+    padding: 12px !important;
+  }
+
+  .auth-title {
+    font-size: 18px;
+  }
+
+  .login-toolbar .v-btn {
+    min-width: 0;
+    padding: 0 8px;
+  }
+}
 </style>
 
 <route lang="yaml">

@@ -72,7 +72,7 @@ const avgOrderValue = computed(() => {
 
     <VRow class="mb-4">
       <VCol
-        cols="12"
+        cols="6"
         sm="6"
         lg="3"
       >
@@ -100,7 +100,7 @@ const avgOrderValue = computed(() => {
       </VCol>
 
       <VCol
-        cols="12"
+        cols="6"
         sm="6"
         lg="3"
       >
@@ -128,7 +128,7 @@ const avgOrderValue = computed(() => {
       </VCol>
 
       <VCol
-        cols="12"
+        cols="6"
         sm="6"
         lg="3"
       >
@@ -156,7 +156,7 @@ const avgOrderValue = computed(() => {
       </VCol>
 
       <VCol
-        cols="12"
+        cols="6"
         sm="6"
         lg="3"
       >
@@ -422,7 +422,7 @@ const avgOrderValue = computed(() => {
   word-break: break-word;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .kpi-card__value {
     font-size: 1.25rem;
   }
@@ -434,7 +434,7 @@ const avgOrderValue = computed(() => {
   }
 }
 
-@media (max-width: 400px) {
+@media (max-width: 420px) {
   .dash-list-row {
     gap: 8px !important;
   }

@@ -1204,26 +1204,46 @@ function clearAllFilters() {
   width: 200px;
 }
 
+/* ── Chip / slug overflow guards ── */
+.chips { flex-wrap: wrap; }
+.chips .chip { overflow-wrap: anywhere; word-break: break-word; max-width: 100%; }
+.control.is-disabled input.mono { min-width: 0; overflow-wrap: anywhere; word-break: break-all; text-overflow: ellipsis; }
+
+/* ── Pagination wrap on phone ── */
+.pagination { flex-wrap: wrap; row-gap: var(--sp-2); }
+.pglist { flex-wrap: wrap; }
+
 /* ── Responsive ── */
 @media (max-width: 1024px) {
   .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
 }
-@media (max-width: 900px) {
+@media (max-width: 768px) {
+  /* Toolbar full-width collapse at canonical phone breakpoint */
   .tb-search,
   .tb-status {
     width: 100%;
     max-width: 100%;
     flex: 1 1 100%;
+    min-width: 0;
   }
   .tb-switch { flex: 1 1 100%; }
-}
-@media (max-width: 720px) {
-  .grid.cols-4 { grid-template-columns: 1fr; }
+
+  /* KPI strip stays 2-up at phone (canonical) */
+  .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+
+  /* Category grid tighter on phone */
   .category-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+
+  /* POS preview chip width relaxed for readability */
+  .pos-category-btn { max-width: 100%; }
 }
 @media (max-width: 480px) {
   .pos-preview__products { flex-wrap: wrap; }
   .pos-product-card { flex: 1 1 calc(50% - 4px); }
+}
+@media (max-width: 420px) {
+  /* Small phone: KPIs single column for breathing room */
+  .grid.cols-4 { grid-template-columns: 1fr; }
 }
 </style>
 

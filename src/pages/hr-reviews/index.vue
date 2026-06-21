@@ -1032,12 +1032,13 @@ meta:
   width: 220px;
   flex: 0 0 auto;
 }
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .reviews-toolbar__search,
   .reviews-toolbar__status {
     flex: 1 1 100%;
     width: 100%;
     max-width: none;
+    min-width: 0;
   }
   :deep(.form-grid) {
     grid-template-columns: 1fr !important;

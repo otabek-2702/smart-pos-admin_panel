@@ -528,7 +528,7 @@ const itemFilterOptions = computed(() => [
       </div>
 
       <!-- filter -->
-      <div style="margin-bottom: 12px; max-width: 240px;">
+      <div class="item-filter-wrap">
         <Select
           :model-value="itemFilter"
           :options="itemFilterOptions"
@@ -542,7 +542,7 @@ const itemFilterOptions = computed(() => [
 
       <!-- items table -->
       <div class="tablewrap">
-        <table class="dtable" style="background: var(--surface); border-radius: 10px; border: 1px solid var(--border); overflow: hidden;">
+        <table class="dtable detail-items-table">
           <thead>
             <tr>
               <th>{{ t('Item') }}</th>
@@ -650,13 +650,32 @@ const itemFilterOptions = computed(() => [
 /* Create/detail modal form grid */
 .form-grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
 
-/* Detail items table horizontal-scrolls below 900px so 7 cols don't break layout */
+/* Detail items table horizontal-scrolls so 7 cols don't break layout */
 .tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.detail-items-table {
+  background: var(--surface);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  min-width: 720px;
+}
+
+/* Detail filter wrapper — capped on desktop, full-width on phone */
+.item-filter-wrap { margin-bottom: 12px; max-width: 240px; }
+
+/* Tablet: collapse 4-col summary to 2-up at canonical 1024 to avoid cramping in 900–1024 range */
+@media (max-width: 1024px) {
+  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+}
 
 @media (max-width: 900px) {
   .filter-cell { width: 100%; flex: 1 1 100%; }
   .toolbar-spacer { margin-left: 0; width: 100%; }
-  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .item-filter-wrap { max-width: 100%; }
+  .summary-val { font-size: 20px; }
 }
 
 @media (max-width: 600px) {

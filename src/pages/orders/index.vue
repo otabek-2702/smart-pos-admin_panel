@@ -981,8 +981,16 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
   }
 }
 
-/* --- Mobile collapse --- */
+/* --- Intermediate tablet: shrink fixed filter widths so toolbar doesn't overflow narrow tablets (769-899px) --- */
 @media (max-width: 900px) {
+  .tb-filter--md { width: 160px; }
+  .tb-filter--sm { width: 140px; }
+  .tb-filter--xs { width: 120px; }
+  .tb-date { width: 140px; }
+}
+
+/* --- Mobile collapse (canonical 768px phone breakpoint) --- */
+@media (max-width: 768px) {
   .orders-toolbar > * {
     width: 100%;
     max-width: 100%;
@@ -1016,7 +1024,8 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
   }
 }
 
-@media (max-width: 600px) {
+/* Keep 2-up down to small-phone breakpoint (420px) per canonical spec; collapse to 1-col only below */
+@media (max-width: 420px) {
   .kpi-grid {
     grid-template-columns: 1fr;
   }

@@ -572,7 +572,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
       :open="newDialog"
       :title="t('New Leave Request')"
       :subtitle="t('leave_modal_create_subtitle')"
-      :width="560"
+      :width="520"
       @close="closeNewDialog"
     >
       <form @submit.prevent="submitNew">
@@ -716,6 +716,18 @@ meta:
 
   .reason-cell {
     max-inline-size: 140px;
+  }
+}
+
+@media (max-width: 768px) {
+  .reason-cell {
+    max-inline-size: 120px;
+  }
+}
+
+@media (max-width: 420px) {
+  .reason-cell {
+    max-inline-size: 90px;
   }
 }
 </style>

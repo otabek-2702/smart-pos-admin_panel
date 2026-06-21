@@ -1090,13 +1090,19 @@ const levelsSkeletonRows = computed(() => 3)
   gap: var(--sp-2);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
+  .overview-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
   .kpi-strip {
     grid-template-columns: 1fr 1fr;
   }
 
   .overview-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
   }
 
   .history-title {
@@ -1111,8 +1117,12 @@ const levelsSkeletonRows = computed(() => 3)
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 420px) {
   .kpi-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .overview-grid {
     grid-template-columns: 1fr;
   }
 }

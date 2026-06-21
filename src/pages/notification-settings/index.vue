@@ -476,7 +476,7 @@ onBeforeUnmount(() => {
           />
         </div>
 
-        <div style="flex:1;" />
+        <div class="toolbar-spacer" />
 
         <Button
           variant="ghost"
@@ -898,6 +898,11 @@ onBeforeUnmount(() => {
   min-inline-size: 160px;
 }
 
+/* Flex spacer inside .toolbar — hidden on mobile so trailing button doesn't wrap to its own row. */
+.toolbar-spacer {
+  flex: 1;
+}
+
 /* Truncate chat ids list inside the table cell. */
 .chat-ids-cell {
   display: inline-block;
@@ -913,11 +918,15 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
-/* Responsive collapse — single column under 900px for KPI strip + form grid. */
-@media (max-width: 900px) {
+/* Tablet — KPI strip 4 → 2 columns. */
+@media (max-width: 1024px) {
   .grid.cols-4 {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* Phone — toolbar/form collapse; KPI stays 2-up per spec. */
+@media (max-width: 768px) {
   .form-grid {
     grid-template-columns: 1fr !important;
   }
@@ -926,9 +935,20 @@ onBeforeUnmount(() => {
   }
   .filter-select {
     inline-size: 100%;
+    min-inline-size: 0;
+  }
+  .toolbar-spacer {
+    display: none;
   }
   .chat-ids-cell {
     max-inline-size: 140px;
+  }
+}
+
+/* Small phone — KPI 2 → 1 column. */
+@media (max-width: 420px) {
+  .grid.cols-4 {
+    grid-template-columns: 1fr;
   }
 }
 

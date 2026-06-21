@@ -457,7 +457,6 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
       :open="createDialog"
       :title="t('New Production Order')"
       :subtitle="t('production_orders_subtitle')"
-      :width="560"
       @close="closeCreate"
     >
       <form @submit.prevent="createOrder">
@@ -547,7 +546,6 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
       :open="actionDialog"
       :title="t(actionTitleKey[actionType] ?? actionType)"
       :subtitle="actionItem?.order_number ?? ''"
-      :width="420"
       @close="actionDialog = false"
     >
       <div style="padding:4px 2px 8px;color:rgb(var(--v-theme-text-secondary));">

@@ -601,7 +601,7 @@ function clearFilters() {
   font-size: 13px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .modal-grid {
     grid-template-columns: 1fr;
   }

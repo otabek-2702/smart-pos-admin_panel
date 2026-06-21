@@ -35,7 +35,7 @@
 .aithread__head .row { min-width: 0; }
 .aithread__head > .row:first-child { flex: 1; min-width: 0; }
 .aithread__scroll { flex: 1; overflow-y: auto; min-height: 0; }
-.aithread__inner { max-width: 780px; margin: 0 auto; padding: var(--sp-7) var(--sp-6) var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-5); }
+.aithread__inner { max-width: 780px; margin: 0 auto; padding: var(--sp-7) var(--sp-6) var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-5); min-height: 100%; }
 
 /* notify button */
 .notifbtn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-radius: var(--r-pill); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-secondary); font-size: var(--fs-sm); font-weight: var(--fw-medium); cursor: pointer; transition: all .14s; }

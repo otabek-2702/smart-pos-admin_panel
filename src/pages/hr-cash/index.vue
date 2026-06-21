@@ -858,15 +858,24 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 
 @media (max-width: 900px) {
   .hr-cash__kpis {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
+}
 
+@media (max-width: 768px) {
   .hr-cash__search,
   .hr-cash__filter,
   .hr-cash__date {
     width: 100%;
     max-width: none;
+    min-width: 0;
     flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .hr-cash__kpis {
+    grid-template-columns: 1fr;
   }
 }
 </style>

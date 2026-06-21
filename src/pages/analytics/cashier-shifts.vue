@@ -773,7 +773,7 @@ const shiftColumns = computed<DataTableColumn<any>[]>(() => [
   flex: 1 1 220px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .cs-select-field,
   .cs-date-input {
     min-width: 100%;
@@ -785,12 +785,20 @@ const shiftColumns = computed<DataTableColumn<any>[]>(() => [
   .cs-stats-row--4 {
     grid-template-columns: repeat(2, 1fr);
   }
+  .cs-expand__col {
+    min-width: 100%;
+    flex: 1 1 100%;
+  }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 420px) {
   .cs-stats-row,
   .cs-stats-row--4 {
     grid-template-columns: 1fr;
+  }
+  .cs-expand {
+    gap: 16px;
+    padding: var(--sp-2);
   }
 }
 </style>

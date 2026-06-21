@@ -623,7 +623,7 @@ function onBatchMultiplierInput(v: string) {
 
       <!-- Overview card -->
       <div class="card" style="margin-bottom: var(--sp-5);">
-        <div class="toolbar" style="border-bottom: 1px solid var(--border);">
+        <div class="toolbar recipe-toolbar" style="border-bottom: 1px solid var(--border);">
           <div style="font-weight: var(--fw-semibold); font-size: var(--fs-md);">
             {{ t('recipe_overview') }}
           </div>
@@ -806,7 +806,7 @@ function onBatchMultiplierInput(v: string) {
 
       <!-- Ingredients card -->
       <div class="card" style="margin-bottom: var(--sp-5);">
-        <div class="toolbar" style="border-bottom: 1px solid var(--border);">
+        <div class="toolbar recipe-toolbar" style="border-bottom: 1px solid var(--border);">
           <div style="font-weight: var(--fw-semibold); font-size: var(--fs-md); margin-right: auto;">
             {{ t('recipe_ingredients') }}
           </div>
@@ -913,7 +913,7 @@ function onBatchMultiplierInput(v: string) {
 
       <!-- Batch multiplier toolbar (shared by availability + cost) -->
       <div class="card" style="margin-bottom: var(--sp-5);">
-        <div class="toolbar" style="gap: var(--sp-3); align-items: center; flex-wrap: wrap;">
+        <div class="toolbar recipe-bm-toolbar" style="gap: var(--sp-3); align-items: center; flex-wrap: wrap;">
           <div style="font-weight: var(--fw-semibold); font-size: var(--fs-md);">
             {{ t('recipe_batch_multiplier') }}
           </div>
@@ -935,7 +935,7 @@ function onBatchMultiplierInput(v: string) {
           >
             {{ t('recipe_recalculate') }}
           </Button>
-          <div style="margin-left: auto;">
+          <div class="recipe-bm-summary">
             <Badge :tone="availabilitySummaryTone" dot>
               {{ t(availabilitySummaryKey) }}
             </Badge>
@@ -945,7 +945,7 @@ function onBatchMultiplierInput(v: string) {
 
       <!-- Availability card -->
       <div class="card" style="margin-bottom: var(--sp-5);">
-        <div class="toolbar" style="border-bottom: 1px solid var(--border);">
+        <div class="toolbar recipe-toolbar" style="border-bottom: 1px solid var(--border);">
           <div style="font-weight: var(--fw-semibold); font-size: var(--fs-md); margin-right: auto;">
             {{ t('recipe_availability') }}
           </div>
@@ -1023,7 +1023,7 @@ function onBatchMultiplierInput(v: string) {
 
       <!-- Cost breakdown card -->
       <div class="card">
-        <div class="toolbar" style="border-bottom: 1px solid var(--border);">
+        <div class="toolbar recipe-toolbar" style="border-bottom: 1px solid var(--border);">
           <div style="font-weight: var(--fw-semibold); font-size: var(--fs-md); margin-right: auto;">
             {{ t('recipe_cost_breakdown') }}
           </div>
@@ -1109,7 +1109,7 @@ function onBatchMultiplierInput(v: string) {
     <Modal
       :open="editOpen"
       :title="t('recipe_action_edit')"
-      :width="720"
+      width="min(720px, 100vw)"
       @close="editOpen = false"
       @update:open="(v: boolean) => editOpen = v"
     >
@@ -1194,7 +1194,7 @@ function onBatchMultiplierInput(v: string) {
     <Modal
       :open="addIngOpen"
       :title="t('recipe_add_ingredient')"
-      :width="640"
+      width="min(640px, 100vw)"
       @close="addIngOpen = false"
       @update:open="(v: boolean) => addIngOpen = v"
     >
@@ -1257,7 +1257,7 @@ function onBatchMultiplierInput(v: string) {
     <Modal
       :open="editIngOpen"
       :title="t('recipe_edit_ingredient')"
-      :width="640"
+      width="min(640px, 100vw)"
       @close="editIngOpen = false"
       @update:open="(v: boolean) => editIngOpen = v"
     >
@@ -1368,6 +1368,14 @@ function onBatchMultiplierInput(v: string) {
   max-inline-size: 100%;
 }
 
+.recipe-toolbar {
+  flex-wrap: wrap;
+}
+
+.recipe-bm-summary {
+  margin-left: auto;
+}
+
 @media (max-width: 1100px) {
   .recipe-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1375,10 +1383,32 @@ function onBatchMultiplierInput(v: string) {
 }
 
 @media (max-width: 900px) {
-  .recipe-kpis {
-    grid-template-columns: 1fr;
+  .recipe-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .recipe-overview-grid .span-3 {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 768px) {
+  .recipe-bm-input {
+    inline-size: 100%;
+    flex: 1 1 100%;
+  }
+
+  .recipe-bm-summary {
+    margin-left: 0;
+    flex: 1 1 100%;
+  }
+
+  .recipe-toolbar > * {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 600px) {
   .recipe-overview-grid {
     grid-template-columns: 1fr;
   }
@@ -1386,9 +1416,11 @@ function onBatchMultiplierInput(v: string) {
   .recipe-overview-grid .span-3 {
     grid-column: span 1;
   }
+}
 
-  .recipe-bm-input {
-    inline-size: 100%;
+@media (max-width: 420px) {
+  .recipe-kpis {
+    grid-template-columns: 1fr;
   }
 }
 </style>

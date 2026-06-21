@@ -712,10 +712,7 @@ function fmtTime(iso: string) {
         class="toolbar"
         style="flex-wrap: wrap;"
       >
-        <div
-          class="grow"
-          style="min-width: 220px; max-width: 280px;"
-        >
+        <div class="grow toolbar-search">
           <Input
             v-model="search"
             icon="search"
@@ -724,10 +721,7 @@ function fmtTime(iso: string) {
           />
         </div>
 
-        <div
-          class="toolbar-select"
-          style="min-width: 160px;"
-        >
+        <div class="toolbar-select toolbar-type-filter">
           <Select
             :model-value="typeFilter ?? ''"
             :placeholder="t('All Types')"
@@ -833,7 +827,7 @@ function fmtTime(iso: string) {
       @close="dialog = false"
     >
       <div
-        class="grid cols-2"
+        class="grid cols-2 unit-modal-grid"
         style="gap: var(--sp-4);"
       >
         <Field :label="t('Name')">
@@ -1073,6 +1067,14 @@ function fmtTime(iso: string) {
   align-items: center;
 }
 
+.toolbar-search {
+  min-width: 220px;
+  max-width: 280px;
+}
+.toolbar-type-filter {
+  min-width: 160px;
+}
+
 @media (max-width: 1100px) {
   .conv-form {
     grid-template-columns: repeat(2, 1fr);
@@ -1094,6 +1096,37 @@ function fmtTime(iso: string) {
   }
   .toolbar-select {
     width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .toolbar-search {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+  }
+  .toolbar-type-filter {
+    flex: 1 1 100%;
+    min-width: 0;
+    width: 100%;
+  }
+  .unit-modal-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .unit-modal-grid > [style*="grid-column: span 2"] {
+    grid-column: span 1 !important;
+  }
+  .hist-head,
+  .hist-row {
+    grid-template-columns: 140px repeat(5, minmax(96px, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .hist-head,
+  .hist-row {
+    min-width: 640px;
   }
 }
 </style>

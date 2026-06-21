@@ -763,8 +763,7 @@ function clearAll() {
 
         <div class="tablewrap">
           <table
-            class="dtable"
-            style="background: var(--surface); border-radius: 10px; border: 1px solid var(--border); overflow: hidden;"
+            class="dtable rcv-items-table"
           >
             <thead>
               <tr>
@@ -941,7 +940,7 @@ function clearAll() {
       :subtitle="t('Confirm complete receiving?')"
       @close="confirmCompleteOpen = false"
     >
-      <div v-if="activeReceiving" class="row" style="gap: 14px; align-items: flex-start;">
+      <div v-if="activeReceiving" class="row rcv-confirm-row" style="gap: 14px; align-items: flex-start;">
         <div
           class="kpi__icon t-success"
           style="width: 44px; height: 44px; flex: 0 0 44px;"
@@ -997,7 +996,29 @@ function clearAll() {
 .tb-dates { gap: 8px; margin-left: auto; }
 .tb-date { width: 160px; }
 
-@media (max-width: 900px) {
+/* Receiving items table — let .tablewrap handle horizontal scroll on phone */
+.rcv-items-table {
+  background: var(--surface);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+/* Tablet (<=1024px): collapse inline grids per canonical breakpoint */
+@media (max-width: 1024px) {
+  .rcv-meta {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .rcv-form {
+    grid-template-columns: 1fr !important;
+  }
+  .rcv-form > [style*="grid-column"] {
+    grid-column: auto !important;
+  }
+}
+
+/* Phone (<=768px): canonical breakpoint — collapse toolbar, single-col grids,
+   modals → near full viewport, table scrolls horizontally via .tablewrap. */
+@media (max-width: 768px) {
   .tb-search,
   .tb-status,
   .tb-po,
@@ -1011,22 +1032,47 @@ function clearAll() {
     flex-wrap: wrap;
   }
   .tb-date { flex: 1 1 140px; }
-}
 
-/* View modal meta grid: 3 cols → 1 col under 900px */
-@media (max-width: 900px) {
   .rcv-meta {
     grid-template-columns: 1fr !important;
   }
   .rcv-meta > [style*="grid-column"] {
     grid-column: auto !important;
   }
-  /* Add-item form grid: 2 cols → 1 col under 900px */
   .rcv-form {
     grid-template-columns: 1fr !important;
   }
   .rcv-form > [style*="grid-column"] {
     grid-column: auto !important;
+  }
+
+  /* Hard-coded modal widths exceed phone viewport — collapse to sheet. */
+  :deep(.rcv-modal) .modal,
+  :deep(.rcv-modal) .modal__panel,
+  :deep(.rcv-modal) .modal-panel,
+  :deep(.rcv-modal) .modal-content,
+  :deep(.rcv-modal) [class*="modal__dialog"],
+  :deep(.rcv-modal) [class*="modal-dialog"] {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  /* Confirm modal body row should wrap on tiny widths. */
+  .rcv-confirm-row {
+    flex-wrap: wrap;
+  }
+}
+
+/* Small phone (<=420px) — tighter modal margins. */
+@media (max-width: 420px) {
+  :deep(.rcv-modal) .modal,
+  :deep(.rcv-modal) .modal__panel,
+  :deep(.rcv-modal) .modal-panel,
+  :deep(.rcv-modal) .modal-content,
+  :deep(.rcv-modal) [class*="modal__dialog"],
+  :deep(.rcv-modal) [class*="modal-dialog"] {
+    width: calc(100vw - 12px) !important;
+    max-width: calc(100vw - 12px) !important;
   }
 }
 </style>

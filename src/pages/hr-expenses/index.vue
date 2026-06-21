@@ -1171,18 +1171,14 @@ meta:
 }
 
 /* Tablet collapse */
-@media (max-width: 1100px) {
+@media (max-width: 1024px) {
   .kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-/* Mobile collapse */
-@media (max-width: 900px) {
-  .kpi-grid {
-    grid-template-columns: 1fr;
-  }
-
+/* Phone collapse — KPI cols-4 stays 2-up at 768px per canonical rules */
+@media (max-width: 768px) {
   .tb-filter,
   .tb-filter--wide,
   .tb-date {
@@ -1204,6 +1200,13 @@ meta:
 
   .cat-list__wrap {
     max-height: 280px;
+  }
+}
+
+/* Small phone — KPI collapses to single column */
+@media (max-width: 480px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

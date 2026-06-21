@@ -553,7 +553,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       :open="createOpen"
       :title="t('hr_event_modal_create_title')"
       :subtitle="t('hr_events_subtitle')"
-      :width="640"
+      class="hr-events-modal hr-events-modal--lg"
       @close="closeCreate"
     >
       <form @submit.prevent="submitCreate">
@@ -659,7 +659,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     <Modal
       :open="viewOpen"
       :title="t('hr_event_modal_view_title')"
-      :width="560"
+      class="hr-events-modal hr-events-modal--md"
       @close="closeView"
     >
       <div
@@ -800,7 +800,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       :open="timelineOpen"
       :title="t('hr_event_timeline_title')"
       :subtitle="employeeName(timelineEmployee)"
-      :width="680"
+      class="hr-events-modal hr-events-modal--xl"
       @close="closeTimeline"
     >
       <div
@@ -935,6 +935,23 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   .hr-events-form-grid :deep(.span-2) {
     grid-column: span 1 !important;
   }
+}
+@media (max-width: 768px) {
+  .hr-events-toolbar__search {
+    min-width: 0;
+  }
+}
+</style>
+
+<!-- Non-scoped so it can reach teleported .modal element (Modal class lands on the .overlay root) -->
+<style>
+.overlay.hr-events-modal--md > .modal { max-width: 560px; }
+.overlay.hr-events-modal--lg > .modal { max-width: 640px; }
+.overlay.hr-events-modal--xl > .modal { max-width: 680px; }
+@media (max-width: 768px) {
+  .overlay.hr-events-modal--md > .modal,
+  .overlay.hr-events-modal--lg > .modal,
+  .overlay.hr-events-modal--xl > .modal { max-width: 100%; }
 }
 .timeline {
   list-style: none;

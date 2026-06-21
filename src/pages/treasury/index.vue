@@ -470,7 +470,7 @@ function deltaDisplay(t_: any) {
     <!-- Transfer modal -->
     <Modal
       :open="transferDialog"
-      :width="560"
+      width="min(560px, 100%)"
       :title="t('Transfer between accounts')"
       :subtitle="t('Move funds between Safe and Bank')"
       @close="transferDialog = false"
@@ -546,7 +546,7 @@ function deltaDisplay(t_: any) {
     <!-- Expense modal -->
     <Modal
       :open="expenseDialog"
-      :width="520"
+      width="min(520px, 100%)"
       :title="t('Record Treasury Expense')"
       :subtitle="t('Record an outgoing payment from Safe or Bank')"
       @close="expenseDialog = false"
@@ -671,8 +671,7 @@ function deltaDisplay(t_: any) {
   gap: var(--sp-4);
 }
 
-@media (max-width: 900px) {
-  .treasury-kpis { grid-template-columns: 1fr; }
+@media (max-width: 768px) {
   .treasury-search,
   .treasury-date,
   .treasury-select { flex: 1 1 100%; min-width: 0; max-width: none; }
@@ -680,6 +679,10 @@ function deltaDisplay(t_: any) {
   .treasury-actions > * { flex: 1 1 auto; }
   .treasury-form-grid { grid-template-columns: 1fr; }
   .treasury-form-grid > div[style*="span 2"] { grid-column: span 1 !important; }
+}
+
+@media (max-width: 480px) {
+  .treasury-kpis { grid-template-columns: 1fr; }
 }
 </style>
 

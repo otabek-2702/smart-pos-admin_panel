@@ -543,18 +543,21 @@ const pagination = computed<DataTablePagination>(() => ({
 }
 
 /* Responsive */
-@media (max-width: 1100px) {
+/* Tablet: KPI strip collapses from 3-up to 2-up, perf grid to 1-col */
+@media (max-width: 1024px) {
   .inkassa-kpis {
     grid-template-columns: repeat(2, 1fr);
   }
 }
-@media (max-width: 900px) {
-  .inkassa-kpis,
+/* Phone (canonical 768px): perf grid stacks, toolbar wraps & filters go full-width.
+   KPI strip stays 2-up at this breakpoint per design spec. */
+@media (max-width: 768px) {
   .perf-grid {
     grid-template-columns: 1fr;
   }
   .inkassa-toolbar {
     align-items: stretch;
+    flex-wrap: wrap;
   }
   .toolbar__grow {
     display: none;
@@ -565,6 +568,11 @@ const pagination = computed<DataTablePagination>(() => ({
     min-width: 0;
     width: 100%;
   }
+  /* Modal: collapse hard-coded width to viewport on phone */
+  :deep(.modal-card) {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
 }
 @media (max-width: 560px) {
   .form-grid--amounts {
@@ -572,6 +580,12 @@ const pagination = computed<DataTablePagination>(() => ({
   }
   .form-grid--amounts .span-2 {
     grid-column: auto;
+  }
+}
+/* Small phone: KPI strip finally collapses to single column */
+@media (max-width: 480px) {
+  .inkassa-kpis {
+    grid-template-columns: 1fr;
   }
 }
 </style>

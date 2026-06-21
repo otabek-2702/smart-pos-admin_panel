@@ -683,7 +683,7 @@ onBeforeUnmount(() => {
             :sub="t('ntpl_empty_state_body')"
           >
             <template #action>
-              <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
+              <div class="tpl-empty-actions">
                 <Button
                   v-if="activeFilters.length > 0"
                   variant="ghost"
@@ -1098,8 +1098,15 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.tpl-empty-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .tpl-toolbar__search,
   .tpl-toolbar__type,
   .tpl-toolbar__lang {
@@ -1118,6 +1125,12 @@ onBeforeUnmount(() => {
   }
   :deep(.form-grid .span-2) {
     grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .tpl-cell-body {
+    max-width: 180px;
   }
 }
 </style>

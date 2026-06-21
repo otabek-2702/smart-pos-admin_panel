@@ -574,8 +574,9 @@ function initial(s: string | undefined | null): string {
         >
           <Skeleton v-for="i in 5" :key="`ros${i}`" :h="18" />
         </div>
-        <table v-else-if="recentOrders.length" class="dtable">
-          <thead>
+        <div v-else-if="recentOrders.length" class="tablewrap">
+          <table class="dtable">
+            <thead>
             <tr>
               <th>{{ t('Order') }}</th>
               <th>{{ t('Type') }}</th>
@@ -613,7 +614,8 @@ function initial(s: string | undefined | null): string {
               </td>
             </tr>
           </tbody>
-        </table>
+          </table>
+        </div>
         <div v-else class="statefill">
           <div class="statefill__title">
             {{ t('No orders today yet') }}
@@ -653,14 +655,14 @@ function initial(s: string | undefined | null): string {
                   {{ initial(c.name) }}
                 </div>
                 <div style="flex: 1; min-width: 0;">
-                  <div style="font-weight: 600; font-size: 14px;">
+                  <div style="font-weight: 600; font-size: 14px; overflow-wrap: anywhere; word-break: break-word;">
                     {{ c.name }}
                   </div>
-                  <div class="tertiary" style="font-size: 12px;">
+                  <div class="tertiary" style="font-size: 12px; overflow-wrap: anywhere;">
                     {{ t('Since') }} {{ fmtDateTime(c.start_time) }}
                   </div>
                 </div>
-                <span class="badge t-success badge--dot">{{ t('On shift') }}</span>
+                <span class="badge t-success badge--dot" style="flex-shrink: 0;">{{ t('On shift') }}</span>
               </div>
             </template>
             <div v-else class="statefill">
@@ -695,11 +697,11 @@ function initial(s: string | undefined | null): string {
               <div
                 v-for="s in lowStockItems"
                 :key="s.id"
-                class="row between"
-                style="padding: 9px 0; border-bottom: 1px solid var(--border);"
+                class="row between low-stock-row"
+                style="padding: 9px 0; border-bottom: 1px solid var(--border); gap: 12px;"
               >
-                <span style="font-weight: 500; font-size: 14px;">{{ s.name }}</span>
-                <span class="row" style="gap: 10px;">
+                <span class="low-stock-name" style="font-weight: 500; font-size: 14px; min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; word-break: break-word;">{{ s.name }}</span>
+                <span class="row" style="gap: 10px; flex-shrink: 0;">
                   <span class="mono" style="color: var(--warning); font-weight: 600; font-size: 13px;">{{ s.level }} {{ s.unit }}</span>
                   <span class="tertiary" style="font-size: 12px;">/ {{ s.reorder }}</span>
                 </span>
@@ -740,14 +742,18 @@ function initial(s: string | undefined | null): string {
   .split-1-7, .split-1-4 { grid-template-columns: 1fr; }
 }
 
-/* KPI rows: global .cols-4/.cols-3 collapse at 1100px (to 2 cols) and 720px (to 1 col).
-   Force a 1-column collapse below 900px so KPI cards never feel cramped on tablets/phones. */
+/* KPI rows: keep 2-up on tablet/phone (>=520px), collapse to single column only on small phones. */
+@media (max-width: 1100px) {
+  .dash-kpi-row { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 900px) {
-  .dash-kpi-row { grid-template-columns: 1fr !important; }
   .page :deep(.page__head-actions) {
     width: 100%;
     margin-left: 0;
   }
+}
+@media (max-width: 520px) {
+  .dash-kpi-row { grid-template-columns: 1fr; }
 }
 </style>
 

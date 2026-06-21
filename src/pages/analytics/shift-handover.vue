@@ -373,7 +373,7 @@ function shiftDurationLabel(): string {
             >
           </div>
         </div>
-        <button class="btn btn--primary" :class="{ 'is-loading': loading }" :disabled="loading" style="align-self:flex-end;" @click="load">
+        <button class="btn btn--primary shift-handover__load-btn" :class="{ 'is-loading': loading }" :disabled="loading" style="align-self:flex-end;" @click="load">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7" /><polyline points="15 7 21 7 21 13" /></svg>
           {{ t('Load') }}
         </button>
@@ -434,7 +434,7 @@ function shiftDurationLabel(): string {
     <template v-else-if="shift">
       <!-- ===== Shift summary banner ===== -->
       <div class="card" style="margin-bottom:var(--sp-5);">
-        <div class="row between" style="padding:var(--sp-5); flex-wrap:wrap; gap:16px;">
+        <div class="row between shift-handover__summary" style="padding:var(--sp-5); flex-wrap:wrap; gap:16px;">
           <div class="row" style="gap:16px; flex-wrap:wrap; min-width:0;">
             <div class="avatar" style="width:48px;height:48px;flex-basis:48px;font-size:17px;">
               {{ initialsOf(data?.cashier?.name) }}
@@ -451,28 +451,28 @@ function shiftDurationLabel(): string {
               </div>
             </div>
           </div>
-          <div class="row" style="gap:28px; flex-wrap:wrap;">
-            <div style="text-align:right;">
+          <div class="row shift-handover__summary-kpis" style="gap:28px; flex-wrap:wrap;">
+            <div class="shift-handover__summary-kpi" style="text-align:right;">
               <div class="kpi__label">
                 {{ t('Receipts') }}
               </div>
-              <div class="mono" style="font-size:20px;font-weight:700;margin-top:2px;color:var(--text);max-width:180px;">
+              <div class="mono shift-handover__summary-kpi-value" style="font-size:20px;font-weight:700;margin-top:2px;color:var(--text);max-width:180px;">
                 {{ fmtNum(data?.receipt_count) }}
               </div>
             </div>
-            <div style="text-align:right;">
+            <div class="shift-handover__summary-kpi" style="text-align:right;">
               <div class="kpi__label">
                 {{ t('Avg / hour') }}
               </div>
-              <div class="mono" style="font-size:20px;font-weight:700;margin-top:2px;color:var(--text);max-width:180px;">
+              <div class="mono shift-handover__summary-kpi-value" style="font-size:20px;font-weight:700;margin-top:2px;color:var(--text);max-width:180px;">
                 {{ Number(shift.speed?.orders_per_hour ?? 0).toFixed(1) }}
               </div>
             </div>
-            <div v-if="data?.best_seller" style="text-align:right;">
+            <div v-if="data?.best_seller" class="shift-handover__summary-kpi" style="text-align:right;">
               <div class="kpi__label">
                 {{ t('Top product') }}
               </div>
-              <div style="font-size:15px;font-weight:700;margin-top:2px;color:var(--primary);max-width:180px;">
+              <div class="shift-handover__summary-kpi-value" style="font-size:15px;font-weight:700;margin-top:2px;color:var(--primary);max-width:180px;overflow-wrap:anywhere;">
                 {{ data.best_seller.name }}
               </div>
             </div>
@@ -481,7 +481,7 @@ function shiftDurationLabel(): string {
       </div>
 
       <!-- ===== KPI row ===== -->
-      <div class="grid cols-4" style="margin-bottom:var(--sp-5);">
+      <div class="grid cols-4 shift-handover__kpi-grid" style="margin-bottom:var(--sp-5);">
         <div class="kpi">
           <div class="kpi__top">
             <div class="kpi__icon t-primary">
@@ -576,10 +576,10 @@ function shiftDurationLabel(): string {
                 {{ t('No paid orders yet') }}
               </div>
             </div>
-            <div v-else class="row" style="gap:24px; align-items:center; flex-wrap:wrap;">
-              <div style="position:relative; flex:0 0 auto;">
+            <div v-else class="row shift-handover__donut-row" style="gap:24px; align-items:center; flex-wrap:wrap;">
+              <div class="shift-handover__donut-wrap" style="position:relative; flex:0 0 auto;">
                 <svg
-                  class="donut-in"
+                  class="donut-in shift-handover__donut-svg"
                   :width="DONUT_SIZE"
                   :height="DONUT_SIZE"
                   :style="{ opacity: donutShown ? 1 : 0, transform: donutShown ? 'none' : 'rotate(-10deg) scale(.9)' }"
@@ -598,7 +598,7 @@ function shiftDurationLabel(): string {
                   <text :x="DONUT_SIZE / 2" :y="DONUT_SIZE / 2 + 16" class="donut-center donut-center__l" font-size="11">{{ t('Collected') }}</text>
                 </svg>
               </div>
-              <div style="display:flex; flex-direction:column; gap:10px; flex:1; min-width:160px;">
+              <div class="shift-handover__donut-legend" style="display:flex; flex-direction:column; gap:10px; flex:1; min-width:160px;">
                 <div
                   v-for="(a, i) in donutArcs"
                   :key="`dl${i}`"
@@ -710,7 +710,7 @@ function shiftDurationLabel(): string {
                 <div style="font-size:12px; font-weight:600; color:var(--success); margin-bottom:4px;">
                   {{ t('Completed') }}
                 </div>
-                <div class="mono" style="font-size:26px; font-weight:700; letter-spacing:-0.02em;">
+                <div class="mono shift-handover__orders-stat-value" style="font-size:26px; font-weight:700; letter-spacing:-0.02em;">
                   {{ fmtNum(shift.orders?.completed) }}
                 </div>
               </div>
@@ -718,7 +718,7 @@ function shiftDurationLabel(): string {
                 <div style="font-size:12px; font-weight:600; color:var(--error); margin-bottom:4px;">
                   {{ t('Cancelled') }} ({{ fmtPct(shift.orders?.cancel_rate_pct, 1) }})
                 </div>
-                <div class="mono" style="font-size:26px; font-weight:700; letter-spacing:-0.02em;">
+                <div class="mono shift-handover__orders-stat-value" style="font-size:26px; font-weight:700; letter-spacing:-0.02em;">
                   {{ fmtNum(shift.orders?.cancelled) }}
                 </div>
               </div>
@@ -726,7 +726,7 @@ function shiftDurationLabel(): string {
                 <div style="font-size:12px; font-weight:600; color:var(--primary); margin-bottom:4px;">
                   {{ t('Paid') }}
                 </div>
-                <div class="mono" style="font-size:26px; font-weight:700; letter-spacing:-0.02em;">
+                <div class="mono shift-handover__orders-stat-value" style="font-size:26px; font-weight:700; letter-spacing:-0.02em;">
                   {{ fmtNum(shift.orders?.paid) }}
                 </div>
               </div>
@@ -802,7 +802,7 @@ function shiftDurationLabel(): string {
               </div>
               <div class="row between" style="padding:7px 0;">
                 <span class="muted" style="font-size:14px;">{{ t('Work / Overtime') }}</span>
-                <span class="mono" style="font-weight:600; font-size:14px;">{{ shift.punctuality.attendance.work_hours }}{{ t('hour_suffix') }} / {{ shift.punctuality.attendance.overtime_hours }}{{ t('hour_suffix') }}</span>
+                <span class="mono" style="font-weight:600; font-size:14px; text-align:right; overflow-wrap:anywhere;">{{ shift.punctuality.attendance.work_hours }}{{ t('hour_suffix') }} / {{ shift.punctuality.attendance.overtime_hours }}{{ t('hour_suffix') }}</span>
               </div>
             </div>
           </div>
@@ -944,7 +944,7 @@ function shiftDurationLabel(): string {
         </div>
         <div class="card__divider" />
         <div class="card__body" style="padding-top:var(--sp-5);">
-          <div class="grid cols-4" style="gap:var(--sp-5);">
+          <div class="grid cols-4 shift-handover__recon-grid" style="gap:var(--sp-5);">
             <div>
               <div class="kpi__label">
                 {{ t('Expected') }}
@@ -1054,7 +1054,7 @@ function shiftDurationLabel(): string {
             </h3>
           </div>
           <div class="card__actions">
-            <span class="mono" style="color:var(--error);font-weight:700;">{{ t('negative_amount', { amount: fmtMoney(cashExpensesTotal) }) }}</span>
+            <span class="mono" style="color:var(--error);font-weight:700;overflow-wrap:anywhere;">{{ t('negative_amount', { amount: fmtMoney(cashExpensesTotal) }) }}</span>
           </div>
         </div>
         <div class="card__divider" />
@@ -1211,28 +1211,102 @@ function shiftDurationLabel(): string {
   row-gap: 14px;
 }
 
-@media (max-width: 900px) {
+/* Tablet: collapse outer 2-up chart grids to a single column at 1024 */
+@media (max-width: 1024px) {
+  .grid.cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Phone: canonical 768 — KPI cols-4 stays 2-up (NOT 1-col).
+   Reconciliation cols-4 also stays 2-up. Toolbars stack. */
+@media (max-width: 768px) {
   .shift-handover__shift-field {
     width: 100%;
     min-width: 0;
   }
 
-  /* Collapse the 4-up KPI grid and 2-up chart grid to single column */
-  .grid.cols-4,
-  .grid.cols-2 {
-    grid-template-columns: 1fr !important;
+  .shift-handover__load-btn {
+    align-self: stretch !important;
+    justify-content: center;
   }
 
-  /* Orders breakdown 3 inline cards become 1 column */
+  /* KPI strip stays 2-up at phone per canonical rules */
+  .shift-handover__kpi-grid,
+  .shift-handover__recon-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  /* Generic cols-2 already collapsed at 1024; ensure cols-4 elsewhere is 2-up */
+  .grid.cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  /* Summary banner KPI strip — tighter gap, allow wrap; clear right-align so it
+     does not collide with avatar block when wrapped */
+  .shift-handover__summary-kpis {
+    gap: 14px !important;
+    width: 100%;
+  }
+  .shift-handover__summary-kpi {
+    text-align: left !important;
+    flex: 1 1 calc(50% - 14px);
+    min-width: 0;
+  }
+  .shift-handover__summary-kpi-value {
+    max-width: none !important;
+    overflow-wrap: anywhere;
+  }
+
+  /* Orders breakdown columns stack 1-col at phone, shrink large numeric font */
   .shift-handover__orders-stats > div {
     flex: 1 1 100%;
   }
-}
+  .shift-handover__orders-stat-value {
+    font-size: 22px !important;
+    overflow-wrap: anywhere;
+  }
 
-@media (max-width: 600px) {
+  /* Donut chart — center the donut + legend stack, full-width legend */
+  .shift-handover__donut-row {
+    justify-content: center;
+    gap: 16px !important;
+  }
+  .shift-handover__donut-legend {
+    min-width: 0 !important;
+    flex: 1 1 100%;
+  }
+
   /* KPI tags wider so translated labels are not cramped */
   .kpi__label {
     max-width: none;
+  }
+}
+
+/* Small phone: tighten further, allow donut to shrink */
+@media (max-width: 420px) {
+  /* All cols-4 collapse to single col on tiny screens */
+  .shift-handover__kpi-grid,
+  .shift-handover__recon-grid,
+  .grid.cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+
+  .shift-handover__summary-kpi {
+    flex: 1 1 100%;
+  }
+
+  /* Donut SVG: scale via CSS so it never overflows */
+  .shift-handover__donut-svg {
+    max-inline-size: 100%;
+    block-size: auto;
+  }
+  .shift-handover__donut-wrap {
+    max-inline-size: 100%;
+  }
+
+  .shift-handover__orders-stat-value {
+    font-size: 20px !important;
   }
 }
 </style>

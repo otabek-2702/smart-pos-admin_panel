@@ -370,7 +370,7 @@ function clearAllFilters() {
   min-width: 180px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .hr-att__filter,
   .hr-att__filter--wide {
     flex: 1 1 100%;

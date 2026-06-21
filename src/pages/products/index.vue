@@ -1616,7 +1616,7 @@ function goPage(p: number | '…') {
   -webkit-overflow-scrolling: touch;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .products-toolbar__search,
   .products-toolbar__select {
     width: 100% !important;
@@ -1624,9 +1624,6 @@ function goPage(p: number | '…') {
     min-width: 0 !important;
     flex: 1 1 100%;
   }
-}
-
-@media (max-width: 600px) {
   .form-grid {
     grid-template-columns: 1fr !important;
   }

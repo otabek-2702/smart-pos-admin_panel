@@ -1126,17 +1126,32 @@ function shortageOf(row: any): number | null {
   width: 200px;
 }
 
-@media (max-width: 900px) {
+/* Tablet: keep KPI strip 2-up between phone & desktop */
+@media (max-width: 1024px) {
   .grid.cols-3 {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
   }
+}
 
+/* Phone: toolbar fields go full-width; KPI collapse handled by canonical design-responsive.css */
+@media (max-width: 768px) {
   .tb-search,
   .tb-select {
     flex: 1 1 100%;
     max-width: 100%;
     width: 100%;
     min-width: 0;
+  }
+}
+
+/* Small phone: tighten min-widths so toolbar + switch row don't overflow */
+@media (max-width: 420px) {
+  .tb-search {
+    min-width: 0;
+  }
+
+  .tb-select {
+    width: 100%;
   }
 }
 </style>

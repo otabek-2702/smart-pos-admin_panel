@@ -633,7 +633,7 @@ function fmtInt(n: any): string {
   flex: 0 0 auto;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .tb-search,
   .tb-select {
     width: 100%;
@@ -652,7 +652,7 @@ function fmtInt(n: any): string {
   grid-column: span 2;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .form-grid {
     grid-template-columns: 1fr;
   }

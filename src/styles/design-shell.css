@@ -941,7 +941,8 @@ textarea.control { height: auto; padding: var(--sp-2) var(--sp-3); resize: verti
 .tooltip-anchor { position: relative; }
 
 @media (max-width: 1100px) { .cols-4 { grid-template-columns: repeat(2, 1fr); } .cols-3 { grid-template-columns: 1fr; } }
-@media (max-width: 720px) { .cols-4, .cols-2 { grid-template-columns: 1fr; } .form-grid { grid-template-columns: 1fr; } .form-grid .span-2 { grid-column: auto; } }
+@media (max-width: 720px) { .form-grid { grid-template-columns: 1fr; } .form-grid .span-2 { grid-column: auto; } }
+@media (max-width: 420px) { .cols-4, .cols-2 { grid-template-columns: 1fr; } }
 
 /* ============================================================
    ALPHA POS — motion layer (CSS)
@@ -1129,6 +1130,8 @@ textarea.control { height: auto; padding: var(--sp-2) var(--sp-3); resize: verti
   .aihist__search, .histitem__main, .histitem__meta, .aihist__label { display: none; }
   .aihist__top .btn span { display: none; }
 }
+
+/* Mobile drawer / tabbar / AI rules live in design-responsive.css (1:1 from design handoff) */
 
 /* Custom popup Select menu (Teleport target = body) */
 .select__menu {

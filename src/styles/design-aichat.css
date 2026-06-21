@@ -113,3 +113,4 @@
   .aihist__search, .histitem__main, .histitem__meta, .aihist__label { display: none; }
   .aihist__top .btn span { display: none; }
 }
+/* phone (<=768) overrides moved to design-responsive.css */

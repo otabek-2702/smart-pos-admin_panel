@@ -193,10 +193,20 @@ function regen(idx: number) {
 
 const notifyBlocked = computed(() => permission.value === 'denied')
 const notifyOn = computed(() => notify.value && permission.value === 'granted')
+
+const histOpen = ref(false)
+function selectChat(id: string) {
+  store.selectChat(id)
+  histOpen.value = false
+}
 </script>
 
 <template>
-  <div class="aiwrap">
+  <div class="aiwrap" :class="{ 'hist-open': histOpen }">
+    <div
+      class="aihist-scrim"
+      @click="histOpen = false"
+    />
     <!-- ===== History sidebar ===== -->
     <aside class="aihist">
       <div class="aihist__top">
@@ -231,7 +241,7 @@ const notifyOn = computed(() => notify.value && permission.value === 'granted')
           :key="c.id"
           class="histitem"
           :class="{ 'is-active': c.id === activeId }"
-          @click="store.selectChat(c.id)"
+          @click="selectChat(c.id)"
         >
           <div class="histitem__icon">
             <DesignIcon name="inbox" :size="15" />
@@ -268,6 +278,13 @@ const notifyOn = computed(() => notify.value && permission.value === 'granted')
     <section class="aithread">
       <div class="aithread__head">
         <div class="row" style="gap: 10px; min-width: 0;">
+          <button
+            class="aihist__toggle"
+            :title="t('Show chats')"
+            @click="histOpen = true"
+          >
+            <DesignIcon name="menu" :size="18" />
+          </button>
           <div class="msg__avatar" style="flex: 0 0 34px; width: 34px; height: 34px;">
             <DesignIcon name="sparkle" :size="17" />
           </div>
@@ -423,7 +440,7 @@ const notifyOn = computed(() => notify.value && permission.value === 'granted')
               v-model="draft"
               class="composer__ta"
               rows="1"
-              :placeholder="t('Message the assistant…  (Enter to send, Shift+Enter for a new line)')"
+              :placeholder="t('Message the assistant…')"
               @keydown="onKey"
             />
             <button
@@ -444,19 +461,6 @@ const notifyOn = computed(() => notify.value && permission.value === 'granted')
             >
               <DesignIcon name="send" :size="17" />
             </button>
-          </div>
-          <div class="composer__hint">
-            <span
-              v-if="isGenerating"
-              class="row"
-              style="gap: 6px; color: var(--primary); justify-content: center;"
-            >
-              <span class="typing"><span /><span /><span /></span>
-              {{ t('Generating — you can leave this page, I will keep working.') }}
-            </span>
-            <span v-else>
-              {{ t('Alpha POS assistant · powered by your live data') }}
-            </span>
           </div>
         </div>
       </div>

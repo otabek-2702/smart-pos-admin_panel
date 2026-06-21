@@ -18,7 +18,8 @@ interface NavItem {
 }
 type NavEntry = NavSection | NavItem
 
-defineProps<{ collapsed?: boolean }>()
+defineProps<{ collapsed?: boolean, open?: boolean }>()
+const emit = defineEmits<{ (e: 'nav-go'): void, (e: 'close'): void }>()
 
 const { t } = useI18n({ useScope: 'global' })
 const router = useRouter()
@@ -79,11 +80,12 @@ function isActive(item: NavItem): boolean {
 function go(item: NavItem) {
   if (!isActive(item))
     router.push(item.to)
+  emit('nav-go')
 }
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ 'is-collapsed': collapsed }">
+  <aside class="sidebar" :class="{ 'is-collapsed': collapsed, 'is-open': open }">
     <div class="sidebar__brand">
       <div class="sidebar__logo">
         <DesignIcon name="store" :size="19" :weight="2" />
@@ -91,6 +93,13 @@ function go(item: NavItem) {
       <div v-if="!collapsed" class="sidebar__name">
         {{ t('Alpha POS') }}
       </div>
+      <button
+        class="sidebar__close"
+        :title="t('Close')"
+        @click="emit('close')"
+      >
+        <DesignIcon name="close" :size="18" />
+      </button>
     </div>
 
     <nav class="sidebar__nav">

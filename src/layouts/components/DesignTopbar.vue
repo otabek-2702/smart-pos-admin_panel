@@ -166,10 +166,7 @@ const currentNavLabel = computed(() => {
 
 /* ---------- showDate: only on dashboard / analytics / orders / shifts ----------
    Source: `route === "dashboard" || "analytics" || "orders" || "shifts"` */
-const DATE_ROUTES = ['/dashboard', '/analytics', '/orders', '/shifts-analytics', '/shift-analytics']
-const showDate = computed(() =>
-  DATE_ROUTES.some(prefix => route.path === prefix || route.path.startsWith(`${prefix}/`)),
-)
+const showDate = computed(() => false)
 
 /* ---------- Theme (mirrors source onToggleTheme) ---------- */
 const theme = ref(document.documentElement.getAttribute('data-theme') || 'light')

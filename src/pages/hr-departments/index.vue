@@ -607,9 +607,19 @@ meta:
     max-width: 100%;
     flex: 1 1 100%;
   }
+}
+
+@media (max-width: 768px) {
+  .tb-search,
+  .tb-filter {
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 100%;
+  }
 
   .form-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .form-grid .span-2 {

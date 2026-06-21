@@ -730,7 +730,7 @@ const sourceOptions = computed(() => [
     <!-- Ledger Modal -->
     <Modal
       :open="ledgerDialog"
-      :width="900"
+      :width="860"
       :title="`${ledgerSupplier?.name ?? ''} · ${t('Ledger')}`"
       :subtitle="ledgerBalance !== null ? t('Current balance') + ': ' + formatCurrency(ledgerBalance) : undefined"
       @close="ledgerDialog = false"
@@ -828,8 +828,8 @@ const sourceOptions = computed(() => [
 
 .toolbar__search {
   max-inline-size: 320px;
-  min-inline-size: 220px;
-  flex: 1 1 240px;
+  min-inline-size: 180px;
+  flex: 1 1 200px;
 }
 
 .toolbar__status {
@@ -847,7 +847,7 @@ const sourceOptions = computed(() => [
   margin-bottom: 2px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .toolbar__search,
   .toolbar__status {
     inline-size: 100%;

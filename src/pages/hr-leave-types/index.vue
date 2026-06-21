@@ -740,12 +740,13 @@ meta:
   grid-column: span 2;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .tb-search,
   .tb-filter,
   .tb-filter--wide {
     width: 100%;
     max-width: 100%;
+    min-width: 0;
     flex: 1 1 100%;
   }
 

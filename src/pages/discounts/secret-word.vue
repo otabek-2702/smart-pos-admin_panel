@@ -583,7 +583,7 @@ function dash(v: any) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-4);
 }
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .form-grid {
     grid-template-columns: 1fr;
   }
@@ -605,7 +605,7 @@ function dash(v: any) {
 .toolbar-spacer {
   flex: 1;
 }
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .filter-word,
   .filter-order {
     max-width: none;

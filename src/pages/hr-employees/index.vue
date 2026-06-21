@@ -620,7 +620,6 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
       :open="dialog"
       :title="editing ? t('Edit Employee') : t('New Employee')"
       :subtitle="t('hr_employees_modal_sub')"
-      :width="760"
       :close-on-backdrop="!saving"
       :close-on-esc="!saving"
       @close="closeDialog"
@@ -812,7 +811,6 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
       :open="deleteDialog"
       :title="t('hr_employees_delete_title')"
       :subtitle="deletingName"
-      :width="440"
       @close="closeDelete"
     >
       <p class="cell-muted" style="margin:0;">
@@ -893,7 +891,23 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
+  .hr-emp__kpis {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid .span-2,
+  .form-grid .span-3,
+  .form-grid .span-4 {
+    grid-column: span 1 !important;
+  }
+}
+
+@media (max-width: 420px) {
   .hr-emp__kpis {
     grid-template-columns: 1fr;
   }

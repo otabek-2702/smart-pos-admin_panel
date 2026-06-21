@@ -1102,7 +1102,7 @@ const qrImgUrl = computed(() => qrMenuUrl.value ? qrPngUrl(qrMenuUrl.value, 320)
   grid-column: span 2;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .tb-search,
   .tb-filter {
     flex: 1 1 100%;
@@ -1120,6 +1120,10 @@ const qrImgUrl = computed(() => qrMenuUrl.value ? qrPngUrl(qrMenuUrl.value, 320)
     flex: 1 1 100%;
   }
 
+  .qr-expanded {
+    gap: 14px !important;
+  }
+
   .qr-display {
     width: 240px;
     height: 240px;
@@ -1131,6 +1135,12 @@ const qrImgUrl = computed(() => qrMenuUrl.value ? qrPngUrl(qrMenuUrl.value, 320)
 
   .form-grid .span-2 {
     grid-column: span 1;
+  }
+
+  :deep(.row-actions) {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 4px;
   }
 }
 

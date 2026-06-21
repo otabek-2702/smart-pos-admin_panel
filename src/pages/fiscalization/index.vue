@@ -501,9 +501,12 @@ const columns = computed<DataTableColumn<any>[]>(() => [
 }
 
 @media (max-width: 600px) {
-  .grid.cols-4 { grid-template-columns: 1fr; }
   .tb-actions { flex-direction: column; align-items: stretch; }
   .tb-actions :deep(.btn) { width: 100%; }
+}
+
+@media (max-width: 420px) {
+  .grid.cols-4 { grid-template-columns: 1fr; }
 }
 </style>
 

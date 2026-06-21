@@ -963,23 +963,35 @@ onBeforeUnmount(() => {
   width: 180px;
 }
 
-/* Tablet — KPI strip drops to 2 columns; filters shrink */
-@media (max-width: 1100px) {
+/* Tablet (canonical 1024px) — KPI strip drops to 2 columns; filters shrink to fit */
+@media (max-width: 1024px) {
   .users-kpi-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+  .users-toolbar__search {
+    min-width: 180px;
+    max-width: none;
+  }
+  .users-toolbar__filter {
+    width: 160px;
+  }
 }
 
-/* Mobile — single column everywhere, toolbar inputs take full width */
-@media (max-width: 900px) {
-  .users-kpi-grid {
-    grid-template-columns: 1fr;
-  }
+/* Phone (canonical 768px) — toolbar inputs take full width; KPI stays 2-up */
+@media (max-width: 768px) {
   .users-toolbar__search,
   .users-toolbar__filter {
     width: 100%;
     max-width: 100%;
+    min-width: 0;
     flex: 1 1 100%;
+  }
+}
+
+/* Small phone (canonical 420px) — KPI collapses to single column */
+@media (max-width: 420px) {
+  .users-kpi-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

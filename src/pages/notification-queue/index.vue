@@ -392,20 +392,14 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
         class="toolbar nq-toolbar"
         style="flex-wrap:wrap;gap:12px;"
       >
-        <div
-          class="nq-search"
-          style="flex:1;min-width:200px;max-width:320px;"
-        >
+        <div class="nq-search">
           <Input
             v-model="search"
             icon="search"
             :placeholder="t('notif_queue_filter_search')"
           />
         </div>
-        <div
-          class="nq-type-select"
-          style="width:220px;"
-        >
+        <div class="nq-type-select">
           <Select
             v-model="typeFilter"
             icon="filter"
@@ -760,9 +754,29 @@ meta:
 </route>
 
 <style scoped>
-@media (max-width: 900px) {
+/* Toolbar fields — class-driven widths so breakpoints are not duplicated inline */
+.nq-search {
+  flex: 1 1 240px;
+  min-width: 200px;
+  max-width: 320px;
+}
+.nq-type-select {
+  flex: 0 0 220px;
+  width: 220px;
+}
+
+/* Tablet — KPI strip stays 3-up but compacts */
+@media (max-width: 1024px) {
   .nq-kpis {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+/* Phone — canonical 768px breakpoint */
+@media (max-width: 768px) {
+  /* KPIs stay 2-up at phone breakpoint (canonical rule) */
+  .nq-kpis {
+    grid-template-columns: repeat(2, 1fr) !important;
   }
   .nq-toolbar {
     flex-direction: column;
@@ -772,6 +786,14 @@ meta:
   .nq-type-select {
     width: 100% !important;
     max-width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+}
+
+/* Small phone — KPIs collapse to single column */
+@media (max-width: 420px) {
+  .nq-kpis {
+    grid-template-columns: 1fr !important;
   }
 }
 </style>

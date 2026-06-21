@@ -287,12 +287,11 @@ function refUserName(u: any) {
         </template>
 
         <template #cell.item="{ row }">
-          <span class="cell-strong">
+          <span class="cell-strong tx-item-cell">
             {{ row.stock_item?.name ?? row.item?.name ?? '—' }}
             <span
               v-if="row.batch?.batch_number"
-              class="cell-muted"
-              style="margin-left: 6px; font-weight: normal;"
+              class="cell-muted tx-item-batch"
             >
               · {{ t('Batch #') }}{{ row.batch.batch_number }}
             </span>
@@ -391,10 +390,12 @@ function refUserName(u: any) {
   align-items: center;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .tx-toolbar {
     flex-direction: column;
     align-items: stretch;
+    padding: 12px;
+    gap: 8px;
   }
 
   .tx-tb-cell,
@@ -413,6 +414,24 @@ function refUserName(u: any) {
 
 .nowrap {
   white-space: nowrap;
+}
+
+.tx-item-cell {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.tx-item-batch {
+  margin-left: 6px;
+  font-weight: normal;
+}
+
+@media (max-width: 768px) {
+  .tx-item-cell {
+    white-space: normal;
+  }
 }
 </style>
 

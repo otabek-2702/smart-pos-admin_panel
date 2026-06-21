@@ -268,9 +268,9 @@ const dtPagination = computed(() => ({
           />
         </div>
 
-        <label class="row tb-switch" style="gap:8px; cursor:pointer;">
+        <label class="row tb-switch">
           <Switch v-model="lowStockOnly" />
-          <span style="font-size:13px;">{{ t('Low stock only') }}</span>
+          <span class="tb-switch__label">{{ t('Low stock only') }}</span>
         </label>
 
         <div class="tb-spacer" />
@@ -365,18 +365,15 @@ const dtPagination = computed(() => ({
       :subtitle="t('This action cannot be undone')"
       @close="deleteDialog = false"
     >
-      <div class="row" style="gap:14px;align-items:flex-start;">
-        <div
-          class="kpi__icon t-error"
-          style="width:44px;height:44px;flex:0 0 44px;"
-        >
+      <div class="row delete-confirm">
+        <div class="kpi__icon t-error delete-confirm__icon">
           <DesignIcon name="alert" :size="22" />
         </div>
-        <div>
-          <p style="margin:0;font-weight:600;">
+        <div class="delete-confirm__body">
+          <p class="delete-confirm__name">
             {{ selectedItem?.name }}
           </p>
-          <p class="muted" style="margin:6px 0 0;font-size:14px;">
+          <p class="muted delete-confirm__sub">
             {{ t('items_confirm_delete_body') }}
           </p>
         </div>
@@ -435,10 +432,45 @@ const dtPagination = computed(() => ({
   display: flex;
   align-items: center;
   flex: 0 0 auto;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.tb-switch__label {
+  font-size: 13px;
 }
 
 .tb-spacer {
   margin-left: auto;
+}
+
+/* Delete confirm body */
+.delete-confirm {
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.delete-confirm__icon {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+}
+
+.delete-confirm__body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.delete-confirm__name {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.delete-confirm__sub {
+  margin: 6px 0 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
 }
 
 /* Tablet collapse */
@@ -460,8 +492,8 @@ const dtPagination = computed(() => ({
   }
 }
 
-/* Mobile collapse — every filter stretches full width */
-@media (max-width: 900px) {
+/* Mobile collapse — canonical phone breakpoint */
+@media (max-width: 768px) {
   .items-toolbar {
     gap: 10px;
   }

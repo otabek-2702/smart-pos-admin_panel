@@ -474,10 +474,21 @@ const activeFilters = computed(() => {
 .lb-toolbar__employee { flex: 1 1 240px; max-width: 340px; min-width: 200px; }
 .lb-toolbar__year { flex: 0 1 160px; min-width: 120px; }
 
-@media (max-width: 900px) {
+/* Tablet: keep KPI strip as 2-up so cards stay readable. */
+@media (max-width: 1024px) {
+  .lb-page .lb-kpis { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Phone: toolbar items stretch full width; KPI stays 2-up per canonical rules. */
+@media (max-width: 768px) {
+  .lb-page .lb-kpis { grid-template-columns: repeat(2, 1fr); }
+  .lb-toolbar__employee { max-width: none; min-width: 0; flex: 1 1 100%; }
+  .lb-toolbar__year { flex: 1 1 100%; min-width: 0; }
+}
+
+/* Small phone: collapse KPI strip to single column. */
+@media (max-width: 420px) {
   .lb-page .lb-kpis { grid-template-columns: 1fr; }
-  .lb-toolbar__employee { max-width: none; }
-  .lb-toolbar__year { flex: 1 1 100%; }
 }
 </style>
 

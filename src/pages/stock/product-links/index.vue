@@ -243,10 +243,7 @@ async function doUnlink() {
         class="toolbar"
         style="flex-wrap: wrap;"
       >
-        <div
-          class="grow"
-          style="min-width: 220px; max-width: 280px;"
-        >
+        <div class="grow toolbar-search">
           <Input
             v-model="search"
             icon="search"
@@ -255,10 +252,7 @@ async function doUnlink() {
           />
         </div>
 
-        <div
-          class="toolbar-select"
-          style="min-width: 180px;"
-        >
+        <div class="toolbar-select toolbar-select--type">
           <Select
             :model-value="typeFilter ?? ''"
             :placeholder="t('product_links_all_types')"
@@ -267,10 +261,7 @@ async function doUnlink() {
           />
         </div>
 
-        <div
-          class="toolbar-select"
-          style="min-width: 160px;"
-        >
+        <div class="toolbar-select toolbar-select--status">
           <Select
             :model-value="activeFilter ?? ''"
             :placeholder="t('product_links_all_statuses')"
@@ -279,7 +270,7 @@ async function doUnlink() {
           />
         </div>
 
-        <div style="flex: 1;" />
+        <div class="toolbar-spacer" />
 
         <Button
           variant="primary"
@@ -500,6 +491,20 @@ async function doUnlink() {
   grid-column: 1 / -1;
 }
 
+.toolbar-search {
+  min-width: 220px;
+  max-width: 280px;
+}
+.toolbar-select--type {
+  min-width: 180px;
+}
+.toolbar-select--status {
+  min-width: 160px;
+}
+.toolbar-spacer {
+  flex: 1;
+}
+
 @media (max-width: 900px) {
   .form-grid {
     grid-template-columns: 1fr;
@@ -507,6 +512,28 @@ async function doUnlink() {
   .toolbar-select {
     width: 100%;
     min-width: 0 !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .toolbar-search {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    flex: 1 1 100%;
+  }
+  .toolbar-select,
+  .toolbar-select--type,
+  .toolbar-select--status {
+    width: 100%;
+    min-width: 0 !important;
+    flex: 1 1 100%;
+  }
+  .toolbar-spacer {
+    display: none;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

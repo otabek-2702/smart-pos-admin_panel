@@ -1214,7 +1214,7 @@ meta:
   color: rgb(var(--v-theme-error-strong));
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .sal-kpis {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1231,12 +1231,6 @@ meta:
   .sal-row__input {
     width: 100%;
     flex: 1 1 100%;
-  }
-}
-
-@media (max-width: 600px) {
-  .sal-kpis {
-    grid-template-columns: 1fr;
   }
 }
 </style>

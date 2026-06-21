@@ -197,7 +197,7 @@ const columns = computed<DataTableColumn<any>[]>(() => [
   align-items: center;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .tb-search {
     width: 100%;
     max-width: 100%;

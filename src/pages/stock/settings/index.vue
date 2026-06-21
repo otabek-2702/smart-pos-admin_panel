@@ -340,6 +340,62 @@ onMounted(loadSettings)
   </div>
 </template>
 
+<style scoped>
+.page-head__title {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.page-head__subtitle {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 768px) {
+  .page-head {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .page-head__title {
+    font-size: 18px;
+    line-height: 1.3;
+  }
+  .page-head__subtitle {
+    font-size: 12px;
+  }
+  /* Compact card padding on phone */
+  :deep(.v-card-title) {
+    padding-inline: 12px;
+    padding-block: 12px 8px;
+    font-size: 15px;
+  }
+  :deep(.v-card-text) {
+    padding: 12px;
+  }
+  /* Ensure inputs and selects don't overflow */
+  :deep(.v-field),
+  :deep(.v-input) {
+    max-width: 100%;
+    min-width: 0;
+  }
+  /* Save button stretches full width on mobile for easier tap */
+  :deep(.d-flex.justify-end) {
+    justify-content: stretch !important;
+  }
+  :deep(.d-flex.justify-end .v-btn) {
+    inline-size: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  :deep(.v-card-title) {
+    padding-inline: 10px;
+    font-size: 14px;
+  }
+  :deep(.v-card-text) {
+    padding: 10px;
+  }
+}
+</style>
+
 <route lang="yaml">
 name: stock-settings
 meta:

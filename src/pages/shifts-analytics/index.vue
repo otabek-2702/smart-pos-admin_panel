@@ -574,7 +574,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
     </div>
 
     <!-- Summary KPI strip -->
-    <div class="grid cols-4" style="margin-bottom: var(--sp-5);">
+    <div class="grid cols-4 shifts-kpi-strip" style="margin-bottom: var(--sp-5);">
       <!-- Active now -->
       <div class="kpi">
         <div class="kpi__top">
@@ -718,7 +718,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         </div>
 
         <!-- Staff role toggle (which roles populate the cashier dropdown) -->
-        <div class="row" style="gap:6px;flex:0 0 auto;">
+        <div class="row staff-role-toggle" style="gap:6px;flex:0 0 auto;flex-wrap:wrap;">
           <button
             type="button"
             class="badge"
@@ -760,7 +760,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         </div>
 
         <!-- Live only switch -->
-        <div class="row" style="gap:10px;">
+        <div class="row live-only-wrap" style="gap:10px;">
           <span class="row" style="gap:8px;font-size:14px;font-weight:500;">
             <span
               class="switch"
@@ -927,7 +927,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
             </span>
           </div>
           <div class="row between" style="align-items:flex-end;margin-bottom:12px;">
-            <span class="mono" style="font-size:26px;font-weight:700;letter-spacing:-0.03em;">
+            <span class="mono shift-hero-amount">
               {{ fmtMoney(shiftState(s) === 'reconciled' ? reportedCash(s) : expectedCash(s)) }}<span class="tertiary" style="font-size:12px;font-weight:500;"> UZS</span>
             </span>
           </div>
@@ -1270,7 +1270,27 @@ meta:
   }
 }
 
-/* Modals — collapse hard-coded widths on narrow viewports */
+/* Hero amount in each shift card — long money values may overflow at phone widths */
+.shift-hero-amount {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+}
+@media (max-width: 768px) {
+  .shift-hero-amount {
+    font-size: 22px;
+  }
+}
+@media (max-width: 420px) {
+  .shift-hero-amount {
+    font-size: 19px;
+  }
+}
+
+/* Modals — collapse hard-coded widths on narrow viewports (canonical phone breakpoint 768px) */
 .modal--receive {
   max-width: 520px;
   width: 100%;
@@ -1279,7 +1299,7 @@ meta:
   max-width: 440px;
   width: 100%;
 }
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .modal--receive,
   .modal--end {
     max-width: 100%;
@@ -1291,6 +1311,30 @@ meta:
 @media (max-width: 900px) {
   .date-range-wrap {
     flex: 1 1 100% !important;
+  }
+}
+
+/* KPI strip — keep 2-up on phone (cols-4 → 2 cols at 768) instead of collapsing to 1 col */
+@media (max-width: 768px) {
+  .shifts-kpi-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+@media (max-width: 420px) {
+  .shifts-kpi-strip {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Toolbar role-toggle + live-only switch — span full width at phone widths so they don't collide */
+@media (max-width: 768px) {
+  .staff-role-toggle,
+  .live-only-wrap {
+    flex: 1 1 100% !important;
+  }
+  .staff-role-toggle .badge {
+    flex: 1 1 auto;
+    justify-content: center;
   }
 }
 </style>

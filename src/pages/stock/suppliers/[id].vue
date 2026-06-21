@@ -670,8 +670,7 @@ function backToList() {
           </div>
         </div>
         <div
-          style="text-align:right; font-size:13px;"
-          class="cell-muted"
+          class="cell-muted identity-meta"
         >
           <div>
             <span style="color: var(--color-warning, #d97706);">{{ ratingStars(supplier.rating) }}</span>
@@ -879,7 +878,7 @@ function backToList() {
 
     <!-- Items tab -->
     <Card v-else-if="tab === 'items'">
-      <div class="toolbar" style="flex-wrap: wrap; gap: 8px;">
+      <div class="toolbar toolbar-responsive" style="flex-wrap: wrap; gap: 8px;">
         <div
           class="row"
           style="gap:10px; align-items:center; flex-wrap: wrap;"
@@ -891,7 +890,7 @@ function backToList() {
             {{ t('items_col_is_preferred') }}
           </span>
         </div>
-        <div style="flex: 1;" />
+        <div class="toolbar-spacer" />
         <Button
           variant="primary"
           icon="plus"
@@ -987,7 +986,7 @@ function backToList() {
 
     <!-- Ledger tab -->
     <Card v-else-if="tab === 'ledger'">
-      <div class="toolbar" style="flex-wrap: wrap; gap: 8px;">
+      <div class="toolbar toolbar-responsive" style="flex-wrap: wrap; gap: 8px;">
         <div class="ledger-filter">
           <Select
             v-model="ledgerTypeFilter"
@@ -1002,7 +1001,7 @@ function backToList() {
             :options="sourceOptions"
           />
         </div>
-        <div style="flex: 1;" />
+        <div class="toolbar-spacer" />
         <Button
           variant="ghost"
           icon="refresh"
@@ -1073,8 +1072,7 @@ function backToList() {
         </template>
         <template #cell.note="{ row }">
           <span
-            class="cell-muted"
-            style="display:inline-block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;"
+            class="cell-muted ledger-note"
             :title="row.note || row.description || ''"
           >
             {{ row.note || row.description || '—' }}
@@ -1538,24 +1536,60 @@ function backToList() {
   min-width: 160px;
   max-width: 240px;
 }
-@media (max-width: 1100px) {
+.identity-meta {
+  text-align: right;
+  font-size: 13px;
+  min-width: 0;
+}
+.ledger-note {
+  display: inline-block;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.toolbar-spacer {
+  flex: 1;
+}
+@media (max-width: 1024px) {
   .kpi-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 900px) {
-  .kv-grid {
-    grid-template-columns: 1fr;
   }
   .overview-grid {
     grid-template-columns: 1fr;
   }
-  .kpi-strip {
+}
+@media (max-width: 768px) {
+  .kv-grid {
     grid-template-columns: 1fr;
   }
   .ledger-filter {
     flex: 1 1 100%;
     max-width: none;
+    min-width: 0;
+  }
+  .identity-meta {
+    text-align: left;
+    flex: 1 1 100%;
+  }
+  .ledger-note {
+    max-width: 180px;
+  }
+  .toolbar-responsive .toolbar-spacer {
+    display: none;
+  }
+  .toolbar-responsive > .row,
+  .toolbar-responsive > :deep(button) {
+    flex: 1 1 100%;
+  }
+}
+@media (max-width: 480px) {
+  .kpi-strip {
+    grid-template-columns: 1fr;
+  }
+  .ledger-note {
+    max-width: 140px;
   }
 }
 .kv {

@@ -178,7 +178,7 @@ const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.su
   min-width: 80px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .forecast-row {
     flex-wrap: wrap;
   }

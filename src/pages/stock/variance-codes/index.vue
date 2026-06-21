@@ -427,7 +427,6 @@ const countLabel = computed(() => t('variance_count_label', { n: total.value }))
     <!-- ============ Create / Edit modal ============ -->
     <Modal
       :open="dialog"
-      :width="540"
       :title="dialogMode === 'create' ? t('variance_create_title') : t('variance_edit_title')"
       @close="dialog = false"
     >
@@ -526,7 +525,6 @@ const countLabel = computed(() => t('variance_count_label', { n: total.value }))
     <!-- ============ Delete confirm modal ============ -->
     <Modal
       :open="deleteDialog"
-      :width="420"
       :title="t('Delete Variance Code')"
       :subtitle="t('This action cannot be undone')"
       @close="deleteDialog = false"
@@ -566,7 +564,6 @@ const countLabel = computed(() => t('variance_count_label', { n: total.value }))
     <!-- ============ Seed defaults confirm modal ============ -->
     <Modal
       :open="seedDialog"
-      :width="480"
       :title="t('variance_seed_confirm_title')"
       @close="seedDialog = false"
     >
@@ -668,7 +665,7 @@ const countLabel = computed(() => t('variance_count_label', { n: total.value }))
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .form-grid {
     grid-template-columns: 1fr;
   }

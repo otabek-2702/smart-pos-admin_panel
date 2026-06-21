@@ -991,13 +991,20 @@ meta:
     margin-left: 0;
     width: 100%;
   }
+}
 
+@media (max-width: 768px) {
   .form-grid {
     grid-template-columns: 1fr;
   }
 
   .form-grid .span-2 {
     grid-column: span 1;
+  }
+
+  /* Force modals to collapse to sheet on phone — inline maxWidth on Modal beats canonical .modal rule */
+  :deep(.modal) {
+    max-width: 100% !important;
   }
 }
 </style>

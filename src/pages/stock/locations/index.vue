@@ -277,14 +277,14 @@ function fmtDecimal(v: any) {
   if (v == null || v === '') return '—'
   const n = Number(v)
   if (!Number.isFinite(n)) return '—'
-  return n.toLocaleString(undefined, { maximumFractionDigits: 3 })
+  return n.toLocaleString('fr-FR', { maximumFractionDigits: 3 }).replace(/ | /g, ' ')
 }
 
 function fmtNumber(v: any) {
   if (v == null) return '—'
   const n = Number(v)
   if (!Number.isFinite(n)) return '—'
-  return n.toLocaleString()
+  return n.toLocaleString('fr-FR').replace(/ | /g, ' ')
 }
 
 // ---- filters / chips ----
@@ -863,7 +863,7 @@ function parentNameOf(row: any) {
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .toolbar__search,
   .toolbar__type,
   .toolbar__parent {
@@ -885,7 +885,7 @@ function parentNameOf(row: any) {
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 420px) {
   .kpi-grid {
     grid-template-columns: 1fr;
   }

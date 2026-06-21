@@ -124,8 +124,14 @@ function previewOf(c: any): string {
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
+function spaceifyNumbers(s: string): string {
+  return s.replace(/(\d{1,3}(?:,\d{3})+)(?:\.(\d+))?/g, (_m, intPart: string, dec?: string) => {
+    const spaced = intPart.replace(/,/g, ' ')
+    return dec ? `${spaced}.${dec}` : spaced
+  })
+}
 function mdInline(s: string): string {
-  return escapeHtml(s)
+  return escapeHtml(spaceifyNumbers(s))
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
 }
@@ -307,7 +313,7 @@ function selectChat(id: string) {
             @click="store.toggleNotify()"
           >
             <DesignIcon :name="notifyOn ? 'bell' : 'belloff'" :size="16" />
-            <span>{{ notifyBlocked ? t('Blocked') : (notifyOn ? t('Notifications on') : t('Notify me')) }}</span>
+            <span class="notifbtn__label">{{ notifyBlocked ? t('Blocked') : (notifyOn ? t('Notifications on') : t('Notify me')) }}</span>
           </button>
         </div>
       </div>
@@ -480,18 +486,15 @@ meta:
   gap: 10px;
 }
 
-@media (max-width: 900px) {
-  .aiwrap {
-    display: block;
+/* Always show delete button on touch / phone (no hover affordance) */
+@media (hover: none), (max-width: 768px) {
+  :deep(.histitem__del) {
+    display: grid !important;
+    opacity: 1 !important;
   }
+}
 
-  .aihist {
-    inline-size: 100%;
-    max-block-size: 220px;
-    border-inline-end: none;
-    border-block-end: 1px solid var(--border, rgba(0, 0, 0, 0.08));
-  }
-
+@media (max-width: 768px) {
   .aithread__head {
     flex-direction: column;
     align-items: flex-start;
@@ -499,6 +502,15 @@ meta:
 
   .aiempty__chips {
     grid-template-columns: 1fr;
+  }
+
+  /* Hide verbose notif label on phone — icon + tooltip remain */
+  .notifbtn__label {
+    display: none;
+  }
+
+  .notifbtn {
+    flex: 0 0 auto;
   }
 }
 </style>

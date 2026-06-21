@@ -995,7 +995,6 @@ const confirmTitle = computed(() => {
     <div
       v-if="snackbar"
       :class="['notify-snackbar', `tone-${snackbarColor}`]"
-      style="position: fixed; bottom: 24px; right: 24px; padding: 12px 18px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-md); z-index: 9999;"
     >
       {{ snackbarMsg }}
     </div>
@@ -1020,12 +1019,49 @@ const confirmTitle = computed(() => {
 .receive-qty-cell { width: 160px; }
 .tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+/* Snackbar pinned bottom-right; clears bottom tabbar on phone */
+.notify-snackbar {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 18px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  z-index: 9999;
+  max-width: calc(100vw - 32px);
+}
+
 @media (max-width: 900px) {
   .filter-cell,
   .filter-cell--wide { width: 100%; flex: 1 1 100%; }
   .toolbar-spacer { margin-left: 0; width: 100%; }
   .cols-2 { grid-template-columns: 1fr; }
   .receive-qty-cell { width: 100%; }
+}
+
+@media (max-width: 768px) {
+  /* Snackbar clears the bottom tabbar */
+  .notify-snackbar {
+    left: 16px;
+    right: 16px;
+    bottom: calc(var(--tabbar-h, 64px) + 16px);
+    max-width: none;
+  }
+  /* Receive row stacks fully */
+  .receive-row { gap: 8px; }
+}
+</style>
+
+<style>
+/* Global override: force modal sheet conversion on phones (overrides inline
+   width style set by Modal primitive). Non-scoped because Modal teleports
+   its content to <body>. */
+@media (max-width: 768px) {
+  .overlay > .modal {
+    max-width: 100% !important;
+  }
 }
 </style>
 

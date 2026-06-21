@@ -303,7 +303,7 @@ const formOutputUnitStr = computed<string>({
     <div class="card">
       <!-- Toolbar (flex-wrap built into .toolbar) -->
       <div class="toolbar">
-        <div class="grow" style="min-width: 220px; max-width: 320px;">
+        <div class="grow toolbar-search">
           <Input
             v-model="search"
             icon="search"
@@ -524,7 +524,7 @@ const formOutputUnitStr = computed<string>({
 
         <div v-if="dialogMode === 'edit'" class="span-12">
           <Field :label="t('Active')">
-            <label class="row" style="gap:10px; cursor:pointer; padding-top:4px;">
+            <label class="row active-toggle">
               <Switch v-model="form.is_active" />
               <span style="font-size:13px; color:var(--text-secondary);">
                 {{ form.is_active ? t('Active') : t('Inactive') }}
@@ -605,6 +605,12 @@ const formOutputUnitStr = computed<string>({
   align-items: center;
 }
 
+/* Search input wrapper — bounded on desktop, full-width on phone */
+.toolbar-search {
+  min-width: 220px;
+  max-width: 320px;
+}
+
 /* Toolbar fields: fixed min on desktop, drop to 100% on mobile */
 .toolbar-field {
   width: 200px;
@@ -621,6 +627,14 @@ const formOutputUnitStr = computed<string>({
   user-select: none;
 }
 
+.active-toggle {
+  gap: 10px;
+  cursor: pointer;
+  padding-top: 4px;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+
 /* Form grid — 12-col on desktop, single column on mobile */
 .form-grid {
   display: grid;
@@ -632,15 +646,18 @@ const formOutputUnitStr = computed<string>({
 .form-grid .span-8  { grid-column: span 8; }
 .form-grid .span-12 { grid-column: span 12; }
 
-@media (max-width: 900px) {
+/* Canonical phone breakpoint = 768px */
+@media (max-width: 768px) {
+  .toolbar-search {
+    max-width: none;
+    min-width: 0;
+    flex: 1 1 100%;
+  }
   .toolbar-field {
     width: 100%;
     min-width: 0;
     flex: 1 1 100%;
   }
-}
-
-@media (max-width: 720px) {
   .form-grid {
     grid-template-columns: 1fr;
   }

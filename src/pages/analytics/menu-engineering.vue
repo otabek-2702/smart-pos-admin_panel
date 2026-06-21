@@ -421,7 +421,7 @@ const subtitle = computed(() => `${dateFrom.value} — ${dateTo.value}`)
   font-size: var(--fs-label);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .me-field--date,
   .me-field--cogs,
   .me-field--search {
@@ -431,12 +431,22 @@ const subtitle = computed(() => `${dateFrom.value} — ${dateTo.value}`)
   .me-presets {
     width: 100%;
   }
+}
+
+@media (max-width: 768px) {
   .me-kpi-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+  .me-toolbar {
+    flex-wrap: wrap;
+  }
+  .me-meta {
+    flex: 1 1 100%;
+    word-break: break-word;
+  }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 420px) {
   .me-kpi-grid {
     grid-template-columns: 1fr;
   }

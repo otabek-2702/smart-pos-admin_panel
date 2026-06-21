@@ -668,6 +668,13 @@ const pagination = computed(() => ({
   display: flex;
 }
 
+.po-confirm > div:last-child {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 @media (max-width: 900px) {
   .po-toolbar {
     flex-direction: column;
@@ -686,6 +693,26 @@ const pagination = computed(() => ({
   .po-expand__meta {
     flex-direction: column;
     gap: 6px;
+  }
+}
+
+/* Phone — ensure modal-internal form-grid collapses to single column
+   and the line-items table remains horizontally scrollable. */
+@media (max-width: 768px) {
+  .po-lines-wrap {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Small phone — tighten confirm icon and lines table padding. */
+@media (max-width: 420px) {
+  .po-confirm {
+    gap: 10px;
+  }
+
+  .po-lines th,
+  .po-lines td {
+    padding: 6px 8px;
   }
 }
 </style>

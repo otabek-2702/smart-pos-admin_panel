@@ -493,6 +493,16 @@ function clearAllFilters() {
   flex-wrap: wrap;
 }
 
+/* ── Form grid (modal) ── */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-3, 12px);
+}
+.form-grid .span-2 {
+  grid-column: span 2;
+}
+
 /* ── Form switch row ── */
 .row-switch {
   display: flex;
@@ -517,7 +527,7 @@ function clearAllFilters() {
 }
 
 /* ── Responsive ── */
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .toolbar__search,
   .toolbar__filter {
     flex: 1 1 100%;
@@ -527,6 +537,12 @@ function clearAllFilters() {
   }
   .toolbar__clear {
     margin-left: 0;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-grid .span-2 {
+    grid-column: span 1;
   }
 }
 </style>

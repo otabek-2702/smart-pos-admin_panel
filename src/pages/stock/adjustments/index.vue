@@ -527,7 +527,7 @@ watch([historyPage, historyPerPage], () => loadHistory())
         </div>
 
         <!-- Submit -->
-        <div style="grid-column: span 12; display: flex; justify-content: flex-end; gap: 10px;">
+        <div class="adjust-form__submit" style="grid-column: span 12;">
           <Button
             type="button"
             variant="ghost"
@@ -825,7 +825,14 @@ watch([historyPage, historyPerPage], () => loadHistory())
   grid-template-columns: repeat(12, 1fr);
 }
 
-@media (max-width: 900px) {
+.adjust-form__submit {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 1024px) {
   .adjust-form {
     grid-template-columns: 1fr;
   }
@@ -833,11 +840,21 @@ watch([historyPage, historyPerPage], () => loadHistory())
   .adjust-form > div[style*="grid-column"] {
     grid-column: span 1 !important;
   }
+}
 
+@media (max-width: 768px) {
   .tool-search,
   .tool-select {
     width: 100%;
     flex: 1 1 100%;
+  }
+
+  .adjust-form__submit {
+    justify-content: stretch;
+  }
+
+  .adjust-form__submit > * {
+    flex: 1 1 auto;
   }
 }
 </style>

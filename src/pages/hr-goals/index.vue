@@ -988,7 +988,14 @@ function progressOf(row: any): number {
   overflow: hidden;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
+  .tb-status {
+    inline-size: auto;
+    flex: 1 1 200px;
+  }
+}
+
+@media (max-width: 768px) {
   .tb-wrap {
     flex-direction: column;
     align-items: stretch;
@@ -998,7 +1005,7 @@ function progressOf(row: any): number {
   .tb-status {
     inline-size: 100%;
     max-inline-size: none;
-    flex: 1 1 auto;
+    flex: 1 1 100%;
   }
 
   .progress-cell__bar {

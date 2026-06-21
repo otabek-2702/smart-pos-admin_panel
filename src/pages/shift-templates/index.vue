@@ -847,6 +847,22 @@ onBeforeUnmount(() => {
     grid-column: span 1 !important;
   }
 }
+
+/* Phone — modal sheet rows (delete/toggle confirm) must wrap so the
+   44px fixed-width icon doesn't crowd the text on narrow viewports.
+   Modal primitive already collapses to bottom sheet at <=768 via
+   design-responsive.css (max-width:100%, max-height:92dvh). */
+@media (max-width: 768px) {
+  :deep(.modal__body .row) {
+    flex-wrap: wrap;
+  }
+  /* Drop the inline fixed height on duration/switch preview rows
+     so they breathe on small screens without clipping. */
+  :deep(.form-grid .row[style*="height:42px"]) {
+    height: auto !important;
+    min-height: 42px;
+  }
+}
 </style>
 
 <route lang="yaml">

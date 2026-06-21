@@ -27,9 +27,7 @@ const route = useRoute()
 /* NAV array — mirrors source App.shell.jsx NAV verbatim.
    Source ids are mapped to existing Vue routes via `to`. */
 const NAV: NavEntry[] = [
-  { type: 'item', id: 'design', label: 'Design System', icon: 'sliders', to: '/design' },
   { type: 'item', id: 'dashboard', label: 'Dashboard', icon: 'dashboard', to: '/dashboard' },
-  { type: 'item', id: 'analytics', label: 'Analytics', icon: 'chart', to: '/analytics' },
   { type: 'item', id: 'ai', label: 'AI Assistant', icon: 'ai', to: '/ai-assistant' },
   { type: 'item', id: 'shifts', label: 'Shifts', icon: 'clock', to: '/shifts-analytics', badge: '2' },
   { type: 'section', label: 'Management' },

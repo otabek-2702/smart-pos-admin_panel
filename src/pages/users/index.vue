@@ -499,7 +499,7 @@ onBeforeUnmount(() => {
 
     <!-- KPI strip -->
     <div
-      class="grid cols-4"
+      class="grid cols-4 users-kpi-grid"
       style="margin-bottom: var(--sp-5);"
     >
       <Kpi :data="kpiTotal" />
@@ -510,9 +510,12 @@ onBeforeUnmount(() => {
 
     <!-- Toolbar + table -->
     <Card>
-      <div class="toolbar">
+      <div
+        class="toolbar users-toolbar"
+        style="flex-wrap:wrap;"
+      >
         <!-- Search -->
-        <div style="flex:1;max-width:300px;">
+        <div class="users-toolbar__search">
           <Input
             v-model="search"
             icon="search"
@@ -521,7 +524,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Role -->
-        <div style="width:180px;">
+        <div class="users-toolbar__filter">
           <Select
             v-model="roleFilter"
             icon="filter"
@@ -531,7 +534,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Status -->
-        <div style="width:180px;">
+        <div class="users-toolbar__filter">
           <Select
             v-model="statusFilter"
             :placeholder="t('All Statuses')"
@@ -770,7 +773,7 @@ onBeforeUnmount(() => {
               type="email"
               icon="mail"
               :error="!!errors.email"
-              placeholder="name@pos.local"
+              :placeholder="t('Email placeholder example')"
               @blur="onBlur('email')"
             />
           </Field>
@@ -787,7 +790,7 @@ onBeforeUnmount(() => {
               icon="lock"
               :error="!!errors.password"
               :type="isPinRole ? 'tel' : 'password'"
-              :placeholder="editing ? t('Leave blank to keep') : '••••••••'"
+              :placeholder="editing ? t('Leave blank to keep') : t('Password placeholder dots')"
               :maxlength="isPinRole ? 4 : undefined"
               :pattern="isPinRole ? '[0-9]{4}' : undefined"
               inputmode="numeric"
@@ -948,6 +951,36 @@ onBeforeUnmount(() => {
 .iconaction.is-busy {
   cursor: progress;
   opacity: 0.7;
+}
+
+/* Toolbar: search expands, filters are fixed at 180px on desktop */
+.users-toolbar__search {
+  flex: 1;
+  min-width: 220px;
+  max-width: 300px;
+}
+.users-toolbar__filter {
+  width: 180px;
+}
+
+/* Tablet — KPI strip drops to 2 columns; filters shrink */
+@media (max-width: 1100px) {
+  .users-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Mobile — single column everywhere, toolbar inputs take full width */
+@media (max-width: 900px) {
+  .users-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .users-toolbar__search,
+  .users-toolbar__filter {
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 100%;
+  }
 }
 </style>
 

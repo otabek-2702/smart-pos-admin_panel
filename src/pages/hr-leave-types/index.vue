@@ -391,15 +391,15 @@ function fmtInt(n: any): string {
 
     <!-- Toolbar + table -->
     <Card>
-      <div class="toolbar">
-        <div style="flex:1;max-width:300px;">
+      <div class="toolbar toolbar--wrap">
+        <div class="tb-search">
           <Input
             v-model="search"
             icon="search"
             :placeholder="t('Search')"
           />
         </div>
-        <div style="width:200px;">
+        <div class="tb-filter">
           <Select
             v-model="isActiveFilter"
             icon="filter"
@@ -407,7 +407,7 @@ function fmtInt(n: any): string {
             :options="isActiveOptions"
           />
         </div>
-        <div style="width:200px;">
+        <div class="tb-filter">
           <Select
             v-model="isPaidFilter"
             icon="dollar"
@@ -415,7 +415,7 @@ function fmtInt(n: any): string {
             :options="isPaidOptions"
           />
         </div>
-        <div style="width:220px;">
+        <div class="tb-filter tb-filter--wide">
           <Select
             v-model="requiresApprovalFilter"
             icon="checkcircle"
@@ -585,12 +585,12 @@ function fmtInt(n: any): string {
             :label="t('leave_type_field_short_name')"
             class="span-2"
             :error="errors.short_name"
-            hint="VAC, SICK, ..."
+            :hint="t('leave_type_short_name_hint')"
           >
             <Input
               v-model="form.short_name"
               :error="!!errors.short_name"
-              placeholder="VAC"
+              :placeholder="t('leave_type_short_name_placeholder')"
             />
           </Field>
 
@@ -604,7 +604,7 @@ function fmtInt(n: any): string {
               type="number"
               icon="calendar"
               :error="!!errors.annual_quota"
-              placeholder="0"
+              :placeholder="t('leave_type_qty_placeholder')"
               inputmode="numeric"
             />
           </Field>
@@ -619,7 +619,7 @@ function fmtInt(n: any): string {
               type="number"
               icon="calendar"
               :error="!!errors.max_carryover"
-              placeholder="0"
+              :placeholder="t('leave_type_qty_placeholder')"
               inputmode="numeric"
             />
           </Field>
@@ -710,3 +710,51 @@ meta:
   action: manage
   subject: all
 </route>
+
+<style scoped>
+.toolbar--wrap {
+  flex-wrap: wrap;
+}
+
+.tb-search {
+  flex: 1;
+  min-width: 220px;
+  max-width: 300px;
+}
+
+.tb-filter {
+  width: 200px;
+}
+
+.tb-filter--wide {
+  width: 220px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-grid .span-2 {
+  grid-column: span 2;
+}
+
+@media (max-width: 900px) {
+  .tb-search,
+  .tb-filter,
+  .tb-filter--wide {
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid .span-2 {
+    grid-column: span 1;
+  }
+}
+</style>

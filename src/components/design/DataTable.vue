@@ -212,7 +212,12 @@ const rangeEnd = computed(() =>
   Math.min(curPage.value * pp.value, totalItems.value),
 )
 function fmtNum(n: number) {
-  return new Intl.NumberFormat('en-US').format(n)
+  if (n === null || n === undefined || Number.isNaN(n))
+    return ''
+  const neg = n < 0
+  const s = Math.round(Math.abs(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+
+  return (neg ? '-' : '') + s
 }
 
 /* ---------- selection (controlled / uncontrolled) ---------- */

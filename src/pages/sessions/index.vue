@@ -285,12 +285,9 @@ onBeforeUnmount(() => {
 
     <!-- Toolbar + table -->
     <Card>
-      <div class="toolbar">
+      <div class="toolbar sessions-toolbar">
         <!-- Search -->
-        <div
-          class="control"
-          style="flex:1;max-width:340px;"
-        >
+        <div class="control sessions-search">
           <Input
             v-model="search"
             icon="search"
@@ -299,12 +296,9 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Current-only switch -->
-        <div
-          class="control"
-          style="display:flex;align-items:center;gap:10px;height:42px;"
-        >
+        <div class="control sessions-switch">
           <Switch v-model="currentOnly" />
-          <span style="font-size:14px;font-weight:500;color:var(--text-secondary);">
+          <span class="sessions-switch__label">
             {{ t('sessions_current_only') }}
           </span>
         </div>
@@ -370,9 +364,8 @@ onBeforeUnmount(() => {
 
         <template #cell.user_agent="{ row }">
           <span
-            class="cell-muted"
+            class="cell-muted sessions-ua"
             :title="String(row.user_agent || '')"
-            style="display:inline-block;max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;"
           >{{ displayUa(row) }}</span>
         </template>
 
@@ -436,32 +429,22 @@ onBeforeUnmount(() => {
     >
       <div
         v-if="revokeTarget"
-        class="row"
-        style="gap:14px;align-items:flex-start;"
+        class="row sessions-modal-row"
       >
-        <div
-          class="kpi__icon t-error"
-          style="width:44px;height:44px;flex:0 0 44px;"
-        >
+        <div class="kpi__icon t-error sessions-modal-icon">
           <DesignIcon
             name="alert"
             :size="22"
           />
         </div>
-        <div style="min-width:0;">
-          <p style="margin:0;font-weight:600;">
+        <div class="sessions-modal-body">
+          <p class="sessions-modal-title">
             <span class="mono">{{ displayIp(revokeTarget) }}</span>
           </p>
-          <p
-            class="muted"
-            style="margin:6px 0 0;font-size:13px;word-break:break-word;"
-          >
+          <p class="muted sessions-modal-ua">
             {{ displayUa(revokeTarget) }}
           </p>
-          <p
-            class="muted"
-            style="margin:6px 0 0;font-size:12px;"
-          >
+          <p class="muted sessions-modal-meta">
             {{ t('sessions_col_last_activity') }}:
             {{ revokeTarget.last_activity ? formatDate(revokeTarget.last_activity) : '—' }}
           </p>
@@ -496,27 +479,18 @@ onBeforeUnmount(() => {
       :width="460"
       @close="cancelLogoutAll"
     >
-      <div
-        class="row"
-        style="gap:14px;align-items:flex-start;"
-      >
-        <div
-          class="kpi__icon t-warning"
-          style="width:44px;height:44px;flex:0 0 44px;"
-        >
+      <div class="row sessions-modal-row">
+        <div class="kpi__icon t-warning sessions-modal-icon">
           <DesignIcon
             name="alert"
             :size="22"
           />
         </div>
         <div>
-          <p style="margin:0;font-weight:600;">
+          <p class="sessions-modal-title">
             {{ t('sessions_action_logout_all') }}
           </p>
-          <p
-            class="muted"
-            style="margin:6px 0 0;font-size:14px;"
-          >
+          <p class="muted sessions-modal-ua">
             {{ t('sessions_confirm_logout_all_body') }}
           </p>
         </div>
@@ -564,6 +538,86 @@ onBeforeUnmount(() => {
 .iconaction.is-busy {
   cursor: progress;
   opacity: 0.7;
+}
+
+/* Toolbar — responsive */
+.sessions-toolbar {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.sessions-search {
+  flex: 1;
+  max-width: 340px;
+  min-width: 220px;
+}
+.sessions-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+}
+.sessions-switch__label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* User-agent cell ellipsis */
+.sessions-ua {
+  display: inline-block;
+  max-width: 520px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* Modal layout */
+.sessions-modal-row {
+  gap: 14px;
+  align-items: flex-start;
+}
+.sessions-modal-icon {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+}
+.sessions-modal-body {
+  min-width: 0;
+}
+.sessions-modal-title {
+  margin: 0;
+  font-weight: 600;
+}
+.sessions-modal-ua {
+  margin: 6px 0 0;
+  font-size: 13px;
+  word-break: break-word;
+}
+.sessions-modal-meta {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+/* Responsive collapse */
+@media (max-width: 900px) {
+  .sessions-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sessions-search {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .sessions-switch {
+    height: auto;
+  }
+  .sessions-ua {
+    max-width: 260px;
+  }
+  .sessions-modal-row {
+    flex-wrap: wrap;
+  }
 }
 </style>
 

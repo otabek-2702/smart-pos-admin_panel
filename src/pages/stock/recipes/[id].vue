@@ -583,7 +583,7 @@ function onBatchMultiplierInput(v: string) {
 
     <template v-else>
       <!-- KPI strip -->
-      <div class="grid cols-4" style="margin-bottom: var(--sp-5);">
+      <div class="recipe-kpis" style="margin-bottom: var(--sp-5);">
         <Kpi
           :data="{
             label: t('recipe_total_cost'),
@@ -635,7 +635,7 @@ function onBatchMultiplierInput(v: string) {
           <div class="sk-box" style="height: 14px; width: 70%; border-radius: 4px;" />
         </div>
 
-        <div v-else-if="recipe" class="grid cols-3" style="padding: var(--sp-5); gap: var(--sp-4);">
+        <div v-else-if="recipe" class="recipe-overview-grid" style="padding: var(--sp-5); gap: var(--sp-4);">
           <div>
             <div class="cell-muted" style="font-size: var(--fs-sm); margin-bottom: 4px;">
               {{ t('recipe_code') }}
@@ -842,7 +842,7 @@ function onBatchMultiplierInput(v: string) {
           <table class="dtable">
             <thead>
               <tr>
-                <th class="center" style="width: 60px;">
+                <th class="center">
                   {{ t('recipe_ingredient_sort_order') }}
                 </th>
                 <th>{{ t('recipe_ingredient_item') }}</th>
@@ -858,7 +858,7 @@ function onBatchMultiplierInput(v: string) {
                 <th class="center">
                   {{ t('recipe_ingredient_is_optional') }}
                 </th>
-                <th class="num" style="width: 110px;">
+                <th class="num">
                   {{ t('Actions') }}
                 </th>
               </tr>
@@ -913,11 +913,11 @@ function onBatchMultiplierInput(v: string) {
 
       <!-- Batch multiplier toolbar (shared by availability + cost) -->
       <div class="card" style="margin-bottom: var(--sp-5);">
-        <div class="toolbar" style="gap: var(--sp-3); align-items: center;">
+        <div class="toolbar" style="gap: var(--sp-3); align-items: center; flex-wrap: wrap;">
           <div style="font-weight: var(--fw-semibold); font-size: var(--fs-md);">
             {{ t('recipe_batch_multiplier') }}
           </div>
-          <div style="width: 160px;">
+          <div class="recipe-bm-input">
             <Input
               :model-value="String(batchMultiplier)"
               type="number"
@@ -1096,7 +1096,7 @@ function onBatchMultiplierInput(v: string) {
                   {{ fmtMoney(totalCost) }}
                 </td>
                 <td class="num mono cell-muted">
-                  100%
+                  {{ t('recipe_cost_share_total') }}
                 </td>
               </tr>
             </tbody>
@@ -1219,7 +1219,7 @@ function onBatchMultiplierInput(v: string) {
         <Field :label="t('recipe_ingredient_waste_percentage')">
           <Input v-model="ingForm.waste_percentage" type="number" min="0" max="100" step="0.1" />
         </Field>
-        <Field :label="t('recipe_ingredient_sort_order')" :hint="'0 = auto-append'">
+        <Field :label="t('recipe_ingredient_sort_order')" :hint="t('recipe_ingredient_sort_order_hint')">
           <Input v-model="ingForm.sort_order" type="number" min="0" step="1" />
         </Field>
         <Field :label="t('recipe_ingredient_substitute_group')" class="span-2">
@@ -1346,6 +1346,50 @@ function onBatchMultiplierInput(v: string) {
 .row {
   display: flex;
   align-items: center;
+}
+
+.recipe-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-4);
+}
+
+.recipe-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.recipe-overview-grid .span-3 {
+  grid-column: span 3;
+}
+
+.recipe-bm-input {
+  inline-size: 160px;
+  max-inline-size: 100%;
+}
+
+@media (max-width: 1100px) {
+  .recipe-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .recipe-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .recipe-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .recipe-overview-grid .span-3 {
+    grid-column: span 1;
+  }
+
+  .recipe-bm-input {
+    inline-size: 100%;
+  }
 }
 </style>
 

@@ -24,6 +24,7 @@ import Segmented from '@/components/design/Segmented.vue'
 import Select from '@/components/design/Select.vue'
 import StatusBadge from '@/components/design/StatusBadge.vue'
 import Switch from '@/components/design/Switch.vue'
+import { fmtNum, NB } from '@/components/design/utils/format'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -99,16 +100,14 @@ const LICENSE_TONE: Record<string, 'primary' | 'info' | 'neutral' | 'success' | 
 // ============================================================
 // Formatters
 // ============================================================
-const NB = ' '
 function fmtMoney(n: number | string | null | undefined, currency?: string): string {
   if (n === null || n === undefined || n === '' || Number.isNaN(Number(n)))
     return '—'
-  const v = Number(n)
-  const neg = v < 0
-  const fixed = Math.abs(v).toFixed(2).replace(/\.00$/, '')
-  const s = fixed.replace(/\B(?=(\d{3})+(?!\d))/g, NB)
+  const s = fmtNum(Number(n))
+  if (s === '—')
+    return s
 
-  return `${neg ? '−' : ''}${s}${currency ? ` ${currency}` : ''}`
+  return `${s}${currency ? `${NB}${currency}` : ''}`
 }
 
 function fmtFeatures(f: any): string {
@@ -424,7 +423,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 
     <!-- License summary strip -->
     <div
-      class="grid cols-4"
+      class="grid cols-4 kpi-strip"
       style="margin-bottom: var(--sp-5);"
     >
       <Kpi :data="kpiStatus" />
@@ -477,21 +476,15 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
          ============================================================ -->
     <Card v-if="tab === 'plans'">
       <!-- Toolbar -->
-      <div class="toolbar">
-        <div
-          class="control"
-          style="flex:1; max-width:320px;"
-        >
+      <div class="toolbar plans-toolbar">
+        <div class="control plans-toolbar__search">
           <Input
             v-model="search"
             icon="search"
             :placeholder="t('Search')"
           />
         </div>
-        <div
-          class="control"
-          style="width:180px;"
-        >
+        <div class="control plans-toolbar__select plans-toolbar__select--md">
           <Select
             v-model="currencyFilter"
             icon="filter"
@@ -499,10 +492,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             :options="currencyOptions"
           />
         </div>
-        <div
-          class="control"
-          style="width:200px;"
-        >
+        <div class="control plans-toolbar__select plans-toolbar__select--lg">
           <Select
             v-model="periodFilter"
             :placeholder="t('license_filter_period')"
@@ -510,7 +500,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
           />
         </div>
         <div
-          class="control"
+          class="control plans-toolbar__switch"
           style="display:flex; gap:10px; align-items:center;"
         >
           <Switch v-model="activeOnly" />
@@ -707,7 +697,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
               tone="error"
               dot
             >
-              {{ t('Kill switch active') }}
+              {{ t('license_kill_switch_active') }}
             </Badge>
           </div>
 
@@ -715,12 +705,12 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             class="form-grid"
             style="gap: var(--sp-3);"
           >
-            <Field :label="t('Organization')">
+            <Field :label="t('license_organization')">
               <div class="cell-strong">
                 {{ licenseState.tenant?.org_name ?? '—' }}
               </div>
             </Field>
-            <Field :label="t('Contact email')">
+            <Field :label="t('license_contact_email')">
               <div class="cell-strong">
                 {{ licenseState.tenant?.email ?? '—' }}
               </div>
@@ -763,7 +753,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
               icon="lock"
               @click="$router.push('/licensing/setup')"
             >
-              {{ t('Run setup') }}
+              {{ t('license_run_setup') }}
             </Button>
           </div>
         </div>
@@ -896,6 +886,37 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.plans-toolbar {
+  flex-wrap: wrap;
+}
+.plans-toolbar__search {
+  flex: 1;
+  min-width: 200px;
+  max-width: 320px;
+}
+.plans-toolbar__select--md {
+  width: 180px;
+}
+.plans-toolbar__select--lg {
+  width: 200px;
+}
+
+@media (max-width: 900px) {
+  .kpi-strip {
+    grid-template-columns: 1fr !important;
+  }
+  .plans-toolbar__search,
+  .plans-toolbar__select--md,
+  .plans-toolbar__select--lg,
+  .plans-toolbar__switch {
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 100%;
+  }
+}
+</style>
 
 <route lang="yaml">
 meta:

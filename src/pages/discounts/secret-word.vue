@@ -21,6 +21,11 @@ const { notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 const router = useRouter()
 
+/* ---------- responsive modal widths ---------- */
+const { width: viewportWidth } = useWindowSize()
+const modalWidthRedeem = computed(() => Math.min(520, viewportWidth.value - 32))
+const modalWidthRetry = computed(() => Math.min(440, viewportWidth.value - 32))
+
 /* ---------- result tone (badge) ---------- */
 const RESULT_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'primary' | 'neutral'> = {
   SUCCESS: 'success',
@@ -314,11 +319,8 @@ function dash(v: any) {
       </div>
 
       <!-- Toolbar / filters -->
-      <div class="toolbar">
-        <div
-          class="grow"
-          style="max-width: 280px;"
-        >
+      <div class="toolbar secret-toolbar">
+        <div class="filter-word grow">
           <Input
             v-model="filterWord"
             icon="search"
@@ -326,7 +328,7 @@ function dash(v: any) {
             :aria-label="t('discount_secret_filter_word')"
           />
         </div>
-        <div style="width: 200px;">
+        <div class="filter-order">
           <Input
             v-model="filterOrderId"
             icon="receipt"
@@ -334,7 +336,7 @@ function dash(v: any) {
             :aria-label="t('discount_secret_filter_order_id')"
           />
         </div>
-        <div style="flex: 1;" />
+        <div class="toolbar-spacer" />
         <Button
           v-if="hasFilters"
           variant="ghost"
@@ -380,7 +382,7 @@ function dash(v: any) {
             name="receipt"
             :size="13"
           />
-          #{{ filterOrderId }}
+          {{ t('discount_secret_order_prefix', { id: filterOrderId }) }}
           <button
             type="button"
             class="chip__x"
@@ -406,7 +408,7 @@ function dash(v: any) {
         empty-icon="gift"
       >
         <template #cell.order_id="{ row }">
-          <span class="mono">#{{ row.order_id }}</span>
+          <span class="mono">{{ t('discount_secret_order_prefix', { id: row.order_id }) }}</span>
         </template>
 
         <template #cell.discount_code="{ row }">
@@ -475,7 +477,7 @@ function dash(v: any) {
       :open="createOpen"
       :title="t('discount_secret_action_redeem')"
       :subtitle="t('discount_secret_subtitle')"
-      :width="520"
+      :width="modalWidthRedeem"
       @close="createOpen = false"
     >
       <div class="form-grid">
@@ -528,7 +530,7 @@ function dash(v: any) {
     <Modal
       :open="!!retryTarget"
       :title="t('discount_secret_action_retry')"
-      :width="440"
+      :width="modalWidthRetry"
       @close="retryTarget = null"
     >
       <div v-if="retryTarget">
@@ -551,7 +553,7 @@ function dash(v: any) {
               name="receipt"
               :size="13"
             />
-            #{{ retryTarget.request_order_id }}
+            {{ t('discount_secret_order_prefix', { id: retryTarget.request_order_id }) }}
           </Badge>
         </div>
       </div>
@@ -581,9 +583,37 @@ function dash(v: any) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-4);
 }
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   .form-grid {
     grid-template-columns: 1fr;
+  }
+}
+.secret-toolbar {
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+.filter-word {
+  max-width: 280px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.filter-order {
+  width: 200px;
+  flex: 0 1 200px;
+  min-width: 0;
+}
+.toolbar-spacer {
+  flex: 1;
+}
+@media (max-width: 900px) {
+  .filter-word,
+  .filter-order {
+    max-width: none;
+    width: 100%;
+    flex: 1 1 100%;
+  }
+  .toolbar-spacer {
+    display: none;
   }
 }
 .mono {

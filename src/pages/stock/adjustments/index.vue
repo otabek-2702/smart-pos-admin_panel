@@ -20,6 +20,7 @@ import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
 import Switch from '@/components/design/Switch.vue'
+import { fmtDateTime } from '@/components/design/utils/format'
 
 const { t } = useI18n({ useScope: 'global' })
 const { notify } = useNotify()
@@ -201,7 +202,7 @@ async function loadHistory() {
 }
 
 const historyColumns = computed<DataTableColumn<any>[]>(() => [
-  { key: 'created_at', label: t('status'), sortable: false },
+  { key: 'created_at', label: t('date_time_col'), sortable: false },
   { key: 'movement_type', label: t('movement_type') },
   { key: 'item', label: t('stock_item') },
   { key: 'location', label: t('location') },
@@ -219,11 +220,7 @@ const historyPagination = computed(() => ({
 
 function fmtDate(iso: string | undefined) {
   if (!iso) return '—'
-  try {
-    const d = new Date(iso)
-    return d.toLocaleString()
-  }
-  catch { return iso }
+  return fmtDateTime(iso)
 }
 
 function fmtQty(v: any) {
@@ -400,7 +397,7 @@ watch([historyPage, historyPerPage], () => loadHistory())
 
     <!-- ============ ADJUSTMENT FORM CARD ============ -->
     <div class="card" style="margin-bottom: var(--sp-5);">
-      <div class="toolbar" style="border-bottom: 1px solid var(--border);">
+      <div class="toolbar wrap" style="border-bottom: 1px solid var(--border);">
         <div>
           <div class="kpi__label" style="font-weight: var(--fw-semibold); color: var(--text);">
             {{ t('new_adjustment') }}
@@ -409,7 +406,7 @@ watch([historyPage, historyPerPage], () => loadHistory())
       </div>
 
       <form
-        style="padding: var(--sp-5); display: grid; gap: var(--sp-4); grid-template-columns: repeat(12, 1fr);"
+        class="adjust-form"
         @submit.prevent="submitAdjustment"
       >
         <!-- Stock item -->
@@ -553,9 +550,9 @@ watch([historyPage, historyPerPage], () => loadHistory())
 
     <!-- ============ HISTORY CARD ============ -->
     <div class="card" style="margin-bottom: var(--sp-5);">
-      <div class="toolbar">
+      <div class="toolbar wrap">
         <div class="kpi__label" style="color: var(--text); font-weight: var(--fw-semibold);">
-          {{ t('stock_adjust_title') }} — {{ t('status') }}
+          {{ t('recent_adjustments') }}
         </div>
       </div>
       <div class="card__divider" />
@@ -605,8 +602,8 @@ watch([historyPage, historyPerPage], () => loadHistory())
 
     <!-- ============ VARIANCE CODES CARD ============ -->
     <div class="card">
-      <div class="toolbar">
-        <div style="flex: 1; min-width: 0;">
+      <div class="toolbar wrap">
+        <div style="flex: 1 1 220px; min-width: 0;">
           <div class="kpi__label" style="color: var(--text); font-weight: var(--fw-semibold);">
             {{ t('variance_codes_title') }}
           </div>
@@ -615,7 +612,7 @@ watch([historyPage, historyPerPage], () => loadHistory())
           </div>
         </div>
 
-        <div style="width: 220px;">
+        <div class="tool-search">
           <Input
             v-model="codesSearch"
             icon="search"
@@ -623,7 +620,7 @@ watch([historyPage, historyPerPage], () => loadHistory())
           />
         </div>
 
-        <div style="width: 180px;">
+        <div class="tool-select">
           <Select
             v-model="codesActive"
             :options="[
@@ -804,6 +801,44 @@ watch([historyPage, historyPerPage], () => loadHistory())
 .row {
   display: flex;
   align-items: center;
+}
+
+.toolbar.wrap {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tool-search {
+  width: 220px;
+  max-width: 100%;
+}
+
+.tool-select {
+  width: 180px;
+  max-width: 100%;
+}
+
+.adjust-form {
+  padding: var(--sp-5);
+  display: grid;
+  gap: var(--sp-4);
+  grid-template-columns: repeat(12, 1fr);
+}
+
+@media (max-width: 900px) {
+  .adjust-form {
+    grid-template-columns: 1fr;
+  }
+
+  .adjust-form > div[style*="grid-column"] {
+    grid-column: span 1 !important;
+  }
+
+  .tool-search,
+  .tool-select {
+    width: 100%;
+    flex: 1 1 100%;
+  }
 }
 </style>
 

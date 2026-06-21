@@ -335,15 +335,15 @@ function fmtInt(n: any): string {
 
     <!-- Toolbar + table -->
     <Card>
-      <div class="toolbar">
-        <div style="flex:1;max-width:320px;">
+      <div class="toolbar toolbar--wrap">
+        <div class="tb-search">
           <Input
             v-model="search"
             icon="search"
             :placeholder="t('expcat_search_ph')"
           />
         </div>
-        <div style="width:220px;">
+        <div class="tb-select">
           <Select
             v-model="isActiveFilter"
             icon="filter"
@@ -529,7 +529,7 @@ function fmtInt(n: any): string {
               type="number"
               icon="dollar"
               :error="!!errors.budget_limit"
-              placeholder="0.00"
+              :placeholder="t('expcat_input_amount_ph')"
               inputmode="decimal"
               min="0"
               step="0.01"
@@ -613,6 +613,55 @@ function fmtInt(n: any): string {
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.toolbar--wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.tb-search {
+  flex: 1 1 240px;
+  max-width: 320px;
+  min-width: 200px;
+}
+
+.tb-select {
+  width: 220px;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 900px) {
+  .tb-search,
+  .tb-select {
+    width: 100%;
+    max-width: none;
+    flex: 1 1 100%;
+  }
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.form-grid .span-2 {
+  grid-column: span 2;
+}
+
+@media (max-width: 900px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid .span-2 {
+    grid-column: span 1;
+  }
+}
+</style>
 
 <route lang="yaml">
 meta:

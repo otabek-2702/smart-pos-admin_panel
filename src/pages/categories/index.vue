@@ -424,8 +424,8 @@ function clearAllFilters() {
 
     <!-- Toolbar -->
     <Card>
-      <div class="toolbar">
-        <div style="flex:1;max-width:300px;">
+      <div class="toolbar toolbar--wrap">
+        <div class="tb-search">
           <Input
             v-model="search"
             icon="search"
@@ -433,7 +433,7 @@ function clearAllFilters() {
           />
         </div>
 
-        <div style="width:200px;">
+        <div class="tb-status">
           <Select
             v-model="statusFilter"
             icon="filter"
@@ -443,7 +443,7 @@ function clearAllFilters() {
         </div>
 
         <div
-          class="row"
+          class="row tb-switch"
           style="gap:10px;align-items:center;"
         >
           <Switch v-model="includeDeleted" />
@@ -711,7 +711,7 @@ function clearAllFilters() {
     <Modal
       :open="dialogOpen"
       :title="editingCategory ? t('Edit Category') : t('Add Category')"
-      :width="560"
+      :width="500"
       @close="tryCloseDialog(false)"
     >
       <!-- POS Preview -->
@@ -744,7 +744,7 @@ function clearAllFilters() {
               {{ t('Product') }} 1
             </div>
             <div class="pos-product-card__price">
-              25 000 so'm
+              {{ t('category_sample_price_1') }}
             </div>
           </div>
           <div
@@ -755,7 +755,7 @@ function clearAllFilters() {
               {{ t('Product') }} 2
             </div>
             <div class="pos-product-card__price">
-              18 000 so'm
+              {{ t('category_sample_price_2') }}
             </div>
           </div>
           <div
@@ -766,7 +766,7 @@ function clearAllFilters() {
               {{ t('Product') }} 3
             </div>
             <div class="pos-product-card__price">
-              32 000 so'm
+              {{ t('category_sample_price_3') }}
             </div>
           </div>
         </div>
@@ -1188,9 +1188,34 @@ function clearAllFilters() {
   box-shadow: 0 0 0 2px var(--primary-weak);
 }
 
+/* ── Toolbar ── */
+.toolbar--wrap {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tb-search {
+  flex: 1;
+  max-width: 300px;
+  min-width: 220px;
+}
+
+.tb-status {
+  width: 200px;
+}
+
 /* ── Responsive ── */
 @media (max-width: 1024px) {
   .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 900px) {
+  .tb-search,
+  .tb-status {
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 100%;
+  }
+  .tb-switch { flex: 1 1 100%; }
 }
 @media (max-width: 720px) {
   .grid.cols-4 { grid-template-columns: 1fr; }

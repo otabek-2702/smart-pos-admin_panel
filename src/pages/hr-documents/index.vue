@@ -321,7 +321,7 @@ const activeFilters = computed(() => {
   if (typeFilter.value)
     out.push({ k: 't', label: t('hr_documents_type'), val: t(`hrdoc_type_${typeFilter.value}`), clear: () => { typeFilter.value = '' } })
   if (expiringOnly.value)
-    out.push({ k: 'exp', label: t('hr_documents_expiring_switch'), val: `≤ ${expiringDays.value} ${t('days')}`, clear: () => { expiringOnly.value = false } })
+    out.push({ k: 'exp', label: t('hr_documents_expiring_switch'), val: t('hr_documents_expiring_within', { days: expiringDays.value }), clear: () => { expiringOnly.value = false } })
   return out
 })
 
@@ -401,15 +401,15 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 
     <!-- Toolbar + table -->
     <Card>
-      <div class="toolbar">
-        <div style="flex:1;max-width:300px;">
+      <div class="toolbar hr-docs-toolbar">
+        <div class="tb-search">
           <Input
             v-model="search"
             icon="search"
             :placeholder="t('hr_documents_search_ph')"
           />
         </div>
-        <div style="width:240px;">
+        <div class="tb-select tb-select--wide">
           <Select
             v-model="employeeFilter"
             icon="employee"
@@ -417,7 +417,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             :options="employeeOptions"
           />
         </div>
-        <div style="width:200px;">
+        <div class="tb-select">
           <Select
             v-model="typeFilter"
             icon="filter"
@@ -425,15 +425,13 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             :options="typeOptions"
           />
         </div>
-        <div
-          style="display:flex;align-items:center;gap:8px;"
-        >
+        <div class="tb-switch">
           <Switch v-model="expiringOnly" />
           <span class="tertiary" style="font-size:13px;">{{ t('hr_documents_expiring_switch') }}</span>
         </div>
         <div
           v-if="expiringOnly"
-          style="width:130px;"
+          class="tb-days"
         >
           <Input
             v-model="expiringDays"
@@ -787,6 +785,31 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.hr-docs-toolbar {
+  flex-wrap: wrap;
+}
+.tb-search { flex: 1; max-width: 300px; min-width: 200px; }
+.tb-select { width: 200px; }
+.tb-select--wide { width: 240px; }
+.tb-switch { display: flex; align-items: center; gap: 8px; }
+.tb-days { width: 130px; }
+
+@media (max-width: 900px) {
+  .tb-search,
+  .tb-select,
+  .tb-select--wide,
+  .tb-days {
+    width: 100%;
+    max-width: none;
+    flex: 1 1 100%;
+  }
+  .tb-switch {
+    width: 100%;
+  }
+}
+</style>
 
 <route lang="yaml">
 meta:

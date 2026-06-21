@@ -19,6 +19,7 @@ import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
+import { fmtNum } from '@/components/design/utils/format'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -37,15 +38,17 @@ const employeeFilter = ref<string>('')
 const yearFilter = ref<string>(String(currentYear))
 
 // ============================================================
-// Formatters
+// Formatters — leave days may be fractional (e.g. 1.5). The integer
+// portion uses the design fmtNum; the decimal suffix is appended.
 // ============================================================
-const NB = ' '
-function fmtNum(n: number | string | null | undefined): string {
+function fmtDays(n: number | string | null | undefined): string {
   if (n === null || n === undefined || n === '' || Number.isNaN(Number(n))) return '—'
   const v = Number(n)
-  // Show up to 2 decimals, drop trailing zeros
-  const s = v.toFixed(2).replace(/\.?0+$/, '')
-  return s.replace(/\B(?=(\d{3})+(?!\d))/g, NB)
+  const absV = Math.abs(v)
+  const int = Math.trunc(absV)
+  const decStr = absV.toFixed(2).replace(/\.?0+$/, '').split('.')[1]
+  const base = fmtNum(v < 0 ? -int : int)
+  return decStr ? base + '.' + decStr : base
 }
 
 // ============================================================
@@ -120,7 +123,6 @@ const kpiAllocated = computed(() => ({
   value: items.value.length ? sumOf('allocated_days') : null,
   icon: 'calendar',
   tone: 'primary' as const,
-  sub: t('leave_balance_year') + ': ' + (yearFilter.value || '—'),
 }))
 const kpiUsed = computed(() => ({
   label: t('leave_balance_kpi_used_total'),
@@ -246,7 +248,7 @@ const activeFilters = computed(() => {
 </script>
 
 <template>
-  <div class="page">
+  <div class="page lb-page">
     <PageHeader
       :title="t('leave_balances_title')"
       :subtitle="t('leave_balances_subtitle')"
@@ -272,7 +274,7 @@ const activeFilters = computed(() => {
 
     <!-- KPI strip -->
     <div
-      class="grid cols-4"
+      class="grid cols-4 lb-kpis"
       style="margin-bottom: var(--sp-5);"
     >
       <Kpi :data="kpiAllocated" />
@@ -283,8 +285,8 @@ const activeFilters = computed(() => {
 
     <!-- Toolbar + table -->
     <Card>
-      <div class="toolbar">
-        <div style="flex:1;max-width:340px;">
+      <div class="toolbar lb-toolbar">
+        <div class="lb-toolbar__employee">
           <Select
             v-model="employeeFilter"
             icon="employee"
@@ -293,7 +295,7 @@ const activeFilters = computed(() => {
             :disabled="employeesLoading"
           />
         </div>
-        <div style="width:160px;">
+        <div class="lb-toolbar__year">
           <Select
             v-model="yearFilter"
             icon="calendar"
@@ -382,23 +384,23 @@ const activeFilters = computed(() => {
         </template>
 
         <template #cell.allocated_days="{ row }">
-          <span class="mono cell-strong">{{ fmtNum(row.allocated_days) }}</span>
+          <span class="mono cell-strong">{{ fmtDays(row.allocated_days) }}</span>
         </template>
 
         <template #cell.used_days="{ row }">
           <span
             class="mono"
             :style="{ color: Number(row.used_days) > 0 ? 'var(--warning)' : undefined }"
-          >{{ fmtNum(row.used_days) }}</span>
+          >{{ fmtDays(row.used_days) }}</span>
         </template>
 
         <template #cell.carried_over="{ row }">
-          <span class="mono cell-muted">{{ fmtNum(row.carried_over) }}</span>
+          <span class="mono cell-muted">{{ fmtDays(row.carried_over) }}</span>
         </template>
 
         <template #cell.remaining_days="{ row }">
           <Badge :tone="Number(row.remaining_days) > 0 ? 'success' : 'neutral'">
-            <span class="mono">{{ fmtNum(row.remaining_days) }}</span>
+            <span class="mono">{{ fmtDays(row.remaining_days) }}</span>
           </Badge>
         </template>
 
@@ -428,7 +430,7 @@ const activeFilters = computed(() => {
               icon="calendar"
               type="number"
               :error="!!initErrors.year"
-              placeholder="2026"
+              :placeholder="t('leave_balance_year_placeholder')"
               inputmode="numeric"
             />
           </Field>
@@ -465,6 +467,19 @@ const activeFilters = computed(() => {
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+/* Toolbar: employee select takes the lion's share, year is fixed-ish.
+   Both shrink/wrap on narrow viewports. */
+.lb-toolbar__employee { flex: 1 1 240px; max-width: 340px; min-width: 200px; }
+.lb-toolbar__year { flex: 0 1 160px; min-width: 120px; }
+
+@media (max-width: 900px) {
+  .lb-page .lb-kpis { grid-template-columns: 1fr; }
+  .lb-toolbar__employee { max-width: none; }
+  .lb-toolbar__year { flex: 1 1 100%; }
+}
+</style>
 
 <route lang="yaml">
 meta:

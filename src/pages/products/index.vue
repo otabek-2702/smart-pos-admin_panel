@@ -456,9 +456,12 @@ function goPage(p: number | '…') {
     <!-- ============== CARD ============== -->
     <div class="card">
       <!-- Toolbar -->
-      <div class="toolbar">
+      <div
+        class="toolbar products-toolbar"
+        style="flex-wrap:wrap;"
+      >
         <div
-          class="grow"
+          class="grow products-toolbar__search"
           style="max-width:280px;"
         >
           <div class="control">
@@ -491,7 +494,10 @@ function goPage(p: number | '…') {
           </div>
         </div>
 
-        <div style="width:220px;">
+        <div
+          class="products-toolbar__select"
+          style="width:220px;"
+        >
           <div class="control control--select">
             <svg
               class="ic"
@@ -533,7 +539,10 @@ function goPage(p: number | '…') {
           </div>
         </div>
 
-        <div style="width:220px;">
+        <div
+          class="products-toolbar__select"
+          style="width:220px;"
+        >
           <div class="control control--select">
             <svg
               class="ic"
@@ -571,7 +580,10 @@ function goPage(p: number | '…') {
           </div>
         </div>
 
-        <div style="min-width:200px;">
+        <div
+          class="products-toolbar__select"
+          style="min-width:200px;"
+        >
           <div
             class="control control--select"
             :title="t('Filter by multiple categories')"
@@ -1066,7 +1078,7 @@ function goPage(p: number | '…') {
         </div>
         <span class="pagination__spacer" />
         <span class="muted">
-          {{ pageStart }}–{{ pageEnd }} {{ t('of') }} {{ totalProducts }}
+          {{ t('pagination_range', { start: pageStart, end: pageEnd, total: totalProducts }) }}
         </span>
         <div class="pglist">
           <button
@@ -1127,7 +1139,7 @@ function goPage(p: number | '…') {
     >
       <form
         class="modal"
-        style="max-width:560px;"
+        style="width:min(560px, 92vw); max-width:560px;"
         @submit.prevent="saveProduct"
       >
         <div class="modal__head">
@@ -1375,7 +1387,7 @@ function goPage(p: number | '…') {
     >
       <div
         class="modal"
-        style="max-width:440px;"
+        style="width:min(440px, 92vw); max-width:440px;"
       >
         <div class="modal__head">
           <div style="flex:1;min-width:0;">
@@ -1589,6 +1601,38 @@ function goPage(p: number | '…') {
   background: var(--surface-inset);
   color: var(--text-secondary);
   border: 1px solid var(--border-strong);
+}
+
+/* ── Responsive toolbar / modals ── */
+.products-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.tablewrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 900px) {
+  .products-toolbar__search,
+  .products-toolbar__select {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .form-grid .span-2 {
+    grid-column: 1 / -1 !important;
+  }
 }
 </style>
 

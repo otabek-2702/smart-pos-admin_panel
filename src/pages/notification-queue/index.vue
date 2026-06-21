@@ -228,7 +228,6 @@ const kpiPending = computed(() => ({
   value: items.value.length,
   icon: 'bell',
   tone: 'primary' as const,
-  sub: t('notif_queue_subtitle'),
 }))
 
 const kpiTargeted = computed(() => ({
@@ -236,7 +235,6 @@ const kpiTargeted = computed(() => ({
   value: items.value.filter(it => it.chat_ids !== null && it.chat_ids !== undefined).length,
   icon: 'retry',
   tone: 'warning' as const,
-  sub: t('notif_queue_filter_targeted'),
 }))
 
 const kpiCapacity = computed(() => ({
@@ -244,7 +242,7 @@ const kpiCapacity = computed(() => ({
   value: capacity.value !== null && capacity.value !== undefined ? capacity.value : '—',
   icon: 'inbox',
   tone: 'info' as const,
-  sub: t('notif_queue_kpi_pending'),
+  sub: t('notif_queue_kpi_capacity_sub'),
 }))
 
 // ============================================================
@@ -378,7 +376,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 
     <!-- KPI strip -->
     <div
-      class="grid cols-3"
+      class="grid cols-3 nq-kpis"
       style="margin-bottom: var(--sp-5);"
     >
       <Kpi :data="kpiPending" />
@@ -390,15 +388,24 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
          Queue list
          ====================================================== -->
     <Card>
-      <div class="toolbar">
-        <div style="flex:1;max-width:320px;">
+      <div
+        class="toolbar nq-toolbar"
+        style="flex-wrap:wrap;gap:12px;"
+      >
+        <div
+          class="nq-search"
+          style="flex:1;min-width:200px;max-width:320px;"
+        >
           <Input
             v-model="search"
             icon="search"
             :placeholder="t('notif_queue_filter_search')"
           />
         </div>
-        <div style="width:220px;">
+        <div
+          class="nq-type-select"
+          style="width:220px;"
+        >
           <Select
             v-model="typeFilter"
             icon="filter"
@@ -408,7 +415,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
         </div>
         <div
           class="row"
-          style="gap:10px;align-items:center;"
+          style="gap:10px;align-items:center;flex-wrap:wrap;"
         >
           <Switch v-model="targetedOnly" />
           <span style="font-size:14px;color:var(--text-secondary);">
@@ -420,13 +427,13 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
       <div
         v-if="activeFilters.length > 0"
         class="toolbar"
-        style="padding-top:0;"
+        style="padding-top:0;flex-wrap:wrap;gap:8px;"
       >
         <div class="chips">
           <span
             class="tertiary"
             style="font-size:13px;margin-right:2px;"
-          >{{ t('Filters') }}:</span>
+          >{{ t('notif_queue_filters_label') }}</span>
           <span
             v-for="f in activeFilters"
             :key="f.k"
@@ -751,3 +758,20 @@ meta:
   action: manage
   subject: all
 </route>
+
+<style scoped>
+@media (max-width: 900px) {
+  .nq-kpis {
+    grid-template-columns: 1fr !important;
+  }
+  .nq-toolbar {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+  .nq-search,
+  .nq-type-select {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+</style>

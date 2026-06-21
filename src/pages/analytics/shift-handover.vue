@@ -95,7 +95,7 @@ function fmtSec(s: number | null | undefined): string {
   if (!s && s !== 0) return '—'
   const m = Math.floor((s as number) / 60)
   const sec = (s as number) % 60
-  return `${m}m ${sec}s`
+  return `${m}${t('time_min_suffix')} ${sec}${t('time_sec_suffix')}`
 }
 
 // ============================================================
@@ -339,7 +339,9 @@ function shiftDurationLabel(): string {
   const dm = Number(shift.value?.duration_minutes || 0)
   const h = Math.floor(dm / 60)
   const m = dm % 60
-  return h ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`
+  return h
+    ? `${h}${t('hour_suffix')} ${String(m).padStart(2, '0')}${t('time_min_suffix')}`
+    : `${m}${t('time_min_suffix')}`
 }
 </script>
 
@@ -355,8 +357,8 @@ function shiftDurationLabel(): string {
           {{ t('Per-shift performance, payments and punctuality') }}
         </div>
       </div>
-      <div class="page__head-actions">
-        <div class="field" style="width:130px;">
+      <div class="page__head-actions shift-handover__head-actions">
+        <div class="field shift-handover__shift-field">
           <div class="field__label">
             {{ t('Shift ID') }}
           </div>
@@ -433,7 +435,7 @@ function shiftDurationLabel(): string {
       <!-- ===== Shift summary banner ===== -->
       <div class="card" style="margin-bottom:var(--sp-5);">
         <div class="row between" style="padding:var(--sp-5); flex-wrap:wrap; gap:16px;">
-          <div class="row" style="gap:16px;">
+          <div class="row" style="gap:16px; flex-wrap:wrap; min-width:0;">
             <div class="avatar" style="width:48px;height:48px;flex-basis:48px;font-size:17px;">
               {{ initialsOf(data?.cashier?.name) }}
             </div>
@@ -443,7 +445,7 @@ function shiftDurationLabel(): string {
                 <span class="badge badge--dot" :class="`t-${tone(shift.status)}`">{{ shift.status ? t(`shift_status_${shift.status}`) : '—' }}</span>
               </div>
               <div class="muted" style="font-size:13px;margin-top:2px;">
-                {{ t('Shift') }} #{{ shiftIdInput }} · {{ formatDate(shift.start_time) }} —
+                {{ t('Shift') }} {{ t('id_prefix') }}{{ shiftIdInput }} · {{ formatDate(shift.start_time) }} —
                 {{ shift.end_time ? formatDate(shift.end_time) : t('in progress') }} ·
                 {{ shiftDurationLabel() }}
               </div>
@@ -490,10 +492,10 @@ function shiftDurationLabel(): string {
             </div>
           </div>
           <div class="kpi__value">
-            {{ fmtAbbr(revenueCounted) }}<span class="kpi__unit">UZS</span>
+            {{ fmtAbbr(revenueCounted) }}<span class="kpi__unit">{{ t('currency_uzs') }}</span>
           </div>
           <div class="kpi__foot">
-            <span class="kpi__subtext">{{ fmtAbbr(shift.money?.revenue_per_hour) }} / {{ t('h') }}</span>
+            <span class="kpi__subtext">{{ fmtAbbr(shift.money?.revenue_per_hour) }} / {{ t('hour_suffix') }}</span>
           </div>
         </div>
 
@@ -507,7 +509,7 @@ function shiftDurationLabel(): string {
             </div>
           </div>
           <div class="kpi__value">
-            {{ fmtAbbr(cashCounted) }}<span class="kpi__unit">UZS</span>
+            {{ fmtAbbr(cashCounted) }}<span class="kpi__unit">{{ t('currency_uzs') }}</span>
           </div>
           <div class="kpi__foot">
             <span class="kpi__subtext">{{ cashPctOfRevenue }}% {{ t('of revenue') }}</span>
@@ -524,7 +526,7 @@ function shiftDurationLabel(): string {
             </div>
           </div>
           <div class="kpi__value">
-            {{ fmtAbbr(cardCounted) }}<span class="kpi__unit">UZS</span>
+            {{ fmtAbbr(cardCounted) }}<span class="kpi__unit">{{ t('currency_uzs') }}</span>
           </div>
           <div class="kpi__foot">
             <span class="kpi__subtext">{{ cardPctOfRevenue }}% {{ t('of revenue') }}</span>
@@ -541,7 +543,7 @@ function shiftDurationLabel(): string {
             </div>
           </div>
           <div class="kpi__value">
-            {{ fmtAbbr(aovCounted) }}<span class="kpi__unit">UZS</span>
+            {{ fmtAbbr(aovCounted) }}<span class="kpi__unit">{{ t('currency_uzs') }}</span>
           </div>
           <div class="kpi__foot">
             <span class="kpi__subtext">{{ t('vs shift avg') }}</span>
@@ -642,7 +644,7 @@ function shiftDurationLabel(): string {
                 {{ t('No data for this range') }}
               </div>
             </div>
-            <div v-else ref="barEl" style="position:relative;">
+            <div v-else ref="barEl" style="position:relative;overflow-x:auto;max-inline-size:100%;">
               <svg :width="BAR_W" :height="BAR_H" style="display:block;">
                 <g v-for="(tv, i) in barTicks.ticks" :key="`bg${i}`">
                   <line :x1="BAR_PAD_L" :x2="BAR_W - BAR_PAD_R" :y1="barY(tv)" :y2="barY(tv)" stroke="var(--chart-grid)" stroke-width="1" />
@@ -703,7 +705,7 @@ function shiftDurationLabel(): string {
             </div>
           </div>
           <div class="card__body">
-            <div class="row" style="gap:0; margin-bottom:18px;">
+            <div class="row shift-handover__orders-stats" style="gap:0; margin-bottom:18px;">
               <div style="flex:1;">
                 <div style="font-size:12px; font-weight:600; color:var(--success); margin-bottom:4px;">
                   {{ t('Completed') }}
@@ -782,7 +784,7 @@ function shiftDurationLabel(): string {
             <div class="row between" style="padding:7px 0;">
               <span class="muted" style="font-size:14px;">{{ t('Late') }}</span>
               <span v-if="shift.punctuality?.late_minutes !== null && shift.punctuality?.late_minutes !== undefined" style="color:var(--warning); font-weight:600; font-size:14px;">
-                {{ shift.punctuality?.is_late ? `+${shift.punctuality.late_minutes}m` : t('On time') }}
+                {{ shift.punctuality?.is_late ? t('late_by_minutes', { n: shift.punctuality.late_minutes }) : t('On time') }}
               </span>
               <span v-else class="tertiary">{{ t('No schedule') }}</span>
             </div>
@@ -800,7 +802,7 @@ function shiftDurationLabel(): string {
               </div>
               <div class="row between" style="padding:7px 0;">
                 <span class="muted" style="font-size:14px;">{{ t('Work / Overtime') }}</span>
-                <span class="mono" style="font-weight:600; font-size:14px;">{{ shift.punctuality.attendance.work_hours }}h / {{ shift.punctuality.attendance.overtime_hours }}h</span>
+                <span class="mono" style="font-weight:600; font-size:14px;">{{ shift.punctuality.attendance.work_hours }}{{ t('hour_suffix') }} / {{ shift.punctuality.attendance.overtime_hours }}{{ t('hour_suffix') }}</span>
               </div>
             </div>
           </div>
@@ -885,38 +887,40 @@ function shiftDurationLabel(): string {
               {{ t('No products sold') }}
             </div>
           </div>
-          <table v-else class="dtable">
-            <thead>
-              <tr>
-                <th>{{ t('Name') }}</th>
-                <th class="num">
-                  {{ t('Units') }}
-                </th>
-                <th class="num">
-                  {{ t('Orders') }}
-                </th>
-                <th class="num">
-                  {{ t('Revenue') }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="p in products" :key="p.product_id">
-                <td class="cell-strong">
-                  {{ p.name }}
-                </td>
-                <td class="num mono">
-                  {{ p.units_sold }}
-                </td>
-                <td class="num mono cell-muted">
-                  {{ p.times_sold }}
-                </td>
-                <td class="num mono cell-strong">
-                  {{ fmtMoney(p.revenue) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div v-else class="dtable-scroll">
+            <table class="dtable">
+              <thead>
+                <tr>
+                  <th>{{ t('Name') }}</th>
+                  <th class="num">
+                    {{ t('Units') }}
+                  </th>
+                  <th class="num">
+                    {{ t('Orders') }}
+                  </th>
+                  <th class="num">
+                    {{ t('Revenue') }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="p in products" :key="p.product_id">
+                  <td class="cell-strong">
+                    {{ p.name }}
+                  </td>
+                  <td class="num mono">
+                    {{ p.units_sold }}
+                  </td>
+                  <td class="num mono cell-muted">
+                    {{ p.times_sold }}
+                  </td>
+                  <td class="num mono cell-strong">
+                    {{ fmtMoney(p.revenue) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -996,13 +1000,14 @@ function shiftDurationLabel(): string {
           </div>
         </div>
         <div class="card__divider" />
-        <table class="dtable">
-          <thead>
-            <tr>
-              <th>{{ t('Method') }}</th>
-              <th class="num">
-                {{ t('Expected (system)') }}
-              </th>
+        <div class="dtable-scroll">
+          <table class="dtable">
+            <thead>
+              <tr>
+                <th>{{ t('Method') }}</th>
+                <th class="num">
+                  {{ t('Expected (system)') }}
+                </th>
               <th class="num">
                 {{ t('Cashier counted') }}
               </th>
@@ -1017,7 +1022,7 @@ function shiftDurationLabel(): string {
           <tbody>
             <tr v-for="row in settlement" :key="row.method">
               <td>
-                <span class="badge" :class="`t-${tone(row.method)}`">{{ row.method }}</span>
+                <span class="badge" :class="`t-${tone(row.method)}`">{{ row.method ? t(`payment_method_${row.method}`) : '—' }}</span>
               </td>
               <td class="num mono">
                 {{ fmtMoney(row.expected) }}
@@ -1036,6 +1041,7 @@ function shiftDurationLabel(): string {
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
 
       <!-- ===== Cash drawer expenses (extra) ===== -->
@@ -1048,10 +1054,11 @@ function shiftDurationLabel(): string {
             </h3>
           </div>
           <div class="card__actions">
-            <span class="mono" style="color:var(--error);font-weight:700;">−{{ fmtMoney(cashExpensesTotal) }}</span>
+            <span class="mono" style="color:var(--error);font-weight:700;">{{ t('negative_amount', { amount: fmtMoney(cashExpensesTotal) }) }}</span>
           </div>
         </div>
         <div class="card__divider" />
+        <div class="dtable-scroll">
         <table class="dtable">
           <thead>
             <tr>
@@ -1073,11 +1080,12 @@ function shiftDurationLabel(): string {
                 {{ e.count }}
               </td>
               <td class="num mono" style="color:var(--error);font-weight:600;">
-                −{{ fmtMoney(e.total) }}
+                {{ t('negative_amount', { amount: fmtMoney(e.total) }) }}
               </td>
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
 
       <!-- ===== All receipts (.dtable) ===== -->
@@ -1107,10 +1115,11 @@ function shiftDurationLabel(): string {
             {{ t('No receipts') }}
           </div>
         </div>
-        <table v-else class="dtable">
+        <div v-else class="dtable-scroll">
+        <table class="dtable">
           <thead>
             <tr>
-              <th>#</th>
+              <th>{{ t('id_prefix') }}</th>
               <th>{{ t('Status') }}</th>
               <th>{{ t('Type') }}</th>
               <th>{{ t('Payment') }}</th>
@@ -1132,7 +1141,7 @@ function shiftDurationLabel(): string {
           <tbody>
             <tr v-for="r in receipts" :key="r.order_id">
               <td class="cell-strong mono">
-                #{{ r.display_id }}
+                {{ t('id_prefix') }}{{ r.display_id }}
               </td>
               <td>
                 <span class="badge badge--dot" :class="`t-${tone(r.status)}`">{{ r.status ? t(`order_status_${r.status}`) : '—' }}</span>
@@ -1150,7 +1159,7 @@ function shiftDurationLabel(): string {
                 {{ r.units }}
               </td>
               <td class="num">
-                <span v-if="Number(r.discount_amount) > 0" class="mono" style="color:var(--warning);">−{{ fmtMoney(r.discount_amount) }}</span>
+                <span v-if="Number(r.discount_amount) > 0" class="mono" style="color:var(--warning);">{{ t('negative_amount', { amount: fmtMoney(r.discount_amount) }) }}</span>
                 <span v-else class="cell-muted">—</span>
               </td>
               <td class="num mono cell-strong">
@@ -1162,6 +1171,7 @@ function shiftDurationLabel(): string {
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
     </template>
 
@@ -1176,6 +1186,54 @@ function shiftDurationLabel(): string {
 /* Animated HBar fill width */
 .hbar-fill {
   transition: width .55s cubic-bezier(.2, .8, .3, 1);
+}
+
+/* Shift handover toolbar — wrap on narrow viewports */
+.shift-handover__head-actions {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.shift-handover__shift-field {
+  width: 200px;
+  min-width: 160px;
+}
+
+/* Horizontal scroll wrapper for data tables on narrow screens */
+.dtable-scroll {
+  inline-size: 100%;
+  overflow-x: auto;
+}
+
+/* Orders breakdown stat row — stack columns on small screens */
+.shift-handover__orders-stats {
+  flex-wrap: wrap;
+  row-gap: 14px;
+}
+
+@media (max-width: 900px) {
+  .shift-handover__shift-field {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* Collapse the 4-up KPI grid and 2-up chart grid to single column */
+  .grid.cols-4,
+  .grid.cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Orders breakdown 3 inline cards become 1 column */
+  .shift-handover__orders-stats > div {
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  /* KPI tags wider so translated labels are not cramped */
+  .kpi__label {
+    max-width: none;
+  }
 }
 </style>
 

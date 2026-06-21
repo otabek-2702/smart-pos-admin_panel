@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import axios from '@/plugins/axios'
 import VueApexCharts from 'vue3-apexcharts'
+import Button from '@/components/design/Button.vue'
+import Card from '@/components/design/Card.vue'
+import DataTable from '@/components/design/DataTable.vue'
+import Field from '@/components/design/Field.vue'
+import Input from '@/components/design/Input.vue'
+import Kpi from '@/components/design/Kpi.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
+import Select from '@/components/design/Select.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -9,7 +17,7 @@ const { formatDate } = useFormatters()
 // -------- filters --------
 const dateFrom = ref(new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10))
 const dateTo = ref(new Date().toISOString().slice(0, 10))
-const userIdFilter = ref<number | null>(null)
+const userIdFilter = ref<string>('')
 const roleFilter = ref<string>('WAITER')
 const targetPrepMinutes = ref<number>(15)
 const staff = ref<any[]>([])
@@ -66,8 +74,19 @@ function fmtSec(s: number | null | undefined) {
   const m = Math.floor(s / 60)
   const sec = s % 60
 
-  return `${m}m ${sec}s`
+  return `${m}${t('time_min_suffix')} ${sec}${t('time_sec_suffix')}`
 }
+
+const roleOptions = computed(() => [
+  { value: 'WAITER', label: t('role_WAITER') },
+  { value: 'CASHIER', label: t('role_CASHIER') },
+  { value: 'ADMIN', label: t('role_ADMIN') },
+  { value: 'MANAGER', label: t('role_MANAGER') },
+])
+
+const staffOptions = computed(() =>
+  staff.value.map((s: any) => ({ value: String(s.id), label: `${s.first_name} ${s.last_name}` })),
+)
 
 const byHourSeries = computed(() => [{
   name: t('Orders'),
@@ -81,243 +100,177 @@ const byHourOptions = computed(() => ({
   colors: ['#f59e0b'],
   dataLabels: { enabled: false },
 }))
+
+// -------- shift table columns --------
+const shiftColumns = computed(() => [
+  { key: 'user_name', label: t('Staff'), sortable: true },
+  { key: 'start_time', label: t('Date'), sortable: true },
+  { key: 'duration_minutes', label: t('Duration'), sortable: true, align: 'right' as const },
+  { key: 'orders_in_window', label: t('Orders'), sortable: true, align: 'right' as const },
+  { key: 'orders_readied', label: t('Readied'), align: 'right' as const },
+  { key: 'items_prepared', label: t('Items'), align: 'right' as const },
+  { key: 'avg_prep', label: t('Avg Prep'), align: 'right' as const },
+  { key: 'median_prep', label: t('Median prep'), align: 'right' as const },
+  { key: 'slow', label: t('Slow'), align: 'right' as const },
+  { key: 'throughput', label: t('Orders/h'), align: 'right' as const },
+  { key: 'late', label: t('Late'), align: 'right' as const },
+])
 </script>
 
 <template>
   <div>
-    <div class="page-head">
-      <div style="min-width:0;">
-        <h1 class="page-head__title">{{ t('Kitchen Shift Analytics') }}</h1>
-        <div class="page-head__subtitle">{{ dateFrom }} — {{ dateTo }}</div>
+    <PageHeader
+      :title="t('Kitchen Shift Analytics')"
+      :subtitle="`${dateFrom} — ${dateTo}`"
+    />
+
+    <Card class="mb-4">
+      <div class="toolbar">
+        <Field :label="t('From')" class="toolbar__field toolbar__field--date">
+          <Input v-model="dateFrom" type="date" />
+        </Field>
+        <Field :label="t('To')" class="toolbar__field toolbar__field--date">
+          <Input v-model="dateTo" type="date" />
+        </Field>
+        <Field :label="t('Role')" class="toolbar__field toolbar__field--select">
+          <Select v-model="roleFilter" :options="roleOptions" />
+        </Field>
+        <Field :label="t('Staff')" class="toolbar__field toolbar__field--select">
+          <Select v-model="userIdFilter" :options="staffOptions" :placeholder="t('All staff')" />
+        </Field>
+        <Field :label="t('Target prep (min)')" class="toolbar__field toolbar__field--num">
+          <Input v-model.number="targetPrepMinutes" type="number" min="1" />
+        </Field>
       </div>
-    </div>
+    </Card>
 
-    <VCard class="mb-4">
-      <VCardText class="d-flex flex-wrap align-center gap-3">
-        <VTextField v-model="dateFrom" type="date" :label="t('From')" density="compact" hide-details style="max-inline-size:170px;" />
-        <VTextField v-model="dateTo" type="date" :label="t('To')" density="compact" hide-details style="max-inline-size:170px;" />
-        <VSelect
-          v-model="roleFilter"
-          :items="[
-            { title: t('role_WAITER'), value: 'WAITER' },
-            { title: t('role_CASHIER'), value: 'CASHIER' },
-            { title: t('role_ADMIN'), value: 'ADMIN' },
-            { title: t('role_MANAGER'), value: 'MANAGER' },
-          ]"
-          :label="t('Role')"
-          density="compact"
-          hide-details
-          style="min-inline-size:140px;"
-        />
-        <VSelect
-          v-model="userIdFilter"
-          :items="staff.map((s: any) => ({ title: `${s.first_name} ${s.last_name}`, value: s.id }))"
-          :label="t('Staff')"
-          density="compact"
-          hide-details
-          style="min-inline-size:180px;"
-          clearable
-        />
-        <VTextField
-          v-model.number="targetPrepMinutes"
-          type="number"
-          :label="t('Target prep (min)')"
-          density="compact"
-          hide-details
-          style="max-inline-size:140px;"
-          min="1"
-        />
-      </VCardText>
-    </VCard>
-
-    <div v-if="!summary && loading" class="text-center py-8">
+    <div v-if="!summary && loading" class="loading-pad">
       <VProgressCircular indeterminate />
     </div>
 
     <template v-else-if="summary">
       <!-- KPIs -->
-      <VRow class="mb-4">
-        <VCol cols="6" sm="3">
-          <div class="kpi-card">
-            <div class="kpi-card__top">
-              <div class="kpi-card__icon t-primary"><VIcon icon="bx-time" size="20" /></div>
-              <div class="kpi-card__label">{{ t('Shifts') }}</div>
-            </div>
-            <div class="kpi-card__value num-tabular">{{ summary.shift_count }}</div>
-            <div class="kpi-card__sub">{{ summary.distinct_staff }} {{ t('staff') }}</div>
-          </div>
-        </VCol>
-        <VCol cols="6" sm="3">
-          <div class="kpi-card">
-            <div class="kpi-card__top">
-              <div class="kpi-card__icon t-info"><VIcon icon="bx-receipt" size="20" /></div>
-              <div class="kpi-card__label">{{ t('Orders in Window') }}</div>
-            </div>
-            <div class="kpi-card__value num-tabular">{{ summary.orders_in_window }}</div>
-            <div class="kpi-card__sub text-success">{{ summary.completion_rate_pct }}% {{ t('completed') }}</div>
-          </div>
-        </VCol>
-        <VCol cols="6" sm="3">
-          <div class="kpi-card">
-            <div class="kpi-card__top">
-              <div class="kpi-card__icon t-success"><VIcon icon="bx-package" size="20" /></div>
-              <div class="kpi-card__label">{{ t('Items Prepared') }}</div>
-            </div>
-            <div class="kpi-card__value num-tabular">{{ summary.items_prepared }}</div>
-            <div class="kpi-card__sub">{{ summary.items_per_hour }} / {{ t('h') }}</div>
-          </div>
-        </VCol>
-        <VCol cols="6" sm="3">
-          <div class="kpi-card">
-            <div class="kpi-card__top">
-              <div class="kpi-card__icon t-warning"><VIcon icon="bx-stopwatch" size="20" /></div>
-              <div class="kpi-card__label">{{ t('Avg Prep Time') }}</div>
-            </div>
-            <div class="kpi-card__value num-tabular">{{ fmtSec(summary.prep_time.avg_seconds) }}</div>
-            <div class="kpi-card__sub">{{ summary.prep_time.slow_orders }} {{ t('slow') }} ({{ summary.prep_time.slow_rate_pct }}%)</div>
-          </div>
-        </VCol>
-      </VRow>
+      <div class="grid cols-4 mb-4">
+        <Kpi :data="{ label: t('Shifts'), value: summary.shift_count, icon: 'clock', tone: 'primary', sub: `${summary.distinct_staff} ${t('staff')}` }" />
+        <Kpi :data="{ label: t('Orders in Window'), value: summary.orders_in_window, icon: 'receipt', tone: 'info', sub: `${summary.completion_rate_pct}% ${t('completed')}` }" />
+        <Kpi :data="{ label: t('Items Prepared'), value: summary.items_prepared, icon: 'package', tone: 'success', sub: `${summary.items_per_hour} / ${t('h')}` }" />
+        <Kpi :data="{ label: t('Avg Prep Time'), value: fmtSec(summary.prep_time.avg_seconds), icon: 'clock', tone: 'warning', sub: `${summary.prep_time.slow_orders} ${t('slow')} (${summary.prep_time.slow_rate_pct}%)` }" />
+      </div>
 
       <!-- Prep + Punctuality -->
-      <VRow class="mb-4">
-        <VCol cols="12" md="6">
-          <VCard>
-            <VCardText>
-              <div class="text-subtitle-1 font-weight-medium mb-3">
-                {{ t('Prep Time') }}
-              </div>
-              <div class="d-flex justify-space-between mb-2">
-                <span class="text-disabled">{{ t('Average') }}</span>
-                <span class="font-weight-bold">{{ fmtSec(summary.prep_time.avg_seconds) }}</span>
-              </div>
-              <div class="d-flex justify-space-between mb-2">
-                <span class="text-disabled">{{ t('Median') }}</span>
-                <span class="font-weight-bold">{{ fmtSec(summary.prep_time.median_seconds) }}</span>
-              </div>
-              <div class="d-flex justify-space-between mb-2">
-                <span class="text-success">{{ t('Best shift') }}</span>
-                <span>{{ fmtSec(summary.prep_time.best_shift_avg_seconds) }}</span>
-              </div>
-              <div class="d-flex justify-space-between mb-2">
-                <span class="text-error">{{ t('Worst shift') }}</span>
-                <span>{{ fmtSec(summary.prep_time.worst_shift_avg_seconds) }}</span>
-              </div>
-              <VDivider class="my-2" />
-              <div class="d-flex justify-space-between mb-1">
-                <span class="text-disabled">{{ t('Target') }}</span>
-                <span>{{ fmtSec(summary.prep_time.target_seconds) }}</span>
-              </div>
-              <div class="d-flex justify-space-between">
-                <span class="text-warning">{{ t('Slow orders') }}</span>
-                <span>{{ summary.prep_time.slow_orders }} ({{ summary.prep_time.slow_rate_pct }}%)</span>
-              </div>
-            </VCardText>
-          </VCard>
-        </VCol>
-        <VCol cols="12" md="6">
-          <VCard>
-            <VCardText>
-              <div class="text-subtitle-1 font-weight-medium mb-3">
-                {{ t('Punctuality') }}
-              </div>
-              <VRow>
-                <VCol cols="4">
-                  <div class="text-caption text-success">
-                    {{ t('On time') }}
-                  </div>
-                  <div class="text-h6">
-                    {{ summary.punctuality.on_time_shifts }}
-                  </div>
-                </VCol>
-                <VCol cols="4">
-                  <div class="text-caption text-warning">
-                    {{ t('Late') }}
-                  </div>
-                  <div class="text-h6">
-                    {{ summary.punctuality.late_shifts }}
-                  </div>
-                </VCol>
-                <VCol cols="4">
-                  <div class="text-caption text-disabled">
-                    {{ t('Rate') }}
-                  </div>
-                  <div class="text-h6">
-                    {{ summary.punctuality.punctuality_rate_pct }}%
-                  </div>
-                </VCol>
-              </VRow>
-              <VDivider class="my-3" />
-              <div
-                v-for="la in lateArrivals.slice(0, 5)"
-                :key="la.shift_id"
-                class="d-flex justify-space-between text-body-2 mb-1"
-              >
-                <span>{{ la.user_name }}</span>
-                <span class="text-warning font-weight-medium">+{{ la.late_minutes }}m</span>
-              </div>
-            </VCardText>
-          </VCard>
-        </VCol>
-      </VRow>
+      <div class="grid cols-2 mb-4">
+        <Card>
+          <div class="section-title">{{ t('Prep Time') }}</div>
+          <div class="row-line">
+            <span class="muted">{{ t('Average') }}</span>
+            <span class="strong">{{ fmtSec(summary.prep_time.avg_seconds) }}</span>
+          </div>
+          <div class="row-line">
+            <span class="muted">{{ t('Median') }}</span>
+            <span class="strong">{{ fmtSec(summary.prep_time.median_seconds) }}</span>
+          </div>
+          <div class="row-line">
+            <span class="t-success">{{ t('Best shift') }}</span>
+            <span>{{ fmtSec(summary.prep_time.best_shift_avg_seconds) }}</span>
+          </div>
+          <div class="row-line">
+            <span class="t-danger">{{ t('Worst shift') }}</span>
+            <span>{{ fmtSec(summary.prep_time.worst_shift_avg_seconds) }}</span>
+          </div>
+          <div class="divider" />
+          <div class="row-line">
+            <span class="muted">{{ t('Target') }}</span>
+            <span>{{ fmtSec(summary.prep_time.target_seconds) }}</span>
+          </div>
+          <div class="row-line">
+            <span class="t-warning">{{ t('Slow orders') }}</span>
+            <span>{{ summary.prep_time.slow_orders }} ({{ summary.prep_time.slow_rate_pct }}%)</span>
+          </div>
+        </Card>
+
+        <Card>
+          <div class="section-title">{{ t('Punctuality') }}</div>
+          <div class="grid cols-3 punct-grid">
+            <div>
+              <div class="caption t-success">{{ t('On time') }}</div>
+              <div class="big-num">{{ summary.punctuality.on_time_shifts }}</div>
+            </div>
+            <div>
+              <div class="caption t-warning">{{ t('Late') }}</div>
+              <div class="big-num">{{ summary.punctuality.late_shifts }}</div>
+            </div>
+            <div>
+              <div class="caption muted">{{ t('Rate') }}</div>
+              <div class="big-num">{{ summary.punctuality.punctuality_rate_pct }}%</div>
+            </div>
+          </div>
+          <div class="divider" />
+          <div class="section-sub">{{ t('Worst late arrivals') }}</div>
+          <div
+            v-for="la in lateArrivals.slice(0, 5)"
+            :key="la.shift_id"
+            class="row-line small"
+          >
+            <span>{{ la.user_name }}</span>
+            <span class="t-warning strong">+{{ la.late_minutes }}{{ t('time_min_suffix') }}</span>
+          </div>
+        </Card>
+      </div>
 
       <!-- Per-shift -->
-      <VCard class="mb-4">
-        <VCardText>
-          <div class="text-subtitle-1 font-weight-medium mb-2">
-            {{ t('Per-shift breakdown') }}
-          </div>
-          <VTable density="compact">
-            <thead>
-              <tr>
-                <th>{{ t('Staff') }}</th>
-                <th>{{ t('Date') }}</th>
-                <th class="text-end">{{ t('Duration') }}</th>
-                <th class="text-end">{{ t('Orders') }}</th>
-                <th class="text-end">{{ t('Readied') }}</th>
-                <th class="text-end">{{ t('Items') }}</th>
-                <th class="text-end">{{ t('Avg Prep') }}</th>
-                <th class="text-end">{{ t('Median prep') }}</th>
-                <th class="text-end">{{ t('Slow') }}</th>
-                <th class="text-end">{{ t('Orders/h') }}</th>
-                <th class="text-end">{{ t('Late') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="s in shifts" :key="s.shift_id">
-                <td class="font-weight-medium">{{ s.user_name }}</td>
-                <td>{{ formatDate(s.start_time) }}</td>
-                <td class="text-end">{{ Math.round(s.duration_minutes / 60) }}h</td>
-                <td class="text-end">{{ s.orders_in_window }}</td>
-                <td class="text-end">{{ s.orders_readied }} ({{ s.completion_rate_pct }}%)</td>
-                <td class="text-end">{{ s.items_prepared.units }}</td>
-                <td class="text-end">{{ fmtSec(s.prep_time.avg_seconds) }}</td>
-                <td class="text-end">{{ fmtSec(s.prep_time.median_seconds) }}</td>
-                <td class="text-end">{{ s.prep_time.slow_orders }} ({{ s.prep_time.slow_rate_pct }}%)</td>
-                <td class="text-end">{{ s.throughput.orders_per_hour }}</td>
-                <td class="text-end">
-                  <span v-if="s.punctuality.is_late" class="text-warning">+{{ s.punctuality.late_minutes }}m</span>
-                  <span v-else class="text-success">✓</span>
-                </td>
-              </tr>
-            </tbody>
-          </VTable>
-        </VCardText>
-      </VCard>
+      <Card class="mb-4">
+        <div class="section-title">{{ t('Per-shift breakdown') }}</div>
+        <DataTable
+          :columns="shiftColumns"
+          :rows="shifts"
+          row-key="shift_id"
+          :loading="loading"
+        >
+          <template #cell.user_name="{ row }">
+            <span class="strong">{{ row.user_name }}</span>
+          </template>
+          <template #cell.start_time="{ row }">
+            {{ formatDate(row.start_time) }}
+          </template>
+          <template #cell.duration_minutes="{ row }">
+            {{ Math.round(row.duration_minutes / 60) }}{{ t('hour_suffix') }}
+          </template>
+          <template #cell.orders_readied="{ row }">
+            {{ row.orders_readied }} ({{ row.completion_rate_pct }}%)
+          </template>
+          <template #cell.items_prepared="{ row }">
+            {{ row.items_prepared.units }}
+          </template>
+          <template #cell.avg_prep="{ row }">
+            {{ fmtSec(row.prep_time.avg_seconds) }}
+          </template>
+          <template #cell.median_prep="{ row }">
+            {{ fmtSec(row.prep_time.median_seconds) }}
+          </template>
+          <template #cell.slow="{ row }">
+            {{ row.prep_time.slow_orders }} ({{ row.prep_time.slow_rate_pct }}%)
+          </template>
+          <template #cell.throughput="{ row }">
+            {{ row.throughput.orders_per_hour }}
+          </template>
+          <template #cell.late="{ row }">
+            <span v-if="row.punctuality.is_late" class="t-warning">+{{ row.punctuality.late_minutes }}{{ t('time_min_suffix') }}</span>
+            <span v-else class="t-success">{{ t('punctuality_on_time_check') }}</span>
+          </template>
+        </DataTable>
+      </Card>
 
       <!-- Chart -->
-      <VCard>
-        <VCardText>
-          <div class="text-subtitle-1 font-weight-medium mb-2">
-            {{ t('Orders by Hour') }} ({{ t('Peak') }}: {{ distribution.peak_hour }}:00)
-          </div>
-          <VueApexCharts
-            :options="byHourOptions"
-            :series="byHourSeries"
-            height="280"
-          />
-        </VCardText>
-      </VCard>
+      <Card>
+        <div class="section-title">
+          {{ t('Orders by Hour') }} ({{ t('Peak') }}: {{ distribution.peak_hour }}:00)
+        </div>
+        <VueApexCharts
+          :options="byHourOptions"
+          :series="byHourSeries"
+          height="280"
+        />
+      </Card>
     </template>
 
     <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">
@@ -325,6 +278,82 @@ const byHourOptions = computed(() => ({
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.mb-4 { margin-bottom: 16px; }
+.loading-pad { text-align: center; padding: 32px 0; }
+
+/* Toolbar: flex-wrap so inputs collapse on narrow screens */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+.toolbar__field { flex: 0 1 auto; }
+.toolbar__field--date { min-width: 160px; }
+.toolbar__field--select { min-width: 180px; }
+.toolbar__field--num { min-width: 140px; }
+
+@media (max-width: 900px) {
+  .toolbar__field,
+  .toolbar__field--date,
+  .toolbar__field--select,
+  .toolbar__field--num { width: 100%; min-width: 0; }
+}
+
+/* Simple grid utility (collapses on mobile) */
+.grid { display: grid; gap: 16px; }
+.grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+@media (max-width: 1100px) {
+  .grid.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .grid.cols-2,
+  .grid.cols-3,
+  .grid.cols-4 { grid-template-columns: 1fr; }
+}
+
+.section-title {
+  font-size: var(--fs-h6, 16px);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.section-sub {
+  font-size: var(--fs-body, 14px);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.row-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.row-line.small { font-size: 13px; }
+.row-line .strong, .strong { font-weight: 600; }
+.muted { color: var(--text-tertiary, #94a3b8); }
+.t-success { color: var(--success, #22c55e); }
+.t-warning { color: var(--warning, #f59e0b); }
+.t-danger { color: var(--danger, #ef4444); }
+
+.divider {
+  height: 1px;
+  background: var(--border, rgba(148,163,184,0.2));
+  margin: 8px 0;
+}
+
+.punct-grid { margin-bottom: 8px; }
+.caption { font-size: 12px; }
+.big-num {
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+</style>
 
 <route lang="yaml">
 meta:

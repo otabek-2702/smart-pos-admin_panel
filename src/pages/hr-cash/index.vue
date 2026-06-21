@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /* ============================================================
    HR CASH — register deposits, withdrawals, salary/expense payouts
    Plain HTML + design primitives (PageHeader / Card / DataTable /
@@ -19,6 +19,7 @@ import Kpi from '@/components/design/Kpi.vue'
 import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
+import { fmtNum } from '@/components/design/utils/format'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -69,13 +70,9 @@ const METHOD_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'ne
 // ============================================================
 // Formatters
 // ============================================================
-const NB = ' ' // narrow no-break space
 function fmtMoney(n: number | string | null | undefined): string {
   if (n === null || n === undefined || n === '' || Number.isNaN(Number(n))) return '—'
-  const v = Number(n)
-  const neg = v < 0
-  const s = Math.round(Math.abs(v)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, NB)
-  return (neg ? '−' : '') + s
+  return fmtNum(Number(n))
 }
 
 // ============================================================
@@ -250,7 +247,6 @@ const kpiBalance = computed(() => ({
   icon: 'wallet',
   tone: 'primary' as const,
   money: true,
-  sub: t('cash_method_CASH'),
 }))
 const kpiDeposits = computed(() => ({
   label: t('hr_cash_total_deposits'),
@@ -258,7 +254,6 @@ const kpiDeposits = computed(() => ({
   icon: 'arrowup',
   tone: 'success' as const,
   money: true,
-  sub: t('cash_type_DEPOSIT'),
 }))
 const kpiWithdrawals = computed(() => ({
   label: t('hr_cash_total_withdrawals'),
@@ -266,7 +261,6 @@ const kpiWithdrawals = computed(() => ({
   icon: 'arrowdown',
   tone: 'warning' as const,
   money: true,
-  sub: t('cash_type_WITHDRAWAL'),
 }))
 const kpiOutflow = computed(() => ({
   label: t('hr_cash_total_expenses'),
@@ -350,10 +344,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
     </PageHeader>
 
     <!-- KPI strip -->
-    <div
-      class="grid cols-4"
-      style="margin-bottom: var(--sp-5);"
-    >
+    <div class="grid cols-4 hr-cash__kpis">
       <Kpi :data="kpiBalance" />
       <Kpi :data="kpiDeposits" />
       <Kpi :data="kpiWithdrawals" />
@@ -362,15 +353,15 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 
     <!-- Toolbar + table -->
     <Card>
-      <div class="toolbar">
-        <div style="flex:1;max-width:300px;">
+      <div class="toolbar hr-cash__toolbar">
+        <div class="hr-cash__search">
           <Input
             v-model="search"
             icon="search"
             :placeholder="t('hr_cash_search_placeholder')"
           />
         </div>
-        <div style="width:200px;">
+        <div class="hr-cash__filter">
           <Select
             v-model="typeFilter"
             icon="filter"
@@ -378,7 +369,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             :options="typeOptions"
           />
         </div>
-        <div style="width:170px;">
+        <div class="hr-cash__date">
           <div class="control">
             <DesignIcon
               name="calendar"
@@ -392,7 +383,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             >
           </div>
         </div>
-        <div style="width:170px;">
+        <div class="hr-cash__date">
           <div class="control">
             <DesignIcon
               name="calendar"
@@ -591,10 +582,9 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
           >
             <textarea
               v-model="form.notes"
-              class="control"
+              class="control hr-cash__textarea"
               rows="3"
               :placeholder="t('hr_cash_notes')"
-              style="resize:vertical;min-height:80px;padding:10px 12px;"
             />
           </Field>
         </div>
@@ -634,7 +624,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             :label="t('hr_cash_amount')"
             class="span-2"
             :error="errors.amount"
-            :hint="stats ? t('hr_cash_current_balance') + ': ' + fmtMoney(stats?.current_balance ?? stats?.balance ?? 0) + ' UZS' : undefined"
+            :hint="stats ? t('hr_cash_current_balance') + ': ' + fmtMoney(stats?.current_balance ?? stats?.balance ?? 0) + ' ' + t('currency_short') : undefined"
           >
             <Input
               v-model="form.amount"
@@ -674,10 +664,9 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
           >
             <textarea
               v-model="form.notes"
-              class="control"
+              class="control hr-cash__textarea"
               rows="3"
               :placeholder="t('hr_cash_notes')"
-              style="resize:vertical;min-height:80px;padding:10px 12px;"
             />
           </Field>
         </div>
@@ -748,7 +737,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
         </Field>
         <Field :label="t('hr_cash_amount')">
           <div class="mono cell-strong">
-            {{ fmtMoney(detail.amount) }} UZS
+            {{ fmtMoney(detail.amount) }} {{ t('currency_short') }}
           </div>
         </Field>
         <Field :label="t('hr_cash_created_at')">
@@ -758,12 +747,12 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
         </Field>
         <Field :label="t('hr_cash_balance_before')">
           <div class="mono">
-            {{ fmtMoney(detail.balance_before) }} UZS
+            {{ fmtMoney(detail.balance_before) }} {{ t('currency_short') }}
           </div>
         </Field>
         <Field :label="t('hr_cash_balance_after')">
           <div class="mono">
-            {{ fmtMoney(detail.balance_after) }} UZS
+            {{ fmtMoney(detail.balance_after) }} {{ t('currency_short') }}
           </div>
         </Field>
         <Field
@@ -837,6 +826,50 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.hr-cash__kpis {
+  margin-bottom: var(--sp-5);
+}
+
+.hr-cash__toolbar {
+  flex-wrap: wrap;
+}
+
+.hr-cash__search {
+  flex: 1;
+  max-width: 300px;
+  min-width: 200px;
+}
+
+.hr-cash__filter {
+  width: 200px;
+}
+
+.hr-cash__date {
+  width: 170px;
+}
+
+.hr-cash__textarea {
+  resize: vertical;
+  min-height: 80px;
+  padding: 10px 12px;
+}
+
+@media (max-width: 900px) {
+  .hr-cash__kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .hr-cash__search,
+  .hr-cash__filter,
+  .hr-cash__date {
+    width: 100%;
+    max-width: none;
+    flex: 1 1 100%;
+  }
+}
+</style>
 
 <route lang="yaml">
 meta:

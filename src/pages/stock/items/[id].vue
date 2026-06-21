@@ -539,7 +539,7 @@ const levelsSkeletonRows = computed(() => 3)
     </PageHeader>
 
     <!-- KPI strip -->
-    <div class="grid cols-4" style="margin-bottom: var(--sp-5);">
+    <div class="grid cols-4 kpi-strip" style="margin-bottom: var(--sp-5);">
       <Kpi
         :data="{
           label: t('item_drill_total_on_hand'),
@@ -592,7 +592,7 @@ const levelsSkeletonRows = computed(() => 3)
         <div class="sk-box" style="height: 14px; width: 70%; border-radius: 4px;" />
       </div>
 
-      <div v-else-if="item" class="grid cols-3" style="padding: var(--sp-5); gap: var(--sp-4);">
+      <div v-else-if="item" class="grid cols-3 overview-grid" style="padding: var(--sp-5); gap: var(--sp-4);">
         <div>
           <div class="cell-muted" style="font-size: var(--fs-sm); margin-bottom: 4px;">{{ t('Name') }}</div>
           <div style="font-weight: var(--fw-semibold);">{{ item.name }}</div>
@@ -716,17 +716,17 @@ const levelsSkeletonRows = computed(() => 3)
 
     <!-- Movement history card -->
     <div class="card">
-      <div class="toolbar" style="border-bottom: 1px solid var(--border);">
-        <div style="font-weight: var(--fw-semibold); font-size: var(--fs-md); margin-right: auto;">
+      <div class="toolbar history-toolbar" style="border-bottom: 1px solid var(--border); flex-wrap: wrap;">
+        <div class="history-title" style="font-weight: var(--fw-semibold); font-size: var(--fs-md); margin-right: auto;">
           {{ t('item_drill_history') }}
         </div>
-        <div style="width: 200px;">
+        <div class="filter-control">
           <Select
             v-model="days"
             :options="periodOptions"
           />
         </div>
-        <div style="width: 200px;">
+        <div class="filter-control">
           <Select
             :model-value="movementTypeFilter"
             :placeholder="t('Movement')"
@@ -734,7 +734,7 @@ const levelsSkeletonRows = computed(() => 3)
             @update:model-value="(v: string) => movementTypeFilter = v"
           />
         </div>
-        <div style="width: 200px;">
+        <div class="filter-control">
           <Select
             :model-value="locationFilter"
             :placeholder="t('Location')"
@@ -742,7 +742,7 @@ const levelsSkeletonRows = computed(() => 3)
             @update:model-value="(v: string) => locationFilter = v"
           />
         </div>
-        <div style="width: 240px;">
+        <div class="filter-control filter-control--search">
           <Input
             v-model="search"
             icon="search"
@@ -790,7 +790,7 @@ const levelsSkeletonRows = computed(() => 3)
       <div v-if="txSummary" class="toolbar" style="padding-top: 0;">
         <div class="cell-muted" style="font-size: 13px;">
           {{ t('item_drill_summary') }}:
-          <b class="mono">{{ filteredTransactions.length }}</b> / <b class="mono">{{ transactions.length }}</b>
+          <span class="mono">{{ t('item_drill_filter_count', { shown: filteredTransactions.length, total: transactions.length }) }}</span>
         </div>
       </div>
 
@@ -1072,6 +1072,51 @@ const levelsSkeletonRows = computed(() => 3)
     </Modal>
   </div>
 </template>
+
+<style scoped>
+.filter-control {
+  flex: 1 1 180px;
+  min-width: 160px;
+  max-width: 220px;
+}
+
+.filter-control--search {
+  flex: 1 1 220px;
+  min-width: 180px;
+  max-width: 280px;
+}
+
+.history-toolbar {
+  gap: var(--sp-2);
+}
+
+@media (max-width: 900px) {
+  .kpi-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .history-title {
+    flex-basis: 100%;
+    margin-right: 0;
+  }
+
+  .filter-control,
+  .filter-control--search {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .kpi-strip {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
 
 <route lang="yaml">
 meta:

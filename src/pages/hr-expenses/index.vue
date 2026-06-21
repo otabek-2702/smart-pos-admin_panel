@@ -1,11 +1,30 @@
 <script setup lang="ts">
+/* ============================================================
+   HR EXPENSES — operational spend, approve / reject / pay
+   Plain HTML + design primitives. No Vuetify on this surface.
+   ============================================================ */
+import type { DataTableColumn } from '@/components/design/DataTable.vue'
 import { hrApi as axios } from '@/plugins/axios'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
+import Badge from '@/components/design/Badge.vue'
+import Button from '@/components/design/Button.vue'
+import Card from '@/components/design/Card.vue'
+import DataTable from '@/components/design/DataTable.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import Field from '@/components/design/Field.vue'
+import IconAction from '@/components/design/IconAction.vue'
+import Input from '@/components/design/Input.vue'
+import Kpi from '@/components/design/Kpi.vue'
+import Modal from '@/components/design/Modal.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
+import Select from '@/components/design/Select.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 
+// ============================================================
+// State
+// ============================================================
 const items = ref<any[]>([])
 const total = ref(0)
 const loading = ref(false)
@@ -29,35 +48,32 @@ const form = ref({
 
 const categories = ref<any[]>([])
 
-const statusFilter = ref<string | undefined>(undefined)
-const categoryFilter = ref<number | undefined>(undefined)
+const statusFilter = ref<string>('')
+const categoryFilter = ref<string>('')
 const dateFrom = ref<string>('')
 const dateTo = ref<string>('')
 
 const EXPENSE_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'PAID'] as const
 const PAYMENT_METHODS = ['CASH', 'UZCARD', 'HUMO', 'PAYME', 'BANK_TRANSFER'] as const
-const paymentMethodOptions = computed(() => PAYMENT_METHODS.map(v => ({ title: t(`payment_method_${v}`), value: v })))
-const statusFilterOptions = computed(() => EXPENSE_STATUSES.map(v => ({ title: t(`expense_status_${v}`), value: v })))
 
-const headers = [
-  { title: t('Date'), key: 'expense_date', sortable: false },
-  { title: t('Category'), key: 'category', sortable: false },
-  { title: t('Description'), key: 'description', sortable: false },
-  { title: t('Amount'), key: 'amount', sortable: false },
-  { title: t('Payment method'), key: 'payment_method', sortable: false },
-  { title: t('Receipt #'), key: 'receipt_number', sortable: false },
-  { title: t('Filed by'), key: 'created_by', sortable: false },
-  { title: t('Status'), key: 'status', sortable: false },
-  { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
-]
+const paymentMethodOptions = computed(() =>
+  PAYMENT_METHODS.map(v => ({ value: v, label: t(`payment_method_${v}`) })),
+)
+const statusFilterOptions = computed(() => [
+  { value: '', label: t('expense_status_filter_all') },
+  ...EXPENSE_STATUSES.map(v => ({ value: v, label: t(`expense_status_${v}`) })),
+])
+const categoryFilterOptions = computed(() => [
+  { value: '', label: t('expense_filter_all_categories') },
+  ...categories.value.map((c: any) => ({ value: String(c.id), label: c.name })),
+])
+const categoryFormOptions = computed(() =>
+  categories.value.map((c: any) => ({ value: String(c.id), label: c.name })),
+)
 
-const statusColor: Record<string, string> = {
-  PENDING: 'warning',
-  APPROVED: 'info',
-  REJECTED: 'error',
-  PAID: 'success',
-}
-
+// ============================================================
+// API
+// ============================================================
 async function load() {
   loading.value = true
   try {
@@ -106,6 +122,46 @@ watch([statusFilter, categoryFilter, dateFrom, dateTo], () => {
   load()
 })
 
+// ============================================================
+// Columns
+// ============================================================
+const columns: DataTableColumn<any>[] = [
+  { key: 'expense_date', label: t('Date'), sortable: false, width: 120 },
+  { key: 'category', label: t('Category'), sortable: false },
+  { key: 'description', label: t('Description'), sortable: false },
+  { key: 'amount', label: t('Amount'), sortable: false, align: 'right', width: 140 },
+  { key: 'payment_method', label: t('Payment method'), sortable: false, width: 140 },
+  { key: 'receipt_number', label: t('Receipt #'), sortable: false, width: 130 },
+  { key: 'created_by', label: t('Filed by'), sortable: false },
+  { key: 'status', label: t('Status'), sortable: false, width: 130 },
+]
+
+const tablePagination = computed(() => ({
+  page: page.value,
+  perPage: itemsPerPage.value,
+  total: total.value,
+  onPage: (n: number) => { page.value = n },
+  onPerPage: (n: number) => { itemsPerPage.value = n; page.value = 1 },
+}))
+
+const STATUS_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'primary'> = {
+  PENDING: 'warning',
+  APPROVED: 'info',
+  REJECTED: 'error',
+  PAID: 'success',
+}
+
+// ============================================================
+// Form bindings (Select expects string values)
+// ============================================================
+const categoryIdStr = computed({
+  get: () => form.value.category_id == null ? '' : String(form.value.category_id),
+  set: (v: string) => { form.value.category_id = v ? Number(v) : null },
+})
+
+// ============================================================
+// Create / Edit
+// ============================================================
 function openCreate() {
   editing.value = null
   form.value = {
@@ -134,6 +190,12 @@ function openEdit(e: any) {
   dialog.value = true
 }
 
+function closeForm() {
+  if (saving.value)
+    return
+  dialog.value = false
+}
+
 async function save() {
   saving.value = true
   try {
@@ -156,19 +218,47 @@ async function save() {
   }
 }
 
-async function removeExpense(e: any) {
-  if (!confirm(t('Delete this expense?') as string))
+// ============================================================
+// Delete confirm
+// ============================================================
+const deleteOpen = ref(false)
+const deleteRow = ref<any>(null)
+const deletingFlag = ref(false)
+
+function askDelete(e: any) {
+  deleteRow.value = e
+  deleteOpen.value = true
+}
+
+function closeDelete() {
+  if (deletingFlag.value)
     return
+  deleteOpen.value = false
+  deleteRow.value = null
+}
+
+async function doDelete() {
+  if (!deleteRow.value)
+    return
+  deletingFlag.value = true
   try {
-    await axios.delete(`/expenses/${e.id}/`)
+    await axios.delete(`/expenses/${deleteRow.value.id}/`)
     notify(t('Deleted'))
+    deleteOpen.value = false
+    deleteRow.value = null
     await Promise.all([load(), loadStats()])
   }
   catch (err: any) {
     notify(err?.response?.data?.message ?? t('Error'), 'error')
   }
+  finally {
+    deletingFlag.value = false
+  }
 }
 
+// ============================================================
+// Approve / Reject
+// ============================================================
 async function approve(e: any) {
   try {
     await axios.post(`/expenses/${e.id}/approve/`)
@@ -180,23 +270,55 @@ async function approve(e: any) {
   }
 }
 
-async function reject(e: any) {
-  const reason = prompt(t('Rejection reason') as string)
-  if (!reason)
+const rejectOpen = ref(false)
+const rejectRow = ref<any>(null)
+const rejectReason = ref('')
+const rejectingFlag = ref(false)
+
+function openReject(e: any) {
+  rejectRow.value = e
+  rejectReason.value = ''
+  rejectOpen.value = true
+}
+
+function closeReject() {
+  if (rejectingFlag.value)
     return
+  rejectOpen.value = false
+  rejectRow.value = null
+}
+
+async function doReject() {
+  if (!rejectRow.value)
+    return
+  if (!rejectReason.value.trim()) {
+    notify(t('Rejection reason is required'), 'error')
+
+    return
+  }
+  rejectingFlag.value = true
   try {
-    await axios.post(`/expenses/${e.id}/reject/`, { notes: reason })
+    await axios.post(`/expenses/${rejectRow.value.id}/reject/`, { notes: rejectReason.value })
     notify(t('Rejected'))
+    rejectOpen.value = false
+    rejectRow.value = null
     await Promise.all([load(), loadStats()])
   }
   catch (err: any) {
     notify(err?.response?.data?.message ?? t('Error'), 'error')
   }
+  finally {
+    rejectingFlag.value = false
+  }
 }
 
+// ============================================================
+// Pay
+// ============================================================
 const payDialog = ref(false)
 const paying = ref<any>(null)
 const payMethod = ref<'CASH' | 'UZCARD' | 'HUMO' | 'PAYME' | 'BANK_TRANSFER'>('CASH')
+const payingFlag = ref(false)
 
 function openPay(e: any) {
   paying.value = e
@@ -204,9 +326,17 @@ function openPay(e: any) {
   payDialog.value = true
 }
 
+function closePay() {
+  if (payingFlag.value)
+    return
+  payDialog.value = false
+  paying.value = null
+}
+
 async function pay() {
   if (!paying.value)
     return
+  payingFlag.value = true
   try {
     await axios.post(`/expenses/${paying.value.id}/pay/`, { payment_method: payMethod.value })
     notify(t('Paid'))
@@ -216,9 +346,14 @@ async function pay() {
   catch (err: any) {
     notify(err?.response?.data?.message ?? t('Error'), 'error')
   }
+  finally {
+    payingFlag.value = false
+  }
 }
 
-// ---------- Category manager ----------
+// ============================================================
+// Category manager
+// ============================================================
 const catDialog = ref(false)
 const catSaving = ref(false)
 const catEditing = ref<any>(null)
@@ -230,9 +365,20 @@ function openCatManager() {
   catDialog.value = true
 }
 
+function closeCatManager() {
+  if (catSaving.value)
+    return
+  catDialog.value = false
+}
+
 function pickCat(c: any) {
   catEditing.value = c
   catForm.value = { name: c.name ?? '', description: c.description ?? '' }
+}
+
+function cancelCatEdit() {
+  catEditing.value = null
+  catForm.value = { name: '', description: '' }
 }
 
 async function saveCat() {
@@ -260,597 +406,627 @@ async function saveCat() {
   }
 }
 
-async function deleteCat(c: any) {
-  if (!confirm(t('Delete this category?')))
+const catDeleteOpen = ref(false)
+const catDeleteRow = ref<any>(null)
+
+function askDeleteCat(c: any) {
+  catDeleteRow.value = c
+  catDeleteOpen.value = true
+}
+
+function closeDeleteCat() {
+  catDeleteOpen.value = false
+  catDeleteRow.value = null
+}
+
+async function doDeleteCat() {
+  if (!catDeleteRow.value)
     return
   try {
+    const c = catDeleteRow.value
     await axios.delete(`/expense-categories/${c.id}/`)
     notify(t('Deleted'))
     if (catEditing.value?.id === c.id) {
       catEditing.value = null
       catForm.value = { name: '', description: '' }
     }
+    catDeleteOpen.value = false
+    catDeleteRow.value = null
     await loadCategories()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
   }
 }
+
+// ============================================================
+// ESC handler
+// ============================================================
+function onKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape')
+    return
+  if (deleteOpen.value) { closeDelete(); e.preventDefault(); return }
+  if (rejectOpen.value) { closeReject(); e.preventDefault(); return }
+  if (payDialog.value) { closePay(); e.preventDefault(); return }
+  if (catDeleteOpen.value) { closeDeleteCat(); e.preventDefault(); return }
+  if (catDialog.value) { closeCatManager(); e.preventDefault(); return }
+  if (dialog.value) { closeForm(); e.preventDefault() }
+}
+
+onMounted(() => { window.addEventListener('keydown', onKeydown) })
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
+
+// ============================================================
+// Helpers
+// ============================================================
+function categoryName(row: any): string {
+  return row?.category?.name ?? '—'
+}
+
+function fullName(u: any): string {
+  if (!u)
+    return '—'
+  return `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() || '—'
+}
+
+function statusTooltip(row: any): string {
+  const parts: string[] = []
+  if (row.approved_by)
+    parts.push(`${t('Approved by')}: ${fullName(row.approved_by)}`)
+  if (row.paid_by)
+    parts.push(`${t('Paid by')}: ${fullName(row.paid_by)}`)
+  return parts.join(' · ')
+}
 </script>
 
 <template>
-  <div>
-    <div class="page-head">
-      <div style="min-width:0;">
-        <h1 class="page-head__title">
-          {{ t('Expenses') }}
-        </h1>
-        <div class="page-head__subtitle">
-          {{ t('Operational spend — approve, reject and settle') }}
-        </div>
-      </div>
-      <div class="page-head__actions">
-        <VBtn
-          variant="tonal"
-          prepend-icon="bx-folder"
+  <div class="page">
+    <PageHeader
+      :title="t('Expenses')"
+      :subtitle="t('expense_subtitle')"
+    >
+      <template #actions>
+        <Button
+          variant="ghost"
+          icon="folder"
           @click="openCatManager"
         >
           {{ t('Categories') }}
-        </VBtn>
-        <VBtn
-          color="primary"
-          prepend-icon="bx-plus"
+        </Button>
+        <Button
+          variant="primary"
+          icon="plus"
           @click="openCreate"
         >
           {{ t('New Expense') }}
-        </VBtn>
-      </div>
+        </Button>
+      </template>
+    </PageHeader>
+
+    <!-- KPI cards -->
+    <div class="kpi-grid">
+      <Kpi
+        :data="{
+          label: t('Pending'),
+          value: stats?.pending_count ?? null,
+          icon: 'time',
+          tone: 'warning',
+        }"
+      />
+      <Kpi
+        :data="{
+          label: t('Total'),
+          value: stats?.total_amount ?? null,
+          icon: 'wallet',
+          tone: 'primary',
+          money: true,
+        }"
+      />
+      <Kpi
+        :data="{
+          label: t('This Month'),
+          value: stats?.this_month ?? null,
+          icon: 'calendar',
+          tone: 'info',
+          money: true,
+        }"
+      />
+      <Kpi
+        :data="{
+          label: t('Paid'),
+          value: stats?.paid_amount ?? null,
+          icon: 'check',
+          tone: 'success',
+          money: true,
+        }"
+      />
     </div>
 
-    <VRow class="mb-4">
-      <VCol
-        cols="6"
-        sm="3"
-      >
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-warning">
-              <VIcon icon="bx-time" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Pending') }}
-            </div>
-          </div>
-          <div class="kpi-card__value">
-            <template v-if="stats">
-              {{ stats.pending_count ?? 0 }}
-            </template>
-            <span
-              v-else
-              class="sk-box d-inline-block"
-              style="width:36px;height:1em;border-radius:4px;"
-            />
-          </div>
-        </div>
-      </VCol>
-      <VCol
-        cols="6"
-        sm="3"
-      >
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-primary">
-              <VIcon icon="bx-wallet" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Total') }}
-            </div>
-          </div>
-          <div class="kpi-card__value">
-            <template v-if="stats">
-              {{ formatCurrency(stats.total_amount ?? 0) }}<span class="kpi-card__unit">UZS</span>
-            </template>
-            <span
-              v-else
-              class="sk-box d-inline-block"
-              style="width:80px;height:1em;border-radius:4px;"
-            />
-          </div>
-        </div>
-      </VCol>
-      <VCol
-        cols="6"
-        sm="3"
-      >
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-info">
-              <VIcon icon="bx-calendar" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('This Month') }}
-            </div>
-          </div>
-          <div class="kpi-card__value">
-            <template v-if="stats">
-              {{ formatCurrency(stats.this_month ?? 0) }}<span class="kpi-card__unit">UZS</span>
-            </template>
-            <span
-              v-else
-              class="sk-box d-inline-block"
-              style="width:80px;height:1em;border-radius:4px;"
-            />
-          </div>
-        </div>
-      </VCol>
-      <VCol
-        cols="6"
-        sm="3"
-      >
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-success">
-              <VIcon icon="bx-check-circle" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Paid') }}
-            </div>
-          </div>
-          <div class="kpi-card__value">
-            <template v-if="stats">
-              {{ formatCurrency(stats.paid_amount ?? 0) }}<span class="kpi-card__unit">UZS</span>
-            </template>
-            <span
-              v-else
-              class="sk-box d-inline-block"
-              style="width:80px;height:1em;border-radius:4px;"
-            />
-          </div>
-        </div>
-      </VCol>
-    </VRow>
-
-    <VCard>
-      <div class="toolbar pa-3 d-flex flex-wrap" style="gap:8px;">
-        <div class="control control--select" style="min-width:160px;">
-          <VSelect
+    <!-- Toolbar + table -->
+    <Card>
+      <div class="toolbar toolbar--wrap">
+        <div class="tb-filter">
+          <Select
             v-model="statusFilter"
-            :items="statusFilterOptions"
-            :label="t('Status')"
-            density="compact"
-            clearable
-            hide-details
+            icon="filter"
+            :placeholder="t('Status')"
+            :options="statusFilterOptions"
           />
         </div>
-        <div class="control control--select" style="min-width:180px;">
-          <VSelect
+        <div class="tb-filter tb-filter--wide">
+          <Select
             v-model="categoryFilter"
-            :items="categories.map((c: any) => ({ title: c.name, value: c.id }))"
-            :label="t('Category')"
-            density="compact"
-            clearable
-            hide-details
+            icon="folder"
+            :placeholder="t('Category')"
+            :options="categoryFilterOptions"
           />
         </div>
-        <div class="control" style="min-width:150px;">
-          <VTextField
-            v-model="dateFrom"
-            type="date"
-            :label="t('From')"
-            density="compact"
-            clearable
-            hide-details
-          />
+        <div class="tb-date">
+          <Field :label="t('expense_date_from')">
+            <Input
+              v-model="dateFrom"
+              type="date"
+            />
+          </Field>
         </div>
-        <div class="control" style="min-width:150px;">
-          <VTextField
-            v-model="dateTo"
-            type="date"
-            :label="t('To')"
-            density="compact"
-            clearable
-            hide-details
-          />
+        <div class="tb-date">
+          <Field :label="t('expense_date_to')">
+            <Input
+              v-model="dateTo"
+              type="date"
+            />
+          </Field>
         </div>
       </div>
 
-      <VDataTableServer
-        :headers="headers"
-        :items="items"
-        :items-length="total"
+      <div class="card__divider" />
+
+      <DataTable
+        :columns="columns"
+        :rows="items"
+        row-key="id"
         :loading="loading"
-        :items-per-page="itemsPerPage"
-        :page="page"
+        :pagination="tablePagination"
+        :empty-title="t('expense_empty_title')"
+        :empty-sub="t('expense_empty_hint')"
       >
-        <template #bottom>
-          <DataTableFooter
-            v-model:page="page"
-            v-model:items-per-page="itemsPerPage"
-            :total-items="total"
+        <template #cell.expense_date="{ row }">
+          {{ formatDate(row.expense_date) }}
+        </template>
+
+        <template #cell.category="{ row }">
+          <span>{{ categoryName(row) }}</span>
+        </template>
+
+        <template #cell.description="{ row }">
+          <span class="cell-muted">{{ row.description || '—' }}</span>
+        </template>
+
+        <template #cell.amount="{ row }">
+          <span class="mono">{{ formatCurrency(row.amount ?? 0) }}</span>
+        </template>
+
+        <template #cell.payment_method="{ row }">
+          <template v-if="row.payment_method">
+            {{ t(`payment_method_${row.payment_method}`) }}
+          </template>
+          <span
+            v-else
+            class="cell-muted"
+          >—</span>
+        </template>
+
+        <template #cell.receipt_number="{ row }">
+          {{ row.receipt_number || '—' }}
+        </template>
+
+        <template #cell.created_by="{ row }">
+          {{ fullName(row.created_by) }}
+        </template>
+
+        <template #cell.status="{ row }">
+          <Badge
+            :tone="STATUS_TONE[row.status] ?? 'neutral'"
+            :title="statusTooltip(row)"
+          >
+            {{ t(`expense_status_${row.status}`) }}
+          </Badge>
+        </template>
+
+        <template #row-actions="{ row }">
+          <IconAction
+            v-if="row.status === 'PENDING'"
+            icon="check"
+            tone="success"
+            :title="t('Approve')"
+            @click="approve(row)"
+          />
+          <IconAction
+            v-if="row.status === 'PENDING'"
+            icon="close"
+            tone="danger"
+            :title="t('Reject')"
+            @click="openReject(row)"
+          />
+          <IconAction
+            v-if="row.status === 'APPROVED'"
+            icon="dollar"
+            tone="success"
+            :title="t('Pay')"
+            @click="openPay(row)"
+          />
+          <IconAction
+            v-if="row.status !== 'PAID'"
+            icon="pencil"
+            :title="t('Edit')"
+            @click="openEdit(row)"
+          />
+          <IconAction
+            v-if="row.status !== 'PAID'"
+            icon="trash"
+            tone="danger"
+            :title="t('Delete')"
+            @click="askDelete(row)"
           />
         </template>
-        <template #item.expense_date="{ item }">
-          {{ formatDate(item.raw.expense_date) }}
-        </template>
-        <template #item.category="{ item }">
-          {{ item.raw.category?.name ?? '—' }}
-        </template>
-        <template #item.amount="{ item }">
-          <span class="font-weight-medium num-tabular">{{ formatCurrency(item.raw.amount ?? 0) }}</span>
-        </template>
-        <template #item.payment_method="{ item }">
-          <template v-if="item.raw.payment_method">
-            {{ t(`payment_method_${item.raw.payment_method}`) }}
-          </template>
-          <span v-else class="text-disabled">—</span>
-        </template>
-        <template #item.receipt_number="{ item }">
-          {{ item.raw.receipt_number || '—' }}
-        </template>
-        <template #item.created_by="{ item }">
-          <template v-if="item.raw.created_by">
-            {{ item.raw.created_by.first_name }} {{ item.raw.created_by.last_name }}
-          </template>
-          <span v-else class="text-disabled">—</span>
-        </template>
-        <template #item.status="{ item }">
-          <VChip
-            size="small"
-            class="status-pill"
-            :color="statusColor[item.raw.status] ?? 'default'"
-            variant="tonal"
-          >
-            {{ t(`expense_status_${item.raw.status}`) }}
-            <VTooltip
-              v-if="item.raw.approved_by || item.raw.paid_by"
-              activator="parent"
-              location="top"
-            >
-              <div v-if="item.raw.approved_by">
-                {{ t('Approved by') }}: {{ item.raw.approved_by.first_name }} {{ item.raw.approved_by.last_name }}
-              </div>
-              <div v-if="item.raw.paid_by">
-                {{ t('Paid by') }}: {{ item.raw.paid_by.first_name }} {{ item.raw.paid_by.last_name }}
-              </div>
-            </VTooltip>
-          </VChip>
-        </template>
-        <template #item.actions="{ item }">
-          <div
-            class="d-flex justify-end"
-            style="gap:2px;"
-          >
-            <template v-if="item.raw.status === 'PENDING'">
-              <VBtn
-                icon
-                variant="text"
-                size="small"
-                color="success"
-                @click="approve(item.raw)"
-              >
-                <VIcon
-                  icon="bx-check"
-                  size="18"
-                />
-                <VTooltip
-                  activator="parent"
-                  location="top"
-                >
-                  {{ t('Approve') }}
-                </VTooltip>
-              </VBtn>
-              <VBtn
-                icon
-                variant="text"
-                size="small"
-                color="error"
-                @click="reject(item.raw)"
-              >
-                <VIcon
-                  icon="bx-x"
-                  size="18"
-                />
-                <VTooltip
-                  activator="parent"
-                  location="top"
-                >
-                  {{ t('Reject') }}
-                </VTooltip>
-              </VBtn>
-            </template>
-            <VBtn
-              v-if="item.raw.status === 'APPROVED'"
-              icon
-              variant="text"
-              size="small"
-              color="success"
-              @click="openPay(item.raw)"
-            >
-              <VIcon
-                icon="bx-dollar"
-                size="18"
+
+        <template #empty>
+          <div class="statefill">
+            <div class="statefill__icon">
+              <DesignIcon
+                name="wallet"
+                :size="24"
               />
-              <VTooltip
-                activator="parent"
-                location="top"
+            </div>
+            <div class="statefill__title">
+              {{ t('expense_empty_title') }}
+            </div>
+            <div class="statefill__sub">
+              {{ t('expense_empty_hint') }}
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
+              <Button
+                variant="primary"
+                icon="plus"
+                @click="openCreate"
               >
-                {{ t('Pay') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="item.raw.status !== 'PAID'"
-              icon
-              variant="text"
-              size="small"
-              @click="openEdit(item.raw)"
-            >
-              <VIcon
-                icon="bx-pencil"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Edit') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="item.raw.status !== 'PAID'"
-              icon
-              variant="text"
-              size="small"
-              color="error"
-              @click="removeExpense(item.raw)"
-            >
-              <VIcon
-                icon="bx-trash"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Delete') }}
-              </VTooltip>
-            </VBtn>
+                {{ t('New Expense') }}
+              </Button>
+            </div>
           </div>
         </template>
-      </VDataTableServer>
-    </VCard>
+      </DataTable>
+    </Card>
 
-    <VDialog
-      v-model="dialog"
-      max-width="520"
-      persistent
+    <!-- Create / Edit modal -->
+    <Modal
+      :open="dialog"
+      :title="editing ? t('Edit Expense') : t('New Expense')"
+      :subtitle="t('expense_subtitle')"
+      :width="560"
+      @close="closeForm"
     >
-      <VCard :title="editing ? t('Edit Expense') : t('New Expense')">
-        <VCardText>
-          <VRow>
-            <VCol cols="12">
-              <VSelect
-                v-model="form.category_id"
-                :items="categories.map((c: any) => ({ title: c.name, value: c.id }))"
-                :label="t('Category')"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model.number="form.amount"
-                :label="t('Amount')"
-                type="number"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.expense_date"
-                type="date"
-                :label="t('Date')"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VSelect
-                v-model="form.payment_method"
-                :items="paymentMethodOptions"
-                :label="t('Payment method')"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.receipt_number"
-                :label="t('Receipt #')"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VTextarea
-                v-model="form.description"
-                :label="t('Description')"
-                rows="2"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VTextarea
-                v-model="form.notes"
-                :label="t('Notes')"
-                rows="2"
-              />
-            </VCol>
-          </VRow>
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn
-            variant="text"
-            @click="dialog = false"
+      <form @submit.prevent="save">
+        <div class="form-grid">
+          <Field
+            :label="t('Category')"
+            class="span-2"
           >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="primary"
-            :loading="saving"
-            @click="save"
-          >
-            {{ t('Save') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+            <Select
+              v-model="categoryIdStr"
+              :options="categoryFormOptions"
+              :placeholder="t('expense_pick_category')"
+            />
+          </Field>
 
-    <VDialog
-      v-model="payDialog"
-      max-width="420"
-      persistent
+          <Field :label="t('Amount')">
+            <Input
+              v-model.number="form.amount"
+              type="number"
+              :placeholder="t('expense_amount_placeholder')"
+            />
+          </Field>
+
+          <Field :label="t('Date')">
+            <Input
+              v-model="form.expense_date"
+              type="date"
+            />
+          </Field>
+
+          <Field :label="t('Payment method')">
+            <Select
+              v-model="form.payment_method"
+              :options="paymentMethodOptions"
+            />
+          </Field>
+
+          <Field :label="t('Receipt #')">
+            <Input
+              v-model="form.receipt_number"
+              :placeholder="t('expense_receipt_placeholder')"
+            />
+          </Field>
+
+          <Field
+            :label="t('Description')"
+            class="span-2"
+          >
+            <Input
+              v-model="form.description"
+              :placeholder="t('expense_description_placeholder')"
+            />
+          </Field>
+
+          <Field
+            :label="t('Notes')"
+            class="span-2"
+          >
+            <Input
+              v-model="form.notes"
+              :placeholder="t('expense_notes_placeholder')"
+            />
+          </Field>
+        </div>
+      </form>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="saving"
+          @click="closeForm"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="check"
+          :loading="saving"
+          :disabled="saving"
+          @click="save"
+        >
+          {{ t('Save') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Delete confirm modal -->
+    <Modal
+      :open="deleteOpen"
+      :title="t('expense_delete_title')"
+      :subtitle="deleteRow ? (deleteRow.description || '') : ''"
+      :width="440"
+      @close="closeDelete"
     >
-      <VCard :title="t('Pay Expense')">
-        <VCardText>
-          <div class="text-body-2 mb-3">
-            {{ t('Amount') }}: <strong>{{ formatCurrency(paying?.amount ?? 0) }}</strong>
+      <div style="padding:4px 2px 8px;color:rgb(var(--v-theme-text-secondary));">
+        {{ t('expense_confirm_delete') }}
+      </div>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="deletingFlag"
+          @click="closeDelete"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="danger"
+          icon="trash"
+          :loading="deletingFlag"
+          :disabled="deletingFlag"
+          @click="doDelete"
+        >
+          {{ t('Delete') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Reject modal -->
+    <Modal
+      :open="rejectOpen"
+      :title="t('expense_reject_title')"
+      :subtitle="rejectRow ? (rejectRow.description || '') : ''"
+      :width="480"
+      @close="closeReject"
+    >
+      <Field
+        :label="t('Rejection reason')"
+        :hint="t('expense_reject_hint')"
+      >
+        <Input
+          v-model="rejectReason"
+          :placeholder="t('expense_reject_placeholder')"
+        />
+      </Field>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="rejectingFlag"
+          @click="closeReject"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="danger"
+          icon="close"
+          :loading="rejectingFlag"
+          :disabled="rejectingFlag"
+          @click="doReject"
+        >
+          {{ t('Reject') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Pay modal -->
+    <Modal
+      :open="payDialog"
+      :title="t('Pay Expense')"
+      :subtitle="paying ? formatCurrency(paying.amount ?? 0) : ''"
+      :width="420"
+      @close="closePay"
+    >
+      <div class="pay-amount">
+        <span class="pay-amount__label">{{ t('Amount') }}:</span>
+        <strong class="pay-amount__value">{{ formatCurrency(paying?.amount ?? 0) }}</strong>
+      </div>
+      <Field :label="t('Payment method')">
+        <Select
+          v-model="payMethod"
+          :options="paymentMethodOptions"
+        />
+      </Field>
+      <div class="pay-hint">
+        {{ t('expense_pay_hint') }}
+      </div>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="payingFlag"
+          @click="closePay"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="dollar"
+          :loading="payingFlag"
+          :disabled="payingFlag"
+          @click="pay"
+        >
+          {{ t('Pay') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Category manager modal -->
+    <Modal
+      :open="catDialog"
+      :title="t('Expense Categories')"
+      :subtitle="t('expense_cats_subtitle')"
+      :width="720"
+      @close="closeCatManager"
+    >
+      <div class="cat-grid">
+        <div class="cat-form">
+          <div class="cat-form__title">
+            {{ catEditing ? t('Edit Category') : t('New Category') }}
           </div>
-          <VSelect
-            v-model="payMethod"
-            :items="paymentMethodOptions"
-            :label="t('Payment method')"
-            autofocus
-          />
-          <div class="text-caption text-disabled mt-2">
-            {{ t('CASH debits the drawer; cards settle externally') }}
+          <Field :label="t('Name')">
+            <Input
+              v-model="catForm.name"
+              :placeholder="t('expense_cat_name_placeholder')"
+            />
+          </Field>
+          <Field :label="t('Description')">
+            <Input
+              v-model="catForm.description"
+              :placeholder="t('expense_cat_desc_placeholder')"
+            />
+          </Field>
+          <div class="cat-form__actions">
+            <Button
+              variant="primary"
+              :loading="catSaving"
+              :disabled="catSaving"
+              @click="saveCat"
+            >
+              {{ catEditing ? t('Save') : t('Add') }}
+            </Button>
+            <Button
+              v-if="catEditing"
+              variant="ghost"
+              :disabled="catSaving"
+              @click="cancelCatEdit"
+            >
+              {{ t('Cancel') }}
+            </Button>
           </div>
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn
-            variant="text"
-            @click="payDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="success"
-            @click="pay"
-          >
-            {{ t('Pay') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+        </div>
 
-    <VDialog
-      v-model="catDialog"
-      max-width="720"
-      scrollable
+        <div class="cat-list">
+          <div class="cat-list__title">
+            {{ t('expense_cats_existing') }} ({{ categories.length }})
+          </div>
+          <div class="cat-list__wrap">
+            <div
+              v-for="c in categories"
+              :key="c.id"
+              class="cat-list__item"
+              :class="{ 'is-active': catEditing?.id === c.id }"
+              @click="pickCat(c)"
+            >
+              <div class="cat-list__main">
+                <div class="cat-list__name">
+                  {{ c.name }}
+                </div>
+                <div
+                  v-if="c.description"
+                  class="cat-list__sub"
+                >
+                  {{ c.description }}
+                </div>
+              </div>
+              <IconAction
+                icon="trash"
+                tone="danger"
+                :title="t('Delete')"
+                @click.stop="askDeleteCat(c)"
+              />
+            </div>
+            <div
+              v-if="!categories.length"
+              class="cat-list__empty"
+            >
+              {{ t('No categories yet') }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          @click="closeCatManager"
+        >
+          {{ t('Close') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Category delete confirm -->
+    <Modal
+      :open="catDeleteOpen"
+      :title="t('expense_cat_delete_title')"
+      :subtitle="catDeleteRow ? (catDeleteRow.name || '') : ''"
+      :width="420"
+      @close="closeDeleteCat"
     >
-      <VCard :title="t('Expense Categories')">
-        <VCardText style="max-height:70vh;overflow-y:auto;">
-          <VRow>
-            <VCol
-              cols="12"
-              md="5"
-            >
-              <div class="text-subtitle-2 mb-2">
-                {{ catEditing ? t('Edit Category') : t('New Category') }}
-              </div>
-              <VTextField
-                v-model="catForm.name"
-                :label="t('Name')"
-                class="mb-2"
-                density="compact"
-              />
-              <VTextarea
-                v-model="catForm.description"
-                :label="t('Description')"
-                rows="3"
-                density="compact"
-                class="mb-2"
-              />
-              <div class="d-flex gap-2">
-                <VBtn
-                  color="primary"
-                  size="small"
-                  :loading="catSaving"
-                  @click="saveCat"
-                >
-                  {{ catEditing ? t('Save') : t('Add') }}
-                </VBtn>
-                <VBtn
-                  v-if="catEditing"
-                  variant="tonal"
-                  size="small"
-                  @click="catEditing = null; catForm = { name: '', description: '' }"
-                >
-                  {{ t('Cancel') }}
-                </VBtn>
-              </div>
-            </VCol>
-            <VCol
-              cols="12"
-              md="7"
-            >
-              <div class="text-subtitle-2 mb-2">
-                {{ t('Existing') }} ({{ categories.length }})
-              </div>
-              <VList
-                density="compact"
-                class="pa-0"
-                style="border:1px solid rgba(var(--v-theme-on-surface),0.08);border-radius:6px;max-height:340px;overflow-y:auto;"
-              >
-                <VListItem
-                  v-for="c in categories"
-                  :key="c.id"
-                  :active="catEditing?.id === c.id"
-                  @click="pickCat(c)"
-                >
-                  <VListItemTitle>{{ c.name }}</VListItemTitle>
-                  <VListItemSubtitle v-if="c.description">
-                    {{ c.description }}
-                  </VListItemSubtitle>
-                  <template #append>
-                    <VBtn
-                      icon
-                      variant="text"
-                      size="x-small"
-                      color="error"
-                      @click.stop="deleteCat(c)"
-                    >
-                      <VIcon
-                        icon="bx-trash"
-                        size="16"
-                      />
-                    </VBtn>
-                  </template>
-                </VListItem>
-                <VListItem v-if="!categories.length">
-                  <VListItemTitle class="text-disabled">
-                    {{ t('No categories yet') }}
-                  </VListItemTitle>
-                </VListItem>
-              </VList>
-            </VCol>
-          </VRow>
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn
-            variant="text"
-            @click="catDialog = false"
-          >
-            {{ t('Close') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      <div style="padding:4px 2px 8px;color:rgb(var(--v-theme-text-secondary));">
+        {{ t('expense_cat_confirm_delete') }}
+      </div>
 
+      <template #footer>
+        <Button
+          variant="ghost"
+          @click="closeDeleteCat"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="danger"
+          icon="trash"
+          @click="doDeleteCat"
+        >
+          {{ t('Delete') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Toast -->
     <VSnackbar
       v-model="snackbar"
       :color="snackbarColor"
@@ -866,3 +1042,168 @@ meta:
   action: manage
   subject: all
 </route>
+
+<style scoped>
+/* ============================================================
+   Layout — KPI grid, toolbar, modals
+   Mobile-first responsive collapse for KPI grid + form grids
+   ============================================================ */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-block-end: 16px;
+}
+
+.toolbar--wrap {
+  flex-wrap: wrap;
+}
+
+.tb-filter {
+  width: 200px;
+}
+
+.tb-filter--wide {
+  width: 240px;
+}
+
+.tb-date {
+  width: 170px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-grid .span-2 {
+  grid-column: span 2;
+}
+
+.cat-grid {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: 20px;
+}
+
+.cat-form__title,
+.cat-list__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgb(var(--v-theme-text-secondary));
+  margin-block-end: 8px;
+}
+
+.cat-form__actions {
+  display: flex;
+  gap: 8px;
+  margin-block-start: 8px;
+}
+
+.cat-list__wrap {
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  border-radius: 6px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.cat-list__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  border-block-end: 1px solid rgba(var(--v-theme-on-surface), 0.06);
+}
+
+.cat-list__item:last-child {
+  border-block-end: 0;
+}
+
+.cat-list__item:hover {
+  background: rgba(var(--v-theme-on-surface), 0.04);
+}
+
+.cat-list__item.is-active {
+  background: rgba(var(--v-theme-primary), 0.08);
+}
+
+.cat-list__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cat-list__name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.cat-list__sub {
+  font-size: 12px;
+  color: rgb(var(--v-theme-text-secondary));
+  margin-block-start: 2px;
+}
+
+.cat-list__empty {
+  padding: 14px;
+  font-size: 13px;
+  color: rgb(var(--v-theme-text-secondary));
+  text-align: center;
+}
+
+.pay-amount {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin-block-end: 12px;
+  font-size: 14px;
+}
+
+.pay-amount__value {
+  font-size: 18px;
+}
+
+.pay-hint {
+  margin-block-start: 8px;
+  font-size: 12px;
+  color: rgb(var(--v-theme-text-secondary));
+}
+
+/* Tablet collapse */
+@media (max-width: 1100px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Mobile collapse */
+@media (max-width: 900px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tb-filter,
+  .tb-filter--wide,
+  .tb-date {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid .span-2 {
+    grid-column: span 1;
+  }
+
+  .cat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cat-list__wrap {
+    max-height: 280px;
+  }
+}
+</style>

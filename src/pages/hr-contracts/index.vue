@@ -1,11 +1,29 @@
 <script setup lang="ts">
+/* ============================================================
+   HR CONTRACTS — employment contracts: draft, activate, renew, terminate.
+   Plain HTML + design primitives. No Vuetify on this surface.
+   ============================================================ */
+import type { DataTableColumn } from '@/components/design/DataTable.vue'
 import { hrApi as axios } from '@/plugins/axios'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
+import Badge from '@/components/design/Badge.vue'
+import Button from '@/components/design/Button.vue'
+import Card from '@/components/design/Card.vue'
+import DataTable from '@/components/design/DataTable.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import Field from '@/components/design/Field.vue'
+import IconAction from '@/components/design/IconAction.vue'
+import Input from '@/components/design/Input.vue'
+import Modal from '@/components/design/Modal.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
+import Select from '@/components/design/Select.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 
+// ============================================================
+// State
+// ============================================================
 const items = ref<any[]>([])
 const total = ref(0)
 const loading = ref(false)
@@ -14,29 +32,32 @@ const itemsPerPage = ref(20)
 
 const employees = ref<any[]>([])
 
-const statusFilter = ref<string | undefined>(undefined)
-const employeeFilter = ref<number | undefined>(undefined)
+const statusFilter = ref<string>('')
+const employeeFilter = ref<string>('')
 const expiringCount = ref<number | null>(null)
 
 const statusOptions = ['DRAFT', 'ACTIVE', 'EXPIRED', 'TERMINATED', 'RENEWED']
+const contractTypes = ['INITIAL', 'RENEWAL', 'AMENDMENT']
 
 const dialog = ref(false)
 const editing = ref<any>(null)
 const saving = ref(false)
+const errors = ref<Record<string, string>>({})
 
 const deleteDialog = ref(false)
 const deleting = ref<any>(null)
+const deletingBusy = ref(false)
 
 const terminateDialog = ref(false)
 const terminating = ref<any>(null)
 const terminateReason = ref('')
 const terminateDate = ref('')
+const terminatingBusy = ref(false)
 
 const renewDialog = ref(false)
 const renewing = ref<any>(null)
 const renewForm = ref({ new_start_date: '', new_end_date: '', new_salary: 0 })
-
-const contractTypes = ['INITIAL', 'RENEWAL', 'AMENDMENT']
+const renewingBusy = ref(false)
 
 const form = ref({
   employee_id: null as number | null,
@@ -49,26 +70,20 @@ const form = ref({
   terms: '',
 })
 
-const headers = [
-  { title: t('Contract #'), key: 'contract_number', sortable: false },
-  { title: t('Employee'), key: 'employee', sortable: false },
-  { title: t('Contract Type'), key: 'contract_type', sortable: false },
-  { title: t('Start'), key: 'start_date', sortable: false },
-  { title: t('End'), key: 'end_date', sortable: false },
-  { title: t('Probation ends'), key: 'probation_end_date', sortable: false },
-  { title: t('Salary'), key: 'salary', sortable: false },
-  { title: t('Status'), key: 'status', sortable: false },
-  { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
-]
-
-const statusColor: Record<string, string> = {
-  DRAFT: 'default',
+// ============================================================
+// Tone map (status → Badge tone)
+// ============================================================
+const STATUS_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'primary'> = {
+  DRAFT: 'neutral',
   ACTIVE: 'success',
   EXPIRED: 'warning',
   TERMINATED: 'error',
   RENEWED: 'info',
 }
 
+// ============================================================
+// API
+// ============================================================
 async function load() {
   loading.value = true
   try {
@@ -76,7 +91,7 @@ async function load() {
     if (statusFilter.value)
       params.status = statusFilter.value
     if (employeeFilter.value)
-      params.employee_id = employeeFilter.value
+      params.employee_id = Number(employeeFilter.value)
 
     const res = await axios.get('/contracts/', { params })
     const d = res.data?.data ?? res.data
@@ -120,21 +135,92 @@ watch([statusFilter, employeeFilter], () => {
   load()
 })
 
+// ============================================================
+// Select options
+// ============================================================
 const contractTypeOptions = computed(() =>
-  contractTypes.map(v => ({ title: t(`contract_kind_${v}`), value: v })),
+  contractTypes.map(v => ({ value: v, label: t(`contract_kind_${v}`) })),
 )
 
-const statusFilterOptions = computed(() =>
-  statusOptions.map(v => ({ title: t(`contract_status_${v}`), value: v })),
-)
+const statusFilterOptions = computed(() => [
+  { value: '', label: t('All statuses') },
+  ...statusOptions.map(v => ({ value: v, label: t(`contract_status_${v}`) })),
+])
 
-const employeeOptions = computed(() =>
-  employees.value.map((e: any) => ({
-    title: `${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}${e.position ? ` — ${e.position}` : ''}`.trim() || `#${e.id}`,
-    value: e.id,
+const employeeOptions = computed(() => [
+  { value: '', label: t('All employees') },
+  ...employees.value.map((e: any) => ({
+    value: String(e.id),
+    label: `${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}${e.position ? ` — ${e.position}` : ''}`.trim() || `#${e.id}`,
   })),
-)
+])
 
+const employeeFormOptions = computed(() => [
+  { value: '', label: t('contract_employee_select') },
+  ...employees.value.map((e: any) => ({
+    value: String(e.id),
+    label: `${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}${e.position ? ` — ${e.position}` : ''}`.trim() || `#${e.id}`,
+  })),
+])
+
+// ============================================================
+// Filter chips
+// ============================================================
+const activeFilters = computed(() => {
+  const out: { k: string; label: string; val: string; clear: () => void }[] = []
+  if (statusFilter.value) {
+    out.push({
+      k: 's',
+      label: t('Status'),
+      val: t(`contract_status_${statusFilter.value}`),
+      clear: () => { statusFilter.value = '' },
+    })
+  }
+  if (employeeFilter.value) {
+    const hit = employees.value.find((e: any) => String(e.id) === employeeFilter.value)
+    const label = hit
+      ? `${hit.user?.first_name ?? ''} ${hit.user?.last_name ?? ''}`.trim() || `#${hit.id}`
+      : `#${employeeFilter.value}`
+    out.push({
+      k: 'e',
+      label: t('Employee'),
+      val: label,
+      clear: () => { employeeFilter.value = '' },
+    })
+  }
+  return out
+})
+
+function clearAllFilters() {
+  statusFilter.value = ''
+  employeeFilter.value = ''
+}
+
+// ============================================================
+// Columns
+// ============================================================
+const columns: DataTableColumn<any>[] = [
+  { key: 'contract_number', label: t('Contract #'), sortable: false, width: 130 },
+  { key: 'employee', label: t('Employee'), sortable: false },
+  { key: 'contract_type', label: t('Contract Type'), sortable: false, width: 130 },
+  { key: 'start_date', label: t('Start Date'), sortable: false, width: 120 },
+  { key: 'end_date', label: t('End Date'), sortable: false, width: 120 },
+  { key: 'probation_end_date', label: t('Probation ends'), sortable: false, width: 140 },
+  { key: 'salary', label: t('Salary'), sortable: false, align: 'right', width: 140 },
+  { key: 'status', label: t('Status'), sortable: false, width: 130 },
+]
+
+const tablePagination = computed(() => ({
+  page: page.value,
+  perPage: itemsPerPage.value,
+  total: total.value,
+  onPage: (n: number) => { page.value = n },
+  onPerPage: (n: number) => { itemsPerPage.value = n; page.value = 1 },
+}))
+
+// ============================================================
+// Create / Edit
+// ============================================================
 function openCreate() {
   editing.value = null
   form.value = {
@@ -147,6 +233,7 @@ function openCreate() {
     position_title: '',
     terms: '',
   }
+  errors.value = {}
   dialog.value = true
 }
 
@@ -162,13 +249,30 @@ function openEdit(c: any) {
     position_title: c.position_title ?? '',
     terms: c.terms ?? '',
   }
+  errors.value = {}
   dialog.value = true
 }
 
-async function save() {
-  if (!form.value.employee_id || !form.value.start_date) {
-    notify(t('Employee and start date are required'), 'error')
+function closeForm() {
+  if (saving.value)
+    return
+  dialog.value = false
+  editing.value = null
+}
 
+function validate(): boolean {
+  const e: Record<string, string> = {}
+  if (!form.value.employee_id)
+    e.employee_id = t('Required')
+  if (!form.value.start_date)
+    e.start_date = t('Required')
+  errors.value = e
+  return Object.keys(e).length === 0
+}
+
+async function save() {
+  if (!validate()) {
+    notify(t('Employee and start date are required'), 'error')
     return
   }
   saving.value = true
@@ -203,25 +307,43 @@ async function save() {
   }
 }
 
+// ============================================================
+// Delete confirm
+// ============================================================
 function confirmDelete(c: any) {
   deleting.value = c
   deleteDialog.value = true
 }
 
+function closeDelete() {
+  if (deletingBusy.value)
+    return
+  deleteDialog.value = false
+  deleting.value = null
+}
+
 async function doDelete() {
   if (!deleting.value)
     return
+  deletingBusy.value = true
   try {
     await axios.delete(`/contracts/${deleting.value.id}/`)
     notify(t('Contract deleted'))
     deleteDialog.value = false
+    deleting.value = null
     await load()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
   }
+  finally {
+    deletingBusy.value = false
+  }
 }
 
+// ============================================================
+// Activate
+// ============================================================
 async function activate(c: any) {
   try {
     await axios.post(`/contracts/${c.id}/activate/`)
@@ -233,6 +355,9 @@ async function activate(c: any) {
   }
 }
 
+// ============================================================
+// Terminate
+// ============================================================
 function openTerminate(c: any) {
   terminating.value = c
   terminateReason.value = ''
@@ -240,9 +365,17 @@ function openTerminate(c: any) {
   terminateDialog.value = true
 }
 
+function closeTerminate() {
+  if (terminatingBusy.value)
+    return
+  terminateDialog.value = false
+  terminating.value = null
+}
+
 async function doTerminate() {
   if (!terminating.value)
     return
+  terminatingBusy.value = true
   try {
     const payload: any = {}
     if (terminateDate.value)
@@ -252,13 +385,20 @@ async function doTerminate() {
     await axios.post(`/contracts/${terminating.value.id}/terminate/`, payload)
     notify(t('Terminated'))
     terminateDialog.value = false
+    terminating.value = null
     await load()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
   }
+  finally {
+    terminatingBusy.value = false
+  }
 }
 
+// ============================================================
+// Renew
+// ============================================================
 function openRenew(c: any) {
   renewing.value = c
   renewForm.value = {
@@ -269,12 +409,19 @@ function openRenew(c: any) {
   renewDialog.value = true
 }
 
+function closeRenew() {
+  if (renewingBusy.value)
+    return
+  renewDialog.value = false
+  renewing.value = null
+}
+
 async function doRenew() {
   if (!renewing.value || !renewForm.value.new_start_date) {
     notify(t('New start date is required'), 'error')
-
     return
   }
+  renewingBusy.value = true
   try {
     const payload: any = { new_start_date: renewForm.value.new_start_date }
     if (renewForm.value.new_end_date)
@@ -284,536 +431,504 @@ async function doRenew() {
     await axios.post(`/contracts/${renewing.value.id}/renew/`, payload)
     notify(t('Contract renewed'))
     renewDialog.value = false
+    renewing.value = null
     await load()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
   }
+  finally {
+    renewingBusy.value = false
+  }
 }
+
+// ============================================================
+// Form-modal binding for employee_id (Select uses string values)
+// ============================================================
+const employeeIdStr = computed({
+  get: () => form.value.employee_id == null ? '' : String(form.value.employee_id),
+  set: (v: string) => { form.value.employee_id = v ? Number(v) : null },
+})
+
+// ============================================================
+// Helpers
+// ============================================================
+function employeeName(row: any): string {
+  const e = row?.employee
+  if (!e)
+    return '—'
+  const full = `${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}`.trim()
+  return full || `#${e.id}`
+}
+
+// ============================================================
+// ESC handler
+// ============================================================
+function onKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape')
+    return
+  if (deleteDialog.value) { closeDelete(); e.preventDefault(); return }
+  if (terminateDialog.value) { closeTerminate(); e.preventDefault(); return }
+  if (renewDialog.value) { closeRenew(); e.preventDefault(); return }
+  if (dialog.value) { closeForm(); e.preventDefault() }
+}
+
+onMounted(() => { window.addEventListener('keydown', onKeydown) })
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 </script>
 
 <template>
-  <div>
-    <div class="page-head">
-      <div style="min-width:0;">
-        <h1 class="page-head__title">
-          {{ t('Contracts') }}
-        </h1>
-        <div class="page-head__subtitle">
-          {{ t('Employment contracts — draft, activate, renew or terminate') }}
-        </div>
-      </div>
-      <div
-        class="page-head__actions"
-        style="flex-wrap:wrap;gap:8px;align-items:center;"
-      >
-        <VSelect
-          v-model="statusFilter"
-          :items="statusFilterOptions"
-          :label="t('Status')"
-          :placeholder="t('All statuses')"
-          clearable
-          hide-details
-          density="compact"
-          style="min-width:180px;max-width:220px;"
-        />
-        <VSelect
-          v-model="employeeFilter"
-          :items="employeeOptions"
-          :label="t('Employee')"
-          :placeholder="t('All employees')"
-          clearable
-          hide-details
-          density="compact"
-          style="min-width:200px;max-width:260px;"
-        />
-        <VChip
-          v-if="expiringCount !== null"
-          color="warning"
-          variant="tonal"
-          size="small"
-          prepend-icon="bx-time"
+  <div class="page">
+    <PageHeader
+      :title="t('Contracts')"
+      :subtitle="t('contract_subtitle')"
+    >
+      <template #actions>
+        <Button
+          variant="ghost"
+          icon="refresh"
+          :disabled="loading"
+          @click="load"
         >
-          {{ t('Expiring soon (30 days)') }}: {{ expiringCount }}
-        </VChip>
-        <VBtn
-          color="primary"
-          prepend-icon="bx-plus"
+          {{ t('Refresh') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="plus"
           @click="openCreate"
         >
           {{ t('New Contract') }}
-        </VBtn>
-      </div>
-    </div>
+        </Button>
+      </template>
+    </PageHeader>
 
-    <VCard>
-      <VDataTableServer
-        :headers="headers"
-        :items="items"
-        :items-length="total"
-        :loading="loading"
-        :items-per-page="itemsPerPage"
-        :page="page"
+    <!-- Toolbar + table -->
+    <Card>
+      <div class="toolbar toolbar--wrap">
+        <div class="tb-filter">
+          <Select
+            v-model="statusFilter"
+            icon="filter"
+            :placeholder="t('All statuses')"
+            :options="statusFilterOptions"
+          />
+        </div>
+        <div class="tb-filter tb-filter--lg">
+          <Select
+            v-model="employeeFilter"
+            icon="user"
+            :placeholder="t('All employees')"
+            :options="employeeOptions"
+          />
+        </div>
+        <div
+          v-if="expiringCount !== null"
+          class="tb-chip"
+        >
+          <Badge tone="warning">
+            <DesignIcon
+              name="clock"
+              :size="13"
+            />
+            {{ t('Expiring soon (30 days)') }}: {{ expiringCount }}
+          </Badge>
+        </div>
+      </div>
+
+      <!-- Filter chips -->
+      <div
+        v-if="activeFilters.length > 0"
+        class="toolbar"
+        style="padding-top:0;"
       >
-        <template #bottom>
-          <DataTableFooter
-            v-model:page="page"
-            v-model:items-per-page="itemsPerPage"
-            :total-items="total"
+        <div class="chips">
+          <span
+            class="tertiary"
+            style="font-size:13px;margin-right:2px;"
+          >{{ t('Filters') }}:</span>
+          <span
+            v-for="f in activeFilters"
+            :key="f.k"
+            class="chip"
+          >
+            <span>{{ f.label }}: <b>{{ f.val }}</b></span>
+            <span
+              class="chip__x"
+              @click="f.clear()"
+            >
+              <DesignIcon
+                name="close"
+                :size="13"
+              />
+            </span>
+          </span>
+          <button
+            class="chip--clear"
+            @click="clearAllFilters"
+          >
+            {{ t('Clear all') }}
+          </button>
+        </div>
+      </div>
+
+      <div class="card__divider" />
+
+      <DataTable
+        :columns="columns"
+        :rows="items"
+        row-key="id"
+        :loading="loading"
+        :pagination="tablePagination"
+      >
+        <template #cell.contract_number="{ row }">
+          <span class="cell-strong">{{ row.contract_number ?? '—' }}</span>
+        </template>
+
+        <template #cell.employee="{ row }">
+          <span>{{ employeeName(row) }}</span>
+        </template>
+
+        <template #cell.contract_type="{ row }">
+          <Badge tone="info">
+            {{ t(`contract_kind_${row.contract_type}`) }}
+          </Badge>
+        </template>
+
+        <template #cell.start_date="{ row }">
+          <span>{{ formatDate(row.start_date) }}</span>
+        </template>
+
+        <template #cell.end_date="{ row }">
+          <span>{{ row.end_date ? formatDate(row.end_date) : '—' }}</span>
+        </template>
+
+        <template #cell.probation_end_date="{ row }">
+          <span>{{ row.probation_end_date ? formatDate(row.probation_end_date) : '—' }}</span>
+        </template>
+
+        <template #cell.salary="{ row }">
+          <span class="num-tabular">{{ formatCurrency(row.salary_amount ?? row.salary ?? row.base_salary ?? 0) }}</span>
+        </template>
+
+        <template #cell.status="{ row }">
+          <Badge :tone="STATUS_TONE[row.status] ?? 'neutral'">
+            {{ t(`contract_status_${row.status}`) }}
+          </Badge>
+        </template>
+
+        <template #row-actions="{ row }">
+          <IconAction
+            v-if="row.status === 'DRAFT'"
+            icon="play"
+            tone="success"
+            :title="t('Activate')"
+            @click="activate(row)"
+          />
+          <IconAction
+            v-if="row.status === 'ACTIVE'"
+            icon="stop"
+            tone="warning"
+            :title="t('Terminate')"
+            @click="openTerminate(row)"
+          />
+          <IconAction
+            v-if="['ACTIVE', 'EXPIRED', 'TERMINATED'].includes(row.status)"
+            icon="refresh"
+            tone="primary"
+            :title="t('Renew')"
+            @click="openRenew(row)"
+          />
+          <IconAction
+            v-if="row.status === 'DRAFT'"
+            icon="pencil"
+            :title="t('Edit')"
+            @click="openEdit(row)"
+          />
+          <IconAction
+            icon="trash"
+            tone="danger"
+            :title="t('Delete')"
+            @click="confirmDelete(row)"
           />
         </template>
 
-        <template
-          v-if="loading && items.length === 0"
-          #body
-        >
-          <tr
-            v-for="n in itemsPerPage"
-            :key="n"
-            class="sk-row"
-          >
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:90px;height:13px;border-radius:4px;"
+        <template #empty>
+          <div class="statefill">
+            <div class="statefill__icon">
+              <DesignIcon
+                name="document"
+                :size="24"
               />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:140px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:80px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:80px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:80px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:80px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:80px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:70px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td
-              class="sk-cell"
-              style="text-align:end;"
-            >
-              <div class="d-flex justify-end gap-1">
-                <div
-                  class="sk-box"
-                  style="width:32px;height:32px;border-radius:6px;"
-                />
-                <div
-                  class="sk-box"
-                  style="width:32px;height:32px;border-radius:6px;"
-                />
-              </div>
-            </td>
-          </tr>
-        </template>
-
-        <template #item.contract_number="{ item }">
-          {{ item.raw.contract_number ?? '—' }}
-        </template>
-        <template #item.employee="{ item }">
-          {{ item.raw.employee?.user?.first_name }} {{ item.raw.employee?.user?.last_name }}
-        </template>
-        <template #item.contract_type="{ item }">
-          <VChip
-            size="small"
-            class="status-pill"
-            color="info"
-            variant="tonal"
-          >
-            {{ t(`contract_kind_${item.raw.contract_type}`) }}
-          </VChip>
-        </template>
-        <template #item.start_date="{ item }">
-          {{ formatDate(item.raw.start_date) }}
-        </template>
-        <template #item.end_date="{ item }">
-          {{ item.raw.end_date ? formatDate(item.raw.end_date) : '—' }}
-        </template>
-        <template #item.probation_end_date="{ item }">
-          {{ item.raw.probation_end_date ? formatDate(item.raw.probation_end_date) : '—' }}
-        </template>
-        <template #item.salary="{ item }">
-          <span class="num-tabular">{{ formatCurrency(item.raw.salary_amount ?? item.raw.salary ?? item.raw.base_salary ?? 0) }}</span>
-        </template>
-        <template #item.status="{ item }">
-          <VChip
-            size="small"
-            class="status-pill"
-            :color="statusColor[item.raw.status] ?? 'default'"
-            variant="tonal"
-          >
-            {{ t(`contract_status_${item.raw.status}`) }}
-            <VTooltip
-              v-if="item.raw.status === 'TERMINATED' && (item.raw.termination_date || item.raw.termination_reason)"
-              activator="parent"
-              location="top"
-            >
-              <div v-if="item.raw.termination_date">
-                {{ formatDate(item.raw.termination_date) }}
-              </div>
-              <div v-if="item.raw.termination_reason">
-                {{ item.raw.termination_reason }}
-              </div>
-            </VTooltip>
-          </VChip>
-        </template>
-        <template #item.actions="{ item }">
-          <div
-            class="d-flex justify-end"
-            style="gap:2px;"
-          >
-            <VBtn
-              v-if="item.raw.status === 'DRAFT'"
-              icon
-              variant="text"
-              size="small"
-              color="success"
-              @click="activate(item.raw)"
-            >
-              <VIcon
-                icon="bx-play"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
+            </div>
+            <div class="statefill__title">
+              {{ t('contract_empty_title') }}
+            </div>
+            <div class="statefill__sub">
+              {{ t('contract_empty_sub') }}
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
+              <Button
+                v-if="activeFilters.length > 0"
+                variant="secondary"
+                @click="clearAllFilters"
               >
-                {{ t('Activate') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="item.raw.status === 'ACTIVE'"
-              icon
-              variant="text"
-              size="small"
-              color="warning"
-              @click="openTerminate(item.raw)"
-            >
-              <VIcon
-                icon="bx-stop"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
+                {{ t('Clear all') }}
+              </Button>
+              <Button
+                variant="primary"
+                icon="plus"
+                @click="openCreate"
               >
-                {{ t('Terminate') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="['ACTIVE','EXPIRED','TERMINATED'].includes(item.raw.status)"
-              icon
-              variant="text"
-              size="small"
-              color="info"
-              @click="openRenew(item.raw)"
-            >
-              <VIcon
-                icon="bx-refresh"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Renew') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="item.raw.status === 'DRAFT'"
-              icon
-              variant="text"
-              size="small"
-              @click="openEdit(item.raw)"
-            >
-              <VIcon
-                icon="bx-edit-alt"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Edit') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              color="error"
-              @click="confirmDelete(item.raw)"
-            >
-              <VIcon
-                icon="bx-trash"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Delete') }}
-              </VTooltip>
-            </VBtn>
+                {{ t('New Contract') }}
+              </Button>
+            </div>
           </div>
         </template>
-      </VDataTableServer>
-    </VCard>
+      </DataTable>
+    </Card>
 
-    <!-- Create / Edit dialog -->
-    <VDialog
-      v-model="dialog"
-      max-width="640"
-      persistent
-      scrollable
+    <!-- Create / Edit modal -->
+    <Modal
+      :open="dialog"
+      :title="editing ? t('Edit Contract') : t('New Contract')"
+      :subtitle="editing && editing.contract_number ? editing.contract_number : t('contract_modal_sub')"
+      :width="640"
+      @close="closeForm"
     >
-      <VCard :title="editing ? t('Edit Contract') : t('New Contract')">
-        <VCardText style="max-height:70vh;overflow-y:auto;">
-          <VRow>
-            <VCol cols="12">
-              <VSelect
-                v-model="form.employee_id"
-                :items="employeeOptions"
-                :label="t('Employee')"
-                :disabled="!!editing"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VSelect
-                v-model="form.contract_type"
-                :items="contractTypeOptions"
-                :label="t('Contract Type')"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model.number="form.salary_amount"
-                :label="t('Salary')"
-                type="number"
-                step="1"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.start_date"
-                :label="t('Start Date')"
-                type="date"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.end_date"
-                :label="t('End Date')"
-                type="date"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.probation_end_date"
-                :label="t('Probation End')"
-                type="date"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.position_title"
-                :label="t('Position')"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VTextarea
-                v-model="form.terms"
-                :label="t('Terms')"
-                rows="3"
-              />
-            </VCol>
-          </VRow>
-        </VCardText>
-        <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            @click="dialog = false"
+      <form @submit.prevent="save">
+        <div class="form-grid">
+          <Field
+            :label="t('Employee')"
+            class="span-2"
+            :error="errors.employee_id"
           >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="primary"
-            :loading="saving"
-            @click="save"
-          >
-            {{ t('Save') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+            <Select
+              v-model="employeeIdStr"
+              :options="employeeFormOptions"
+              :placeholder="t('contract_employee_select')"
+              :disabled="!!editing"
+              :error="!!errors.employee_id"
+            />
+          </Field>
 
-    <!-- Delete confirm -->
-    <VDialog
-      v-model="deleteDialog"
-      max-width="420"
-    >
-      <VCard :title="t('Delete Contract')">
-        <VCardText>{{ t('Are you sure?') }}</VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn
-            variant="text"
-            @click="deleteDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="error"
-            @click="doDelete"
-          >
-            {{ t('Delete') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+          <Field :label="t('Contract Type')">
+            <Select
+              v-model="form.contract_type"
+              :options="contractTypeOptions"
+            />
+          </Field>
 
-    <!-- Terminate dialog -->
-    <VDialog
-      v-model="terminateDialog"
-      max-width="520"
+          <Field :label="t('Salary')">
+            <Input
+              v-model.number="form.salary_amount"
+              type="number"
+              step="1"
+              :placeholder="t('contract_salary_placeholder')"
+            />
+          </Field>
+
+          <Field
+            :label="t('Start Date')"
+            :error="errors.start_date"
+          >
+            <Input
+              v-model="form.start_date"
+              type="date"
+              :error="!!errors.start_date"
+            />
+          </Field>
+
+          <Field :label="t('End Date')">
+            <Input
+              v-model="form.end_date"
+              type="date"
+            />
+          </Field>
+
+          <Field :label="t('Probation End')">
+            <Input
+              v-model="form.probation_end_date"
+              type="date"
+            />
+          </Field>
+
+          <Field :label="t('Position')">
+            <Input
+              v-model="form.position_title"
+              :placeholder="t('contract_position_placeholder')"
+            />
+          </Field>
+
+          <Field
+            :label="t('Terms')"
+            class="span-2"
+          >
+            <Input
+              v-model="form.terms"
+              :placeholder="t('contract_terms_placeholder')"
+            />
+          </Field>
+        </div>
+      </form>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="saving"
+          @click="closeForm"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="check"
+          :loading="saving"
+          :disabled="saving"
+          @click="save"
+        >
+          {{ t('Save') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Delete confirm modal -->
+    <Modal
+      :open="deleteDialog"
+      :title="t('Delete Contract')"
+      :subtitle="deleting ? (deleting.contract_number || '') : ''"
+      :width="440"
+      @close="closeDelete"
     >
-      <VCard :title="t('Terminate Contract')">
-        <VCardText>
-          <VTextField
+      <div style="padding:4px 2px 8px;color:rgb(var(--v-theme-text-secondary));">
+        {{ t('contract_confirm_delete') }}
+      </div>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="deletingBusy"
+          @click="closeDelete"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="danger"
+          icon="trash"
+          :loading="deletingBusy"
+          :disabled="deletingBusy"
+          @click="doDelete"
+        >
+          {{ t('Delete') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Terminate modal -->
+    <Modal
+      :open="terminateDialog"
+      :title="t('Terminate Contract')"
+      :subtitle="terminating ? (terminating.contract_number || '') : ''"
+      :width="520"
+      @close="closeTerminate"
+    >
+      <div class="form-grid">
+        <Field
+          :label="t('Termination Date')"
+          class="span-2"
+        >
+          <Input
             v-model="terminateDate"
-            :label="t('Termination Date')"
             type="date"
-            class="mb-3"
           />
-          <VTextarea
+        </Field>
+
+        <Field
+          :label="t('Reason')"
+          class="span-2"
+        >
+          <Input
             v-model="terminateReason"
-            :label="t('Reason')"
-            rows="3"
+            :placeholder="t('contract_terminate_reason_placeholder')"
           />
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn
-            variant="text"
-            @click="terminateDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="warning"
-            @click="doTerminate"
-          >
-            {{ t('Terminate') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+        </Field>
+      </div>
 
-    <!-- Renew dialog -->
-    <VDialog
-      v-model="renewDialog"
-      max-width="520"
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="terminatingBusy"
+          @click="closeTerminate"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="danger"
+          icon="stop"
+          :loading="terminatingBusy"
+          :disabled="terminatingBusy"
+          @click="doTerminate"
+        >
+          {{ t('Terminate') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Renew modal -->
+    <Modal
+      :open="renewDialog"
+      :title="t('Renew Contract')"
+      :subtitle="renewing ? (renewing.contract_number || '') : ''"
+      :width="520"
+      @close="closeRenew"
     >
-      <VCard :title="t('Renew Contract')">
-        <VCardText>
-          <VRow>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="renewForm.new_start_date"
-                :label="t('New Start Date')"
-                type="date"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="renewForm.new_end_date"
-                :label="t('New End Date')"
-                type="date"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VTextField
-                v-model.number="renewForm.new_salary"
-                :label="t('New Salary')"
-                type="number"
-                step="1"
-              />
-            </VCol>
-          </VRow>
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn
-            variant="text"
-            @click="renewDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="info"
-            @click="doRenew"
-          >
-            {{ t('Renew') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      <div class="form-grid">
+        <Field :label="t('New Start Date')">
+          <Input
+            v-model="renewForm.new_start_date"
+            type="date"
+          />
+        </Field>
 
+        <Field :label="t('New End Date')">
+          <Input
+            v-model="renewForm.new_end_date"
+            type="date"
+          />
+        </Field>
+
+        <Field
+          :label="t('New Salary')"
+          class="span-2"
+        >
+          <Input
+            v-model.number="renewForm.new_salary"
+            type="number"
+            step="1"
+          />
+        </Field>
+      </div>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="renewingBusy"
+          @click="closeRenew"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="refresh"
+          :loading="renewingBusy"
+          :disabled="renewingBusy"
+          @click="doRenew"
+        >
+          {{ t('Renew') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Toast -->
     <VSnackbar
       v-model="snackbar"
       :color="snackbarColor"
@@ -829,3 +944,60 @@ meta:
   action: manage
   subject: all
 </route>
+
+<style scoped>
+.toolbar--wrap {
+  flex-wrap: wrap;
+}
+
+.tb-filter {
+  width: 200px;
+  min-width: 180px;
+}
+
+.tb-filter--lg {
+  width: 260px;
+  min-width: 220px;
+  flex: 1;
+  max-width: 320px;
+}
+
+.tb-chip {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-grid .span-2 {
+  grid-column: span 2;
+}
+
+@media (max-width: 900px) {
+  .tb-filter,
+  .tb-filter--lg {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .tb-chip {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid .span-2 {
+    grid-column: span 1;
+  }
+}
+</style>

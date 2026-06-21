@@ -96,15 +96,15 @@ function relTime(ts: number): string {
   if (m < 1)
     return t('just now')
   if (m < 60)
-    return `${m}m ${t('ago')}`
+    return `${m}${t('time_minute_short')} ${t('ago')}`
   const h = Math.round(m / 60)
 
   if (h < 24)
-    return `${h}h ${t('ago')}`
+    return `${h}${t('time_hour_short')} ${t('ago')}`
   const days = Math.round(h / 24)
 
   if (days < 7)
-    return `${days}d ${t('ago')}`
+    return `${days}${t('time_day_short')} ${t('ago')}`
 
   return Fmt.date(ts)
 }
@@ -469,3 +469,32 @@ meta:
   action: manage
   subject: all
 </route>
+
+<style scoped>
+.aithread__head {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .aiwrap {
+    display: block;
+  }
+
+  .aihist {
+    inline-size: 100%;
+    max-block-size: 220px;
+    border-inline-end: none;
+    border-block-end: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  }
+
+  .aithread__head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .aiempty__chips {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

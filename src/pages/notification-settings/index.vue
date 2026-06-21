@@ -29,6 +29,7 @@ import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import Switch from '@/components/design/Switch.vue'
+import { fmtNum } from '@/components/design/utils/format'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -347,17 +348,15 @@ const kpiBot = computed(() => ({
 }))
 const kpiQueue = computed(() => ({
   label: t('notif_status_queue_label'),
-  value: status.value ? status.value.queue_count : null,
+  value: status.value ? fmtNum(status.value.queue_count) : null,
   icon: 'inbox',
   tone: 'info' as const,
-  sub: status.value ? t('notif_status_queue_count', { n: status.value.queue_count }) : '',
 }))
 const kpiChats = computed(() => ({
   label: t('notif_card_recipients'),
-  value: settings.value ? settings.value.chat_ids.length : null,
+  value: settings.value ? fmtNum(settings.value.chat_ids.length) : null,
   icon: 'users',
   tone: 'primary' as const,
-  sub: settings.value ? t('notif_status_chat_count', { n: settings.value.chat_ids.length }) : '',
 }))
 
 // ============================================================
@@ -465,7 +464,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- bot_online — select filter -->
-        <div style="width:200px;">
+        <div class="filter-select">
           <Select
             v-model="filterBotOnline"
             icon="filter"
@@ -567,7 +566,7 @@ onBeforeUnmount(() => {
         </template>
 
         <template #cell.chat_count="{ row }">
-          <span class="mono">{{ row.chat_count }}</span>
+          <span class="mono">{{ fmtNum(row.chat_count) }}</span>
         </template>
 
         <template #cell.chat_ids="{ row }">
@@ -577,20 +576,19 @@ onBeforeUnmount(() => {
           >—</span>
           <span
             v-else
-            class="mono cell-muted"
-            :title="row.chat_ids.join(', ')"
-            style="display:inline-block;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;"
+            class="mono cell-muted chat-ids-cell"
+            :title="row.chat_ids.join(t('notif_list_separator'))"
           >
-            {{ row.chat_ids.join(', ') }}
+            {{ row.chat_ids.join(t('notif_list_separator')) }}
           </span>
         </template>
 
         <template #cell.timeout="{ row }">
-          <span class="mono">{{ row.timeout }}s</span>
+          <span class="mono">{{ t('notif_timeout_seconds', { n: fmtNum(row.timeout) }) }}</span>
         </template>
 
         <template #cell.queue_count="{ row }">
-          <span class="mono">{{ row.queue_count }}</span>
+          <span class="mono">{{ fmtNum(row.queue_count) }}</span>
         </template>
 
         <template #cell.types="{ row }">
@@ -653,6 +651,7 @@ onBeforeUnmount(() => {
       :title="t('notif_settings_title')"
       :subtitle="t('notif_settings_subtitle')"
       :width="720"
+      class="notif-modal-edit"
       @close="closeEdit"
     >
       <form @submit.prevent="save">
@@ -685,7 +684,7 @@ onBeforeUnmount(() => {
               type="password"
               icon="lock"
               :error="!!errors.bot_token"
-              :placeholder="settings?.bot_configured ? '••••••••••••••••' : t('notif_field_bot_token')"
+              :placeholder="settings?.bot_configured ? t('notif_bot_token_masked') : t('notif_field_bot_token')"
               :maxlength="200"
               autocomplete="new-password"
             />
@@ -794,6 +793,7 @@ onBeforeUnmount(() => {
       :title="t('notif_action_test')"
       :subtitle="t('notif_action_test_hint')"
       :width="440"
+      class="notif-modal-test"
       @close="testConfirmOpen = false"
     >
       <div
@@ -890,6 +890,56 @@ onBeforeUnmount(() => {
   font-size: 12px;
   color: var(--text-tertiary, rgb(var(--v-theme-text-secondary)));
   line-height: 1.4;
+}
+
+/* Filter select — sane min-width with collapse on small screens. */
+.filter-select {
+  inline-size: 200px;
+  min-inline-size: 160px;
+}
+
+/* Truncate chat ids list inside the table cell. */
+.chat-ids-cell {
+  display: inline-block;
+  max-inline-size: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/* Toolbar should wrap when room runs out. */
+.toolbar {
+  flex-wrap: wrap;
+}
+
+/* Responsive collapse — single column under 900px for KPI strip + form grid. */
+@media (max-width: 900px) {
+  .grid.cols-4 {
+    grid-template-columns: 1fr;
+  }
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .form-grid .span-2 {
+    grid-column: 1 / -1;
+  }
+  .filter-select {
+    inline-size: 100%;
+  }
+  .chat-ids-cell {
+    max-inline-size: 140px;
+  }
+}
+
+/* Modals: cap declared width by viewport so 720/440 don't overflow. */
+.notif-modal-edit :deep(.modal__panel),
+.notif-modal-edit :deep(.modal__dialog) {
+  max-inline-size: min(720px, calc(100vw - 32px));
+}
+.notif-modal-test :deep(.modal__panel),
+.notif-modal-test :deep(.modal__dialog) {
+  max-inline-size: min(440px, calc(100vw - 32px));
 }
 </style>
 

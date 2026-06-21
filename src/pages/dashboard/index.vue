@@ -371,12 +371,6 @@ const topProductInsight = computed(() =>
 // ============================================================
 // Recent orders helpers
 // ============================================================
-function titleCase(v: any): string {
-  if (!v)
-    return '—'
-  const s = String(v)
-  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
-}
 function initial(s: string | undefined | null): string {
   if (!s)
     return '?'
@@ -409,7 +403,7 @@ function initial(s: string | undefined | null): string {
     </PageHeader>
 
     <!-- ===== KPI row ===== -->
-    <div class="grid cols-4" style="margin-bottom: var(--sp-5);">
+    <div class="grid cols-4 dash-kpi-row" style="margin-bottom: var(--sp-5);">
       <template v-for="k in kpis" :key="k.key">
         <div v-if="loading" class="kpi">
           <div class="kpi__top">
@@ -424,7 +418,7 @@ function initial(s: string | undefined | null): string {
     </div>
 
     <!-- ===== Secondary KPIs ===== -->
-    <div class="grid cols-4" style="margin-bottom: var(--sp-5);">
+    <div class="grid cols-4 dash-kpi-row" style="margin-bottom: var(--sp-5);">
       <template v-for="k in subKpis" :key="k.key">
         <div v-if="loading" class="kpi" style="padding: var(--sp-4) var(--sp-5);">
           <Skeleton :w="70" :h="13" :style="{ marginBottom: '10px' }" />
@@ -435,7 +429,7 @@ function initial(s: string | undefined | null): string {
     </div>
 
     <!-- ===== Extra headline figures (units sold / avg prep / counted into safe) ===== -->
-    <div class="grid cols-3" style="margin-bottom: var(--sp-5);">
+    <div class="grid cols-3 dash-kpi-row" style="margin-bottom: var(--sp-5);">
       <template v-for="k in extraKpis" :key="k.key">
         <div v-if="loading" class="kpi" style="padding: var(--sp-4) var(--sp-5);">
           <Skeleton :w="90" :h="13" :style="{ marginBottom: '10px' }" />
@@ -602,7 +596,7 @@ function initial(s: string | undefined | null): string {
               </td>
               <td>
                 <Badge tone="neutral">
-                  {{ t(titleCase(o.order_type ?? 'HALL')) }}
+                  {{ t(`order_type_${String(o.order_type ?? 'HALL').toUpperCase()}`) }}
                 </Badge>
               </td>
               <td>
@@ -736,8 +730,24 @@ function initial(s: string | undefined | null): string {
 <style scoped>
 .split-1-7 { grid-template-columns: 1.7fr 1fr; }
 .split-1-4 { grid-template-columns: 1.4fr 1fr; }
+
+/* Allow PageHeader action buttons (Refresh + Export) to wrap on narrow screens */
+.page :deep(.page__head-actions) {
+  flex-wrap: wrap;
+}
+
 @media (max-width: 1100px) {
   .split-1-7, .split-1-4 { grid-template-columns: 1fr; }
+}
+
+/* KPI rows: global .cols-4/.cols-3 collapse at 1100px (to 2 cols) and 720px (to 1 col).
+   Force a 1-column collapse below 900px so KPI cards never feel cramped on tablets/phones. */
+@media (max-width: 900px) {
+  .dash-kpi-row { grid-template-columns: 1fr !important; }
+  .page :deep(.page__head-actions) {
+    width: 100%;
+    margin-left: 0;
+  }
 }
 </style>
 

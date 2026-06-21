@@ -1,5 +1,14 @@
 <script setup lang="ts">
 import { fiscalApi as axios } from '@/plugins/axios'
+import Badge from '@/components/design/Badge.vue'
+import Button from '@/components/design/Button.vue'
+import Card from '@/components/design/Card.vue'
+import DataTable, { type DataTableColumn } from '@/components/design/DataTable.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import IconAction from '@/components/design/IconAction.vue'
+import Kpi from '@/components/design/Kpi.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
+import Select from '@/components/design/Select.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -9,7 +18,7 @@ const status = ref<any>(null)
 const receipts = ref<any[]>([])
 const loading = ref(false)
 const receiptsLoading = ref(false)
-const statusFilter = ref<string | undefined>(undefined)
+const statusFilter = ref<string>('')
 const testing = ref(false)
 const retrying = ref(false)
 const savingMode = ref(false)
@@ -121,238 +130,382 @@ async function fiscalizeOrder(receipt: any) {
 onMounted(() => { loadStatus(); loadReceipts() })
 watch(statusFilter, loadReceipts)
 
-const receiptStatusColor: Record<string, string> = {
+const receiptStatusTone: Record<string, 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
   PENDING: 'warning',
   SENT: 'info',
   CONFIRMED: 'success',
   FAILED: 'error',
+  SKIPPED: 'neutral',
 }
 
-const modeColor: Record<string, string> = {
-  off: 'default',
-  mock: 'info',
-  live: 'success',
-}
+// ---- KPI strip ----
+const kpiConfirmed = computed(() => ({
+  label: t('Confirmed'),
+  value: status.value ? (status.value.confirmed ?? status.value.stats?.CONFIRMED ?? 0) : null,
+  icon: 'checkcircle',
+  tone: 'success' as const,
+}))
+const kpiPending = computed(() => ({
+  label: t('Pending'),
+  value: status.value ? (status.value.pending ?? status.value.stats?.PENDING ?? 0) : null,
+  icon: 'clock',
+  tone: 'warning' as const,
+}))
+const kpiSent = computed(() => ({
+  label: t('Sent'),
+  value: status.value ? (status.value.sent ?? status.value.stats?.SENT ?? 0) : null,
+  icon: 'send',
+  tone: 'info' as const,
+}))
+const kpiFailed = computed(() => ({
+  label: t('Failed'),
+  value: status.value ? (status.value.failed ?? status.value.stats?.FAILED ?? 0) : null,
+  icon: 'close',
+  tone: 'error' as const,
+}))
 
-const statusFilterItems = computed(() => [
-  { title: t('fiscal_receipt_status_PENDING'), value: 'PENDING' },
-  { title: t('fiscal_receipt_status_SENT'), value: 'SENT' },
-  { title: t('fiscal_receipt_status_CONFIRMED'), value: 'CONFIRMED' },
-  { title: t('fiscal_receipt_status_FAILED'), value: 'FAILED' },
-  { title: t('fiscal_receipt_status_SKIPPED'), value: 'SKIPPED' },
+const modeOptions = computed(() => [
+  { value: 'off', label: t('fiscal_mode_OFF') },
+  { value: 'mock', label: t('fiscal_mode_MOCK') },
+  { value: 'live', label: t('fiscal_mode_LIVE') },
+])
+
+const statusFilterOptions = computed(() => [
+  { value: 'PENDING', label: t('fiscal_receipt_status_PENDING') },
+  { value: 'SENT', label: t('fiscal_receipt_status_SENT') },
+  { value: 'CONFIRMED', label: t('fiscal_receipt_status_CONFIRMED') },
+  { value: 'FAILED', label: t('fiscal_receipt_status_FAILED') },
+  { value: 'SKIPPED', label: t('fiscal_receipt_status_SKIPPED') },
+])
+
+const columns = computed<DataTableColumn<any>[]>(() => [
+  { key: 'id', label: t('Receipt ID'), sortable: true, align: 'right' as const, width: 80 },
+  { key: 'order_id', label: t('Order'), sortable: true, width: 90 },
+  { key: 'receipt_type', label: t('Type'), sortable: true, width: 120 },
+  { key: 'status', label: t('Status'), sortable: true, width: 130 },
+  { key: 'total', label: t('Total'), sortable: true, align: 'right' as const, width: 130 },
+  { key: 'fiscal_sign', label: t('Fiscal sign'), sortable: false },
+  { key: 'qr_url', label: t('QR'), sortable: false, align: 'center' as const, width: 60 },
+  { key: 'created_at', label: t('Created'), sortable: true, width: 160 },
+  { key: 'error', label: t('Error'), sortable: false },
 ])
 </script>
 
 <template>
-  <div>
-    <div class="page-head">
-      <div style="min-width:0;">
-        <h1 class="page-head__title">{{ t('Fiscalization') }}</h1>
-        <div class="page-head__subtitle">{{ t('Provider') }}: {{ status?.provider ?? '—' }} · {{ t('TIN') }}: {{ status?.tin ?? '—' }}</div>
-      </div>
-      <div class="page-head__actions" />
+  <div class="page fiscalization-page">
+    <!-- Page header -->
+    <PageHeader
+      :title="t('Fiscalization')"
+      :subtitle="t('Fiscalization page subtitle')"
+    />
+
+    <!-- KPI strip -->
+    <div
+      class="grid cols-4 kpi-strip"
+      style="margin-bottom: var(--sp-5);"
+    >
+      <Kpi :data="kpiConfirmed" />
+      <Kpi :data="kpiPending" />
+      <Kpi :data="kpiSent" />
+      <Kpi :data="kpiFailed" />
     </div>
 
-    <!-- Status strip -->
-    <VRow class="mb-4">
-      <VCol cols="12" md="4">
-        <VCard>
-          <VCardText>
-            <div class="text-caption text-disabled">{{ t('Mode') }}</div>
-            <div class="d-flex align-center gap-2">
-              <VChip
-                v-if="status?.mode"
-                class="status-pill"
-                :color="modeColor[status.mode] ?? 'default'"
-                variant="tonal"
-                size="large"
-              >
-                {{ t(`fiscal_mode_${String(status.mode).toUpperCase()}`) }}
-              </VChip>
-              <span v-else class="sk-box d-inline-block" style="width:80px;height:24px;border-radius:4px;" />
-            </div>
-            <div class="text-caption text-disabled mt-2">{{ t('Provider') }}: {{ status?.provider ?? '—' }}</div>
-            <div class="text-caption text-disabled">{{ t('TIN') }}: {{ status?.tin ?? '—' }}</div>
-          </VCardText>
-        </VCard>
-      </VCol>
-      <VCol cols="6" md="2">
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-success"><VIcon icon="bx-check-circle" size="20" /></div>
-            <div class="kpi-card__label">{{ t('Confirmed') }}</div>
-          </div>
-          <div class="kpi-card__value num-tabular">{{ status?.confirmed ?? status?.stats?.CONFIRMED ?? 0 }}</div>
+    <!-- Provider info + Mode + Actions -->
+    <Card>
+      <div class="toolbar toolbar--wrap">
+        <div class="provider-info">
+          <span class="muted">{{ t('Provider') }}:</span>
+          <b>{{ status?.provider ?? '—' }}</b>
+          <span class="muted" style="margin-inline-start: var(--sp-3);">{{ t('TIN') }}:</span>
+          <b>{{ status?.tin ?? '—' }}</b>
         </div>
-      </VCol>
-      <VCol cols="6" md="2">
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-warning"><VIcon icon="bx-time" size="20" /></div>
-            <div class="kpi-card__label">{{ t('Pending') }}</div>
-          </div>
-          <div class="kpi-card__value num-tabular">{{ status?.pending ?? status?.stats?.PENDING ?? 0 }}</div>
-        </div>
-      </VCol>
-      <VCol cols="6" md="2">
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-info"><VIcon icon="bx-send" size="20" /></div>
-            <div class="kpi-card__label">{{ t('Sent') }}</div>
-          </div>
-          <div class="kpi-card__value num-tabular">{{ status?.sent ?? status?.stats?.SENT ?? 0 }}</div>
-        </div>
-      </VCol>
-      <VCol cols="6" md="2">
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-error"><VIcon icon="bx-x-circle" size="20" /></div>
-            <div class="kpi-card__label">{{ t('Failed') }}</div>
-          </div>
-          <div class="kpi-card__value num-tabular">{{ status?.failed ?? status?.stats?.FAILED ?? 0 }}</div>
-        </div>
-      </VCol>
-    </VRow>
 
-    <!-- Controls -->
-    <VCard class="mb-4">
-      <VCardText class="d-flex flex-wrap align-center gap-3">
-        <span class="text-h6">{{ t('Fiscalization') }}</span>
-        <VSpacer />
-        <VBtnToggle
-          :model-value="status?.mode ?? 'off'"
-          variant="outlined"
-          density="compact"
-          color="primary"
-          mandatory
-          :disabled="savingMode"
-        >
-          <VBtn size="small" value="off" @click="setMode('off')">{{ t('Off') }}</VBtn>
-          <VBtn size="small" value="mock" @click="setMode('mock')">{{ t('Mock') }}</VBtn>
-          <VBtn size="small" value="live" @click="setMode('live')">{{ t('Live') }}</VBtn>
-        </VBtnToggle>
-        <VBtn
-          variant="tonal"
-          prepend-icon="bx-test-tube"
-          :loading="testing"
-          @click="runTest"
-        >
-          {{ t('Run test') }}
-        </VBtn>
-        <VBtn
-          variant="tonal"
-          color="warning"
-          prepend-icon="bx-refresh"
-          :loading="retrying"
-          @click="retryFailed"
-        >
-          {{ t('Retry failed') }}
-        </VBtn>
-      </VCardText>
-    </VCard>
+        <div style="flex: 1;" />
+
+        <div class="mode-segmented">
+          <span class="muted mode-label">{{ t('Mode') }}:</span>
+          <div class="segmented">
+            <button
+              type="button"
+              class="seg-btn"
+              :class="{ 'is-active': (status?.mode ?? 'off') === 'off' }"
+              :disabled="savingMode"
+              @click="setMode('off')"
+            >
+              {{ t('fiscal_mode_OFF') }}
+            </button>
+            <button
+              type="button"
+              class="seg-btn"
+              :class="{ 'is-active': status?.mode === 'mock' }"
+              :disabled="savingMode"
+              @click="setMode('mock')"
+            >
+              {{ t('fiscal_mode_MOCK') }}
+            </button>
+            <button
+              type="button"
+              class="seg-btn"
+              :class="{ 'is-active': status?.mode === 'live' }"
+              :disabled="savingMode"
+              @click="setMode('live')"
+            >
+              {{ t('fiscal_mode_LIVE') }}
+            </button>
+          </div>
+        </div>
+
+        <div class="tb-actions">
+          <Button
+            variant="secondary"
+            icon="play"
+            :loading="testing"
+            @click="runTest"
+          >
+            {{ t('Run test') }}
+          </Button>
+          <Button
+            variant="danger-soft"
+            icon="refresh"
+            :loading="retrying"
+            @click="retryFailed"
+          >
+            {{ t('Retry failed') }}
+          </Button>
+        </div>
+      </div>
+    </Card>
 
     <!-- Receipts -->
-    <VCard>
-      <VCardText class="d-flex align-center gap-3 py-3 flex-wrap">
-        <span class="text-h6">{{ t('Receipts') }}</span>
-        <VSpacer />
-        <VSelect
-          v-model="statusFilter"
-          :items="statusFilterItems"
-          item-title="title"
-          item-value="value"
-          :placeholder="t('Status')"
-          density="compact"
-          hide-details
-          clearable
-          style="min-inline-size:160px;"
-        />
-        <VBtn
-          icon
-          variant="text"
+    <Card style="margin-top: var(--sp-4);">
+      <div class="toolbar toolbar--wrap">
+        <h3 class="section-title">{{ t('Receipts') }}</h3>
+        <div style="flex: 1;" />
+        <div class="tb-status">
+          <Select
+            v-model="statusFilter"
+            icon="filter"
+            :placeholder="t('Filter by status')"
+            :options="statusFilterOptions"
+          />
+        </div>
+        <IconAction
+          icon="refresh"
+          tone="primary"
+          :title="t('Refresh')"
           @click="loadReceipts"
-        >
-          <VIcon icon="bx-refresh" />
-        </VBtn>
-      </VCardText>
-      <VProgressLinear
-        v-if="receiptsLoading"
-        indeterminate
-      />
-      <VTable density="compact">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>{{ t('Order') }}</th>
-            <th>{{ t('Type') }}</th>
-            <th>{{ t('Status') }}</th>
-            <th class="text-end">{{ t('Total') }}</th>
-            <th>{{ t('Fiscal sign') }}</th>
-            <th>{{ t('QR') }}</th>
-            <th>{{ t('Created') }}</th>
-            <th>{{ t('Error') }}</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="r in receipts"
-            :key="r.id"
+        />
+      </div>
+
+      <div class="card__divider" />
+
+      <DataTable
+        :columns="columns"
+        :rows="receipts"
+        row-key="id"
+        :loading="receiptsLoading"
+        :per-page="10"
+        :empty-title="t('No receipts yet')"
+        :empty-sub="t('Receipts will appear once orders are fiscalized')"
+        empty-icon="inbox"
+      >
+        <template #cell.id="{ row }">
+          <span class="mono">#{{ row.id }}</span>
+        </template>
+
+        <template #cell.order_id="{ row }">
+          <span v-if="row.order_id" class="mono">#{{ row.order_id }}</span>
+          <span v-else class="muted">—</span>
+        </template>
+
+        <template #cell.receipt_type="{ row }">
+          <span v-if="row.receipt_type">{{ t(`fiscal_receipt_type_${row.receipt_type}`) }}</span>
+          <span v-else class="muted">—</span>
+        </template>
+
+        <template #cell.status="{ row }">
+          <Badge :tone="receiptStatusTone[row.status] ?? 'neutral'" dot>
+            {{ t(`fiscal_receipt_status_${row.status}`) }}
+          </Badge>
+        </template>
+
+        <template #cell.total="{ row }">
+          <span class="num-tabular">{{ formatCurrency(row.total ?? 0) }}</span>
+        </template>
+
+        <template #cell.fiscal_sign="{ row }">
+          <span v-if="row.fiscal_sign" class="mono fiscal-sign">{{ row.fiscal_sign }}</span>
+          <span v-else class="muted">—</span>
+        </template>
+
+        <template #cell.qr_url="{ row }">
+          <a
+            v-if="row.qr_url"
+            :href="row.qr_url"
+            target="_blank"
+            rel="noopener"
+            class="qr-link"
+            :title="t('Open QR')"
           >
-            <td>{{ r.id }}</td>
-            <td>
-              <span v-if="r.order_id">#{{ r.order_id }}</span>
-              <span v-else class="text-disabled">—</span>
-            </td>
-            <td>{{ r.receipt_type ?? '—' }}</td>
-            <td>
-              <VChip class="status-pill" size="x-small" :color="receiptStatusColor[r.status] ?? 'default'" variant="tonal">
-                {{ r.status }}
-              </VChip>
-            </td>
-            <td class="text-end num-tabular">{{ formatCurrency(r.total ?? 0) }}</td>
-            <td class="text-caption">{{ r.fiscal_sign ?? '—' }}</td>
-            <td>
-              <a
-                v-if="r.qr_url"
-                :href="r.qr_url"
-                target="_blank"
-                rel="noopener"
-              >
-                <VIcon icon="bx-qr" size="18" />
-              </a>
-              <span v-else class="text-disabled">—</span>
-            </td>
-            <td class="text-caption">{{ formatDate(r.created_at) }}</td>
-            <td class="text-caption text-error">{{ r.error ?? r.last_error ?? '—' }}</td>
-            <td>
-              <VBtn
-                v-if="r.order_id && (r.status === 'FAILED' || r.status === 'PENDING')"
-                icon
-                variant="text"
-                size="x-small"
-                color="primary"
-                @click="fiscalizeOrder(r)"
-              >
-                <VIcon icon="bx-refresh" size="16" />
-                <VTooltip activator="parent" location="top">{{ t('Re-send') }}</VTooltip>
-              </VBtn>
-            </td>
-          </tr>
-          <tr v-if="!receipts.length && !receiptsLoading">
-            <td colspan="10" class="text-center text-disabled py-4">
-              {{ t('No receipts yet') }}
-            </td>
-          </tr>
-        </tbody>
-      </VTable>
-    </VCard>
+            <DesignIcon name="receipt" :size="18" />
+          </a>
+          <span v-else class="muted">—</span>
+        </template>
+
+        <template #cell.created_at="{ row }">
+          <span class="muted">{{ formatDate(row.created_at) }}</span>
+        </template>
+
+        <template #cell.error="{ row }">
+          <span v-if="row.error || row.last_error" class="error-text">{{ row.error ?? row.last_error }}</span>
+          <span v-else class="muted">—</span>
+        </template>
+
+        <template #row-actions="{ row }">
+          <IconAction
+            v-if="row.order_id && (row.status === 'FAILED' || row.status === 'PENDING')"
+            icon="refresh"
+            tone="primary"
+            :title="t('Re-send')"
+            @click="fiscalizeOrder(row)"
+          />
+        </template>
+      </DataTable>
+    </Card>
 
     <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">
       {{ snackbarMsg }}
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.provider-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+}
+
+.mode-segmented {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mode-label {
+  font-size: 13px;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.seg-btn {
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  border-inline-end: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+
+.seg-btn:last-child {
+  border-inline-end: none;
+}
+
+.seg-btn:hover:not(:disabled):not(.is-active) {
+  background: var(--surface-inset);
+}
+
+.seg-btn.is-active {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.seg-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tb-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tb-status {
+  width: 200px;
+}
+
+.qr-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.qr-link:hover {
+  color: var(--primary-strong, var(--primary));
+}
+
+.fiscal-sign {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.error-text {
+  font-size: 12px;
+  color: rgb(var(--v-theme-error-strong));
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 900px) {
+  .tb-status {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+  .mode-segmented,
+  .tb-actions,
+  .provider-info {
+    flex: 1 1 100%;
+  }
+  .segmented {
+    flex: 1;
+  }
+  .seg-btn {
+    flex: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .grid.cols-4 { grid-template-columns: 1fr; }
+  .tb-actions { flex-direction: column; align-items: stretch; }
+  .tb-actions :deep(.btn) { width: 100%; }
+}
+</style>
 
 <route lang="yaml">
 meta:

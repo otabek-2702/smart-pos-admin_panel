@@ -1,11 +1,30 @@
 <script setup lang="ts">
+/* ============================================================
+   HR SALARIES — monthly payroll: generate, approve, pay
+   Plain HTML + design primitives. No Vuetify on this surface.
+   ============================================================ */
+import type { DataTableColumn } from '@/components/design/DataTable.vue'
 import { hrApi as axios } from '@/plugins/axios'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
+import Badge from '@/components/design/Badge.vue'
+import Button from '@/components/design/Button.vue'
+import Card from '@/components/design/Card.vue'
+import DataTable from '@/components/design/DataTable.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import Field from '@/components/design/Field.vue'
+import IconAction from '@/components/design/IconAction.vue'
+import Input from '@/components/design/Input.vue'
+import Kpi from '@/components/design/Kpi.vue'
+import Modal from '@/components/design/Modal.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
+import Select from '@/components/design/Select.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 
+// ============================================================
+// State
+// ============================================================
 const items = ref<any[]>([])
 const total = ref(0)
 const loading = ref(false)
@@ -14,34 +33,27 @@ const itemsPerPage = ref(20)
 const summary = ref<any>(null)
 
 // ---------- filters ----------
-const statusFilter = ref<string | undefined>(undefined)
+const statusFilter = ref<string>('')
 const periodFilter = ref<string>('') // YYYY-MM
-const employeeFilter = ref<number | undefined>(undefined)
+const employeeFilter = ref<string>('')
 const employeeOptions = ref<any[]>([])
 
 const generateDialog = ref(false)
 const generatePeriod = ref('')
 const generating = ref(false)
 
-const headers = [
-  { title: t('Employee'), key: 'employee', sortable: false },
-  { title: t('Period'), key: 'period', sortable: false },
-  { title: t('Base'), key: 'base_salary', sortable: false },
-  { title: t('Bonus'), key: 'bonus', sortable: false },
-  { title: t('Deduction'), key: 'deduction', sortable: false },
-  { title: t('Net'), key: 'net_salary', sortable: false },
-  { title: t('Status'), key: 'status', sortable: false },
-  { title: t('Payment method'), key: 'payment_method', sortable: false },
-  { title: t('Paid at'), key: 'paid_at', sortable: false },
-  { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
-]
-
-const statusColor: Record<string, string> = {
+// ============================================================
+// Tone map
+// ============================================================
+const STATUS_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'primary'> = {
   PENDING: 'warning',
   APPROVED: 'info',
   PAID: 'success',
 }
 
+// ============================================================
+// API
+// ============================================================
 async function load() {
   loading.value = true
   try {
@@ -93,8 +105,132 @@ onMounted(() => { load(); loadSummary(); loadEmployees() })
 watch([page, itemsPerPage], load)
 watch([statusFilter, periodFilter, employeeFilter], () => { page.value = 1; load() })
 
+// ============================================================
+// Filter options
+// ============================================================
+const statusOptions = computed(() => [
+  { value: '', label: t('All statuses') },
+  { value: 'PENDING', label: t('salary_status_PENDING') },
+  { value: 'APPROVED', label: t('salary_status_APPROVED') },
+  { value: 'PAID', label: t('salary_status_PAID') },
+])
+
+const employeeSelectOptions = computed(() => [
+  { value: '', label: t('All employees') },
+  ...employeeOptions.value.map((e: any) => ({
+    value: String(e.id),
+    label: `${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}`.trim() || e.user?.email || `#${e.id}`,
+  })),
+])
+
+const payMethodOptions = computed(() => [
+  { value: 'CASH', label: t('payment_method_CASH') },
+  { value: 'UZCARD', label: t('payment_method_UZCARD') },
+  { value: 'HUMO', label: t('payment_method_HUMO') },
+  { value: 'PAYME', label: t('payment_method_PAYME') },
+  { value: 'BANK_TRANSFER', label: t('payment_method_BANK_TRANSFER') },
+])
+
+// ============================================================
+// Filter chips
+// ============================================================
+const activeFilters = computed(() => {
+  const out: { k: string; label: string; val: string; clear: () => void }[] = []
+  if (statusFilter.value) {
+    out.push({
+      k: 's',
+      label: t('Status'),
+      val: t(`salary_status_${statusFilter.value}`),
+      clear: () => { statusFilter.value = '' },
+    })
+  }
+  if (periodFilter.value) {
+    out.push({
+      k: 'p',
+      label: t('Period'),
+      val: periodFilter.value,
+      clear: () => { periodFilter.value = '' },
+    })
+  }
+  if (employeeFilter.value) {
+    const hit = employeeSelectOptions.value.find(o => o.value === employeeFilter.value)
+    out.push({
+      k: 'e',
+      label: t('Employee'),
+      val: hit?.label ?? employeeFilter.value,
+      clear: () => { employeeFilter.value = '' },
+    })
+  }
+  return out
+})
+
+function clearAllFilters() {
+  statusFilter.value = ''
+  periodFilter.value = ''
+  employeeFilter.value = ''
+}
+
+// ============================================================
+// KPI cards
+// ============================================================
+const kpiPending = computed(() => ({
+  label: t('Pending'),
+  value: summary.value?.pending_count ?? null,
+  icon: 'clock',
+  tone: 'warning' as const,
+}))
+
+const kpiApproved = computed(() => ({
+  label: t('Approved'),
+  value: summary.value?.approved_count ?? null,
+  icon: 'check',
+  tone: 'info' as const,
+}))
+
+const kpiPaid = computed(() => ({
+  label: t('Paid'),
+  value: summary.value?.paid_count ?? null,
+  icon: 'dollar',
+  tone: 'success' as const,
+}))
+
+const kpiTotal = computed(() => ({
+  label: t('Total'),
+  value: summary.value?.total_amount ?? null,
+  icon: 'trending-up',
+  tone: 'primary' as const,
+  money: true,
+}))
+
+// ============================================================
+// Columns
+// ============================================================
+const columns: DataTableColumn<any>[] = [
+  { key: 'employee', label: t('Employee'), sortable: false },
+  { key: 'period', label: t('Period'), sortable: false, width: 110 },
+  { key: 'base_salary', label: t('Base'), sortable: false, align: 'right', width: 130 },
+  { key: 'bonus', label: t('Bonus'), sortable: false, align: 'right', width: 120 },
+  { key: 'deduction', label: t('Deduction'), sortable: false, align: 'right', width: 120 },
+  { key: 'net_salary', label: t('Net'), sortable: false, align: 'right', width: 140 },
+  { key: 'status', label: t('Status'), sortable: false, width: 120 },
+  { key: 'payment_method', label: t('Payment method'), sortable: false, width: 140 },
+  { key: 'paid_at', label: t('Paid at'), sortable: false, width: 140 },
+]
+
+const tablePagination = computed(() => ({
+  page: page.value,
+  perPage: itemsPerPage.value,
+  total: total.value,
+  onPage: (n: number) => { page.value = n },
+  onPerPage: (n: number) => { itemsPerPage.value = n; page.value = 1 },
+}))
+
+// ============================================================
+// Approve-all
+// ============================================================
 const approveAllDialog = ref(false)
 const approveAllPeriod = ref('')
+const approvingAll = ref(false)
 
 function openApproveAll() {
   const now = new Date()
@@ -106,6 +242,7 @@ function openApproveAll() {
 async function approveAll() {
   if (!approveAllPeriod.value)
     return
+  approvingAll.value = true
   try {
     const [y, m] = approveAllPeriod.value.split('-')
 
@@ -116,6 +253,9 @@ async function approveAll() {
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+  finally {
+    approvingAll.value = false
   }
 }
 
@@ -130,10 +270,13 @@ async function approveOne(s: any) {
   }
 }
 
-// ---------- pay dialog ----------
+// ============================================================
+// Pay dialog
+// ============================================================
 const payDialog = ref(false)
 const paying = ref<any>(null)
-const payMethod = ref<'CASH' | 'UZCARD' | 'HUMO' | 'PAYME' | 'BANK_TRANSFER'>('CASH')
+const payMethod = ref<string>('CASH')
+const submittingPay = ref(false)
 
 function openPay(s: any) {
   paying.value = s
@@ -144,6 +287,7 @@ function openPay(s: any) {
 async function payOne() {
   if (!paying.value)
     return
+  submittingPay.value = true
   try {
     await axios.post(`/salaries/${paying.value.id}/pay/`, { payment_method: payMethod.value })
     notify(t('Paid'))
@@ -153,9 +297,14 @@ async function payOne() {
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
   }
+  finally {
+    submittingPay.value = false
+  }
 }
 
-// ---------- itemization dialog ----------
+// ============================================================
+// Itemization dialog
+// ============================================================
 const itemDialog = ref(false)
 const itemSalary = ref<any>(null)
 const itemLoading = ref(false)
@@ -164,6 +313,7 @@ const bonuses = ref<any[]>([])
 const deductions = ref<any[]>([])
 const newBonus = ref({ amount: 0, reason: '' })
 const newDeduction = ref({ amount: 0, reason: '' })
+const savingBase = ref(false)
 
 const isPaid = computed(() => itemSalary.value?.status === 'PAID')
 
@@ -196,6 +346,7 @@ async function openItems(s: any) {
 async function saveBase() {
   if (!itemSalary.value)
     return
+  savingBase.value = true
   try {
     await axios.post(`/salaries/${itemSalary.value.id}/base/`, { amount: baseInput.value })
     notify(t('Base updated'))
@@ -203,6 +354,9 @@ async function saveBase() {
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+  finally {
+    savingBase.value = false
   }
 }
 
@@ -264,6 +418,9 @@ async function deleteDeduction(d: any) {
   }
 }
 
+// ============================================================
+// Generate dialog
+// ============================================================
 function openGenerate() {
   const now = new Date()
 
@@ -289,643 +446,576 @@ async function generate() {
     generating.value = false
   }
 }
+
+// ============================================================
+// Numeric v-model adapters for base/bonus/deduction inputs
+// ============================================================
+const baseInputStr = computed({
+  get: () => String(baseInput.value ?? 0),
+  set: (v: string) => { baseInput.value = Number(v) || 0 },
+})
+const newBonusAmountStr = computed({
+  get: () => String(newBonus.value.amount ?? 0),
+  set: (v: string) => { newBonus.value.amount = Number(v) || 0 },
+})
+const newDeductionAmountStr = computed({
+  get: () => String(newDeduction.value.amount ?? 0),
+  set: (v: string) => { newDeduction.value.amount = Number(v) || 0 },
+})
+
+// ============================================================
+// ESC handler
+// ============================================================
+function onKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape')
+    return
+  if (payDialog.value) { payDialog.value = false; e.preventDefault(); return }
+  if (itemDialog.value) { itemDialog.value = false; e.preventDefault(); return }
+  if (approveAllDialog.value) { approveAllDialog.value = false; e.preventDefault(); return }
+  if (generateDialog.value) { generateDialog.value = false; e.preventDefault() }
+}
+
+onMounted(() => { window.addEventListener('keydown', onKeydown) })
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
+
+function fmtPeriod(row: any): string {
+  return `${row.period_year}-${String(row.period_month).padStart(2, '0')}`
+}
+
+function employeeName(row: any): string {
+  const u = row?.employee?.user
+  if (!u)
+    return '—'
+  const full = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim()
+  return full || u.email || '—'
+}
 </script>
 
 <template>
-  <div>
-    <div class="page-head">
-      <div style="min-width:0;">
-        <h1 class="page-head__title">
-          {{ t('Salaries') }}
-        </h1>
-        <div class="page-head__subtitle">
-          {{ t('Generate, approve and pay monthly payroll') }}
-        </div>
-      </div>
-      <div class="page-head__actions">
-        <VBtn
-          variant="tonal"
-          prepend-icon="bx-cog"
+  <div class="page">
+    <PageHeader
+      :title="t('Salaries')"
+      :subtitle="t('salary_subtitle')"
+    >
+      <template #actions>
+        <Button
+          variant="secondary"
+          icon="settings"
           @click="openGenerate"
         >
           {{ t('Generate') }}
-        </VBtn>
-        <VBtn
-          color="success"
-          prepend-icon="bx-check-double"
+        </Button>
+        <Button
+          variant="primary"
+          icon="check"
           @click="openApproveAll"
         >
           {{ t('Approve All') }}
-        </VBtn>
+        </Button>
+      </template>
+    </PageHeader>
+
+    <!-- KPI strip -->
+    <div
+      class="grid cols-4 sal-kpis"
+      style="margin-bottom: var(--sp-5);"
+    >
+      <Kpi :data="kpiPending" />
+      <Kpi :data="kpiApproved" />
+      <Kpi :data="kpiPaid" />
+      <Kpi :data="kpiTotal" />
+    </div>
+
+    <!-- Toolbar + table -->
+    <Card>
+      <div class="toolbar toolbar--wrap">
+        <div class="tb-filter">
+          <Select
+            v-model="statusFilter"
+            icon="filter"
+            :placeholder="t('Status')"
+            :options="statusOptions"
+          />
+        </div>
+        <div class="tb-period">
+          <input
+            v-model="periodFilter"
+            type="month"
+            class="control control--native"
+            :placeholder="t('Period')"
+          >
+        </div>
+        <div class="tb-filter tb-filter--wide">
+          <Select
+            v-model="employeeFilter"
+            icon="employee"
+            :placeholder="t('Employee')"
+            :options="employeeSelectOptions"
+          />
+        </div>
       </div>
-    </div>
 
-    <div class="toolbar mb-3">
-      <VSelect
-        v-model="statusFilter"
-        :items="[
-          { title: t('salary_status_PENDING'), value: 'PENDING' },
-          { title: t('salary_status_APPROVED'), value: 'APPROVED' },
-          { title: t('salary_status_PAID'), value: 'PAID' },
-        ]"
-        :placeholder="t('All statuses')"
-        density="compact"
-        style="min-inline-size:180px;max-inline-size:220px;"
-        hide-details
-        clearable
-      />
-      <VTextField
-        v-model="periodFilter"
-        type="month"
-        :placeholder="t('Period')"
-        density="compact"
-        style="min-inline-size:160px;max-inline-size:200px;"
-        hide-details
-        clearable
-      />
-      <VSelect
-        v-model="employeeFilter"
-        :items="employeeOptions.map((e: any) => ({ title: `${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}`.trim() || e.user?.email || `#${e.id}`, value: e.id }))"
-        :placeholder="t('All employees')"
-        density="compact"
-        style="min-inline-size:200px;max-inline-size:260px;"
-        hide-details
-        clearable
-      />
-    </div>
+      <!-- Filter chips -->
+      <div
+        v-if="activeFilters.length > 0"
+        class="toolbar"
+        style="padding-top:0;"
+      >
+        <div class="chips">
+          <span
+            class="tertiary"
+            style="font-size:13px;margin-right:2px;"
+          >{{ t('Filters') }}:</span>
+          <span
+            v-for="f in activeFilters"
+            :key="f.k"
+            class="chip"
+          >
+            <span>{{ f.label }}: <b>{{ f.val }}</b></span>
+            <span
+              class="chip__x"
+              @click="f.clear()"
+            >
+              <DesignIcon
+                name="close"
+                :size="13"
+              />
+            </span>
+          </span>
+          <button
+            class="chip--clear"
+            @click="clearAllFilters"
+          >
+            {{ t('Clear all') }}
+          </button>
+        </div>
+      </div>
 
-    <VRow class="mb-4">
-      <VCol
-        cols="6"
-        sm="3"
-      >
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-warning">
-              <VIcon icon="bx-time" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Pending') }}
-            </div>
-          </div>
-          <div class="kpi-card__value">
-            <template v-if="summary">
-              {{ summary.pending_count ?? 0 }}
-            </template>
-            <span
-              v-else
-              class="sk-box d-inline-block"
-              style="width:36px;height:1em;border-radius:4px;vertical-align:middle;"
-            />
-          </div>
-        </div>
-      </VCol>
-      <VCol
-        cols="6"
-        sm="3"
-      >
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-info">
-              <VIcon icon="bx-check" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Approved') }}
-            </div>
-          </div>
-          <div class="kpi-card__value">
-            <template v-if="summary">
-              {{ summary.approved_count ?? 0 }}
-            </template>
-            <span
-              v-else
-              class="sk-box d-inline-block"
-              style="width:36px;height:1em;border-radius:4px;vertical-align:middle;"
-            />
-          </div>
-        </div>
-      </VCol>
-      <VCol
-        cols="6"
-        sm="3"
-      >
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-success">
-              <VIcon icon="bx-money" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Paid') }}
-            </div>
-          </div>
-          <div class="kpi-card__value">
-            <template v-if="summary">
-              {{ summary.paid_count ?? 0 }}
-            </template>
-            <span
-              v-else
-              class="sk-box d-inline-block"
-              style="width:36px;height:1em;border-radius:4px;vertical-align:middle;"
-            />
-          </div>
-        </div>
-      </VCol>
-      <VCol
-        cols="6"
-        sm="3"
-      >
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-primary">
-              <VIcon icon="bx-trending-up" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Total') }}
-            </div>
-          </div>
-          <div class="kpi-card__value">
-            <template v-if="summary">
-              {{ formatCurrency(summary.total_amount ?? 0) }}<span class="kpi-card__unit">UZS</span>
-            </template>
-            <span
-              v-else
-              class="sk-box d-inline-block"
-              style="width:80px;height:1em;border-radius:4px;vertical-align:middle;"
-            />
-          </div>
-        </div>
-      </VCol>
-    </VRow>
+      <div class="card__divider" />
 
-    <VCard>
-
-      <VDataTableServer
-        :headers="headers"
-        :items="items"
-        :items-length="total"
+      <DataTable
+        :columns="columns"
+        :rows="items"
+        row-key="id"
         :loading="loading"
-        :items-per-page="itemsPerPage"
-        :page="page"
+        :pagination="tablePagination"
       >
-        <template #bottom>
-          <DataTableFooter
-            v-model:page="page"
-            v-model:items-per-page="itemsPerPage"
-            :total-items="total"
+        <template #cell.employee="{ row }">
+          <span class="cell-strong">{{ employeeName(row) }}</span>
+        </template>
+
+        <template #cell.period="{ row }">
+          <span class="mono">{{ fmtPeriod(row) }}</span>
+        </template>
+
+        <template #cell.base_salary="{ row }">
+          <span class="num-tabular">{{ formatCurrency(row.base_amount ?? 0) }}</span>
+        </template>
+
+        <template #cell.bonus="{ row }">
+          <span class="num-tabular t-success">{{ formatCurrency(row.bonus ?? row.bonus_amount ?? 0) }}</span>
+        </template>
+
+        <template #cell.deduction="{ row }">
+          <span class="num-tabular t-error">{{ formatCurrency(row.deduction ?? row.deduction_amount ?? 0) }}</span>
+        </template>
+
+        <template #cell.net_salary="{ row }">
+          <span class="num-tabular cell-strong">{{ formatCurrency(row.net_amount ?? 0) }}</span>
+        </template>
+
+        <template #cell.status="{ row }">
+          <Badge :tone="STATUS_TONE[row.status] ?? 'neutral'">
+            {{ t(`salary_status_${row.status}`) }}
+          </Badge>
+        </template>
+
+        <template #cell.payment_method="{ row }">
+          <span v-if="row.payment_method">{{ t(`payment_method_${row.payment_method}`) }}</span>
+          <span
+            v-else
+            class="cell-muted"
+          >—</span>
+        </template>
+
+        <template #cell.paid_at="{ row }">
+          <span v-if="row.paid_at">{{ formatDate(row.paid_at) }}</span>
+          <span
+            v-else
+            class="cell-muted"
+          >—</span>
+        </template>
+
+        <template #row-actions="{ row }">
+          <IconAction
+            icon="list"
+            :title="t('salary_action_items')"
+            @click="openItems(row)"
+          />
+          <IconAction
+            v-if="row.status === 'PENDING'"
+            icon="check"
+            tone="primary"
+            :title="t('Approve')"
+            @click="approveOne(row)"
+          />
+          <IconAction
+            v-if="row.status === 'APPROVED'"
+            icon="dollar"
+            tone="success"
+            :title="t('Pay')"
+            @click="openPay(row)"
           />
         </template>
-        <template #item.employee="{ item }">
-          {{ item.raw.employee?.user?.first_name }} {{ item.raw.employee?.user?.last_name }}
-        </template>
-        <template #item.period="{ item }">
-          {{ item.raw.period_year }}-{{ String(item.raw.period_month).padStart(2, '0') }}
-        </template>
-        <template #item.base_salary="{ item }">
-          <span class="num-tabular">{{ formatCurrency(item.raw.base_amount ?? 0) }}</span>
-        </template>
-        <template #item.bonus="{ item }">
-          <span class="num-tabular text-success">{{ formatCurrency(item.raw.bonus ?? item.raw.bonus_amount ?? 0) }}</span>
-        </template>
-        <template #item.deduction="{ item }">
-          <span class="num-tabular text-error">{{ formatCurrency(item.raw.deduction ?? item.raw.deduction_amount ?? 0) }}</span>
-        </template>
-        <template #item.net_salary="{ item }">
-          <span class="font-weight-medium num-tabular">{{ formatCurrency(item.raw.net_amount ?? 0) }}</span>
-        </template>
-        <template #item.status="{ item }">
-          <VChip
-            size="small"
-            class="status-pill"
-            :color="statusColor[item.raw.status] ?? 'default'"
-            variant="tonal"
-          >
-            {{ t(`salary_status_${item.raw.status}`) }}
-          </VChip>
-        </template>
-        <template #item.payment_method="{ item }">
-          <span v-if="item.raw.payment_method">{{ t(`payment_method_${item.raw.payment_method}`) }}</span>
-          <span v-else class="text-disabled">—</span>
-        </template>
-        <template #item.paid_at="{ item }">
-          <span v-if="item.raw.paid_at">{{ formatDate(item.raw.paid_at) }}</span>
-          <span v-else class="text-disabled">—</span>
-        </template>
-        <template #item.actions="{ item }">
-          <div
-            class="d-flex justify-end"
-            style="gap:2px;"
-          >
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              @click="openItems(item.raw)"
-            >
-              <VIcon
-                icon="bx-list-ul"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Edit items (base / bonus / deduction)') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="item.raw.status === 'PENDING'"
-              icon
-              variant="text"
-              size="small"
-              color="info"
-              @click="approveOne(item.raw)"
-            >
-              <VIcon
-                icon="bx-check"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Approve') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="item.raw.status === 'APPROVED'"
-              icon
-              variant="text"
-              size="small"
-              color="success"
-              @click="openPay(item.raw)"
-            >
-              <VIcon
-                icon="bx-dollar"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Pay') }}
-              </VTooltip>
-            </VBtn>
+      </DataTable>
+    </Card>
+
+    <!-- Generate modal -->
+    <Modal
+      :open="generateDialog"
+      :title="t('Generate Salaries')"
+      :subtitle="t('salary_generate_subtitle')"
+      :width="480"
+      @close="generateDialog = false"
+    >
+      <Field :label="t('Period')">
+        <input
+          v-model="generatePeriod"
+          type="month"
+          class="control control--native"
+          autofocus
+        >
+      </Field>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="generating"
+          @click="generateDialog = false"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="check"
+          :loading="generating"
+          :disabled="generating"
+          @click="generate"
+        >
+          {{ t('Generate') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Itemization modal -->
+    <Modal
+      :open="itemDialog"
+      :title="t('Salary itemization')"
+      :subtitle="itemSalary ? employeeName(itemSalary) : ''"
+      :width="780"
+      @close="itemDialog = false"
+    >
+      <div
+        v-if="itemSalary"
+        class="sal-item-head"
+      >
+        <div class="sal-item-head__meta">
+          <div class="cell-strong">
+            {{ employeeName(itemSalary) }}
           </div>
-        </template>
-      </VDataTableServer>
-    </VCard>
+          <div class="cell-muted">
+            {{ fmtPeriod(itemSalary) }}
+          </div>
+        </div>
+        <Badge :tone="STATUS_TONE[itemSalary.status] ?? 'neutral'">
+          {{ t(`salary_status_${itemSalary.status}`) }}
+        </Badge>
+      </div>
 
-    <VDialog
-      v-model="generateDialog"
-      max-width="480"
-      persistent
-    >
-      <VCard :title="t('Generate Salaries')">
-        <VCardText>
-          <VTextField
-            v-model="generatePeriod"
-            type="month"
-            :label="t('Period')"
-            autofocus
-          />
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn
-            variant="text"
-            @click="generateDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="primary"
-            :loading="generating"
-            @click="generate"
-          >
-            {{ t('Generate') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      <div
+        v-if="isPaid"
+        class="sal-alert"
+      >
+        <DesignIcon
+          name="warning"
+          :size="16"
+        />
+        <span>{{ t('salary_locked_warning') }}</span>
+      </div>
 
-    <VDialog
-      v-model="itemDialog"
-      max-width="780"
-      scrollable
-    >
-      <VCard :title="t('Salary itemization')">
-        <VCardText style="max-height:75vh;overflow-y:auto;">
-          <div
-            v-if="itemSalary"
-            class="d-flex align-center gap-2 mb-4"
+      <!-- Base -->
+      <div class="sal-section">
+        <div class="sal-section__title">
+          {{ t('Base salary (this month)') }}
+        </div>
+        <div class="sal-row">
+          <div class="sal-row__input">
+            <Input
+              v-model="baseInputStr"
+              type="number"
+              min="0"
+              :disabled="isPaid"
+            />
+          </div>
+          <Button
+            variant="primary"
+            icon="save"
+            :disabled="isPaid || savingBase"
+            :loading="savingBase"
+            @click="saveBase"
           >
-            <VAvatar size="36" color="primary" variant="tonal">
-              <span class="text-caption">{{ (itemSalary.employee?.user?.first_name ?? '?')[0] }}</span>
-            </VAvatar>
-            <div>
-              <div class="text-body-1 font-weight-medium">
-                {{ itemSalary.employee?.user?.first_name }} {{ itemSalary.employee?.user?.last_name }}
+            {{ t('Save base') }}
+          </Button>
+        </div>
+      </div>
+
+      <!-- Bonuses -->
+      <div class="sal-section">
+        <div class="sal-section__title sal-section__title--between">
+          <span>
+            <DesignIcon
+              name="plus-circle"
+              :size="16"
+            />
+            <span>{{ t('Bonuses') }}</span>
+          </span>
+          <span class="t-success cell-strong">+{{ formatCurrency(calcBonusTotal) }}</span>
+        </div>
+        <ul class="sal-list">
+          <li
+            v-for="b in bonuses"
+            :key="b.id"
+            class="sal-list__item"
+          >
+            <div class="sal-list__main">
+              <div class="t-success cell-strong">
+                +{{ formatCurrency(b.amount) }}
               </div>
-              <div class="text-caption text-disabled">
-                {{ itemSalary.period_year }}-{{ String(itemSalary.period_month).padStart(2, '0') }}
+              <div
+                v-if="b.reason"
+                class="cell-muted"
+              >
+                {{ b.reason }}
               </div>
             </div>
-            <VSpacer />
-            <VChip
-              size="small"
-              class="status-pill"
-              :color="statusColor[itemSalary.status] ?? 'default'"
-              variant="tonal"
-            >
-              {{ t(`salary_status_${itemSalary.status}`) }}
-            </VChip>
+            <IconAction
+              icon="trash"
+              tone="danger"
+              :title="t('Delete')"
+              :disabled="isPaid"
+              @click="deleteBonus(b)"
+            />
+          </li>
+          <li
+            v-if="!bonuses.length && !itemLoading"
+            class="sal-list__empty"
+          >
+            {{ t('No bonuses') }}
+          </li>
+        </ul>
+        <div class="sal-row sal-row--add">
+          <div class="sal-row__amount">
+            <Input
+              v-model="newBonusAmountStr"
+              type="number"
+              min="0"
+              :placeholder="t('Amount')"
+              :disabled="isPaid"
+            />
           </div>
-
-          <VAlert
-            v-if="isPaid"
-            type="warning"
-            variant="tonal"
-            class="mb-3"
+          <div class="sal-row__reason">
+            <Input
+              v-model="newBonus.reason"
+              :placeholder="t('Reason')"
+              :disabled="isPaid"
+            />
+          </div>
+          <Button
+            variant="secondary"
+            icon="plus"
+            :disabled="isPaid || !newBonus.amount"
+            @click="addBonus"
           >
-            {{ t('This salary is PAID — items are locked. Backend rejects edits.') }}
-          </VAlert>
+            {{ t('Add') }}
+          </Button>
+        </div>
+      </div>
 
-          <!-- Base -->
-          <VCard
-            variant="outlined"
-            class="mb-4"
+      <!-- Deductions -->
+      <div class="sal-section">
+        <div class="sal-section__title sal-section__title--between">
+          <span>
+            <DesignIcon
+              name="minus-circle"
+              :size="16"
+            />
+            <span>{{ t('Deductions') }}</span>
+          </span>
+          <span class="t-error cell-strong">−{{ formatCurrency(calcDeductionTotal) }}</span>
+        </div>
+        <ul class="sal-list">
+          <li
+            v-for="d in deductions"
+            :key="d.id"
+            class="sal-list__item"
           >
-            <VCardText>
-              <div class="text-subtitle-2 mb-2">
-                {{ t('Base salary (this month)') }}
+            <div class="sal-list__main">
+              <div class="t-error cell-strong">
+                −{{ formatCurrency(d.amount) }}
               </div>
-              <div class="d-flex align-center gap-2">
-                <VTextField
-                  v-model.number="baseInput"
-                  type="number"
-                  min="0"
-                  density="compact"
-                  hide-details
-                  :disabled="isPaid"
-                />
-                <VBtn
-                  color="primary"
-                  :disabled="isPaid"
-                  @click="saveBase"
-                >
-                  {{ t('Save base') }}
-                </VBtn>
+              <div
+                v-if="d.reason"
+                class="cell-muted"
+              >
+                {{ d.reason }}
               </div>
-            </VCardText>
-          </VCard>
-
-          <!-- Bonuses -->
-          <VCard
-            variant="outlined"
-            class="mb-4"
+            </div>
+            <IconAction
+              icon="trash"
+              tone="danger"
+              :title="t('Delete')"
+              :disabled="isPaid"
+              @click="deleteDeduction(d)"
+            />
+          </li>
+          <li
+            v-if="!deductions.length && !itemLoading"
+            class="sal-list__empty"
           >
-            <VCardText>
-              <div class="text-subtitle-2 mb-2 d-flex align-center justify-space-between">
-                <span>
-                  <VIcon icon="bx-plus-circle" size="16" color="success" class="me-1" />
-                  {{ t('Bonuses') }}
-                </span>
-                <span class="text-success font-weight-bold">+{{ formatCurrency(calcBonusTotal) }}</span>
-              </div>
-              <VList density="compact" class="pa-0 mb-2">
-                <VListItem
-                  v-for="b in bonuses"
-                  :key="b.id"
-                >
-                  <VListItemTitle class="text-success">
-                    +{{ formatCurrency(b.amount) }}
-                  </VListItemTitle>
-                  <VListItemSubtitle v-if="b.reason">
-                    {{ b.reason }}
-                  </VListItemSubtitle>
-                  <template #append>
-                    <VBtn
-                      icon
-                      variant="text"
-                      size="x-small"
-                      color="error"
-                      :disabled="isPaid"
-                      @click="deleteBonus(b)"
-                    >
-                      <VIcon icon="bx-trash" size="16" />
-                    </VBtn>
-                  </template>
-                </VListItem>
-                <VListItem v-if="!bonuses.length && !itemLoading">
-                  <VListItemTitle class="text-disabled text-caption">
-                    {{ t('No bonuses') }}
-                  </VListItemTitle>
-                </VListItem>
-              </VList>
-              <div class="d-flex gap-2">
-                <VTextField
-                  v-model.number="newBonus.amount"
-                  :label="t('Amount')"
-                  type="number"
-                  min="0"
-                  density="compact"
-                  hide-details
-                  style="max-inline-size:140px;"
-                  :disabled="isPaid"
-                />
-                <VTextField
-                  v-model="newBonus.reason"
-                  :label="t('Reason')"
-                  density="compact"
-                  hide-details
-                  :disabled="isPaid"
-                />
-                <VBtn
-                  color="success"
-                  variant="tonal"
-                  prepend-icon="bx-plus"
-                  :disabled="isPaid || !newBonus.amount"
-                  @click="addBonus"
-                >
-                  {{ t('Add') }}
-                </VBtn>
-              </div>
-            </VCardText>
-          </VCard>
-
-          <!-- Deductions -->
-          <VCard
-            variant="outlined"
-            class="mb-4"
+            {{ t('No deductions') }}
+          </li>
+        </ul>
+        <div class="sal-row sal-row--add">
+          <div class="sal-row__amount">
+            <Input
+              v-model="newDeductionAmountStr"
+              type="number"
+              min="0"
+              :placeholder="t('Amount')"
+              :disabled="isPaid"
+            />
+          </div>
+          <div class="sal-row__reason">
+            <Input
+              v-model="newDeduction.reason"
+              :placeholder="t('Reason')"
+              :disabled="isPaid"
+            />
+          </div>
+          <Button
+            variant="secondary"
+            icon="minus"
+            :disabled="isPaid || !newDeduction.amount"
+            @click="addDeduction"
           >
-            <VCardText>
-              <div class="text-subtitle-2 mb-2 d-flex align-center justify-space-between">
-                <span>
-                  <VIcon icon="bx-minus-circle" size="16" color="error" class="me-1" />
-                  {{ t('Deductions') }}
-                </span>
-                <span class="text-error font-weight-bold">−{{ formatCurrency(calcDeductionTotal) }}</span>
-              </div>
-              <VList density="compact" class="pa-0 mb-2">
-                <VListItem
-                  v-for="d in deductions"
-                  :key="d.id"
-                >
-                  <VListItemTitle class="text-error">
-                    −{{ formatCurrency(d.amount) }}
-                  </VListItemTitle>
-                  <VListItemSubtitle v-if="d.reason">
-                    {{ d.reason }}
-                  </VListItemSubtitle>
-                  <template #append>
-                    <VBtn
-                      icon
-                      variant="text"
-                      size="x-small"
-                      color="error"
-                      :disabled="isPaid"
-                      @click="deleteDeduction(d)"
-                    >
-                      <VIcon icon="bx-trash" size="16" />
-                    </VBtn>
-                  </template>
-                </VListItem>
-                <VListItem v-if="!deductions.length && !itemLoading">
-                  <VListItemTitle class="text-disabled text-caption">
-                    {{ t('No deductions') }}
-                  </VListItemTitle>
-                </VListItem>
-              </VList>
-              <div class="d-flex gap-2">
-                <VTextField
-                  v-model.number="newDeduction.amount"
-                  :label="t('Amount')"
-                  type="number"
-                  min="0"
-                  density="compact"
-                  hide-details
-                  style="max-inline-size:140px;"
-                  :disabled="isPaid"
-                />
-                <VTextField
-                  v-model="newDeduction.reason"
-                  :label="t('Reason')"
-                  density="compact"
-                  hide-details
-                  :disabled="isPaid"
-                />
-                <VBtn
-                  color="error"
-                  variant="tonal"
-                  prepend-icon="bx-minus"
-                  :disabled="isPaid || !newDeduction.amount"
-                  @click="addDeduction"
-                >
-                  {{ t('Add') }}
-                </VBtn>
-              </div>
-            </VCardText>
-          </VCard>
+            {{ t('Add') }}
+          </Button>
+        </div>
+      </div>
 
-          <!-- Net preview -->
-          <VCard color="primary" variant="tonal">
-            <VCardText class="d-flex align-center justify-space-between">
-              <span class="text-subtitle-1 font-weight-medium">{{ t('Net (preview)') }}</span>
-              <span class="text-h5 font-weight-bold">{{ formatCurrency(calcNet) }}</span>
-            </VCardText>
-          </VCard>
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn
-            variant="text"
-            @click="itemDialog = false"
-          >
-            {{ t('Close') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      <!-- Net preview -->
+      <div class="sal-net">
+        <span>{{ t('Net (preview)') }}</span>
+        <span class="sal-net__value">{{ formatCurrency(calcNet) }}</span>
+      </div>
 
-    <VDialog
-      v-model="approveAllDialog"
-      max-width="480"
-      persistent
+      <template #footer>
+        <Button
+          variant="ghost"
+          @click="itemDialog = false"
+        >
+          {{ t('Close') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Approve-all modal -->
+    <Modal
+      :open="approveAllDialog"
+      :title="t('Approve All Pending Salaries')"
+      :subtitle="t('salary_approve_all_subtitle')"
+      :width="480"
+      @close="approveAllDialog = false"
     >
-      <VCard :title="t('Approve All Pending Salaries')">
-        <VCardText>
-          <VTextField
-            v-model="approveAllPeriod"
-            type="month"
-            :label="t('Period')"
-            autofocus
-          />
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn
-            variant="text"
-            @click="approveAllDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="success"
-            @click="approveAll"
-          >
-            {{ t('Approve All') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      <Field :label="t('Period')">
+        <input
+          v-model="approveAllPeriod"
+          type="month"
+          class="control control--native"
+          autofocus
+        >
+      </Field>
 
-    <VDialog
-      v-model="payDialog"
-      max-width="420"
-      persistent
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="approvingAll"
+          @click="approveAllDialog = false"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="check"
+          :loading="approvingAll"
+          :disabled="approvingAll"
+          @click="approveAll"
+        >
+          {{ t('Approve All') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Pay modal -->
+    <Modal
+      :open="payDialog"
+      :title="t('Pay Salary')"
+      :subtitle="paying ? employeeName(paying) : ''"
+      :width="440"
+      @close="payDialog = false"
     >
-      <VCard :title="t('Pay Salary')">
-        <VCardText>
-          <div class="text-body-2 mb-1">
-            {{ t('Employee') }}:
-            <strong>{{ paying?.employee?.user?.first_name }} {{ paying?.employee?.user?.last_name }}</strong>
-          </div>
-          <div class="text-body-2 mb-3">
-            {{ t('Net') }}: <strong>{{ formatCurrency(paying?.net_amount ?? 0) }}</strong>
-          </div>
-          <VSelect
-            v-model="payMethod"
-            :items="[
-              { title: t('payment_method_CASH'), value: 'CASH' },
-              { title: t('payment_method_UZCARD'), value: 'UZCARD' },
-              { title: t('payment_method_HUMO'), value: 'HUMO' },
-              { title: t('payment_method_PAYME'), value: 'PAYME' },
-              { title: t('payment_method_BANK_TRANSFER'), value: 'BANK_TRANSFER' },
-            ]"
-            :label="t('Payment method')"
-            autofocus
-          />
-          <div class="text-caption text-disabled mt-2">
-            {{ t('CASH debits the drawer; cards settle externally') }}
-          </div>
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn
-            variant="text"
-            @click="payDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="success"
-            @click="payOne"
-          >
-            {{ t('Pay') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      <div class="sal-pay-meta">
+        <div>
+          <span class="cell-muted">{{ t('Employee') }}:</span>
+          <strong>{{ employeeName(paying) }}</strong>
+        </div>
+        <div>
+          <span class="cell-muted">{{ t('Net') }}:</span>
+          <strong>{{ formatCurrency(paying?.net_amount ?? 0) }}</strong>
+        </div>
+      </div>
+
+      <Field :label="t('Payment method')">
+        <Select
+          v-model="payMethod"
+          :options="payMethodOptions"
+          icon="dollar"
+        />
+      </Field>
+
+      <div class="sal-pay-hint">
+        {{ t('salary_pay_hint') }}
+      </div>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="submittingPay"
+          @click="payDialog = false"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="dollar"
+          :loading="submittingPay"
+          :disabled="submittingPay"
+          @click="payOne"
+        >
+          {{ t('Pay') }}
+        </Button>
+      </template>
+    </Modal>
 
     <VSnackbar
       v-model="snackbar"
@@ -942,3 +1032,211 @@ meta:
   action: manage
   subject: all
 </route>
+
+<style scoped>
+.toolbar--wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.tb-filter {
+  width: 200px;
+}
+
+.tb-filter--wide {
+  width: 240px;
+}
+
+.tb-period {
+  width: 180px;
+}
+
+.control--native {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid rgb(var(--v-theme-border));
+  border-radius: var(--r-sm);
+  background: rgb(var(--v-theme-surface));
+  color: rgb(var(--v-theme-text-primary));
+  font-size: var(--fs-body);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sal-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sal-item-head__meta {
+  min-width: 0;
+}
+
+.sal-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  background: rgb(var(--v-theme-warning-weak));
+  color: rgb(var(--v-theme-warning-strong));
+  border: 1px solid rgb(var(--v-theme-warning-border));
+  border-radius: var(--r-sm);
+  font-size: var(--fs-body);
+}
+
+.sal-section {
+  padding: 14px;
+  margin-bottom: 14px;
+  border: 1px solid rgb(var(--v-theme-border));
+  border-radius: var(--r-md);
+  background: rgb(var(--v-theme-surface));
+}
+
+.sal-section__title {
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-body);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sal-section__title--between {
+  justify-content: space-between;
+}
+
+.sal-section__title--between > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sal-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sal-row__input {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.sal-row--add {
+  margin-top: 8px;
+}
+
+.sal-row__amount {
+  width: 140px;
+}
+
+.sal-row__reason {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.sal-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sal-list__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--r-xs);
+}
+
+.sal-list__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.sal-list__empty {
+  padding: 6px 8px;
+  color: rgb(var(--v-theme-text-secondary));
+  font-size: var(--fs-label);
+}
+
+.sal-net {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  background: rgb(var(--v-theme-primary-weak));
+  color: rgb(var(--v-theme-primary));
+  font-weight: var(--fw-semibold);
+}
+
+.sal-net__value {
+  font-size: 22px;
+  font-weight: var(--fw-bold);
+}
+
+.sal-pay-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.sal-pay-meta strong {
+  margin-left: 6px;
+}
+
+.sal-pay-hint {
+  font-size: var(--fs-label);
+  color: rgb(var(--v-theme-text-secondary));
+  margin-top: 8px;
+}
+
+.t-success {
+  color: rgb(var(--v-theme-success-strong));
+}
+
+.t-error {
+  color: rgb(var(--v-theme-error-strong));
+}
+
+@media (max-width: 900px) {
+  .sal-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .tb-filter,
+  .tb-filter--wide,
+  .tb-period {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .sal-row__amount,
+  .sal-row__reason,
+  .sal-row__input {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .sal-kpis {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

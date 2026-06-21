@@ -192,7 +192,7 @@ const kpiBalance = computed(() => ({
   icon: 'wallet',
   tone: 'warning' as const,
   money: true,
-  sub: supplier.value?.currency ?? 'UZS',
+  sub: supplier.value?.currency ?? t('currency_default'),
 }))
 const kpiCreditLimit = computed(() => ({
   label: t('supplier_kpi_credit_limit'),
@@ -200,7 +200,7 @@ const kpiCreditLimit = computed(() => ({
   icon: 'shield',
   tone: 'info' as const,
   money: true,
-  sub: supplier.value?.currency ?? 'UZS',
+  sub: supplier.value?.currency ?? t('currency_default'),
 }))
 const kpiTotalOrders = computed(() => ({
   label: t('supplier_kpi_total_orders'),
@@ -555,9 +555,12 @@ const statusBadgeText = computed(() =>
   supplier.value?.is_active ? t('supplier_status_active') : t('supplier_status_inactive'),
 )
 
+const RATING_STAR_FULL = '★'
+const RATING_STAR_EMPTY = '☆'
+
 function ratingStars(n: number | null | undefined): string {
   const r = Math.max(0, Math.min(5, Number(n) || 0))
-  return '★'.repeat(r) + '☆'.repeat(5 - r)
+  return RATING_STAR_FULL.repeat(r) + RATING_STAR_EMPTY.repeat(5 - r)
 }
 
 function signedAmount(row: any): string {
@@ -672,7 +675,7 @@ function backToList() {
         >
           <div>
             <span style="color: var(--color-warning, #d97706);">{{ ratingStars(supplier.rating) }}</span>
-            <span style="margin-left:6px;">{{ supplier.rating ?? '—' }} / 5</span>
+            <span style="margin-left:6px;">{{ t('rating_out_of_5', { n: supplier.rating ?? '—' }) }}</span>
           </div>
           <div style="margin-top:2px;">
             {{ t('supplier_field_created_at') }}: {{ supplier.created_at ? formatDate(supplier.created_at) : '—' }}
@@ -683,7 +686,7 @@ function backToList() {
 
     <!-- KPI strip -->
     <div
-      class="grid cols-4"
+      class="grid cols-4 kpi-strip"
       style="margin-bottom: var(--sp-5);"
     >
       <Kpi :data="kpiBalance" />
@@ -692,7 +695,7 @@ function backToList() {
       <Kpi :data="kpiTotalValue" />
     </div>
     <div
-      class="grid cols-4"
+      class="grid cols-4 kpi-strip"
       style="margin-bottom: var(--sp-5);"
     >
       <Kpi :data="kpiAvgOrder" />
@@ -713,7 +716,7 @@ function backToList() {
     <!-- Overview tab -->
     <div
       v-if="tab === 'overview'"
-      class="grid cols-2"
+      class="grid cols-2 overview-grid"
       style="gap: var(--sp-5);"
     >
       <Card class-name="card--padded">
@@ -817,7 +820,7 @@ function backToList() {
                 {{ t('supplier_field_currency') }}
               </div>
               <div class="kv__v">
-                {{ supplier?.currency || 'UZS' }}
+                {{ supplier?.currency || t('currency_default') }}
               </div>
             </div>
             <div class="kv">
@@ -876,10 +879,10 @@ function backToList() {
 
     <!-- Items tab -->
     <Card v-else-if="tab === 'items'">
-      <div class="toolbar">
+      <div class="toolbar" style="flex-wrap: wrap; gap: 8px;">
         <div
           class="row"
-          style="gap:10px; align-items:center;"
+          style="gap:10px; align-items:center; flex-wrap: wrap;"
         >
           <Switch
             v-model="itemPreferredOnly"
@@ -924,7 +927,7 @@ function backToList() {
           <span
             class="cell-muted"
             style="margin-left:4px;font-size:12px;"
-          >{{ row.currency || 'UZS' }}</span>
+          >{{ row.currency || t('currency_default') }}</span>
         </template>
         <template #cell.min_order_qty="{ row }">
           <span class="num-tabular">{{ row.min_order_qty ?? '—' }}</span>
@@ -984,15 +987,15 @@ function backToList() {
 
     <!-- Ledger tab -->
     <Card v-else-if="tab === 'ledger'">
-      <div class="toolbar">
-        <div style="width:200px;">
+      <div class="toolbar" style="flex-wrap: wrap; gap: 8px;">
+        <div class="ledger-filter">
           <Select
             v-model="ledgerTypeFilter"
             :placeholder="t('all')"
             :options="txnTypeOptions"
           />
         </div>
-        <div style="width:200px;">
+        <div class="ledger-filter">
           <Select
             v-model="ledgerSourceFilter"
             :placeholder="t('all')"
@@ -1530,9 +1533,29 @@ function backToList() {
   grid-template-columns: 1fr 1fr;
   gap: 10px 24px;
 }
-@media (max-width: 700px) {
+.ledger-filter {
+  flex: 1 1 200px;
+  min-width: 160px;
+  max-width: 240px;
+}
+@media (max-width: 1100px) {
+  .kpi-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
   .kv-grid {
     grid-template-columns: 1fr;
+  }
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+  .kpi-strip {
+    grid-template-columns: 1fr;
+  }
+  .ledger-filter {
+    flex: 1 1 100%;
+    max-width: none;
   }
 }
 .kv {

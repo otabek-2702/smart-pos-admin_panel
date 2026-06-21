@@ -1,60 +1,94 @@
 <script setup lang="ts">
+/* ============================================================
+   HR LEAVES — leave requests with approval workflow
+   Plain HTML + design primitives. No Vuetify on this surface.
+   ============================================================ */
+import type { DataTableColumn } from '@/components/design/DataTable.vue'
 import { hrApi as axios } from '@/plugins/axios'
-import DataTableFooter from '@core/components/DataTableFooter.vue'
+import Badge from '@/components/design/Badge.vue'
+import Button from '@/components/design/Button.vue'
+import Card from '@/components/design/Card.vue'
+import DataTable from '@/components/design/DataTable.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import Field from '@/components/design/Field.vue'
+import IconAction from '@/components/design/IconAction.vue'
+import Input from '@/components/design/Input.vue'
+import Modal from '@/components/design/Modal.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
+import Select from '@/components/design/Select.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatDate } = useFormatters()
 
+// ============================================================
+// State
+// ============================================================
 const items = ref<any[]>([])
 const total = ref(0)
 const loading = ref(false)
 const page = ref(1)
-const itemsPerPage = ref(20)
-const statusFilter = ref<string | undefined>(undefined)
-const employeeFilter = ref<string | number | undefined>(undefined)
-const leaveTypeFilter = ref<string | number | undefined>(undefined)
+const itemsPerPage = ref(10)
+
+const statusFilter = ref<string>('')
+const employeeFilter = ref<string>('')
+const leaveTypeFilter = ref<string>('')
 // Note: BE leave_requests view does not currently filter on date_from/date_to;
 // these are exposed as client-side filters only.
-const dateFrom = ref<string | undefined>(undefined)
-const dateTo = ref<string | undefined>(undefined)
+const dateFrom = ref<string>('')
+const dateTo = ref<string>('')
+
 const employees = ref<any[]>([])
 const leaveTypes = ref<any[]>([])
 
-const statusOptions = computed(() => ['PENDING', 'APPROVED', 'REJECTED', 'CANCELED'].map(v => ({
-  title: t(`leave_status_${v}`),
-  value: v,
-})))
-
-const employeeOptions = computed(() => employees.value.map(e => ({
-  title: `${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}`.trim() || e.user?.email || `#${e.id}`,
-  value: e.id,
-})))
-
-const leaveTypeOptions = computed(() => leaveTypes.value.map(lt => ({
-  title: lt.name,
-  value: lt.id,
-})))
-
-const headers = [
-  { title: t('Employee'), key: 'employee', sortable: false },
-  { title: t('Leave Type'), key: 'leave_type', sortable: false },
-  { title: t('From'), key: 'start_date', sortable: false },
-  { title: t('To'), key: 'end_date', sortable: false },
-  { title: t('Days'), key: 'days', sortable: false },
-  { title: t('Reason'), key: 'reason', sortable: false },
-  { title: t('Approved by'), key: 'approved_by', sortable: false },
-  { title: t('Status'), key: 'status', sortable: false },
-  { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
-]
-
-const statusColor: Record<string, string> = {
+// ============================================================
+// Tone map
+// ============================================================
+const STATUS_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'primary'> = {
   PENDING: 'warning',
   APPROVED: 'success',
   REJECTED: 'error',
-  CANCELED: 'default',
+  CANCELED: 'neutral',
 }
 
+// ============================================================
+// Options
+// ============================================================
+const statusOptions = computed(() => [
+  { value: '', label: t('leave_filter_all_status') },
+  ...['PENDING', 'APPROVED', 'REJECTED', 'CANCELED'].map(v => ({
+    value: v,
+    label: t(`leave_status_${v}`),
+  })),
+])
+
+const employeeOptions = computed(() => [
+  { value: '', label: t('leave_filter_all_employees') },
+  ...employees.value.map((e: any) => ({
+    value: String(e.id),
+    label: `${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}`.trim() || e.user?.email || `#${e.id}`,
+  })),
+])
+
+const leaveTypeOptions = computed(() => [
+  { value: '', label: t('leave_filter_all_types') },
+  ...leaveTypes.value.map((lt: any) => ({ value: String(lt.id), label: lt.name })),
+])
+
+// Modal-only employee/leave-type options (no "all" sentinel)
+const employeeOptionsForm = computed(() =>
+  employees.value.map((e: any) => ({
+    value: String(e.id),
+    label: `${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}`.trim() || e.user?.email || `#${e.id}`,
+  })),
+)
+const leaveTypeOptionsForm = computed(() =>
+  leaveTypes.value.map((lt: any) => ({ value: String(lt.id), label: lt.name })),
+)
+
+// ============================================================
+// API
+// ============================================================
 async function load() {
   loading.value = true
   try {
@@ -71,9 +105,9 @@ async function load() {
     let rows = d?.leave_requests ?? d?.leaves ?? d?.items ?? []
     // Client-side date filtering (BE does not yet support date_from/date_to on this endpoint)
     if (dateFrom.value)
-      rows = rows.filter((r: any) => (r.start_date ?? '') >= dateFrom.value!)
+      rows = rows.filter((r: any) => (r.start_date ?? '') >= dateFrom.value)
     if (dateTo.value)
-      rows = rows.filter((r: any) => (r.end_date ?? '') <= dateTo.value!)
+      rows = rows.filter((r: any) => (r.end_date ?? '') <= dateTo.value)
     items.value = rows
     total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? items.value.length
   }
@@ -108,8 +142,15 @@ onMounted(() => {
   loadEmployees()
   loadLeaveTypes()
 })
-watch([page, itemsPerPage, statusFilter, employeeFilter, leaveTypeFilter, dateFrom, dateTo], load)
+watch([page, itemsPerPage], load)
+watch([statusFilter, employeeFilter, leaveTypeFilter, dateFrom, dateTo], () => {
+  page.value = 1
+  load()
+})
 
+// ============================================================
+// Actions
+// ============================================================
 async function approve(l: any) {
   try {
     await axios.post(`/leaves/${l.id}/approve/`)
@@ -148,19 +189,109 @@ async function cancelLeave(l: any) {
   }
 }
 
+// ============================================================
+// Filter chips
+// ============================================================
+const activeFilters = computed(() => {
+  const out: { k: string; label: string; val: string; clear: () => void }[] = []
+  if (statusFilter.value) {
+    out.push({
+      k: 'status',
+      label: t('Status'),
+      val: t(`leave_status_${statusFilter.value}`),
+      clear: () => { statusFilter.value = '' },
+    })
+  }
+  if (employeeFilter.value) {
+    const hit = employees.value.find((e: any) => String(e.id) === employeeFilter.value)
+    const name = hit ? (`${hit.user?.first_name ?? ''} ${hit.user?.last_name ?? ''}`.trim() || hit.user?.email || `#${hit.id}`) : employeeFilter.value
+    out.push({
+      k: 'emp',
+      label: t('Employee'),
+      val: name,
+      clear: () => { employeeFilter.value = '' },
+    })
+  }
+  if (leaveTypeFilter.value) {
+    const hit = leaveTypes.value.find((lt: any) => String(lt.id) === leaveTypeFilter.value)
+    out.push({
+      k: 'lt',
+      label: t('Leave Type'),
+      val: hit?.name ?? leaveTypeFilter.value,
+      clear: () => { leaveTypeFilter.value = '' },
+    })
+  }
+  if (dateFrom.value) {
+    out.push({
+      k: 'df',
+      label: t('Date from'),
+      val: dateFrom.value,
+      clear: () => { dateFrom.value = '' },
+    })
+  }
+  if (dateTo.value) {
+    out.push({
+      k: 'dt',
+      label: t('Date to'),
+      val: dateTo.value,
+      clear: () => { dateTo.value = '' },
+    })
+  }
+  return out
+})
+
+function clearAllFilters() {
+  statusFilter.value = ''
+  employeeFilter.value = ''
+  leaveTypeFilter.value = ''
+  dateFrom.value = ''
+  dateTo.value = ''
+}
+
+// ============================================================
+// Columns
+// ============================================================
+const columns: DataTableColumn<any>[] = [
+  { key: 'employee', label: t('Employee'), sortable: false },
+  { key: 'leave_type', label: t('Leave Type'), sortable: false },
+  { key: 'start_date', label: t('From'), sortable: true, width: 120 },
+  { key: 'end_date', label: t('To'), sortable: true, width: 120 },
+  { key: 'days', label: t('Days'), sortable: false, align: 'right', width: 80 },
+  { key: 'reason', label: t('Reason'), sortable: false },
+  { key: 'approved_by', label: t('Approved by'), sortable: false },
+  { key: 'status', label: t('Status'), sortable: true, width: 120 },
+]
+
+const tablePagination = computed(() => ({
+  page: page.value,
+  perPage: itemsPerPage.value,
+  total: total.value,
+  onPage: (n: number) => { page.value = n },
+  onPerPage: (n: number) => { itemsPerPage.value = n; page.value = 1 },
+}))
+
+// ============================================================
+// Create modal
+// ============================================================
 const newDialog = ref(false)
 const newSubmitting = ref(false)
-const newForm = ref<{ employee_id: string | number | null, leave_type_id: string | number | null, start_date: string, end_date: string, reason: string }>({
-  employee_id: null,
-  leave_type_id: null,
+const newForm = ref<{ employee_id: string, leave_type_id: string, start_date: string, end_date: string, reason: string }>({
+  employee_id: '',
+  leave_type_id: '',
   start_date: '',
   end_date: '',
   reason: '',
 })
 
 function openNewDialog() {
-  newForm.value = { employee_id: null, leave_type_id: null, start_date: '', end_date: '', reason: '' }
+  newForm.value = { employee_id: '', leave_type_id: '', start_date: '', end_date: '', reason: '' }
   newDialog.value = true
+}
+
+function closeNewDialog() {
+  if (newSubmitting.value)
+    return
+  newDialog.value = false
 }
 
 async function submitNew() {
@@ -170,7 +301,13 @@ async function submitNew() {
   }
   newSubmitting.value = true
   try {
-    await axios.post('/leaves/', { ...newForm.value })
+    await axios.post('/leaves/', {
+      employee_id: Number(newForm.value.employee_id),
+      leave_type_id: Number(newForm.value.leave_type_id),
+      start_date: newForm.value.start_date,
+      end_date: newForm.value.end_date,
+      reason: newForm.value.reason,
+    })
     notify(t('Leave request created'))
     newDialog.value = false
     await load()
@@ -182,262 +319,333 @@ async function submitNew() {
     newSubmitting.value = false
   }
 }
+
+// ============================================================
+// Helpers
+// ============================================================
+function employeeName(row: any): string {
+  const u = row?.employee?.user
+  if (!u)
+    return '—'
+  const full = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim()
+  return full || u.email || '—'
+}
+
+function approverName(row: any): string {
+  const a = row?.approved_by
+  if (!a)
+    return '—'
+  const full = `${a.first_name ?? ''} ${a.last_name ?? ''}`.trim()
+  return full || a.email || '—'
+}
+
+// ============================================================
+// ESC handler
+// ============================================================
+function onKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape')
+    return
+  if (newDialog.value) {
+    closeNewDialog()
+    e.preventDefault()
+  }
+}
+
+onMounted(() => { window.addEventListener('keydown', onKeydown) })
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 </script>
 
 <template>
-  <div>
-    <div class="page-head">
-      <div style="min-width:0;">
-        <h1 class="page-head__title">
-          {{ t('Leave Requests') }}
-        </h1>
-        <div class="page-head__subtitle">
-          {{ t('Approve or reject time-off requests') }}
-        </div>
-      </div>
-      <div class="page-head__actions">
-        <VSelect
-          v-model="employeeFilter"
-          :items="employeeOptions"
-          :placeholder="t('Employee')"
-          density="compact"
-          style="min-inline-size:180px;"
-          hide-details
-          clearable
-        />
-        <VSelect
-          v-model="leaveTypeFilter"
-          :items="leaveTypeOptions"
-          :placeholder="t('Leave Type')"
-          density="compact"
-          style="min-inline-size:160px;"
-          hide-details
-          clearable
-        />
-        <VTextField
-          v-model="dateFrom"
-          type="date"
-          :placeholder="t('Date from')"
-          density="compact"
-          style="min-inline-size:150px;"
-          hide-details
-          clearable
-        />
-        <VTextField
-          v-model="dateTo"
-          type="date"
-          :placeholder="t('Date to')"
-          density="compact"
-          style="min-inline-size:150px;"
-          hide-details
-          clearable
-        />
-        <VSelect
-          v-model="statusFilter"
-          :items="statusOptions"
-          :placeholder="t('Status')"
-          density="compact"
-          style="min-inline-size:160px;"
-          hide-details
-          clearable
-        />
-        <VBtn
-          color="primary"
-          prepend-icon="bx-plus"
+  <div class="page">
+    <PageHeader
+      :title="t('Leave Requests')"
+      :subtitle="t('leave_subtitle')"
+    >
+      <template #actions>
+        <Button
+          variant="ghost"
+          icon="refresh"
+          :disabled="loading"
+          @click="load"
+        >
+          {{ t('Refresh') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="plus"
           @click="openNewDialog"
         >
           {{ t('New Leave Request') }}
-        </VBtn>
-      </div>
-    </div>
+        </Button>
+      </template>
+    </PageHeader>
 
-    <VCard>
-
-      <VDataTableServer
-        :headers="headers"
-        :items="items"
-        :items-length="total"
-        :loading="loading"
-        :items-per-page="itemsPerPage"
-        :page="page"
-      >
-        <template #bottom>
-          <DataTableFooter
-            v-model:page="page"
-            v-model:items-per-page="itemsPerPage"
-            :total-items="total"
+    <Card>
+      <div class="toolbar toolbar--wrap">
+        <div class="tb-filter">
+          <Select
+            v-model="employeeFilter"
+            icon="user"
+            :placeholder="t('Employee')"
+            :options="employeeOptions"
           />
-        </template>
-        <template #item.employee="{ item }">
-          {{ item.raw.employee?.user?.first_name }} {{ item.raw.employee?.user?.last_name }}
-        </template>
-        <template #item.leave_type="{ item }">
-          {{ item.raw.leave_type?.name ?? '—' }}
-        </template>
-        <template #item.start_date="{ item }">
-          {{ formatDate(item.raw.start_date) }}
-        </template>
-        <template #item.end_date="{ item }">
-          {{ formatDate(item.raw.end_date) }}
-        </template>
-        <template #item.days="{ item }">
-          <span class="num-tabular">{{ item.raw.days_count ?? item.raw.duration ?? '—' }}</span>
-        </template>
-        <template #item.reason="{ item }">
+        </div>
+        <div class="tb-filter">
+          <Select
+            v-model="leaveTypeFilter"
+            icon="filter"
+            :placeholder="t('Leave Type')"
+            :options="leaveTypeOptions"
+          />
+        </div>
+        <div class="tb-filter tb-filter--date">
+          <Input
+            v-model="dateFrom"
+            type="date"
+            :placeholder="t('Date from')"
+          />
+        </div>
+        <div class="tb-filter tb-filter--date">
+          <Input
+            v-model="dateTo"
+            type="date"
+            :placeholder="t('Date to')"
+          />
+        </div>
+        <div class="tb-filter">
+          <Select
+            v-model="statusFilter"
+            icon="filter"
+            :placeholder="t('Status')"
+            :options="statusOptions"
+          />
+        </div>
+      </div>
+
+      <!-- Filter chips -->
+      <div
+        v-if="activeFilters.length > 0"
+        class="toolbar"
+        style="padding-top:0;"
+      >
+        <div class="chips">
           <span
-            v-if="item.raw.reason"
-            class="truncate"
-            style="display:inline-block;max-inline-size:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;"
+            class="tertiary"
+            style="font-size:13px;margin-right:2px;"
+          >{{ t('Filters') }}:</span>
+          <span
+            v-for="f in activeFilters"
+            :key="f.k"
+            class="chip"
           >
-            {{ item.raw.reason }}
-            <VTooltip activator="parent" location="top">{{ item.raw.reason }}</VTooltip>
+            <span>{{ f.label }}: <b>{{ f.val }}</b></span>
+            <span
+              class="chip__x"
+              @click="f.clear()"
+            >
+              <DesignIcon
+                name="close"
+                :size="13"
+              />
+            </span>
+          </span>
+          <button
+            class="chip--clear"
+            @click="clearAllFilters"
+          >
+            {{ t('Clear all') }}
+          </button>
+        </div>
+      </div>
+
+      <div class="card__divider" />
+
+      <DataTable
+        :columns="columns"
+        :rows="items"
+        row-key="id"
+        :loading="loading"
+        :pagination="tablePagination"
+      >
+        <template #cell.employee="{ row }">
+          <span class="cell-strong">{{ employeeName(row) }}</span>
+        </template>
+
+        <template #cell.leave_type="{ row }">
+          <span>{{ row.leave_type?.name ?? '—' }}</span>
+        </template>
+
+        <template #cell.start_date="{ row }">
+          <span>{{ formatDate(row.start_date) }}</span>
+        </template>
+
+        <template #cell.end_date="{ row }">
+          <span>{{ formatDate(row.end_date) }}</span>
+        </template>
+
+        <template #cell.days="{ row }">
+          <span class="mono">{{ row.days_count ?? row.duration ?? '—' }}</span>
+        </template>
+
+        <template #cell.reason="{ row }">
+          <span
+            v-if="row.reason"
+            class="reason-cell"
+            :title="row.reason"
+          >
+            {{ row.reason }}
           </span>
           <span v-else>—</span>
         </template>
-        <template #item.approved_by="{ item }">
-          <template v-if="item.raw.approved_by">
-            {{ item.raw.approved_by?.first_name ?? '' }} {{ item.raw.approved_by?.last_name ?? '' }}
-          </template>
-          <template v-else>
-            —
-          </template>
+
+        <template #cell.approved_by="{ row }">
+          <span>{{ approverName(row) }}</span>
         </template>
-        <template #item.status="{ item }">
-          <VChip
-            size="small"
-            class="status-pill"
-            :color="statusColor[item.raw.status] ?? 'default'"
-            variant="tonal"
-          >
-            {{ t(`leave_status_${item.raw.status}`) }}
-          </VChip>
+
+        <template #cell.status="{ row }">
+          <Badge :tone="STATUS_TONE[row.status] ?? 'neutral'">
+            {{ t(`leave_status_${row.status}`) }}
+          </Badge>
         </template>
-        <template #item.actions="{ item }">
-          <div
-            class="d-flex justify-end"
-            style="gap:2px;"
-          >
-            <VBtn
-              v-if="item.raw.status === 'PENDING'"
-              icon
-              variant="text"
-              size="small"
-              color="success"
-              @click="approve(item.raw)"
-            >
-              <VIcon
-                icon="bx-check"
-                size="18"
+
+        <template #row-actions="{ row }">
+          <IconAction
+            v-if="row.status === 'PENDING'"
+            icon="check"
+            tone="success"
+            :title="t('Approve')"
+            @click="approve(row)"
+          />
+          <IconAction
+            v-if="row.status === 'PENDING'"
+            icon="close"
+            tone="danger"
+            :title="t('Reject')"
+            @click="reject(row)"
+          />
+          <IconAction
+            v-if="row.status === 'PENDING' || row.status === 'APPROVED'"
+            icon="stop"
+            tone="warning"
+            :title="t('Cancel')"
+            @click="cancelLeave(row)"
+          />
+        </template>
+
+        <template #empty>
+          <div class="statefill">
+            <div class="statefill__icon">
+              <DesignIcon
+                name="calendar"
+                :size="24"
               />
-              <VTooltip
-                activator="parent"
-                location="top"
+            </div>
+            <div class="statefill__title">
+              {{ t('leave_empty_title') }}
+            </div>
+            <div class="statefill__sub">
+              {{ t('leave_empty_hint') }}
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
+              <Button
+                v-if="activeFilters.length > 0"
+                variant="secondary"
+                @click="clearAllFilters"
               >
-                {{ t('Approve') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="item.raw.status === 'PENDING'"
-              icon
-              variant="text"
-              size="small"
-              color="error"
-              @click="reject(item.raw)"
-            >
-              <VIcon
-                icon="bx-x"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
+                {{ t('Clear all') }}
+              </Button>
+              <Button
+                variant="primary"
+                icon="plus"
+                @click="openNewDialog"
               >
-                {{ t('Reject') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              v-if="item.raw.status === 'PENDING' || item.raw.status === 'APPROVED'"
-              icon
-              variant="text"
-              size="small"
-              color="warning"
-              @click="cancelLeave(item.raw)"
-            >
-              <VIcon
-                icon="bx-block"
-                size="18"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Cancel') }}
-              </VTooltip>
-            </VBtn>
+                {{ t('New Leave Request') }}
+              </Button>
+            </div>
           </div>
         </template>
-      </VDataTableServer>
-    </VCard>
+      </DataTable>
+    </Card>
 
-    <VDialog
-      v-model="newDialog"
-      max-width="560"
+    <!-- Create modal -->
+    <Modal
+      :open="newDialog"
+      :title="t('New Leave Request')"
+      :subtitle="t('leave_modal_create_subtitle')"
+      :width="560"
+      @close="closeNewDialog"
     >
-      <VCard>
-        <VCardTitle>{{ t('New Leave Request') }}</VCardTitle>
-        <VCardText>
-          <div style="display:flex; flex-direction:column; gap:12px;">
-            <VSelect
+      <form @submit.prevent="submitNew">
+        <div class="form-grid">
+          <Field
+            :label="t('Employee')"
+            class="span-2"
+          >
+            <Select
               v-model="newForm.employee_id"
-              :items="employeeOptions"
-              :label="t('Employee')"
-              density="comfortable"
+              :options="employeeOptionsForm"
+              :placeholder="t('leave_select_employee')"
             />
-            <VSelect
+          </Field>
+
+          <Field
+            :label="t('Leave Type')"
+            class="span-2"
+          >
+            <Select
               v-model="newForm.leave_type_id"
-              :items="leaveTypeOptions"
-              :label="t('Leave Type')"
-              density="comfortable"
+              :options="leaveTypeOptionsForm"
+              :placeholder="t('leave_select_type')"
             />
-            <VTextField
+          </Field>
+
+          <Field :label="t('Start date')">
+            <Input
               v-model="newForm.start_date"
               type="date"
-              :label="t('Start date')"
-              density="comfortable"
             />
-            <VTextField
+          </Field>
+
+          <Field :label="t('End date')">
+            <Input
               v-model="newForm.end_date"
               type="date"
-              :label="t('End date')"
-              density="comfortable"
             />
-            <VTextarea
-              v-model="newForm.reason"
-              :label="t('Reason')"
-              rows="3"
-              density="comfortable"
-            />
-          </div>
-        </VCardText>
-        <VCardActions>
-          <VSpacer />
-          <VBtn
-            variant="text"
-            @click="newDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="primary"
-            :loading="newSubmitting"
-            @click="submitNew"
-          >
-            {{ t('Create') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+          </Field>
 
+          <Field
+            :label="t('Reason')"
+            class="span-2"
+          >
+            <Input
+              v-model="newForm.reason"
+              :placeholder="t('leave_reason_placeholder')"
+            />
+          </Field>
+        </div>
+      </form>
+
+      <template #footer>
+        <Button
+          variant="ghost"
+          :disabled="newSubmitting"
+          @click="closeNewDialog"
+        >
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="check"
+          :loading="newSubmitting"
+          :disabled="newSubmitting"
+          @click="submitNew"
+        >
+          {{ t('Create') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Toast -->
     <VSnackbar
       v-model="snackbar"
       :color="snackbarColor"
@@ -453,3 +661,61 @@ meta:
   action: manage
   subject: all
 </route>
+
+<style scoped>
+.toolbar--wrap {
+  flex-wrap: wrap;
+}
+
+.tb-filter {
+  flex: 1 1 180px;
+  min-width: 160px;
+  max-width: 220px;
+}
+
+.tb-filter--date {
+  min-width: 150px;
+  max-width: 180px;
+}
+
+.reason-cell {
+  display: inline-block;
+  max-inline-size: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-grid .span-2 {
+  grid-column: span 2;
+}
+
+@media (max-width: 900px) {
+  .tb-filter,
+  .tb-filter--date {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid .span-2 {
+    grid-column: span 1;
+  }
+
+  .reason-cell {
+    max-inline-size: 140px;
+  }
+}
+</style>

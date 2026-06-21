@@ -418,9 +418,9 @@ onBeforeUnmount(() => {
 
     <!-- Toolbar + table -->
     <Card>
-      <div class="toolbar">
+      <div class="toolbar shift-tpl-toolbar">
         <!-- Search -->
-        <div style="flex:1;max-width:320px;">
+        <div class="shift-tpl-toolbar__search">
           <Input
             v-model="search"
             icon="search"
@@ -429,7 +429,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Status -->
-        <div style="width:200px;">
+        <div class="shift-tpl-toolbar__status">
           <Select
             v-model="statusFilter"
             icon="filter"
@@ -449,7 +449,7 @@ onBeforeUnmount(() => {
           <span
             class="tertiary"
             style="font-size:13px;margin-right:2px;"
-          >{{ t('Filters') }}:</span>
+          >{{ t('shift_template_filters_label') }}</span>
           <span
             v-for="f in activeFilters"
             :key="f.k"
@@ -609,7 +609,7 @@ onBeforeUnmount(() => {
                 v-model="form.start_time"
                 type="time"
                 step="60"
-                placeholder="HH:MM"
+                :placeholder="t('shift_template_time_placeholder')"
               >
             </div>
           </Field>
@@ -632,7 +632,7 @@ onBeforeUnmount(() => {
                 v-model="form.end_time"
                 type="time"
                 step="60"
-                placeholder="HH:MM"
+                :placeholder="t('shift_template_time_placeholder')"
               >
             </div>
           </Field>
@@ -816,6 +816,36 @@ onBeforeUnmount(() => {
 .iconaction.is-busy {
   cursor: progress;
   opacity: 0.7;
+}
+
+/* Toolbar — responsive */
+.shift-tpl-toolbar {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.shift-tpl-toolbar__search {
+  flex: 1 1 240px;
+  max-width: 320px;
+  min-width: 0;
+}
+.shift-tpl-toolbar__status {
+  flex: 0 0 200px;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .shift-tpl-toolbar__search,
+  .shift-tpl-toolbar__status {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+  /* Collapse 2-col form grid to 1 col */
+  :deep(.form-grid) {
+    grid-template-columns: 1fr !important;
+  }
+  :deep(.form-grid .span-2) {
+    grid-column: span 1 !important;
+  }
 }
 </style>
 

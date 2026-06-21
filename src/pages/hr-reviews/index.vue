@@ -424,8 +424,8 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 
     <!-- Toolbar + table -->
     <Card>
-      <div class="toolbar">
-        <div style="flex:1;max-width:280px;">
+      <div class="toolbar reviews-toolbar">
+        <div class="reviews-toolbar__search">
           <Input
             v-model="employeeFilter"
             icon="user"
@@ -433,7 +433,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             inputmode="numeric"
           />
         </div>
-        <div style="width:220px;">
+        <div class="reviews-toolbar__status">
           <Select
             v-model="statusFilter"
             icon="filter"
@@ -1017,3 +1017,33 @@ meta:
   action: manage
   subject: all
 </route>
+
+<style scoped>
+.reviews-toolbar {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.reviews-toolbar__search {
+  flex: 1 1 240px;
+  max-width: 280px;
+  min-width: 200px;
+}
+.reviews-toolbar__status {
+  width: 220px;
+  flex: 0 0 auto;
+}
+@media (max-width: 900px) {
+  .reviews-toolbar__search,
+  .reviews-toolbar__status {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: none;
+  }
+  :deep(.form-grid) {
+    grid-template-columns: 1fr !important;
+  }
+  :deep(.form-grid .span-2) {
+    grid-column: 1 / -1 !important;
+  }
+}
+</style>

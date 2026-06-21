@@ -433,7 +433,6 @@ const kpiActiveRules = computed(() => ({
   value: alerts.value.filter((a: any) => a.is_active).length,
   icon: 'bell',
   tone: 'success' as const,
-  sub: t('stock_alert_status_ACTIVE'),
 }))
 
 const kpiTotalRules = computed(() => ({
@@ -441,7 +440,6 @@ const kpiTotalRules = computed(() => ({
   value: totalAlerts.value,
   icon: 'sliders',
   tone: 'primary' as const,
-  sub: t('stock_alerts.tab.configs'),
 }))
 
 const kpiLowStock = computed(() => ({
@@ -449,7 +447,6 @@ const kpiLowStock = computed(() => ({
   value: totalLow.value,
   icon: 'alert',
   tone: 'warning' as const,
-  sub: t('stock_alerts.tab.low_stock'),
 }))
 
 // ============================================================
@@ -585,15 +582,15 @@ function shortageOf(row: any): number | null {
          CONFIGS — alert rules
          ====================================================== -->
     <Card v-if="activeTab === 'configs'">
-      <div class="toolbar">
-        <div style="flex:1;max-width:300px;">
+      <div class="toolbar toolbar--wrap">
+        <div class="tb-search">
           <Input
             v-model="searchAlerts"
             icon="search"
             :placeholder="t('stock_alerts.filter.search')"
           />
         </div>
-        <div style="width:200px;">
+        <div class="tb-select">
           <Select
             v-model="alertTypeFilter"
             icon="filter"
@@ -741,15 +738,15 @@ function shortageOf(row: any): number | null {
          LOW STOCK — read-only live view
          ====================================================== -->
     <Card v-else>
-      <div class="toolbar">
-        <div style="flex:1;max-width:300px;">
+      <div class="toolbar toolbar--wrap">
+        <div class="tb-search">
           <Input
             v-model="searchLow"
             icon="search"
             :placeholder="t('stock_alerts.filter.search_item')"
           />
         </div>
-        <div style="width:220px;">
+        <div class="tb-select">
           <Select
             v-model="locationFilter"
             icon="store"
@@ -1054,7 +1051,7 @@ function shortageOf(row: any): number | null {
               v-model.number="adjustForm.quantity"
               type="number"
               step="0.01"
-              placeholder="±0.00"
+              :placeholder="t('stock_alerts.placeholder.adjust_qty')"
             />
           </Field>
 
@@ -1112,6 +1109,35 @@ function shortageOf(row: any): number | null {
 .iconaction.is-busy {
   cursor: progress;
   opacity: 0.7;
+}
+
+.toolbar--wrap {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tb-search {
+  flex: 1;
+  max-width: 300px;
+  min-width: 200px;
+}
+
+.tb-select {
+  width: 200px;
+}
+
+@media (max-width: 900px) {
+  .grid.cols-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .tb-search,
+  .tb-select {
+    flex: 1 1 100%;
+    max-width: 100%;
+    width: 100%;
+    min-width: 0;
+  }
 }
 </style>
 

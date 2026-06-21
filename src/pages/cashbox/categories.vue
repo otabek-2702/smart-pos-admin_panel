@@ -1,5 +1,12 @@
 <script setup lang="ts">
 import { cashboxApi as axios } from '@/plugins/axios'
+import Badge from '@/components/design/Badge.vue'
+import Button from '@/components/design/Button.vue'
+import Card from '@/components/design/Card.vue'
+import DataTable, { type DataTableColumn } from '@/components/design/DataTable.vue'
+import Field from '@/components/design/Field.vue'
+import Input from '@/components/design/Input.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -55,93 +62,105 @@ async function add() {
 }
 
 onMounted(load)
+
+// ---- Table columns ----
+const columns = computed<DataTableColumn<any>[]>(() => [
+  { key: 'id', label: t('cashbox_cat_col_id'), sortable: true, align: 'right', width: 80 },
+  { key: 'name', label: t('Name'), sortable: true },
+  { key: 'sort_order', label: t('Sort order'), sortable: true, align: 'right' },
+  { key: 'is_active', label: t('Active'), sortable: true },
+])
 </script>
 
 <template>
-  <div>
-    <div class="page-head">
-      <div style="min-width:0;">
-        <h1 class="page-head__title">
-          {{ t('Cashbox Expense Categories') }}
-        </h1>
-        <div class="page-head__subtitle">
-          {{ t('Categories used when a cashier records a cash-drawer expense during a shift.') }}
+  <div class="page cashbox-categories-page">
+    <PageHeader
+      :title="t('Cashbox Expense Categories')"
+      :subtitle="t('cashbox_cat_page_subtitle')"
+    />
+
+    <Card>
+      <!-- Toolbar: search -->
+      <div class="toolbar toolbar--wrap">
+        <div class="tb-search">
+          <Input
+            v-model="search"
+            icon="search"
+            :placeholder="t('Search categories...')"
+          />
         </div>
       </div>
-      <div class="page-head__actions" />
-    </div>
 
-    <VCard>
-      <VCardText>
-        <div class="d-flex gap-2 mb-4">
-          <VTextField
-            v-model="search"
-            :placeholder="t('Search categories...')"
-            density="compact"
-            hide-details
-            prepend-inner-icon="bx-search"
-            clearable
-            style="max-inline-size:280px;"
-          />
-        </div>
-        <div class="d-flex gap-2 mb-4">
-          <VTextField
+      <div class="card__divider" />
+
+      <!-- Add form row -->
+      <div class="add-form">
+        <Field
+          :label="t('Name')"
+          class="add-form__name"
+        >
+          <Input
             v-model="newCat.name"
-            :label="t('Name')"
-            density="compact"
-            hide-details
+            :placeholder="t('Name')"
             @keyup.enter="add"
           />
-          <VTextField
+        </Field>
+        <Field
+          :label="t('Sort')"
+          class="add-form__sort"
+        >
+          <Input
             v-model.number="newCat.sort_order"
-            :label="t('Sort')"
             type="number"
-            density="compact"
-            hide-details
-            style="max-inline-size:120px;"
+            :placeholder="t('Sort')"
           />
-          <VBtn
-            color="primary"
+        </Field>
+        <div class="add-form__btn">
+          <Button
+            variant="primary"
+            icon="plus"
             :loading="saving"
-            prepend-icon="bx-plus"
             @click="add"
           >
             {{ t('Add') }}
-          </VBtn>
+          </Button>
         </div>
+      </div>
 
-        <VTable density="compact">
-          <thead>
-            <tr>
-              <th class="text-end" style="inline-size:60px;">#</th>
-              <th>{{ t('Name') }}</th>
-              <th class="text-end">{{ t('Sort order') }}</th>
-              <th>{{ t('Active') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="c in filteredCategories"
-              :key="c.id"
-            >
-              <td class="text-end num-tabular">{{ c.id }}</td>
-              <td class="font-weight-medium">{{ c.name }}</td>
-              <td class="text-end num-tabular">{{ c.sort_order ?? 0 }}</td>
-              <td>
-                <span class="badge" :class="c.is_active === false ? 't-neutral' : 't-success'">
-                  {{ t(`active_${c.is_active !== false}`) }}
-                </span>
-              </td>
-            </tr>
-            <tr v-if="!filteredCategories.length && !loading">
-              <td colspan="4" class="text-center text-disabled py-4">
-                {{ t('No categories yet') }}
-              </td>
-            </tr>
-          </tbody>
-        </VTable>
-      </VCardText>
-    </VCard>
+      <div class="card__divider" />
+
+      <!-- Data table -->
+      <DataTable
+        :columns="columns"
+        :rows="filteredCategories"
+        :loading="loading"
+        row-key="id"
+        :empty-title="t('No categories yet')"
+        :empty-sub="t('cashbox_cat_empty_sub')"
+        empty-icon="tag"
+      >
+        <template #cell.id="{ row }">
+          <span class="mono num-tabular">{{ row.id }}</span>
+        </template>
+
+        <template #cell.name="{ row }">
+          <span style="font-weight:600;">{{ row.name }}</span>
+        </template>
+
+        <template #cell.sort_order="{ row }">
+          <span class="num-tabular">{{ row.sort_order ?? 0 }}</span>
+        </template>
+
+        <template #cell.is_active="{ row }">
+          <Badge
+            :tone="row.is_active === false ? 'neutral' : 'success'"
+            dot
+          >
+            {{ t(`active_${row.is_active !== false}`) }}
+          </Badge>
+        </template>
+      </DataTable>
+    </Card>
 
     <VSnackbar
       v-model="snackbar"
@@ -152,6 +171,50 @@ onMounted(load)
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.toolbar--wrap {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tb-search {
+  flex: 1;
+  max-width: 320px;
+  min-width: 220px;
+}
+
+.add-form {
+  display: grid;
+  grid-template-columns: 1fr 140px auto;
+  gap: 12px;
+  align-items: end;
+  padding: var(--sp-4);
+}
+
+.add-form__btn {
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 720px) {
+  .tb-search {
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .add-form {
+    grid-template-columns: 1fr;
+  }
+  .add-form__btn {
+    justify-content: stretch;
+  }
+  .add-form__btn :deep(.btn) {
+    width: 100%;
+  }
+}
+</style>
 
 <route lang="yaml">
 meta:

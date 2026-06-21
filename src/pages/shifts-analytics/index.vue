@@ -749,7 +749,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         </div>
 
         <!-- Date range -->
-        <div style="display:flex; align-items:center; gap:8px; flex:1 1 320px; min-width:0;">
+        <div class="date-range-wrap" style="display:flex; align-items:center; gap:8px; flex:1 1 320px; min-width:0;">
           <div class="control control--sm" style="flex:1 1 140px; min-width:0;">
             <input v-model="dateFrom" type="date" :max="dateTo || undefined" :placeholder="t('From')">
           </div>
@@ -792,7 +792,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
     </div>
 
     <!-- Cards grid -->
-    <div v-if="loading" class="grid" style="grid-template-columns: repeat(auto-fill, minmax(min(430px, 100%), 1fr));">
+    <div v-if="loading" class="grid shift-cards-grid">
       <div v-for="i in 3" :key="i" class="card" style="padding: var(--sp-5);">
         <div class="row" style="gap:12px;margin-bottom:16px;">
           <div class="skel" style="width:40px;height:40px;border-radius:99px;" />
@@ -833,7 +833,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
       </div>
     </div>
 
-    <div v-else class="grid" style="grid-template-columns: repeat(auto-fill, minmax(min(430px, 100%), 1fr));align-items:start;">
+    <div v-else class="grid shift-cards-grid" style="align-items:start;">
       <div
         v-for="s in filtered"
         :key="s.id"
@@ -1073,8 +1073,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
     >
       <form
         ref="receiveModalEl"
-        class="modal"
-        style="max-width:520px;"
+        class="modal modal--receive"
         role="dialog"
         aria-modal="true"
         @submit.prevent="countedParsed !== null && !busy && confirmReceive()"
@@ -1207,8 +1206,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
     >
       <div
         ref="endModalEl"
-        class="modal"
-        style="max-width:440px;"
+        class="modal modal--end"
         role="dialog"
         aria-modal="true"
         @mousedown.stop
@@ -1260,3 +1258,39 @@ meta:
   action: manage
   subject: all
 </route>
+
+<style scoped>
+/* Responsive shift cards grid — auto-fill with sensible breakpoints */
+.shift-cards-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(430px, 100%), 1fr));
+}
+@media (max-width: 900px) {
+  .shift-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Modals — collapse hard-coded widths on narrow viewports */
+.modal--receive {
+  max-width: 520px;
+  width: 100%;
+}
+.modal--end {
+  max-width: 440px;
+  width: 100%;
+}
+@media (max-width: 600px) {
+  .modal--receive,
+  .modal--end {
+    max-width: 100%;
+    margin: var(--sp-3);
+  }
+}
+
+/* Date range — drop to full width on narrow viewports so the two inputs stack cleanly */
+@media (max-width: 900px) {
+  .date-range-wrap {
+    flex: 1 1 100% !important;
+  }
+}
+</style>

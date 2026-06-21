@@ -357,7 +357,7 @@ function itemsOf(o: any) {
 
 // ---- DataTable columns ----
 const columns = computed<DataTableColumn<any>[]>(() => [
-  { key: 'id', label: '#', sortable: true },
+  { key: 'id', label: t('Order #'), sortable: true },
   { key: 'type', label: t('Type') },
   { key: 'info', label: t('Info') },
   { key: 'customer', label: t('Customer') },
@@ -414,7 +414,7 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
     </PageHeader>
 
     <!-- KPI strip -->
-    <div class="grid cols-4" style="margin-bottom: var(--sp-5);">
+    <div class="grid cols-4 kpi-grid" style="margin-bottom: var(--sp-5);">
       <Kpi
         :data="{
           label: t('Total'),
@@ -453,8 +453,8 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
     <!-- Main table card -->
     <div class="card">
       <!-- Toolbar -->
-      <div class="toolbar">
-        <div class="grow" style="max-width: 280px;">
+      <div class="toolbar orders-toolbar">
+        <div class="grow tb-search">
           <Input
             v-model="search"
             icon="search"
@@ -464,7 +464,7 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
         </div>
 
         <!-- Multi-status filter (popover with checkboxes) -->
-        <div style="width: 200px; position: relative;">
+        <div class="tb-filter tb-filter--md" style="position: relative;">
           <div
             class="control control--select"
             style="cursor: pointer;"
@@ -505,7 +505,7 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
           </div>
         </div>
 
-        <div style="width: 180px;">
+        <div class="tb-filter tb-filter--sm">
           <Select
             :model-value="paymentFilter ?? ''"
             :placeholder="t('Payment Status')"
@@ -515,7 +515,7 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
         </div>
 
         <!-- Order type (HALL / DELIVERY / PICKUP) -->
-        <div style="width: 160px;">
+        <div class="tb-filter tb-filter--xs">
           <Select
             :model-value="orderTypeFilter ?? ''"
             :placeholder="t('Order type')"
@@ -525,7 +525,7 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
         </div>
 
         <!-- Cashier -->
-        <div style="width: 180px;">
+        <div class="tb-filter tb-filter--sm">
           <Select
             :model-value="cashierFilter ?? ''"
             :placeholder="t('All cashiers')"
@@ -535,7 +535,7 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
         </div>
 
         <!-- Category multi-select (popover) -->
-        <div style="width: 200px; position: relative;">
+        <div class="tb-filter tb-filter--md" style="position: relative;">
           <div
             class="control control--select"
             style="cursor: pointer;"
@@ -575,12 +575,12 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
           </div>
         </div>
 
-<div class="row" style="gap: 8px; margin-left: auto;">
-          <div class="control control--sm" style="width: 160px;">
+        <div class="row tb-daterange" style="gap: 8px;">
+          <div class="control control--sm tb-date">
             <input v-model="dateFrom" type="date" :aria-label="t('Date from')">
           </div>
-          <span class="tertiary">→</span>
-          <div class="control control--sm" style="width: 160px;">
+          <span class="tertiary" aria-hidden="true">→</span>
+          <div class="control control--sm tb-date">
             <input v-model="dateTo" type="date" :aria-label="t('Date to')">
           </div>
         </div>
@@ -855,6 +855,7 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
     <Modal
       :open="confirmDialog !== null"
       :width="440"
+      class="confirm-modal"
       :title="confirmDialog?.kind === 'cancel-one' ? t('Cancel this order?')
         : confirmDialog?.kind === 'cancel-bulk' ? t('Cancel selected orders?')
           : confirmDialog?.kind === 'pay-one' ? t('Mark this order as paid?')
@@ -942,6 +943,97 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
 .row {
   display: flex;
   align-items: center;
+}
+
+/* --- Responsive toolbar --- */
+.orders-toolbar {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.tb-search {
+  max-width: 280px;
+  min-width: 220px;
+  flex: 1 1 220px;
+}
+
+.tb-filter {
+  flex: 0 1 auto;
+}
+
+.tb-filter--md { width: 200px; }
+.tb-filter--sm { width: 180px; }
+.tb-filter--xs { width: 160px; }
+
+.tb-daterange {
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.tb-date {
+  width: 160px;
+}
+
+/* --- Tablet collapse --- */
+@media (max-width: 1100px) {
+  .tb-daterange {
+    margin-left: 0;
+  }
+}
+
+/* --- Mobile collapse --- */
+@media (max-width: 900px) {
+  .orders-toolbar > * {
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .tb-search,
+  .tb-filter,
+  .tb-filter--md,
+  .tb-filter--sm,
+  .tb-filter--xs {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .tb-daterange {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .tb-date {
+    flex: 1 1 calc(50% - 16px);
+    width: auto;
+  }
+}
+
+/* --- KPI grid responsive collapse --- */
+@media (max-width: 1100px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Expanded row inner table --- */
+:deep(.tablewrap) {
+  overflow-x: auto;
+}
+:deep(.tablewrap .dtable) {
+  min-width: 480px;
+}
+
+/* --- Modal mobile safety --- */
+:deep(.confirm-modal .modal__panel),
+:deep(.confirm-modal .modal) {
+  max-width: calc(100vw - 24px);
 }
 </style>
 

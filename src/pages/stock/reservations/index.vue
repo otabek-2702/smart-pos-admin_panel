@@ -389,7 +389,7 @@ function clearFilters() {
     </PageHeader>
 
     <!-- KPI strip -->
-    <div class="grid cols-4" style="margin-bottom: var(--sp-5);">
+    <div class="grid cols-4 kpi-strip" style="margin-bottom: var(--sp-5);">
       <Kpi
         :data="{
           label: t('kpi_total_items'),
@@ -427,8 +427,8 @@ function clearFilters() {
     <!-- Main card -->
     <div class="card">
       <!-- Toolbar -->
-      <div class="toolbar">
-        <div class="grow" style="max-width: 280px;">
+      <div class="toolbar res-toolbar">
+        <div class="grow tb-search">
           <Input
             v-model="search"
             icon="search"
@@ -437,7 +437,7 @@ function clearFilters() {
           />
         </div>
 
-        <div style="width: 200px;">
+        <div class="tb-filter">
           <Select
             :model-value="locationFilter"
             :placeholder="t('filter_all_locations')"
@@ -446,7 +446,7 @@ function clearFilters() {
           />
         </div>
 
-        <div style="width: 200px;">
+        <div class="tb-filter">
           <Select
             :model-value="categoryFilter"
             :placeholder="t('filter_all_categories')"
@@ -455,7 +455,7 @@ function clearFilters() {
           />
         </div>
 
-        <div style="width: 200px;">
+        <div class="tb-filter">
           <Select
             :model-value="itemTypeFilter"
             :placeholder="t('filter_all_types')"
@@ -464,7 +464,7 @@ function clearFilters() {
           />
         </div>
 
-        <label class="row" style="gap:8px; cursor:pointer; margin-left:auto;">
+        <label class="row tb-toggle" style="gap:8px; cursor:pointer;">
           <Switch v-model="reservedOnly" />
           <span style="font-size:13px;">{{ t('filter_reserved_only') }}</span>
         </label>
@@ -584,7 +584,7 @@ function clearFilters() {
       :close-on-esc="!submitting"
       @close="closeModal"
     >
-      <div class="grid cols-2" style="gap: var(--sp-4);">
+      <div class="grid cols-2 modal-grid" style="gap: var(--sp-4);">
         <Field
           :label="t('field_stock_item')"
           :error="errors.stock_item_id"
@@ -702,6 +702,60 @@ function clearFilters() {
 .row {
   display: flex;
   align-items: center;
+}
+
+.res-toolbar {
+  flex-wrap: wrap;
+  gap: 12px;
+  row-gap: 12px;
+}
+
+.tb-search {
+  max-width: 280px;
+  min-width: 200px;
+  flex: 1 1 200px;
+}
+
+.tb-filter {
+  width: 200px;
+  min-width: 160px;
+  flex: 0 1 200px;
+}
+
+.tb-toggle {
+  margin-left: auto;
+}
+
+@media (max-width: 1100px) {
+  .kpi-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .kpi-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .res-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tb-search,
+  .tb-filter {
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .tb-toggle {
+    margin-left: 0;
+  }
 }
 </style>
 

@@ -453,8 +453,8 @@ function clearAll() {
 
     <div class="card">
       <!-- Toolbar -->
-      <div class="toolbar">
-        <div class="grow" style="max-width: 280px;">
+      <div class="toolbar toolbar--wrap">
+        <div class="grow tb-search">
           <Input
             v-model="search"
             icon="search"
@@ -463,7 +463,7 @@ function clearAll() {
           />
         </div>
 
-        <div style="width: 200px;">
+        <div class="tb-status">
           <Select
             :model-value="statusFilter ?? ''"
             :placeholder="t('Filter by status')"
@@ -472,7 +472,7 @@ function clearAll() {
           />
         </div>
 
-        <div style="width: 220px;">
+        <div class="tb-po">
           <Select
             :model-value="poFilter ?? ''"
             :placeholder="t('Filter by PO')"
@@ -481,16 +481,16 @@ function clearAll() {
           />
         </div>
 
-        <div class="row" style="gap: 8px; margin-left: auto;">
-          <div class="control control--sm" style="width: 160px;">
+        <div class="row tb-dates">
+          <div class="control control--sm tb-date">
             <input
               v-model="dateFrom"
               type="date"
               :aria-label="t('Date From')"
             >
           </div>
-          <span class="tertiary">→</span>
-          <div class="control control--sm" style="width: 160px;">
+          <span class="tertiary" :aria-label="t('to')">{{ t('range_arrow') }}</span>
+          <div class="control control--sm tb-date">
             <input
               v-model="dateTo"
               type="date"
@@ -619,6 +619,7 @@ function clearAll() {
     <Modal
       :open="createOpen"
       :width="540"
+      class="rcv-modal"
       :title="t('Create Receiving')"
       :subtitle="t('Purchase Order')"
       @close="createOpen = false"
@@ -686,13 +687,14 @@ function clearAll() {
     <Modal
       :open="viewOpen"
       :width="900"
+      class="rcv-modal rcv-modal--lg"
       :title="activeReceiving ? `${t('Receiving #')} ${rcvNumber(activeReceiving)}` : t('Receiving #')"
       :subtitle="activeReceiving ? `${t('PO #')} ${poNumber(activeReceiving)}` : ''"
       @close="closeView"
     >
       <div v-if="activeReceiving">
         <!-- Meta strip -->
-        <div class="grid cols-3" style="gap: var(--sp-3); margin-bottom: var(--sp-4);">
+        <div class="grid cols-3 rcv-meta" style="gap: var(--sp-3); margin-bottom: var(--sp-4);">
           <div>
             <div class="kpi__label">
               {{ t('Status') }}
@@ -832,11 +834,12 @@ function clearAll() {
     <Modal
       :open="addItemOpen"
       :width="560"
+      class="rcv-modal"
       :title="t('Add Item')"
       :subtitle="t('PO Item')"
       @close="addItemOpen = false"
     >
-      <div class="grid cols-2" style="gap: var(--sp-3);">
+      <div class="grid cols-2 rcv-form" style="gap: var(--sp-3);">
         <Field :label="t('PO Item')" style="grid-column: span 2;">
           <Select
             v-model="itemForm.po_item_id"
@@ -933,6 +936,7 @@ function clearAll() {
     <Modal
       :open="confirmCompleteOpen"
       :width="440"
+      class="rcv-modal"
       :title="t('Complete Receiving')"
       :subtitle="t('Confirm complete receiving?')"
       @close="confirmCompleteOpen = false"
@@ -979,6 +983,51 @@ function clearAll() {
 .row {
   display: flex;
   align-items: center;
+}
+
+/* Toolbar wraps cleanly on narrow viewports */
+.toolbar--wrap {
+  flex-wrap: wrap;
+  gap: 8px;
+  row-gap: 10px;
+}
+.tb-search { max-width: 280px; }
+.tb-status { width: 200px; }
+.tb-po { width: 220px; }
+.tb-dates { gap: 8px; margin-left: auto; }
+.tb-date { width: 160px; }
+
+@media (max-width: 900px) {
+  .tb-search,
+  .tb-status,
+  .tb-po,
+  .tb-dates,
+  .tb-date {
+    max-width: none;
+    width: 100%;
+  }
+  .tb-dates {
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+  .tb-date { flex: 1 1 140px; }
+}
+
+/* View modal meta grid: 3 cols → 1 col under 900px */
+@media (max-width: 900px) {
+  .rcv-meta {
+    grid-template-columns: 1fr !important;
+  }
+  .rcv-meta > [style*="grid-column"] {
+    grid-column: auto !important;
+  }
+  /* Add-item form grid: 2 cols → 1 col under 900px */
+  .rcv-form {
+    grid-template-columns: 1fr !important;
+  }
+  .rcv-form > [style*="grid-column"] {
+    grid-column: auto !important;
+  }
 }
 </style>
 

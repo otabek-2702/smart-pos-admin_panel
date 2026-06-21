@@ -315,9 +315,9 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 
     <!-- Toolbar + table -->
     <Card>
-      <div class="toolbar">
+      <div class="toolbar nt-toolbar">
         <!-- Search -->
-        <div style="flex:1;max-width:320px;">
+        <div class="nt-toolbar__search">
           <Input
             v-model="search"
             icon="search"
@@ -326,7 +326,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
         </div>
 
         <!-- Bucket -->
-        <div style="width:220px;">
+        <div class="nt-toolbar__bucket">
           <Select
             v-model="bucketFilter"
             icon="filter"
@@ -336,7 +336,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
         </div>
 
         <!-- Status -->
-        <div style="width:200px;">
+        <div class="nt-toolbar__status">
           <Select
             v-model="statusFilter"
             :placeholder="t('notif_status_all')"
@@ -484,6 +484,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
       :title="t('notif_modal_edit_title')"
       :subtitle="editing?.name || editing?.notification_type || ''"
       :width="640"
+      class="nt-modal-edit"
       @close="closeEdit"
     >
       <form
@@ -531,8 +532,8 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             class="span-2"
           >
             <div
-              class="row"
-              style="gap:10px;align-items:center;height:42px;"
+              class="row nt-switch-row"
+              style="gap:10px;align-items:center;"
             >
               <Switch v-model="form.is_enabled" />
               <span style="font-size:14px;font-weight:500;color:var(--text-secondary);">
@@ -552,7 +553,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
               <textarea
                 v-model="form.template_text"
                 rows="8"
-                style="resize:vertical;min-height:160px;font-family:var(--font-mono, monospace);font-size:13px;line-height:1.5;width:100%;background:transparent;border:0;outline:0;color:var(--text);"
+                class="nt-textarea"
                 :placeholder="t('notif_field_template_text')"
               />
             </div>
@@ -586,17 +587,14 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
       :title="t('notif_action_disable')"
       :subtitle="disableConfirm?.name || disableConfirm?.notification_type || ''"
       :width="440"
+      class="nt-modal-confirm"
       @close="cancelDisable"
     >
       <div
         v-if="disableConfirm"
-        class="row"
-        style="gap:14px;align-items:flex-start;"
+        class="row nt-confirm-row"
       >
-        <div
-          class="kpi__icon t-warning"
-          style="width:44px;height:44px;flex:0 0 44px;"
-        >
+        <div class="kpi__icon t-warning nt-confirm-icon">
           <DesignIcon
             name="alert"
             :size="22"
@@ -642,6 +640,74 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.nt-toolbar {
+  flex-wrap: wrap;
+}
+.nt-toolbar__search {
+  flex: 1 1 240px;
+  max-width: 320px;
+  min-width: 200px;
+}
+.nt-toolbar__bucket {
+  flex: 0 1 220px;
+  min-width: 180px;
+}
+.nt-toolbar__status {
+  flex: 0 1 200px;
+  min-width: 160px;
+}
+.nt-switch-row {
+  min-height: 42px;
+}
+.nt-textarea {
+  resize: vertical;
+  min-height: 160px;
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  line-height: 1.5;
+  inline-size: 100%;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+}
+.nt-confirm-row {
+  gap: 14px;
+  align-items: flex-start;
+}
+.nt-confirm-icon {
+  inline-size: 44px;
+  block-size: 44px;
+  flex: 0 0 44px;
+}
+
+@media (max-width: 900px) {
+  .nt-toolbar {
+    gap: 8px;
+  }
+  .nt-toolbar__search,
+  .nt-toolbar__bucket,
+  .nt-toolbar__status {
+    flex: 1 1 100%;
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+  .nt-textarea {
+    min-height: 120px;
+  }
+  .nt-confirm-row {
+    gap: 10px;
+  }
+  .nt-confirm-icon {
+    inline-size: 36px;
+    block-size: 36px;
+    flex: 0 0 36px;
+  }
+}
+</style>
 
 <route lang="yaml">
 meta:

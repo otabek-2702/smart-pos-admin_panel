@@ -517,9 +517,9 @@ onBeforeUnmount(() => {
 
     <!-- Toolbar + table -->
     <Card>
-      <div class="toolbar">
+      <div class="toolbar tpl-toolbar">
         <!-- Search -->
-        <div style="flex:1;max-width:300px;">
+        <div class="tpl-toolbar__search">
           <Input
             v-model="search"
             icon="search"
@@ -528,7 +528,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Type filter -->
-        <div style="width:220px;">
+        <div class="tpl-toolbar__type">
           <Input
             v-model="typeFilter"
             icon="tag"
@@ -537,7 +537,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Language filter -->
-        <div style="width:180px;">
+        <div class="tpl-toolbar__lang">
           <Select
             v-model="languageFilter"
             icon="translate"
@@ -548,7 +548,7 @@ onBeforeUnmount(() => {
 
         <!-- Enabled only switch -->
         <div
-          class="row"
+          class="row tpl-toolbar__switch"
           style="gap:10px;align-items:center;height:42px;padding:0 10px;"
         >
           <Switch v-model="enabledOnly" />
@@ -628,9 +628,8 @@ onBeforeUnmount(() => {
 
         <template #cell.template_text="{ row }">
           <span
-            class="cell-muted"
+            class="cell-muted tpl-cell-body"
             :title="row.template_text"
-            style="display:block;max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
           >
             {{ truncate(row.template_text) }}
           </span>
@@ -726,7 +725,7 @@ onBeforeUnmount(() => {
             <Input
               v-model="form.notification_type"
               icon="tag"
-              placeholder="order_paid"
+              :placeholder="t('ntpl_placeholder_type_example')"
               :disabled="!!editing"
               :error="!!errors.notification_type"
             />
@@ -890,7 +889,7 @@ onBeforeUnmount(() => {
                 color:var(--text);
                 min-height:120px;
               "
-              placeholder='{"first_name":"Ali","order_id":"123"}'
+              :placeholder="t('ntpl_preview_context_example')"
             />
           </div>
         </Field>
@@ -1071,6 +1070,57 @@ onBeforeUnmount(() => {
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.tpl-toolbar {
+  flex-wrap: wrap;
+}
+.tpl-toolbar__search {
+  flex: 1 1 220px;
+  max-width: 300px;
+  min-width: 0;
+}
+.tpl-toolbar__type {
+  width: 220px;
+  min-width: 0;
+}
+.tpl-toolbar__lang {
+  width: 180px;
+  min-width: 0;
+}
+.tpl-toolbar__switch {
+  flex-wrap: nowrap;
+}
+.tpl-cell-body {
+  display: block;
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .tpl-toolbar__search,
+  .tpl-toolbar__type,
+  .tpl-toolbar__lang {
+    flex: 1 1 100%;
+    max-width: 100%;
+    width: 100%;
+  }
+  .tpl-toolbar__switch {
+    flex: 1 1 100%;
+  }
+  .tpl-cell-body {
+    max-width: 220px;
+  }
+  :deep(.form-grid) {
+    grid-template-columns: 1fr;
+  }
+  :deep(.form-grid .span-2) {
+    grid-column: 1 / -1;
+  }
+}
+</style>
 
 <route lang="yaml">
 meta:

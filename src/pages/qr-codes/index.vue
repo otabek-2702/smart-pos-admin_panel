@@ -488,9 +488,9 @@ const qrImgUrl = computed(() => qrMenuUrl.value ? qrPngUrl(qrMenuUrl.value, 320)
 
     <!-- Toolbar + table -->
     <Card>
-      <div class="toolbar">
+      <div class="toolbar toolbar--wrap">
         <!-- Search -->
-        <div style="flex:1;max-width:300px;">
+        <div class="tb-search">
           <Input
             v-model="search"
             icon="search"
@@ -499,7 +499,7 @@ const qrImgUrl = computed(() => qrMenuUrl.value ? qrPngUrl(qrMenuUrl.value, 320)
         </div>
 
         <!-- Place -->
-        <div style="width:200px;">
+        <div class="tb-filter">
           <Select
             v-model="placeFilter"
             icon="filter"
@@ -509,7 +509,7 @@ const qrImgUrl = computed(() => qrMenuUrl.value ? qrPngUrl(qrMenuUrl.value, 320)
         </div>
 
         <!-- Status -->
-        <div style="width:200px;">
+        <div class="tb-filter">
           <Select
             v-model="statusFilter"
             :placeholder="t('all_statuses')"
@@ -619,18 +619,17 @@ const qrImgUrl = computed(() => qrMenuUrl.value ? qrPngUrl(qrMenuUrl.value, 320)
         <!-- Expanded row body — show full token + menu url -->
         <template #expanded="{ row }">
           <div
-            class="row"
+            class="row qr-expanded"
             style="gap:24px;flex-wrap:wrap;padding:6px 4px;"
           >
             <div style="flex:0 0 auto;">
               <div
-                class="kpi__icon"
-                style="width:96px;height:96px;background:#fff;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;"
+                class="kpi__icon qr-thumb"
               >
                 <img
                   v-if="tokenCache[row.id]"
                   :src="qrPngUrl(resolveMenuUrl(tokenCache[row.id].menu_url_suffix), 96)"
-                  alt="QR"
+                  :alt="t('qr_image_alt')"
                   style="width:100%;height:100%;object-fit:contain;"
                 >
                 <DesignIcon
@@ -641,8 +640,7 @@ const qrImgUrl = computed(() => qrMenuUrl.value ? qrPngUrl(qrMenuUrl.value, 320)
               </div>
             </div>
             <div
-              style="flex:1;min-width:240px;"
-              class="col"
+              class="col qr-expanded__info"
             >
               <div style="font-size:13px;color:var(--text-secondary);margin-bottom:2px;">
                 {{ t('qr_token') }}
@@ -970,13 +968,11 @@ const qrImgUrl = computed(() => qrMenuUrl.value ? qrPngUrl(qrMenuUrl.value, 320)
         class="col"
         style="gap:14px;align-items:center;"
       >
-        <div
-          style="width:280px;height:280px;background:#fff;border:1px solid var(--border);border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;"
-        >
+        <div class="qr-display">
           <img
             v-if="qrImgUrl"
             :src="qrImgUrl"
-            alt="QR"
+            :alt="t('qr_image_alt')"
             style="width:100%;height:100%;object-fit:contain;"
           >
           <DesignIcon
@@ -1048,6 +1044,102 @@ const qrImgUrl = computed(() => qrMenuUrl.value ? qrPngUrl(qrMenuUrl.value, 320)
 .col {
   display: flex;
   flex-direction: column;
+}
+
+.toolbar--wrap {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tb-search {
+  flex: 1 1 240px;
+  max-width: 300px;
+  min-width: 200px;
+}
+
+.tb-filter {
+  flex: 0 1 200px;
+  min-width: 160px;
+}
+
+.qr-thumb {
+  width: 96px;
+  height: 96px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.qr-expanded__info {
+  flex: 1;
+  min-width: 240px;
+}
+
+.qr-display {
+  width: 280px;
+  height: 280px;
+  max-width: 100%;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.form-grid .span-2 {
+  grid-column: span 2;
+}
+
+@media (max-width: 900px) {
+  .tb-search,
+  .tb-filter {
+    flex: 1 1 100%;
+    max-width: none;
+    width: 100%;
+  }
+
+  .qr-thumb {
+    width: 80px;
+    height: 80px;
+  }
+
+  .qr-expanded__info {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .qr-display {
+    width: 240px;
+    height: 240px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid .span-2 {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .qr-display {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+  }
 }
 </style>
 

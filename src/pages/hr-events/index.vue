@@ -381,21 +381,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
     <Card>
       <!-- Toolbar -->
-      <div class="toolbar">
-        <div
-          class="control"
-          style="flex:1;max-width:320px;"
-        >
+      <div class="toolbar hr-events-toolbar">
+        <div class="control hr-events-toolbar__search">
           <Input
             v-model="search"
             icon="search"
             :placeholder="t('Search')"
           />
         </div>
-        <div
-          class="control"
-          style="width:220px;"
-        >
+        <div class="control hr-events-toolbar__filter">
           <Select
             v-model="employeeFilter"
             icon="employee"
@@ -403,10 +397,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             :options="employeeOptions"
           />
         </div>
-        <div
-          class="control"
-          style="width:220px;"
-        >
+        <div class="control hr-events-toolbar__filter">
           <Select
             v-model="eventTypeFilter"
             icon="filter"
@@ -483,8 +474,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <template #cell.description="{ row }">
           <span
             v-if="row.description"
-            class="cell-muted"
-            style="display:inline-block;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;"
+            class="cell-muted hr-events-desc"
             :title="row.description"
           >{{ row.description }}</span>
           <span
@@ -567,7 +557,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       @close="closeCreate"
     >
       <form @submit.prevent="submitCreate">
-        <div class="form-grid">
+        <div class="form-grid hr-events-form-grid">
           <Field
             :label="t('hr_event_field_employee')"
             :error="errors.employee_id"
@@ -681,7 +671,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </div>
       <div
         v-else-if="viewRow"
-        class="form-grid"
+        class="form-grid hr-events-form-grid"
       >
         <Field
           :label="t('hr_event_field_employee')"
@@ -911,6 +901,41 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </template>
 
 <style scoped>
+.hr-events-toolbar {
+  flex-wrap: wrap;
+}
+.hr-events-toolbar__search {
+  flex: 1;
+  max-width: 320px;
+  min-width: 200px;
+}
+.hr-events-toolbar__filter {
+  width: 220px;
+}
+.hr-events-desc {
+  display: inline-block;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+@media (max-width: 900px) {
+  .hr-events-toolbar__search,
+  .hr-events-toolbar__filter {
+    width: 100%;
+    max-width: none;
+  }
+  .hr-events-desc {
+    max-width: 180px;
+  }
+  .hr-events-form-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .hr-events-form-grid :deep(.span-2) {
+    grid-column: span 1 !important;
+  }
+}
 .timeline {
   list-style: none;
   margin: 0;

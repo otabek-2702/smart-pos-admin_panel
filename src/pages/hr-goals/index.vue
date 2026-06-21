@@ -479,8 +479,8 @@ function progressOf(row: any): number {
     <!-- Main card -->
     <Card>
       <!-- Toolbar -->
-      <div class="toolbar">
-        <div style="flex:1;max-width:280px;">
+      <div class="toolbar tb-wrap">
+        <div class="tb-search">
           <Input
             v-model="employeeFilter"
             icon="search"
@@ -488,7 +488,7 @@ function progressOf(row: any): number {
             :aria-label="t('hr_goals_filter_employee')"
           />
         </div>
-        <div style="width:200px;">
+        <div class="tb-status">
           <Select
             v-model="statusFilter"
             icon="filter"
@@ -501,14 +501,14 @@ function progressOf(row: any): number {
       <!-- Active filter chips -->
       <div
         v-if="hasFilters"
-        class="toolbar"
+        class="toolbar tb-wrap"
         style="padding-top:0;"
       >
         <div class="chips">
           <span
             class="tertiary"
             style="font-size:13px;margin-right:2px;"
-          >{{ t('Filters') }}:</span>
+          >{{ t('filters_label_colon') }}</span>
 
           <span
             v-if="employeeFilter.trim()"
@@ -580,11 +580,11 @@ function progressOf(row: any): number {
 
         <template #cell.progress_percent="{ row }">
           <div
-            class="row"
+            class="row progress-cell"
             style="gap:8px;align-items:center;justify-content:flex-end;"
           >
             <div
-              style="width:80px;height:6px;background:rgb(var(--v-theme-surface-inset));border-radius:99px;overflow:hidden;"
+              class="progress-cell__bar"
               aria-hidden="true"
             >
               <div
@@ -882,9 +882,9 @@ function progressOf(row: any): number {
             />
           </div>
           <div class="row" style="justify-content:space-between;font-size:12px;color:var(--text-tertiary);">
-            <span>0%</span>
+            <span>{{ t('progress_min_pct') }}</span>
             <span class="mono">{{ Math.max(0, Math.min(100, Number(progressForm.progress_percent) || 0)) }}%</span>
-            <span>100%</span>
+            <span>{{ t('progress_max_pct') }}</span>
           </div>
         </div>
       </div>
@@ -962,6 +962,56 @@ function progressOf(row: any): number {
 .row {
   display: flex;
   align-items: center;
+}
+
+.tb-wrap {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tb-search {
+  flex: 1 1 240px;
+  max-inline-size: 280px;
+  min-inline-size: 200px;
+}
+
+.tb-status {
+  inline-size: 200px;
+  flex: 0 0 200px;
+}
+
+.progress-cell__bar {
+  inline-size: 80px;
+  block-size: 6px;
+  background: rgb(var(--v-theme-surface-inset));
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .tb-wrap {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tb-search,
+  .tb-status {
+    inline-size: 100%;
+    max-inline-size: none;
+    flex: 1 1 auto;
+  }
+
+  .progress-cell__bar {
+    inline-size: 56px;
+  }
+
+  :deep(.form-grid) {
+    grid-template-columns: 1fr;
+  }
+
+  :deep(.form-grid .span-2) {
+    grid-column: 1 / -1;
+  }
 }
 </style>
 

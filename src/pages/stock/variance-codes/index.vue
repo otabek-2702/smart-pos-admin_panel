@@ -1,23 +1,45 @@
 <script setup lang="ts">
+/* ============================================================
+   ALPHA POS — Stock / Variance Reason Codes
+   Plain HTML + design classes from design-shell.css.
+   Adds a "Seed defaults" toolbar button with a confirm modal
+   before POSTing /variance-codes/seed/.
+   ============================================================ */
 import { stockApi as axios } from '@/plugins/axios'
+import Badge from '@/components/design/Badge.vue'
+import Button from '@/components/design/Button.vue'
+import DataTable, { type DataTableColumn } from '@/components/design/DataTable.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import Field from '@/components/design/Field.vue'
+import IconAction from '@/components/design/IconAction.vue'
+import Input from '@/components/design/Input.vue'
+import Modal from '@/components/design/Modal.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
+import Select from '@/components/design/Select.vue'
+import StateFill from '@/components/design/StateFill.vue'
+import Switch from '@/components/design/Switch.vue'
 
 const { t } = useI18n({ useScope: 'global' })
+const { notify, snackbar, snackbarMsg, snackbarColor } = useNotify()
 
+/* ---------------- state ---------------- */
 const codes = ref<any[]>([])
 const total = ref(0)
 const loading = ref(false)
-const page = ref(1)
-const itemsPerPage = ref(10)
-const search = ref('')
-const activeFilter = ref<string | undefined>(undefined)
-const seeding = ref(false)
 
+const search = ref('')
+const activeFilter = ref<'all' | 'true' | 'false'>('true')
+
+// dialogs / actions
 const dialog = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
 const saving = ref(false)
 const deleteDialog = ref(false)
 const deleting = ref(false)
+const seedDialog = ref(false)
+const seeding = ref(false)
 const selectedItem = ref<any>(null)
+const togglingId = ref<number | string | null>(null)
 
 const form = ref({
   code: '',
@@ -27,17 +49,11 @@ const form = ref({
   is_active: true,
 })
 
-const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
+const fieldErrors = ref<Record<string, string>>({})
 
-const headers = [
-  { title: t('Code'), key: 'code', sortable: false },
-  { title: t('Name'), key: 'name', sortable: false },
-  { title: t('Description'), key: 'description', sortable: false },
-  { title: t('Requires Approval'), key: 'requires_approval', sortable: false },
-  { title: t('Status'), key: 'is_active', sortable: false },
-  { title: t('Actions'), key: 'actions', sortable: false, align: 'end' as const },
-]
+const debouncedSearch = useDebounceFn(() => { /* client-side filter, just trigger reactivity */ }, 200)
 
+/* ---------------- load ---------------- */
 async function loadCodes() {
   loading.value = true
   try {
@@ -61,27 +77,28 @@ async function loadCodes() {
   }
 }
 
-async function seedDefaults() {
-  seeding.value = true
-  try {
-    await axios.post('/variance-codes/seed/')
-    notify(t('Defaults seeded'))
-    await loadCodes()
-  }
-  catch (e: any) {
-    notify(e?.response?.data?.message ?? t('Error seeding defaults'), 'error')
-  }
-  finally {
-    seeding.value = false
-  }
-}
-
 onMounted(loadCodes)
 watch(activeFilter, loadCodes)
+watch(search, () => debouncedSearch())
 
+/* ---------------- filtered (client-side search) ---------------- */
+const filteredCodes = computed(() => {
+  const q = (search.value ?? '').trim().toLowerCase()
+  if (!q)
+    return codes.value
+  return codes.value.filter((c: any) =>
+    (c.code ?? '').toLowerCase().includes(q)
+    || (c.name ?? '').toLowerCase().includes(q)
+    || (c.description ?? '').toLowerCase().includes(q),
+  )
+})
+
+/* ---------------- create / edit ---------------- */
 function openCreate() {
   dialogMode.value = 'create'
+  selectedItem.value = null
   form.value = { code: '', name: '', description: '', requires_approval: false, is_active: true }
+  fieldErrors.value = {}
   dialog.value = true
 }
 
@@ -95,35 +112,91 @@ function openEdit(item: any) {
     requires_approval: item.requires_approval ?? false,
     is_active: item.is_active ?? true,
   }
+  fieldErrors.value = {}
   dialog.value = true
 }
 
+function onCodeInput(v: string) {
+  // uppercase + restrict to A-Z 0-9 _
+  const cleaned = (v ?? '').toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 20)
+  form.value.code = cleaned
+}
+
+function validate(): boolean {
+  const e: Record<string, string> = {}
+  if (dialogMode.value === 'create') {
+    if (!form.value.code.trim())
+      e.code = t('Required')
+    else if (!/^[A-Z0-9_]+$/.test(form.value.code))
+      e.code = t('variance_code_hint')
+  }
+  if (!form.value.name.trim())
+    e.name = t('Required')
+  fieldErrors.value = e
+  return Object.keys(e).length === 0
+}
+
 async function save() {
+  if (saving.value)
+    return
+  if (!validate())
+    return
   saving.value = true
   try {
-    const payload = { ...form.value }
-    if (dialogMode.value === 'create')
+    if (dialogMode.value === 'create') {
+      const payload = { ...form.value }
       await axios.post('/variance-codes/', payload)
-    else
-      await axios.put(`/variance-codes/${selectedItem.value.id}/`, payload)
-    notify(dialogMode.value === 'create' ? t('Variance code created') : t('Variance code updated'))
+      notify(t('variance_created'))
+    }
+    else {
+      // BE update() ignores code — immutable
+      const payload: any = {
+        name: form.value.name,
+        description: form.value.description,
+        requires_approval: form.value.requires_approval,
+        is_active: form.value.is_active,
+      }
+      try {
+        await axios.patch(`/variance-codes/${selectedItem.value.id}/`, payload)
+      }
+      catch (err: any) {
+        // some BE wires only PUT — retry
+        if (err?.response?.status === 405)
+          await axios.put(`/variance-codes/${selectedItem.value.id}/`, payload)
+        else
+          throw err
+      }
+      notify(t('variance_updated'))
+    }
     dialog.value = false
     await loadCodes()
   }
   catch (e: any) {
-    notify(e?.response?.data?.message ?? t('Error saving variance code'), 'error')
+    const data = e?.response?.data
+    // duplicate-code detection
+    const msg = (data?.message ?? data?.detail ?? '').toString().toLowerCase()
+    if (data?.errors?.code || msg.includes('exists') || msg.includes('unique')) {
+      fieldErrors.value = { ...fieldErrors.value, code: t('variance_code_exists') }
+      notify(t('variance_code_exists'), 'error')
+    }
+    else {
+      notify(data?.message ?? t('Error saving variance code'), 'error')
+    }
   }
   finally {
     saving.value = false
   }
 }
 
+/* ---------------- delete ---------------- */
 function confirmDelete(item: any) {
   selectedItem.value = item
   deleteDialog.value = true
 }
 
 async function doDelete() {
+  if (deleting.value)
+    return
   deleting.value = true
   try {
     await axios.delete(`/variance-codes/${selectedItem.value.id}/`)
@@ -138,271 +211,397 @@ async function doDelete() {
     deleting.value = false
   }
 }
+
+/* ---------------- toggle active (row inline) ---------------- */
+async function toggleActive(item: any) {
+  if (togglingId.value === item.id)
+    return
+  togglingId.value = item.id
+  try {
+    const payload = { is_active: !item.is_active }
+    try {
+      await axios.patch(`/variance-codes/${item.id}/`, payload)
+    }
+    catch (err: any) {
+      if (err?.response?.status === 405)
+        await axios.put(`/variance-codes/${item.id}/`, payload)
+      else
+        throw err
+    }
+    notify(t('variance_updated'))
+    await loadCodes()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error saving variance code'), 'error')
+  }
+  finally {
+    togglingId.value = null
+  }
+}
+
+/* ---------------- seed defaults ---------------- */
+function openSeedConfirm() {
+  seedDialog.value = true
+}
+
+async function doSeed() {
+  if (seeding.value)
+    return
+  seeding.value = true
+  try {
+    const res = await axios.post('/variance-codes/seed/')
+    const d = res.data?.data ?? res.data
+    const n = Number(d?.created ?? 0)
+    if (n > 0)
+      notify(t('variance_seeded_count', { n }))
+    else
+      notify(t('variance_seeded_none'))
+    seedDialog.value = false
+    await loadCodes()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error seeding defaults'), 'error')
+  }
+  finally {
+    seeding.value = false
+  }
+}
+
+/* ---------------- table columns ---------------- */
+const columns = computed<DataTableColumn<any>[]>(() => [
+  { key: 'code', label: t('variance_code') },
+  { key: 'name', label: t('variance_name') },
+  { key: 'description', label: t('variance_description') },
+  { key: 'requires_approval', label: t('variance_requires_approval') },
+  { key: 'is_active', label: t('variance_is_active') },
+])
+
+const activeFilterOptions = computed(() => [
+  { value: 'all', label: t('variance_filter_all') },
+  { value: 'true', label: t('variance_filter_active') },
+  { value: 'false', label: t('variance_filter_inactive') },
+])
+
+const countLabel = computed(() => t('variance_count_label', { n: total.value }))
 </script>
 
 <template>
-  <div>
-    <VCard>
-      <VCardText class="d-flex flex-wrap gap-3 align-center">
-        <VSelect
-          v-model="activeFilter"
-          :items="[
-            { title: t('All'), value: undefined },
-            { title: t('Active'), value: 'true' },
-            { title: t('Inactive'), value: 'false' },
-          ]"
-          :label="t('Status')"
-          density="compact"
-          style="min-inline-size: 200px; max-inline-size: 240px;"
-          hide-details
-          clearable
-        />
-        <VSpacer />
-        <VBtn
-          variant="tonal"
-          prepend-icon="bx-download"
+  <div class="page">
+    <PageHeader
+      :title="t('variance_codes_title')"
+      :subtitle="t('variance_codes_subtitle')"
+    >
+      <template #actions>
+        <Button
+          variant="secondary"
+          icon="sparkle"
           :loading="seeding"
-          @click="seedDefaults"
+          :disabled="seeding"
+          @click="openSeedConfirm"
         >
-          {{ t('Seed defaults') }}
-        </VBtn>
-        <VBtn
-          prepend-icon="bx-plus"
+          {{ t('variance_seed_defaults') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="plus"
           @click="openCreate"
         >
-          {{ t('Add Variance Code') }}
-        </VBtn>
-      </VCardText>
+          {{ t('variance_create_title') }}
+        </Button>
+      </template>
+    </PageHeader>
 
-      <VDataTable
-        :headers="headers"
-        :items="codes"
+    <div class="card">
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="grow" style="max-width: 320px;">
+          <Input
+            v-model="search"
+            icon="search"
+            :placeholder="t('variance_search_placeholder')"
+            :aria-label="t('variance_search_placeholder')"
+          />
+        </div>
+
+        <div style="width: 200px;">
+          <Select
+            v-model="activeFilter"
+            :options="activeFilterOptions"
+            icon="filter"
+          />
+        </div>
+
+        <div class="row" style="gap: 8px; margin-left: auto; font-size: 13px; color: var(--text-tertiary);">
+          {{ countLabel }}
+        </div>
+      </div>
+
+      <div class="card__divider" />
+
+      <!-- DataTable -->
+      <DataTable
+        :columns="columns"
+        :rows="filteredCodes"
+        row-key="id"
         :loading="loading"
-        :items-per-page="-1"
+        :empty-title="t('variance_empty_title')"
+        :empty-sub="t('variance_empty_body')"
+        empty-icon="flag"
       >
-        <template #bottom />
+        <!-- Code -->
+        <template #cell.code="{ row: c }">
+          <span class="cell-strong mono">{{ c.code }}</span>
+        </template>
 
-        <template
-          v-if="loading && codes.length === 0"
-          #body
+        <!-- Name -->
+        <template #cell.name="{ row: c }">
+          <span class="cell-strong">{{ c.name ?? '—' }}</span>
+        </template>
+
+        <!-- Description -->
+        <template #cell.description="{ row: c }">
+          <span
+            class="cell-muted"
+            style="display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; max-width:340px;"
+            :title="c.description ?? ''"
+          >
+            {{ c.description || '—' }}
+          </span>
+        </template>
+
+        <!-- Requires approval -->
+        <template #cell.requires_approval="{ row: c }">
+          <Badge :tone="c.requires_approval ? 'warning' : 'neutral'">
+            {{ c.requires_approval ? t('variance_approval_required') : t('variance_approval_not_required') }}
+          </Badge>
+        </template>
+
+        <!-- Is active -->
+        <template #cell.is_active="{ row: c }">
+          <Badge :tone="c.is_active ? 'success' : 'neutral'" dot>
+            {{ c.is_active ? t('variance_status_active') : t('variance_status_inactive') }}
+          </Badge>
+        </template>
+
+        <!-- Row actions -->
+        <template #row-actions="{ row: c }">
+          <IconAction
+            :icon="c.is_active ? 'check' : 'close'"
+            :tone="c.is_active ? 'success' : 'warning'"
+            :title="c.is_active ? t('variance_status_active') : t('variance_status_inactive')"
+            :disabled="togglingId === c.id"
+            @click="toggleActive(c)"
+          />
+          <IconAction
+            icon="pencil"
+            :title="t('Edit')"
+            @click="openEdit(c)"
+          />
+          <IconAction
+            icon="trash"
+            tone="danger"
+            :title="t('Delete')"
+            @click="confirmDelete(c)"
+          />
+        </template>
+
+        <!-- Custom empty -->
+        <template #empty>
+          <StateFill
+            icon="flag"
+            :title="t('variance_empty_title')"
+            :sub="t('variance_empty_body')"
+          >
+            <div style="margin-top: 12px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+              <Button variant="secondary" icon="sparkle" @click="openSeedConfirm">
+                {{ t('variance_seed_defaults') }}
+              </Button>
+              <Button variant="primary" icon="plus" @click="openCreate">
+                {{ t('variance_create_title') }}
+              </Button>
+            </div>
+          </StateFill>
+        </template>
+      </DataTable>
+    </div>
+
+    <!-- ============ Create / Edit modal ============ -->
+    <Modal
+      :open="dialog"
+      :width="540"
+      :title="dialogMode === 'create' ? t('variance_create_title') : t('variance_edit_title')"
+      @close="dialog = false"
+    >
+      <div style="display:grid; grid-template-columns: repeat(12, 1fr); gap: var(--sp-4);">
+        <!-- code -->
+        <div style="grid-column: span 6;">
+          <Field
+            :label="t('variance_code')"
+            :error="fieldErrors.code"
+            :hint="dialogMode === 'create' ? t('variance_code_hint') : undefined"
+          >
+            <Input
+              :model-value="form.code"
+              :placeholder="t('variance_code_placeholder')"
+              :disabled="dialogMode === 'edit'"
+              :error="!!fieldErrors.code"
+              @update:model-value="onCodeInput"
+            />
+          </Field>
+        </div>
+
+        <!-- name -->
+        <div style="grid-column: span 6;">
+          <Field
+            :label="t('variance_name')"
+            :error="fieldErrors.name"
+          >
+            <Input
+              v-model="form.name"
+              :placeholder="t('variance_name_placeholder')"
+              maxlength="100"
+              :error="!!fieldErrors.name"
+            />
+          </Field>
+        </div>
+
+        <!-- description -->
+        <div style="grid-column: span 12;">
+          <Field :label="t('variance_description')">
+            <textarea
+              v-model="form.description"
+              class="control"
+              rows="3"
+              :placeholder="t('variance_description_placeholder')"
+              style="resize: vertical; min-height: 78px; padding: 10px 12px; font: inherit; line-height: 1.45;"
+            />
+          </Field>
+        </div>
+
+        <!-- requires_approval -->
+        <div :style="dialogMode === 'edit' ? 'grid-column: span 6;' : 'grid-column: span 12;'">
+          <Field
+            :label="t('variance_requires_approval')"
+            :hint="t('variance_requires_approval_hint')"
+          >
+            <label class="row" style="gap: 10px; cursor: pointer; padding-top: 4px;">
+              <Switch v-model="form.requires_approval" />
+              <span style="font-size: 13px; color: var(--text-secondary);">
+                {{ form.requires_approval ? t('variance_approval_required') : t('variance_approval_not_required') }}
+              </span>
+            </label>
+          </Field>
+        </div>
+
+        <!-- is_active (edit only) -->
+        <div
+          v-if="dialogMode === 'edit'"
+          style="grid-column: span 6;"
         >
-          <tr
-            v-for="n in 6"
-            :key="n"
-            class="sk-row"
-          >
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:80px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:120px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:160px;height:13px;border-radius:4px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:60px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td class="sk-cell">
-              <div
-                class="sk-box"
-                style="width:60px;height:22px;border-radius:12px;"
-              />
-            </td>
-            <td
-              class="sk-cell"
-              style="text-align:end;"
-            >
-              <div class="d-flex justify-end gap-1">
-                <div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:6px;"
-                /><div
-                  class="sk-box"
-                  style="width:28px;height:28px;border-radius:6px;"
-                />
-              </div>
-            </td>
-          </tr>
-        </template>
+          <Field :label="t('variance_is_active')">
+            <label class="row" style="gap: 10px; cursor: pointer; padding-top: 4px;">
+              <Switch v-model="form.is_active" />
+              <span style="font-size: 13px; color: var(--text-secondary);">
+                {{ form.is_active ? t('variance_status_active') : t('variance_status_inactive') }}
+              </span>
+            </label>
+          </Field>
+        </div>
+      </div>
 
-        <template #item.requires_approval="{ item }">
-          <VChip
-            :color="item.raw.requires_approval ? 'warning' : 'default'"
-            size="small"
-            variant="tonal"
-            class="status-pill"
-          >
-            {{ item.raw.requires_approval ? t('Yes') : t('No') }}
-          </VChip>
-        </template>
-        <template #item.is_active="{ item }">
-          <VChip
-            :color="item.raw.is_active ? 'success' : 'default'"
-            size="small"
-            variant="tonal"
-            class="status-pill"
-          >
-            {{ item.raw.is_active ? t('Active') : t('Inactive') }}
-          </VChip>
-        </template>
-        <template #item.actions="{ item }">
-          <div
-            class="d-flex justify-end"
-            style="gap:2px;"
-          >
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              @click="openEdit(item.raw)"
-            >
-              <VIcon
-                size="18"
-                icon="bx-edit"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Edit') }}
-              </VTooltip>
-            </VBtn>
-            <VBtn
-              icon
-              variant="text"
-              size="small"
-              color="error"
-              @click="confirmDelete(item.raw)"
-            >
-              <VIcon
-                size="18"
-                icon="bx-trash"
-              />
-              <VTooltip
-                activator="parent"
-                location="top"
-              >
-                {{ t('Delete') }}
-              </VTooltip>
-            </VBtn>
-          </div>
-        </template>
-      </VDataTable>
-    </VCard>
+      <template #footer>
+        <Button variant="ghost" :disabled="saving" @click="dialog = false">
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          :loading="saving"
+          :disabled="saving"
+          @click="save"
+        >
+          {{ t('Save') }}
+        </Button>
+      </template>
+    </Modal>
 
-    <VDialog
-      v-model="dialog"
-      max-width="480"
-      persistent
+    <!-- ============ Delete confirm modal ============ -->
+    <Modal
+      :open="deleteDialog"
+      :width="420"
+      :title="t('Delete Variance Code')"
+      :subtitle="t('This action cannot be undone')"
+      @close="deleteDialog = false"
     >
-      <VCard :title="dialogMode === 'create' ? t('Add Variance Code') : t('Edit Variance Code')">
-        <VCardText>
-          <VRow>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.code"
-                :label="t('Code')"
-                required
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VTextField
-                v-model="form.name"
-                :label="t('Name')"
-                required
-              />
-            </VCol>
-            <VCol cols="12">
-              <VTextField
-                v-model="form.description"
-                :label="t('Description')"
-              />
-            </VCol>
-            <VCol
-              cols="12"
-              sm="6"
-            >
-              <VSwitch
-                v-model="form.requires_approval"
-                :label="t('Requires Approval')"
-                color="warning"
-              />
-            </VCol>
-            <VCol
-              v-if="dialogMode === 'edit'"
-              cols="12"
-              sm="6"
-            >
-              <VSwitch
-                v-model="form.is_active"
-                :label="t('Active')"
-                color="success"
-              />
-            </VCol>
-          </VRow>
-        </VCardText>
-        <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            color="default"
-            @click="dialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            :loading="saving"
-            @click="save"
-          >
-            {{ t('Save') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      <div class="row" style="gap: 14px; align-items: flex-start;">
+        <div
+          class="kpi__icon t-error"
+          style="width:44px; height:44px; flex:0 0 44px;"
+        >
+          <DesignIcon name="alert" :size="22" />
+        </div>
+        <div>
+          <p style="margin: 0; font-weight: 600;">
+            {{ selectedItem?.code }} · {{ selectedItem?.name }}
+          </p>
+          <p class="muted" style="margin: 6px 0 0; font-size: 14px; color: var(--text-secondary);">
+            {{ t('Are you sure you want to delete') }}?
+          </p>
+        </div>
+      </div>
 
-    <VDialog
-      v-model="deleteDialog"
-      max-width="400"
+      <template #footer>
+        <Button variant="ghost" :disabled="deleting" @click="deleteDialog = false">
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="danger"
+          :loading="deleting"
+          :disabled="deleting"
+          @click="doDelete"
+        >
+          {{ t('Delete') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- ============ Seed defaults confirm modal ============ -->
+    <Modal
+      :open="seedDialog"
+      :width="480"
+      :title="t('variance_seed_confirm_title')"
+      @close="seedDialog = false"
     >
-      <VCard :title="t('Delete Variance Code')">
-        <VCardText>{{ t('Are you sure you want to delete') }} <strong>{{ selectedItem?.name }}</strong>?</VCardText>
-        <VCardActions class="justify-end gap-2 pa-4 pt-0">
-          <VBtn
-            variant="tonal"
-            color="default"
-            @click="deleteDialog = false"
-          >
-            {{ t('Cancel') }}
-          </VBtn>
-          <VBtn
-            color="error"
-            :loading="deleting"
-            @click="doDelete"
-          >
-            {{ t('Delete') }}
-          </VBtn>
-        </VCardActions>
-      </VCard>
-    </VDialog>
+      <div class="row" style="gap: 14px; align-items: flex-start;">
+        <div
+          class="kpi__icon t-primary"
+          style="width:44px; height:44px; flex:0 0 44px;"
+        >
+          <DesignIcon name="sparkle" :size="22" />
+        </div>
+        <div>
+          <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">
+            {{ t('variance_seed_confirm_body') }}
+          </p>
+        </div>
+      </div>
 
+      <template #footer>
+        <Button variant="ghost" :disabled="seeding" @click="seedDialog = false">
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          icon="sparkle"
+          :loading="seeding"
+          :disabled="seeding"
+          @click="doSeed"
+        >
+          {{ t('variance_seed_defaults') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- Snackbar (reused Vuetify toast — already mounted globally elsewhere; kept for parity) -->
     <VSnackbar
       v-model="snackbar"
       :color="snackbarColor"
@@ -412,6 +611,13 @@ async function doDelete() {
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.row {
+  display: flex;
+  align-items: center;
+}
+</style>
 
 <route lang="yaml">
 name: stock-variance-codes

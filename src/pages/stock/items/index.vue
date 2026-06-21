@@ -4,6 +4,7 @@ import { stockApi as axios } from '@/plugins/axios'
 import DataTableFooter from '@core/components/DataTableFooter.vue'
 
 const { t } = useI18n({ useScope: 'global' })
+const router = useRouter()
 
 const items = ref<any[]>([])
 const total = ref(0)
@@ -11,6 +12,8 @@ const loading = ref(false)
 const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
+const barcodeQuery = ref('')
+const barcodeLoading = ref(false)
 const typeFilter = ref<string | undefined>(undefined)
 const categoryFilter = ref<number | undefined>(undefined)
 const lowStockOnly = ref(false)
@@ -137,6 +140,37 @@ async function doDelete() {
   }
 }
 
+async function lookupBarcode() {
+  const code = (barcodeQuery.value || '').trim()
+  if (!code)
+    return
+  barcodeLoading.value = true
+  try {
+    const res = await axios.get(`/items/barcode/${encodeURIComponent(code)}/`)
+    const d = res.data?.data ?? res.data
+    const item = d?.item ?? d
+    const id = item?.id
+    if (id) {
+      notify(t('items_ext_open'))
+      router.push({ path: '/stock/items', query: { id: String(id) } })
+      barcodeQuery.value = ''
+    }
+    else {
+      notify(t('items_ext_not_found'), 'error')
+    }
+  }
+  catch (e: any) {
+    const status = e?.response?.status
+    if (status === 404)
+      notify(t('items_ext_not_found'), 'error')
+    else
+      notify(e?.response?.data?.message ?? t('items_ext_not_found'), 'error')
+  }
+  finally {
+    barcodeLoading.value = false
+  }
+}
+
 async function toggleActive(item: any) {
   try {
     await axios.patch(`/items/${item.id}/`, { is_active: !item.is_active })
@@ -162,6 +196,25 @@ async function toggleActive(item: any) {
           hide-details
           clearable
         />
+        <VTextField
+          v-model="barcodeQuery"
+          :placeholder="t('items_ext_barcode_placeholder')"
+          prepend-inner-icon="bx-barcode-reader"
+          density="compact"
+          style="min-inline-size: 220px;"
+          hide-details
+          clearable
+          :loading="barcodeLoading"
+          :disabled="barcodeLoading"
+          @keydown.enter.prevent="lookupBarcode"
+        >
+          <VTooltip
+            activator="parent"
+            location="top"
+          >
+            {{ t('items_ext_barcode_tab') }}
+          </VTooltip>
+        </VTextField>
         <VSelect
           v-model="typeFilter"
           :items="['RAW', 'SEMI', 'FINISHED', 'PACKAGING'].map(v => ({ title: t(`item_type_${v}`), value: v }))"

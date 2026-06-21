@@ -44,4 +44,42 @@ export default [
     action: 'manage',
     subject: 'all',
   },
+  {
+    title: 'QR Codes',
+    icon: { icon: 'bx-grid' },
+    to: 'qr-codes',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
+    heading: 'Notifications',
+  },
+  {
+    title: 'Notification Queue',
+    icon: { icon: 'bx-inbox' },
+    to: 'notification-queue',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
+    title: 'Notification Settings',
+    icon: { icon: 'bx-slider-alt' },
+    to: 'notification-settings',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
+    title: 'Notification Templates',
+    icon: { icon: 'bx-copy' },
+    to: 'notification-templates',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
+    title: 'Notification Types',
+    icon: { icon: 'bx-bell' },
+    to: 'notification-types',
+    action: 'manage',
+    subject: 'all',
+  },
 ]

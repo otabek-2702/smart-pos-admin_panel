@@ -72,4 +72,11 @@ export default [
     action: 'manage',
     subject: 'all',
   },
+  {
+    title: 'Sessions',
+    icon: { icon: 'bx-lock' },
+    to: 'sessions',
+    action: 'manage',
+    subject: 'all',
+  },
 ]

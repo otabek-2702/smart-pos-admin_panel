@@ -73,6 +73,13 @@ export default [
     subject: 'all',
   },
   {
+    title: 'Stock Alerts',
+    icon: { icon: 'bx-error-circle' },
+    to: 'stock-alerts',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
     heading: 'Settings',
   },
   {

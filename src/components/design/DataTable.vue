@@ -277,7 +277,6 @@ function toggleExpand(id: string | number) {
 const colCount = computed(() =>
   props.columns.length
   + (isSelectable.value ? 1 : 0)
-  + (props.expandable ? 1 : 0)
   + (hasRowActions.value ? 1 : 0),
 )
 
@@ -308,13 +307,15 @@ function thStyle(c: DataTableColumn<R>): CSSProperties {
 }
 
 function rowStyle(): CSSProperties {
-  return slots['row-click'] || hasOnRowClick.value ? { cursor: 'pointer' } : { cursor: 'default' }
+  return props.expandable || hasOnRowClick.value ? { cursor: 'pointer' } : { cursor: 'default' }
 }
 
 const attrs = useAttrs()
 const hasOnRowClick = computed(() => !!(attrs as any).onRowClick)
 
 function emitRowClick(row: R) {
+  if (props.expandable)
+    toggleExpand(idOf(row))
   emit('row-click', row)
 }
 
@@ -382,10 +383,6 @@ function skeletonWidth(c: number) {
         <thead>
           <tr>
             <th
-              v-if="expandable"
-              style="width: 40px;"
-            />
-            <th
               v-if="isSelectable"
               style="width: 44px;"
             >
@@ -429,16 +426,6 @@ function skeletonWidth(c: number) {
             v-for="r in skeletonRowCount"
             :key="`sk-${r}`"
           >
-            <td
-              v-if="expandable"
-              style="width: 40px;"
-            >
-              <Skeleton
-                :w="16"
-                :h="16"
-                :r="4"
-              />
-            </td>
             <td
               v-if="isSelectable"
               style="width: 44px;"
@@ -499,25 +486,6 @@ function skeletonWidth(c: number) {
               :style="rowStyle()"
               @click="emitRowClick(r)"
             >
-              <td
-                v-if="expandable"
-                style="width: 40px;"
-              >
-                <button
-                  class="iconaction"
-                  :title="t('Expand')"
-                  @click.stop="toggleExpand(idOf(r))"
-                >
-                  <DesignIcon
-                    name="chevright"
-                    :size="16"
-                    :style="{
-                      transform: expanded.has(idOf(r)) ? 'rotate(90deg)' : 'none',
-                      transition: 'transform .15s',
-                    }"
-                  />
-                </button>
-              </td>
               <td v-if="isSelectable">
                 <Checkbox
                   :model-value="selection.has(idOf(r))"
@@ -587,7 +555,7 @@ function skeletonWidth(c: number) {
         style="gap: 8px;"
       >
         <span>{{ t('Rows per page') }}:</span>
-        <div style="width: 76px;">
+        <div style="width: 96px;">
           <Select
             size="sm"
             :model-value="String(pp)"

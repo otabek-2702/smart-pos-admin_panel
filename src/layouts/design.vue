@@ -35,15 +35,14 @@ onMounted(() => {
 <style>
 main.page-shell {
   flex: 1;
-  padding: var(--sp-7, 32px) var(--sp-8, 40px);
+  padding: var(--sp-5, 20px) var(--sp-6, 24px);
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
 main.page-shell > .page {
   padding: 0;
-  max-width: 1440px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .fade-enter-active, .fade-leave-active { transition: opacity .15s; }

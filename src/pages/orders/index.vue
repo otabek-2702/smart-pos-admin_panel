@@ -42,7 +42,6 @@ const dateTo = ref('')
 const orderTypeFilter = ref<string | undefined>(undefined)
 const cashierFilter = ref<string | undefined>(undefined)
 const categoryFilter = ref<string[]>([])
-const includeDeleted = ref(false)
 // Lookups for cashier / category selects
 const cashierOptions = ref<{ value: string, label: string }[]>([])
 const categoryOptions = ref<{ value: string, label: string }[]>([])
@@ -58,7 +57,6 @@ const sortDir = ref<'asc' | 'desc'>('desc')
 // Per-row + bulk loading state to prevent duplicate POSTs
 const actingOnId = ref<number | string | null>(null)
 const bulking = ref(false)
-const exporting = ref(false)
 
 // Destructive-action confirm dialogs
 type ConfirmKind = 'cancel-one' | 'cancel-bulk' | 'pay-one' | 'pay-bulk'
@@ -113,9 +111,6 @@ async function loadOrders() {
       params.cashier_id = cashierFilter.value
     if (categoryFilter.value.length)
       params.category_ids = categoryFilter.value.join(',')
-    if (includeDeleted.value)
-      params.include_deleted = true
-
     const res = await axios.get('/orders', { params })
     const d = res.data?.data
 
@@ -173,7 +168,7 @@ onMounted(() => {
 })
 
 watch([page, itemsPerPage], loadOrders)
-watch([statusFilter, paymentFilter, dateFrom, dateTo, orderTypeFilter, cashierFilter, categoryFilter, includeDeleted], () => {
+watch([statusFilter, paymentFilter, dateFrom, dateTo, orderTypeFilter, cashierFilter, categoryFilter], () => {
   page.value = 1
   loadOrders()
 })
@@ -230,36 +225,6 @@ async function confirmCancelBulk() {
 async function confirmPayBulk() {
   closeConfirm()
   await bulkMarkPaid()
-}
-
-async function exportOneC() {
-  if (!dateFrom.value || !dateTo.value) {
-    notify(t('Pick a date range to export'), 'error')
-    return
-  }
-  if (exporting.value) return
-  exporting.value = true
-  try {
-    const res = await axios.get('/exports/1c', {
-      params: { from: dateFrom.value, to: dateTo.value },
-      responseType: 'blob',
-    })
-
-    const url = URL.createObjectURL(new Blob([res.data], { type: 'application/xml' }))
-    const a = document.createElement('a')
-
-    a.href = url
-    a.download = `orders-${dateFrom.value}-to-${dateTo.value}.xml`
-    a.click()
-    URL.revokeObjectURL(url)
-    notify(t('Export downloaded'))
-  }
-  catch (e: any) {
-    notify(e?.response?.data?.message ?? t('Export failed'), 'error')
-  }
-  finally {
-    exporting.value = false
-  }
 }
 
 // ---- bulk + selection ----
@@ -446,17 +411,6 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
       :title="t('Orders')"
       :subtitle="t('Track, settle and reconcile every order')"
     >
-      <template #actions>
-        <Button
-          variant="primary"
-          icon="download"
-          :loading="exporting"
-          :disabled="!dateFrom || !dateTo || exporting"
-          @click="exportOneC"
-        >
-          {{ t('Export to 1C') }}
-        </Button>
-      </template>
     </PageHeader>
 
     <!-- KPI strip -->
@@ -621,13 +575,7 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
           </div>
         </div>
 
-        <!-- Include deleted switch -->
-        <label class="row" style="gap:8px; cursor:pointer;">
-          <Switch v-model="includeDeleted" />
-          <span style="font-size:13px;">{{ t('Include deleted') }}</span>
-        </label>
-
-        <div class="row" style="gap: 8px; margin-left: auto;">
+<div class="row" style="gap: 8px; margin-left: auto;">
           <div class="control control--sm" style="width: 160px;">
             <input v-model="dateFrom" type="date" :aria-label="t('Date from')">
           </div>
@@ -685,14 +633,7 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
             </span>
           </span>
 
-          <span v-if="includeDeleted" class="chip">
-            <span>{{ t('Include deleted') }}</span>
-            <span class="chip__x" @click="includeDeleted = false">
-              <DesignIcon name="close" :size="13" />
-            </span>
-          </span>
-
-          <span v-if="dateFrom" class="chip">
+<span v-if="dateFrom" class="chip">
             <span>{{ t('Date from') }}: <b>{{ dateFrom }}</b></span>
             <span class="chip__x" @click="dateFrom = ''">
               <DesignIcon name="close" :size="13" />

@@ -51,29 +51,24 @@ onMounted(() => {
    regardless of which page is rendered. */
 main.page-shell {
   flex: 1;
-  /* Generous breathing room: 32px top/bottom · 40px left/right. */
-  padding: var(--sp-7, 32px) var(--sp-8, 40px);
+  padding: var(--sp-5, 20px) var(--sp-6, 24px);
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
-/* Pages built with their own .page wrapper (dashboard, shifts-analytics)
-   already provide padding + max-width; cancel the outer padding so they
-   don't double up. */
 main.page-shell > .page {
   padding: 0;
-  max-width: 1440px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 @media (max-width: 900px) {
-  main.page-shell { padding: var(--sp-5) var(--sp-5); }
-}
-@media (max-width: 600px) {
   main.page-shell { padding: var(--sp-4) var(--sp-4); }
 }
-@media (max-width: 420px) {
+@media (max-width: 600px) {
   main.page-shell { padding: var(--sp-3) var(--sp-3); }
+}
+@media (max-width: 420px) {
+  main.page-shell { padding: var(--sp-2) var(--sp-3); }
 }
 
 .fade-enter-active, .fade-leave-active { transition: opacity .15s; }

@@ -91,7 +91,7 @@ async function loadLevels() {
     const d = readData<any>(res)
 
     levels.value = d?.levels ?? []
-    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? levels.value.length
+    total.value = d?.pagination?.total ?? levels.value.length
   }
   catch {
     notify(t('msg_load_failed'), 'error')
@@ -493,7 +493,7 @@ function clearFilters() {
         <!-- Location -->
         <template #cell.location="{ row }">
           <span class="row" style="gap:8px; align-items:center;">
-            <span class="cell-strong">{{ row.location?.name ?? row.location_name ?? '—' }}</span>
+            <span class="cell-strong">{{ row.location?.name ?? '—' }}</span>
             <Badge
               v-if="row.location?.type"
               :tone="LOCATION_TONE[row.location.type] ?? 'neutral'"

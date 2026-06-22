@@ -140,25 +140,25 @@ const receiptStatusTone: Record<string, 'success' | 'warning' | 'error' | 'info'
 // ---- KPI strip ----
 const kpiConfirmed = computed(() => ({
   label: t('Confirmed'),
-  value: status.value ? (status.value.confirmed ?? status.value.stats?.CONFIRMED ?? 0) : null,
+  value: status.value ? (status.value.confirmed ?? 0) : null,
   icon: 'checkcircle',
   tone: 'success' as const,
 }))
 const kpiPending = computed(() => ({
   label: t('Pending'),
-  value: status.value ? (status.value.pending ?? status.value.stats?.PENDING ?? 0) : null,
+  value: status.value ? (status.value.pending ?? 0) : null,
   icon: 'clock',
   tone: 'warning' as const,
 }))
 const kpiSent = computed(() => ({
   label: t('Sent'),
-  value: status.value ? (status.value.sent ?? status.value.stats?.SENT ?? 0) : null,
+  value: status.value ? (status.value.sent ?? 0) : null,
   icon: 'send',
   tone: 'info' as const,
 }))
 const kpiFailed = computed(() => ({
   label: t('Failed'),
-  value: status.value ? (status.value.failed ?? status.value.stats?.FAILED ?? 0) : null,
+  value: status.value ? (status.value.failed ?? 0) : null,
   icon: 'close',
   tone: 'error' as const,
 }))
@@ -185,7 +185,7 @@ const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'amount', label: t('Total'), sortable: true, align: 'right' as const, width: 130 },
   { key: 'fiscal_sign', label: t('Fiscal sign'), sortable: false },
   { key: 'qr_url', label: t('QR'), sortable: false, align: 'center' as const, width: 60 },
-  { key: 'created_at', label: t('Created'), sortable: true, width: 160 },
+  { key: 'fiscalized_at', label: t('Created'), sortable: true, width: 160 },
   { key: 'error', label: t('Error'), sortable: false },
 ])
 </script>
@@ -329,7 +329,7 @@ const columns = computed<DataTableColumn<any>[]>(() => [
         </template>
 
         <template #cell.amount="{ row }">
-          <span class="num-tabular">{{ formatCurrency(row.amount ?? row.total ?? 0) }}</span>
+          <span class="num-tabular">{{ formatCurrency(row.amount ?? 0) }}</span>
         </template>
 
         <template #cell.fiscal_sign="{ row }">
@@ -351,12 +351,12 @@ const columns = computed<DataTableColumn<any>[]>(() => [
           <span v-else class="muted">—</span>
         </template>
 
-        <template #cell.created_at="{ row }">
-          <span class="muted">{{ formatDate(row.created_at) }}</span>
+        <template #cell.fiscalized_at="{ row }">
+          <span class="muted">{{ formatDate(row.fiscalized_at) }}</span>
         </template>
 
         <template #cell.error="{ row }">
-          <span v-if="row.error || row.last_error" class="error-text">{{ row.error ?? row.last_error }}</span>
+          <span v-if="row.error" class="error-text">{{ row.error }}</span>
           <span v-else class="muted">—</span>
         </template>
 

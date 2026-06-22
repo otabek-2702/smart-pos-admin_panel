@@ -1,8 +1,12 @@
-import { fmtDateTime, fmtNum } from '@/components/design/utils/format'
+import { fmtAbbr, fmtDateTime, fmtNum, useFormatMode } from '@/components/design/utils/format'
 
 export function useFormatters() {
+  const { mode } = useFormatMode()
   function formatCurrency(val: number | string): string {
-    return fmtNum(Math.round(Number(val) || 0))
+    const n = Math.round(Number(val) || 0)
+    if (mode.value === 'short' && Math.abs(n) >= 10000)
+      return fmtAbbr(n)
+    return fmtNum(n)
   }
 
   function formatDate(val: string): string {

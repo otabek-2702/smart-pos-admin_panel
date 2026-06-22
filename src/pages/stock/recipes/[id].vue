@@ -261,13 +261,16 @@ const costLines = computed<CostLine[]>(() => {
     const qty = Number(ing.quantity) || 0
     const waste = Number(ing.waste_percentage) || 0
     const scaled = qty * (batchMultiplier.value || 1) * (1 + waste / 100)
-    const unitCost = Number(ing.stock_item?.avg_cost_price ?? ing.stock_item?.cost_price ?? ing.unit_cost ?? 0)
-    const sub = scaled * unitCost
+    // RecipeIngredientService.serialize only exposes stock_item as {id, name, sku} —
+    // no unit cost field is available on the nested object. Per-line subtotals are
+    // therefore not computable client-side; rely on /cost/ endpoint total_cost and
+    // present only the share derived from it.
+    const sub = 0
     return {
       id: ing.id,
-      name: ing.stock_item?.name ?? ing.stock_item_name ?? '—',
+      name: ing.stock_item?.name ?? '—',
       scaled_quantity: scaled,
-      unit_cost: unitCost,
+      unit_cost: 0,
       subtotal: sub,
     }
   })
@@ -659,7 +662,7 @@ function onBatchMultiplierInput(v: string) {
               {{ t('recipe_type') }}
             </div>
             <Badge :tone="recipeTypeTone(recipe.recipe_type)">
-              {{ recipe.recipe_type ? t(`recipe_type_${recipe.recipe_type}`) : '—' }}
+              {{ recipe.recipe_type_display ?? (recipe.recipe_type ? t(`recipe_type_${recipe.recipe_type}`) : '—') }}
             </Badge>
           </div>
           <div>
@@ -675,7 +678,7 @@ function onBatchMultiplierInput(v: string) {
               {{ t('recipe_output_item') }}
             </div>
             <div>
-              {{ recipe.output_item?.name ?? recipe.output_item_name ?? '—' }}
+              {{ recipe.output_item?.name ?? '—' }}
             </div>
           </div>
           <div>
@@ -872,7 +875,7 @@ function onBatchMultiplierInput(v: string) {
                 </td>
                 <td>
                   <div class="cell-strong">
-                    {{ ing.stock_item?.name ?? ing.stock_item_name ?? '—' }}
+                    {{ ing.stock_item?.name ?? '—' }}
                   </div>
                   <div class="cell-muted mono" style="font-size: var(--fs-sm);">
                     {{ ing.stock_item?.sku ?? '—' }}
@@ -1328,7 +1331,7 @@ function onBatchMultiplierInput(v: string) {
     >
       <p v-if="selectedIng" style="margin: 0; color: var(--text-secondary);">
         <strong style="color: var(--text);">
-          {{ selectedIng.stock_item?.name ?? selectedIng.stock_item_name ?? '—' }}
+          {{ selectedIng.stock_item?.name ?? '—' }}
         </strong>
       </p>
 

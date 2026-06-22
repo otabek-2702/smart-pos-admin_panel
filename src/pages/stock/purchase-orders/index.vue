@@ -81,10 +81,33 @@ const columns: DataTableColumn<any>[] = [
   { key: 'order_number', label: t('po_col_order_number'), sortable: false },
   { key: 'supplier_name', label: t('Supplier'), sortable: false },
   { key: 'status', label: t('Status'), sortable: false, width: 140 },
-  { key: 'payment_status', label: t('Payment'), sortable: false, width: 130 },
   { key: 'total', label: t('Total'), sortable: false, align: 'right', width: 140 },
   { key: 'order_date', label: t('Date'), sortable: false, width: 130 },
 ]
+
+// Detail cache: list endpoint returns serialize_brief (no items / delivery_location /
+// expected_date), so the expand row must fetch the full detail per id.
+const detailCache = ref<Record<string | number, any>>({})
+const detailLoading = ref<Record<string | number, boolean>>({})
+
+async function ensureDetail(row: any) {
+  if (!row?.id)
+    return
+  if (detailCache.value[row.id] || detailLoading.value[row.id])
+    return
+  detailLoading.value[row.id] = true
+  try {
+    const res = await axios.get(`/purchase-orders/${row.id}/`)
+    const d = res.data?.data ?? res.data
+    detailCache.value[row.id] = d?.order ?? d
+  }
+  catch {
+    /* ignore — expanded row will show fallback dashes */
+  }
+  finally {
+    detailLoading.value[row.id] = false
+  }
+}
 
 async function loadOrders() {
   loading.value = true
@@ -107,7 +130,10 @@ async function loadOrders() {
     const d = res.data?.data ?? res.data
 
     orders.value = d?.orders ?? []
-    total.value = d.pagination?.total_items ?? d.pagination?.total ?? orders.value.length
+    total.value = d?.pagination?.total ?? orders.value.length
+    // Invalidate the per-row detail cache whenever the list reloads, so
+    // expanded rows refetch fresh detail after pagination/filter changes.
+    detailCache.value = {}
   }
   catch {
     notify(t('Failed to load purchase orders'), 'error')
@@ -317,19 +343,6 @@ const pagination = computed(() => ({
           </Badge>
         </template>
 
-        <template #cell.payment_status="{ row }">
-          <Badge
-            v-if="row.payment_status"
-            :tone="PAYMENT_TONE[row.payment_status] ?? 'neutral'"
-          >
-            {{ t(`po_payment_${row.payment_status}`) }}
-          </Badge>
-          <span
-            v-else
-            class="cell-muted"
-          >—</span>
-        </template>
-
         <template #cell.total="{ row }">
           <span class="mono num-tabular">{{ formatCurrency(row.total ?? 0) }}</span>
         </template>
@@ -369,21 +382,32 @@ const pagination = computed(() => ({
           />
         </template>
 
-        <!-- Expanded row: order metadata + line items -->
+        <!-- Expanded row: order metadata + line items.
+             BE list endpoint returns serialize_brief (no items / delivery_location /
+             expected_date / payment_status). Fetch detail on first expand and read
+             from detailCache. -->
         <template #expanded="{ row }">
+          <!-- Trigger detail fetch on first render of the expanded slot -->
+          {{ (ensureDetail(row), '') }}
           <div class="po-expand">
             <div class="po-expand__meta">
               <span>
                 <span class="cell-muted">{{ t('Supplier') }}: </span>
-                <strong>{{ row.supplier_name ?? row.supplier?.name ?? '—' }}</strong>
+                <strong>{{ (detailCache[row.id]?.supplier?.name) ?? row.supplier_name ?? '—' }}</strong>
               </span>
               <span>
                 <span class="cell-muted">{{ t('Location') }}: </span>
-                <strong>{{ row.delivery_location ?? '—' }}</strong>
+                <strong>{{ detailCache[row.id]?.delivery_location ?? '—' }}</strong>
               </span>
-              <span v-if="row.expected_date">
+              <span v-if="detailCache[row.id]?.expected_date">
                 <span class="cell-muted">{{ t('Expected') }}: </span>
-                <strong>{{ formatDateShort(row.expected_date) }}</strong>
+                <strong>{{ formatDateShort(detailCache[row.id]?.expected_date) }}</strong>
+              </span>
+              <span v-if="detailCache[row.id]?.payment_status">
+                <span class="cell-muted">{{ t('Payment') }}: </span>
+                <Badge :tone="PAYMENT_TONE[detailCache[row.id]?.payment_status] ?? 'neutral'">
+                  {{ t(`po_payment_${detailCache[row.id]?.payment_status}`) }}
+                </Badge>
               </span>
             </div>
 
@@ -408,7 +432,7 @@ const pagination = computed(() => ({
                 </thead>
                 <tbody>
                   <tr
-                    v-for="(li, idx) in ((row.items ?? []) as any[])"
+                    v-for="(li, idx) in ((detailCache[row.id]?.items ?? []) as any[])"
                     :key="idx"
                   >
                     <td>{{ li.stock_item?.name ?? '—' }}</td>
@@ -422,10 +446,18 @@ const pagination = computed(() => ({
                       {{ formatCurrency(li.unit_price ?? 0) }}
                     </td>
                     <td class="num mono">
-                      {{ formatCurrency(Number(li.unit_price ?? 0) * Number(li.quantity_ordered ?? 1)) }}
+                      {{ formatCurrency(li.total_price ?? 0) }}
                     </td>
                   </tr>
-                  <tr v-if="!row.items?.length">
+                  <tr v-if="detailLoading[row.id] && !detailCache[row.id]">
+                    <td
+                      colspan="5"
+                      class="po-lines__empty"
+                    >
+                      {{ t('Loading...') }}
+                    </td>
+                  </tr>
+                  <tr v-else-if="!detailCache[row.id]?.items?.length">
                     <td
                       colspan="5"
                       class="po-lines__empty"

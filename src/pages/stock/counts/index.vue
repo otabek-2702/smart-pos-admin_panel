@@ -251,7 +251,6 @@ const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'location_name', label: t('Location') },
   { key: 'count_type', label: t('Type') },
   { key: 'status', label: t('Status') },
-  { key: 'items_counted', label: t('Items Counted'), align: 'right' },
   { key: 'created_at', label: t('Date'), align: 'right' },
 ])
 
@@ -365,10 +364,6 @@ const itemFilterOptions = computed(() => [
           <Badge :tone="statusTone(r.status)" dot>
             {{ r.status ? t(`count_status_${r.status}`) : '—' }}
           </Badge>
-        </template>
-
-        <template #cell.items_counted="{ row: r }">
-          <span class="mono num">{{ r.items_counted ?? '—' }}</span>
         </template>
 
         <template #cell.created_at="{ row: r }">
@@ -556,7 +551,7 @@ const itemFilterOptions = computed(() => [
           </thead>
           <tbody>
             <tr v-for="i in filteredItems" :key="i.id">
-              <td class="cell-strong">{{ i.stock_item?.name ?? i.item?.name ?? '—' }}</td>
+              <td class="cell-strong">{{ i.stock_item?.name ?? '—' }}</td>
               <td class="num mono">{{ i.system_quantity }} {{ i.stock_item?.unit ?? '' }}</td>
               <td class="num">
                 <Input

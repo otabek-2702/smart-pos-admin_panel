@@ -108,7 +108,7 @@ async function load() {
     const d = res.data?.data ?? res.data
 
     employees.value = d?.employees ?? []
-    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? employees.value.length
+    total.value = d?.pagination?.total ?? employees.value.length
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Failed to load'), 'error')

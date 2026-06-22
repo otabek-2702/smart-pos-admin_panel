@@ -2,6 +2,10 @@
    ALPHA POS — AI Assistant styles
    ============================================================ */
 
+/* AI page kills its host page-shell padding so the inner aiwrap is the only scroll context — prevents the double-scrollbar bug */
+main.page-shell:has(.aiwrap) { padding: 0 !important; }
+main.page-shell > .aiwrap { width: 100%; }
+
 .aiwrap { display: flex; height: calc(100vh - var(--topbar-h)); min-height: 0; }
 
 /* ---------- History sidebar ---------- */

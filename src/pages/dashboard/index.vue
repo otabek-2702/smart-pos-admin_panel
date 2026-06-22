@@ -593,7 +593,7 @@ function initial(s: string | undefined | null): string {
           <tbody>
             <tr v-for="o in recentOrders" :key="o.id">
               <td class="cell-strong mono">
-                #{{ o.display_id ?? o.id }}
+                #{{ o.id }}<span v-if="o.display_id != null"> · K{{ o.display_id }}</span>
               </td>
               <td>
                 <Badge tone="neutral">
@@ -601,10 +601,10 @@ function initial(s: string | undefined | null): string {
                 </Badge>
               </td>
               <td>
-                <StatusBadge :value="String(o.status ?? '')" dot />
+                <StatusBadge :value="o.status ? t(`status_${String(o.status).toUpperCase()}`) : ''" dot />
               </td>
               <td>
-                <StatusBadge :value="o.is_paid ? 'PAID' : 'UNPAID'" />
+                <StatusBadge :value="o.is_paid ? t('payment_status_PAID') : t('payment_status_UNPAID')" />
               </td>
               <td class="num mono cell-strong">
                 {{ fmtMoney(Number(o.total_amount) || 0) }}

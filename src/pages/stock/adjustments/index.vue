@@ -58,7 +58,7 @@ async function loadLookups() {
   const [si, locs, us, bs] = await Promise.all([
     loadLookup('/items/', ['items', 'stock_items'], 'id', 'name'),
     loadLookup('/locations/', ['locations'], 'id', 'name'),
-    loadLookup('/units/', ['units'], 'id', 'name'),
+    loadLookup('/units/', ['units'], 'id', 'short_name'),
     loadLookup('/batches/', ['batches'], 'id', 'batch_number'),
   ])
   stockItems.value = si
@@ -575,11 +575,11 @@ watch([historyPage, historyPerPage], () => loadHistory())
         </template>
 
         <template #cell.item="{ row }">
-          <span class="cell-strong">{{ row.stock_item_name ?? row.stock_item?.name ?? '—' }}</span>
+          <span class="cell-strong">{{ row.stock_item_name ?? '—' }}</span>
         </template>
 
         <template #cell.location="{ row }">
-          <span class="cell-muted">{{ row.location_name ?? row.location?.name ?? '—' }}</span>
+          <span class="cell-muted">{{ row.location_name ?? '—' }}</span>
         </template>
 
         <template #cell.quantity="{ row }">

@@ -703,7 +703,7 @@ const levelsSkeletonRows = computed(() => 3)
           </thead>
           <tbody>
             <tr v-for="lvl in levels" :key="lvl.id">
-              <td>{{ lvl.location_name ?? '—' }}</td>
+              <td>{{ lvl.location?.name ?? '—' }}</td>
               <td class="num mono cell-strong">{{ formatQty(lvl.quantity) }}</td>
               <td class="num mono">{{ formatQty(lvl.reserved_quantity) }}</td>
               <td class="num mono">{{ formatQty(lvl.available_quantity) }}</td>
@@ -820,7 +820,7 @@ const levelsSkeletonRows = computed(() => 3)
         </template>
         <template #cell.quantity="{ row }">
           <span class="mono cell-strong">
-            {{ formatQty(row.quantity ?? row.quantity_change) }}
+            {{ formatQty(row.quantity) }}
             <span v-if="unitShort" class="cell-muted" style="margin-left: 4px;">{{ unitShort }}</span>
           </span>
         </template>

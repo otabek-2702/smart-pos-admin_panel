@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import axios from '@/plugins/axios'
+import { useFormatMode, type NumberFormatMode } from '@/components/design/utils/format'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
+
+const { mode: numberFormat, setMode: setNumberFormat } = useFormatMode()
+function chooseNumberFormat(v: NumberFormatMode) {
+  setNumberFormat(v)
+  notify(t('Number format updated'))
+}
 
 const settings = ref<any>({ hr_enabled: false, waiter_enabled: false, stock_enabled: false })
 const loading = ref(false)
@@ -167,6 +174,50 @@ const modules = computed(() => [
         cols="12"
         md="4"
       >
+        <!-- Number format -->
+        <VCard class="settings-panel" style="margin-bottom: 16px;">
+          <div class="card__head">
+            <div class="card__head-title">
+              {{ t('Number format') }}
+            </div>
+            <div class="card__head-sub">
+              {{ t('Choose how numbers and prices are displayed') }}
+            </div>
+          </div>
+          <div style="padding: 12px 20px 20px; display: flex; flex-direction: column; gap: 8px;">
+            <label
+              style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer;"
+              :style="numberFormat === 'full' ? 'border-color: var(--primary); background: var(--primary-weak);' : ''"
+            >
+              <input
+                type="radio"
+                name="numFormat"
+                :checked="numberFormat === 'full'"
+                @change="chooseNumberFormat('full')"
+              >
+              <div style="flex: 1;">
+                <div style="font-weight: 600;">{{ t('Full (1 000 000)') }}</div>
+                <div class="text-muted" style="font-size: 12px;">{{ t('Group thousands with a space') }}</div>
+              </div>
+            </label>
+            <label
+              style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer;"
+              :style="numberFormat === 'short' ? 'border-color: var(--primary); background: var(--primary-weak);' : ''"
+            >
+              <input
+                type="radio"
+                name="numFormat"
+                :checked="numberFormat === 'short'"
+                @change="chooseNumberFormat('short')"
+              >
+              <div style="flex: 1;">
+                <div style="font-weight: 600;">{{ t('Short (1M / 1K)') }}</div>
+                <div class="text-muted" style="font-size: 12px;">{{ t('Abbreviate big numbers') }}</div>
+              </div>
+            </label>
+          </div>
+        </VCard>
+
         <!-- Tip panel -->
         <VCard class="settings-panel">
           <div class="card__head">

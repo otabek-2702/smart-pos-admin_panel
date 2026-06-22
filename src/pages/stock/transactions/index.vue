@@ -83,12 +83,10 @@ function formatQty(val: any) {
   return Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/\.?0+$/, '')
 }
 
-// BE has no quantity_change field. Derive: after - before. Fallback to signed
-// base_quantity based on movement_type sign (OUT/MINUS/WASTE/SPOILAGE → negative).
+// BE has no quantity_change field. Canonical delta = quantity_after - quantity_before.
+// Fallback to signed base_quantity based on movement_type sign
+// (OUT/MINUS/WASTE/SPOILAGE/RETURN_TO_SUPPLIER → negative).
 function qtyChange(row: any): number {
-  if (row?.quantity_change !== undefined && row?.quantity_change !== null)
-    return Number(row.quantity_change) || 0
-
   const before = Number(row?.quantity_before)
   const after = Number(row?.quantity_after)
   if (!Number.isNaN(before) && !Number.isNaN(after))
@@ -181,7 +179,7 @@ const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'movement_type', label: t('tx_col_type') },
   { key: 'item', label: t('tx_col_item') },
   { key: 'location', label: t('tx_col_location') },
-  { key: 'quantity_change', label: t('tx_col_qty_change'), align: 'right' },
+  { key: 'qty_delta', label: t('tx_col_qty_change'), align: 'right' },
   { key: 'quantity_before', label: t('tx_col_before'), align: 'right' },
   { key: 'quantity_after', label: t('tx_col_after'), align: 'right' },
   { key: 'reference', label: t('tx_col_reference') },
@@ -198,12 +196,6 @@ const dtPagination = computed(() => ({
   onPerPage: (n: number) => { itemsPerPage.value = n; page.value = 1; loadTransactions() },
 }))
 
-function refUserName(u: any) {
-  if (!u)
-    return '—'
-  const full = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim()
-  return full || u.email || '—'
-}
 </script>
 
 <template>
@@ -308,7 +300,7 @@ function refUserName(u: any) {
 
         <template #cell.item="{ row }">
           <span class="cell-strong tx-item-cell">
-            {{ row.stock_item_name ?? row.stock_item?.name ?? row.item?.name ?? '—' }}
+            {{ row.stock_item_name ?? '—' }}
             <span
               v-if="row.batch_id"
               class="cell-muted tx-item-batch"
@@ -319,10 +311,10 @@ function refUserName(u: any) {
         </template>
 
         <template #cell.location="{ row }">
-          <span class="cell-muted">{{ row.location_name ?? row.location?.name ?? '—' }}</span>
+          <span class="cell-muted">{{ row.location_name ?? '—' }}</span>
         </template>
 
-        <template #cell.quantity_change="{ row }">
+        <template #cell.qty_delta="{ row }">
           <span
             class="mono num-tabular cell-strong"
             :style="{ color: qtyChange(row) >= 0 ? 'rgb(var(--v-theme-success-strong))' : 'rgb(var(--v-theme-error-strong))' }"
@@ -340,7 +332,7 @@ function refUserName(u: any) {
         </template>
 
         <template #cell.reference="{ row }">
-          <span class="cell-muted">{{ row.reference_type ? `${row.reference_type} #${row.reference_id}` : '—' }}</span>
+          <span class="cell-muted">{{ row.reference_type ? `${t(`reference_type_${row.reference_type}`)} #${row.reference_id}` : '—' }}</span>
         </template>
 
         <template #cell.unit_cost="{ row }">
@@ -352,7 +344,7 @@ function refUserName(u: any) {
         </template>
 
         <template #cell.user="{ row }">
-          <span class="cell-muted">{{ row.user ? refUserName(row.user) : (row.user_id ? `#${row.user_id}` : '—') }}</span>
+          <span class="cell-muted">{{ row.user_id ? `#${row.user_id}` : '—' }}</span>
         </template>
 
         <template #row-actions="{ row }">

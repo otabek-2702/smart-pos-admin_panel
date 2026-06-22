@@ -148,7 +148,7 @@ async function loadBatches() {
     const d = res.data?.data ?? res.data
 
     batches.value = d?.batches ?? d?.results ?? (Array.isArray(d) ? d : [])
-    total.value = d.pagination?.total_items ?? d.pagination?.total ?? batches.value.length
+    total.value = d.pagination?.total_items ?? d.pagination?.total ?? d?.count ?? batches.value.length
   }
   catch {
     notify(t('Failed to load batches'), 'error')
@@ -283,7 +283,7 @@ const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'batch_number', label: t('Batch #') },
   { key: 'item', label: t('Item') },
   { key: 'location', label: t('Location') },
-  { key: 'received_date', label: t('Received date') },
+  { key: 'received_at', label: t('Received date') },
   { key: 'initial_quantity', label: t('Initial qty'), align: 'right' },
   { key: 'current_quantity', label: t('Current Qty'), align: 'right' },
   { key: 'reserved_quantity', label: t('Reserved qty'), align: 'right' },
@@ -596,8 +596,8 @@ function clearAll() {
           <span class="cell-muted">{{ row.location_name ?? '—' }}</span>
         </template>
 
-        <template #cell.received_date="{ row }">
-          <span class="cell-muted">{{ (row.received_at ?? row.received_date) ? formatDateShort(row.received_at ?? row.received_date) : '—' }}</span>
+        <template #cell.received_at="{ row }">
+          <span class="cell-muted">{{ row.received_at ? formatDateShort(row.received_at) : '—' }}</span>
         </template>
 
         <template #cell.initial_quantity="{ row }">

@@ -103,26 +103,71 @@ const itemForm = ref({
 })
 
 // ---------- load ----------
+// BE has NO GET /receiving/ list endpoint. Receivings are only exposed via the parent PO detail
+// (PurchaseOrderService.get returns data.order with receivings when include_receivings=True;
+// the receiving rows use serialize_brief: {id, receiving_number, received_date, status} —
+// no location_name, no purchase_order_number, no items_count).
+// PO list returns serialize_brief which has no receivings, so we must fetch detail per PO.
+// BE filter applies status= exact match (not CSV), so two requests are issued and merged.
 async function loadReceivings() {
   loading.value = true
   try {
-    const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value.trim())
-      params.search = search.value.trim()
+    const [confirmedRes, partialRes] = await Promise.all([
+      stockApi.get('/purchase-orders/', { params: { status: 'CONFIRMED', per_page: 200 } }),
+      stockApi.get('/purchase-orders/', { params: { status: 'PARTIAL', per_page: 200 } }),
+    ])
+    const cD = confirmedRes.data?.data ?? confirmedRes.data
+    const pD = partialRes.data?.data ?? partialRes.data
+    // BE canonical key is `orders`
+    const briefPos: any[] = [...(cD?.orders ?? []), ...(pD?.orders ?? [])]
+
+    // Fetch full PO detail (which includes receivings) for each PO in parallel
+    const detailResponses = await Promise.all(
+      briefPos.map(p => stockApi.get(`/purchase-orders/${p.id}/`).catch(() => null)),
+    )
+
+    // Flatten: each receiving inherits PO context (purchase_order_id/number + delivery location)
+    let all: any[] = []
+    for (const r of detailResponses) {
+      if (!r)
+        continue
+      const det = r.data?.data ?? r.data
+      // BE canonical: data.order
+      const po = det?.order
+      if (!po)
+        continue
+      const rcvs: any[] = po?.receivings ?? []
+      for (const rcv of rcvs) {
+        all.push({
+          ...rcv,
+          purchase_order_id: po.id,
+          purchase_order_number: po.order_number,
+          // BE full PO serialize: delivery_location is a STRING (po.delivery_location.name), not an object.
+          location_name: typeof po.delivery_location === 'string' ? po.delivery_location : null,
+        })
+      }
+    }
+
+    // Client-side filters (BE list endpoint doesn't exist, so filter here)
+    if (search.value.trim()) {
+      const q = search.value.trim().toLowerCase()
+      all = all.filter(r =>
+        String(r.receiving_number ?? '').toLowerCase().includes(q)
+        || String(r.purchase_order_number ?? '').toLowerCase().includes(q),
+      )
+    }
     if (statusFilter.value)
-      params.status = statusFilter.value
+      all = all.filter(r => r.status === statusFilter.value)
     if (poFilter.value)
-      params.purchase_order_id = poFilter.value
+      all = all.filter(r => String(r.purchase_order_id) === String(poFilter.value))
     if (dateFrom.value)
-      params.date_from = dateFrom.value
+      all = all.filter(r => r.received_date && r.received_date >= dateFrom.value)
     if (dateTo.value)
-      params.date_to = dateTo.value
+      all = all.filter(r => r.received_date && r.received_date <= dateTo.value)
 
-    const res = await stockApi.get('/receiving/', { params })
-    const d = res.data?.data ?? res.data
-
-    receivings.value = d?.receivings ?? d?.items ?? d?.results ?? []
-    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? d?.count ?? receivings.value.length
+    total.value = all.length
+    const start = (page.value - 1) * itemsPerPage.value
+    receivings.value = all.slice(start, start + itemsPerPage.value)
   }
   catch {
     notify(t('Failed to load receivings'), 'error')
@@ -134,14 +179,18 @@ async function loadReceivings() {
 
 async function loadLookups() {
   try {
-    const [poRes, locRes] = await Promise.all([
-      stockApi.get('/purchase-orders/', { params: { status: 'CONFIRMED,PARTIAL', per_page: 200 } }),
+    // BE filter is exact-match on `status` (not CSV). Issue two requests and merge.
+    const [confirmedPoRes, partialPoRes, locRes] = await Promise.all([
+      stockApi.get('/purchase-orders/', { params: { status: 'CONFIRMED', per_page: 200 } }),
+      stockApi.get('/purchase-orders/', { params: { status: 'PARTIAL', per_page: 200 } }),
       stockApi.get('/locations/', { params: { is_active: true, per_page: 200 } }),
     ])
-    const poD = poRes.data?.data ?? poRes.data
+    const confirmedD = confirmedPoRes.data?.data ?? confirmedPoRes.data
+    const partialD = partialPoRes.data?.data ?? partialPoRes.data
     const locD = locRes.data?.data ?? locRes.data
 
-    const poList: any[] = poD?.orders ?? poD?.purchase_orders ?? poD?.results ?? []
+    // BE canonical: data.orders
+    const poList: any[] = [...(confirmedD?.orders ?? []), ...(partialD?.orders ?? [])]
     poOptions.value = poList.map(p => ({
       value: String(p.id),
       label: p.order_number ?? `PO-${p.id}`,
@@ -185,18 +234,23 @@ function openCreate() {
   createOpen.value = true
 }
 
-// Auto-fill delivery location when PO is picked
-watch(() => createForm.value.purchase_order_id, (id) => {
+// Auto-fill delivery location when PO is picked.
+// PO list returns serialize_brief which has neither `delivery_location_id` nor a nested object,
+// so fetch the PO detail (which exposes `delivery_location_id` on the full serialize).
+watch(() => createForm.value.purchase_order_id, async (id) => {
   if (!id) {
     createForm.value.location_id = ''
     return
   }
-  const po = poOptions.value.find(o => o.value === id)?.raw
-  if (po) {
-    const locId = po.delivery_location_id ?? po.delivery_location?.id
+  try {
+    const r = await stockApi.get(`/purchase-orders/${id}/`)
+    const det = r.data?.data ?? r.data
+    const po = det?.order
+    const locId = po?.delivery_location_id
     if (locId)
       createForm.value.location_id = String(locId)
   }
+  catch { /* leave location blank */ }
 })
 
 async function createReceiving() {
@@ -235,23 +289,34 @@ async function createReceiving() {
 }
 
 // ---------- view / drill ----------
+// BE has NO GET /receiving/<id>/ detail endpoint (urls.py only registers POST routes:
+// /receiving/<id>/items/ and /receiving/<id>/complete/). Fetch the parent PO with
+// include_receivings instead — its `receivings` array contains the up-to-date receiving row,
+// and the rest of the drill view needs the PO's `items` (line items) anyway.
 async function openView(rcv: any) {
   activeReceiving.value = rcv
   viewOpen.value = true
-  // fetch fresh details + linked PO (for line items + qty-remaining math)
-  try {
-    const res = await stockApi.get(`/receiving/${rcv.id}/`)
-    const d = res.data?.data ?? res.data
-    activeReceiving.value = d?.receiving ?? d ?? rcv
-  }
-  catch { /* keep row-level data */ }
 
-  const poId = activeReceiving.value?.purchase_order_id ?? activeReceiving.value?.purchase_order?.id
+  // serialize_brief (the shape that comes through as a list row) has no `purchase_order_id`
+  // and no nested `purchase_order` — we attach `purchase_order_id` ourselves in loadReceivings.
+  const poId = activeReceiving.value?.purchase_order_id
   if (poId) {
     try {
       const r = await stockApi.get(`/purchase-orders/${poId}/`)
       const pd = r.data?.data ?? r.data
-      activePO.value = pd?.order ?? pd?.purchase_order ?? pd
+      // BE canonical: data.order
+      activePO.value = pd?.order ?? null
+
+      // Refresh the receiving row from the PO's receivings array (serialize_brief shape)
+      const fresh = (activePO.value?.receivings ?? []).find((x: any) => x.id === rcv.id)
+      if (fresh) {
+        activeReceiving.value = {
+          ...fresh,
+          purchase_order_id: activePO.value.id,
+          purchase_order_number: activePO.value.order_number,
+          location_name: typeof activePO.value.delivery_location === 'string' ? activePO.value.delivery_location : null,
+        }
+      }
     }
     catch { activePO.value = null }
   }
@@ -263,14 +328,16 @@ function closeView() {
   activePO.value = null
 }
 
-// PO line items still awaiting receipt (drives Add Item dropdown)
+// PO line items still awaiting receipt (drives Add Item dropdown).
+// BE canonical: PO full serialize uses `items`. `line_items` is not a BE field.
+// PO line items only have `quantity_ordered` (BE returns it as a string).
 const pendingPOItems = computed<any[]>(() => {
   const po: any = activePO.value
   if (!po)
     return []
-  const lines: any[] = po.items ?? po.line_items ?? []
+  const lines: any[] = po.items ?? []
   return lines.filter((li) => {
-    const ordered = Number(li.quantity_ordered ?? li.quantity ?? 0)
+    const ordered = Number(li.quantity_ordered ?? 0)
     const received = Number(li.quantity_received ?? 0)
     return ordered - received > 0
   })
@@ -313,7 +380,10 @@ const maxReceivable = computed(() => {
   const l: any = selectedPOLine.value
   if (!l)
     return undefined
-  const ordered = Number(l.quantity_ordered ?? l.quantity ?? 0)
+  // BE precomputes `quantity_pending` (ordered - received) on PurchaseOrderItemService.serialize.
+  if (l.quantity_pending != null)
+    return Number(l.quantity_pending)
+  const ordered = Number(l.quantity_ordered ?? 0)
   const received = Number(l.quantity_received ?? 0)
   return ordered - received
 })
@@ -845,7 +915,7 @@ function clearAll() {
             :placeholder="t('Select PO Item')"
             :options="pendingPOItems.map(l => ({
               value: String(l.id),
-              label: `${l.stock_item_name ?? l.stock_item?.name ?? `#${l.id}`} · ${t('Ordered')}: ${l.quantity_ordered ?? l.quantity ?? 0} / ${t('Received')}: ${l.quantity_received ?? 0}`,
+              label: `${l.stock_item_name ?? l.stock_item?.name ?? `#${l.id}`} · ${t('Ordered')}: ${l.quantity_ordered ?? 0} / ${t('Received')}: ${l.quantity_received ?? 0}`,
             }))"
           />
         </Field>

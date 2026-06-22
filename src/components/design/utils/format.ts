@@ -9,6 +9,38 @@ function group(intStr: string): string {
   return intStr.replace(/\B(?=(\d{3})+(?!\d))/g, NB)
 }
 
+// ---- Global number-format mode (persisted to localStorage) ----
+import { computed, ref } from 'vue'
+
+export type NumberFormatMode = 'full' | 'short'
+
+function readMode(): NumberFormatMode {
+  try {
+    const v = localStorage.getItem('numberFormat')
+    return v === 'short' ? 'short' : 'full'
+  }
+  catch { return 'full' }
+}
+
+const _mode = ref<NumberFormatMode>(readMode())
+
+export function setNumberFormatMode(m: NumberFormatMode) {
+  _mode.value = m
+  try { localStorage.setItem('numberFormat', m) }
+  catch { /* noop */ }
+}
+
+export function useFormatMode() {
+  return { mode: computed(() => _mode.value), setMode: setNumberFormatMode }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'numberFormat')
+      _mode.value = readMode()
+  })
+}
+
 export function fmtNum(n: number | null | undefined): string {
   if (n === null || n === undefined || Number.isNaN(n))
     return '—'
@@ -39,7 +71,10 @@ export function fmtAbbr(n: number | null | undefined): string {
 }
 
 export function fmtMoney(n: number | null | undefined, opts?: { unit?: boolean }): string {
-  const v = fmtNum(n)
+  const num = typeof n === 'string' ? Number(n) : n
+  const v = _mode.value === 'short' && typeof num === 'number' && Math.abs(num) >= 10000
+    ? fmtAbbr(num)
+    : fmtNum(num)
   if (v === '—')
     return v
 

@@ -86,7 +86,7 @@ async function load() {
     const d = res.data?.data ?? res.data
 
     items.value = d?.expenses ?? d?.items ?? []
-    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? items.value.length
+    total.value = d?.pagination?.total ?? items.value.length
   }
   catch {
     notify(t('Failed to load'), 'error')
@@ -111,7 +111,7 @@ async function loadCategories() {
     const res = await axios.get('/expense-categories/', { params: { per_page: 100 } })
     const d = res.data?.data ?? res.data
 
-    categories.value = d?.expense_categories ?? d?.categories ?? d?.items ?? []
+    categories.value = d?.categories ?? []
   }
   catch { /* ignore */ }
 }

@@ -184,10 +184,11 @@ function shiftState(s: any): 'active' | 'awaiting' | 'reconciled' {
 }
 function expectedCash(s: any): number {
   // BE reconciliation carries the authoritative expected_cash (cash_collected - expenses). The list
-  // serializer omits expenses_total, so without this fallback expected==cash_collected. Mirror BE.
+  // serializer (_serialize_shift) omits expenses_total entirely — it only appears on dashboard/cashbox
+  // views. Without a reconciliation row we cannot subtract expenses, so fall back to cash_collected.
   if (s.reconciliation?.expected_cash !== undefined && s.reconciliation?.expected_cash !== null)
     return num(s.reconciliation.expected_cash)
-  return num(s.cash_collected) - num(s.expenses_total)
+  return num(s.cash_collected)
 }
 function reportedCash(s: any): number {
   const r = s.reconciliation || {}
@@ -212,6 +213,8 @@ function varianceOf(s: any): number {
 }
 // Returns [{ method, amount }] sorted desc, excluding zero entries.
 // Used to surface per-tender breakdown (CASH/UZCARD/HUMO/PAYME/MIXED) in the card.
+// NOTE: payment_mix is only present on detail responses (_serialize_shift detail=True via _shift_stats).
+// The /shifts list endpoint does NOT include it, so this expander only renders when a detail payload is loaded.
 function paymentMixRows(s: any): { method: string, amount: number }[] {
   const mix = s.payment_mix || {}
   const out: { method: string, amount: number }[] = []
@@ -230,7 +233,8 @@ function toggleMix(id: number) {
 }
 
 function cardPayments(s: any): number {
-  // anything that isn't CASH in payment_mix
+  // payment_mix is detail-only (omitted from /shifts list serializer); the fallback
+  // total_revenue - cash_collected is what actually runs in list view.
   const mix = s.payment_mix || {}
   let total = 0
   for (const k of Object.keys(mix)) {
@@ -241,12 +245,16 @@ function cardPayments(s: any): number {
   return Math.max(0, num(s.total_revenue) - num(s.cash_collected))
 }
 function avgTicket(s: any): number {
+  // total_revenue arrives as a string from BE (str(...) coerce). Wrap both in num() for safety.
   const o = num(s.total_orders)
   return o > 0 ? num(s.total_revenue) / o : 0
 }
 function netOf(s: any): number {
+  // BE /shifts list serializer omits net_revenue, expenses_total and cancelled_orders_value entirely.
+  // Use net_revenue when present (detail payloads); otherwise fall back to gross total_revenue
+  // since we have no expense/cancelled data to subtract on the list endpoint.
   if (s.net_revenue !== undefined && s.net_revenue !== null) return num(s.net_revenue)
-  return num(s.total_revenue) - num(s.expenses_total) - num(s.cancelled_orders_value)
+  return num(s.total_revenue)
 }
 
 // ============================================================
@@ -868,7 +876,8 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         <!-- header: avatar + name + status pill -->
         <div class="row" style="gap:12px;padding: var(--sp-5) var(--sp-5) var(--sp-4);">
           <div class="avatar">
-            {{ initialsOf(s.user?.first_name, s.user?.last_name, s.user?.email, s.user?.name) }}
+            <!-- BE shift.user = { id, uuid, name } only; pass the combined name plus a `#<id>` fallback -->
+            {{ initialsOf(undefined, undefined, undefined, s.user?.name || (s.user?.id ? `#${s.user.id}` : undefined)) }}
           </div>
           <div style="flex:1;min-width:0;">
             <div style="font-weight:700;font-size:15px;">
@@ -917,7 +926,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               {{ t('Gross') }}
             </div>
             <div class="mono" style="font-weight:700;font-size:20px;letter-spacing:-0.02em;">
-              {{ fmtMoney(s.total_revenue) }}
+              {{ fmtMoney(num(s.total_revenue)) }}
             </div>
           </div>
           <div style="flex:1 1 90px; min-width:0;">
@@ -993,6 +1002,11 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               <span class="mono" style="font-weight:600;font-size:12px;">{{ fmtMoney(m.amount) }}</span>
             </div>
           </div>
+          <!--
+            expenses_total / cancelled_orders_count / cancelled_orders_value are NOT in the /shifts list
+            serializer (see _serialize_shift in shift_service.py). They only appear when a detail payload
+            is merged onto s, hence the strict v-if guards. Rendered defensively for that case.
+          -->
           <div v-if="s.expenses_total !== undefined && num(s.expenses_total) > 0" class="row between" style="padding:5px 0;">
             <span class="row" style="gap:8px;color:var(--text-secondary);font-size:13px;">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);">
@@ -1033,9 +1047,14 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
 
         <!-- footer meta -->
         <div style="padding: 0 var(--sp-5) var(--sp-3);">
+          <!--
+            units_sold / avg_prep_seconds / peak_hour live in _shift_stats and are only attached when
+            _serialize_shift is called with detail=True (shift_detail endpoint). On the /shifts list these
+            render as '—'. Use units_sold (BE canonical field name), not the legacy items_sold.
+          -->
           <div class="row wrap" style="gap:14px;font-size:11px;color:var(--text-tertiary);padding-bottom:12px;">
             <span>{{ t('Avg ticket') }} <b class="mono" style="color:var(--text-secondary);">{{ fmtAbbr(avgTicket(s)) }}</b></span>
-            <span>{{ t('Items') }} <b class="mono" style="color:var(--text-secondary);">{{ fmtNum(s.items_sold) }}</b></span>
+            <span>{{ t('Items') }} <b class="mono" style="color:var(--text-secondary);">{{ fmtNum(s.units_sold) }}</b></span>
             <span>{{ t('Avg prep') }} <b style="color:var(--text-secondary);">{{ fmtPrep(s.avg_prep_seconds) }}</b></span>
             <span>{{ t('Peak') }} <b style="color:var(--text-secondary);">{{ fmtPeak(s.peak_hour) }}</b></span>
           </div>

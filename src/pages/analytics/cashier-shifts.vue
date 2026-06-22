@@ -547,9 +547,9 @@ const shiftColumns = computed<DataTableColumn<any>[]>(() => [
           </template>
           <template #cell.by_type="{ row }">
             <div class="cs-type-chips">
-              <Badge tone="primary" :title="t('order_type_HALL')">{{ t('order_type_short_HALL') }} {{ row.orders?.by_type?.HALL ?? 0 }}</Badge>
-              <Badge tone="info" :title="t('order_type_DELIVERY')">{{ t('order_type_short_DELIVERY') }} {{ row.orders?.by_type?.DELIVERY ?? 0 }}</Badge>
-              <Badge tone="warning" :title="t('order_type_PICKUP')">{{ t('order_type_short_PICKUP') }} {{ row.orders?.by_type?.PICKUP ?? 0 }}</Badge>
+              <Badge tone="primary" :title="t('order_type_HALL')">{{ t('order_type_short_HALL') }} {{ row.orders?.by_type?.hall ?? 0 }}</Badge>
+              <Badge tone="info" :title="t('order_type_DELIVERY')">{{ t('order_type_short_DELIVERY') }} {{ row.orders?.by_type?.delivery ?? 0 }}</Badge>
+              <Badge tone="warning" :title="t('order_type_PICKUP')">{{ t('order_type_short_PICKUP') }} {{ row.orders?.by_type?.pickup ?? 0 }}</Badge>
             </div>
           </template>
           <template #cell.units_sold="{ row }">

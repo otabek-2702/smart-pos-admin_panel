@@ -57,6 +57,10 @@ const STATUS_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'ne
 async function load() {
   loading.value = true
   try {
+    // KNOWN LIMITATION: BE salary_views.salaries only forwards `page` and `per_page`
+    // to SalaryService.list. The status / employee_id / year / month params below
+    // are silently dropped server-side until the BE view is updated to forward them
+    // (the service signature already accepts these filters).
     const params: any = { page: page.value, per_page: itemsPerPage.value }
     if (statusFilter.value)
       params.status = statusFilter.value
@@ -73,7 +77,7 @@ async function load() {
     const d = res.data?.data ?? res.data
 
     items.value = d?.salaries ?? d?.items ?? []
-    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? items.value.length
+    total.value = d?.pagination?.total ?? items.value.length
   }
   catch {
     notify(t('Failed to load'), 'error')
@@ -94,7 +98,19 @@ async function loadEmployees() {
 
 async function loadSummary() {
   try {
-    const res = await axios.get('/salaries/summary/')
+    // BE salary_summary requires year/month — derive from periodFilter,
+    // fall back to today so the KPI strip tracks the table filter.
+    const now = new Date()
+    let year = now.getFullYear()
+    let month = now.getMonth() + 1
+    if (periodFilter.value) {
+      const [y, m] = periodFilter.value.split('-')
+      if (y)
+        year = Number(y)
+      if (m)
+        month = Number(m)
+    }
+    const res = await axios.get('/salaries/summary/', { params: { year, month } })
 
     summary.value = res.data?.data ?? res.data
   }
@@ -103,7 +119,7 @@ async function loadSummary() {
 
 onMounted(() => { load(); loadSummary(); loadEmployees() })
 watch([page, itemsPerPage], load)
-watch([statusFilter, periodFilter, employeeFilter], () => { page.value = 1; load() })
+watch([statusFilter, periodFilter, employeeFilter], () => { page.value = 1; load(); loadSummary() })
 
 // ============================================================
 // Filter options
@@ -174,16 +190,12 @@ function clearAllFilters() {
 // KPI cards
 // ============================================================
 // BE /salaries/summary/ returns { year, month, count, total_base, total_bonus,
-// total_deduction, total_net, by_status }. Derive per-status values from by_status
-// (keyed by status string). Fall back to legacy *_count fields if present.
+// total_deduction, total_net, by_status }. by_status is keyed by status string
+// and the VALUE is Sum(net_amount) — a monetary total, NOT a count of salaries.
 function statusValue(status: string): number | null {
   const s = summary.value
   if (!s)
     return null
-  // Legacy/flat field shapes first
-  const flat = s[`${status.toLowerCase()}_count`]
-  if (flat != null)
-    return Number(flat)
   const bs = s.by_status
   if (bs && bs[status] != null)
     return Number(bs[status])
@@ -191,29 +203,32 @@ function statusValue(status: string): number | null {
 }
 
 const kpiPending = computed(() => ({
-  label: t('Pending'),
+  label: t('Pending total'),
   value: statusValue('PENDING'),
   icon: 'clock',
   tone: 'warning' as const,
+  money: true,
 }))
 
 const kpiApproved = computed(() => ({
-  label: t('Approved'),
+  label: t('Approved total'),
   value: statusValue('APPROVED'),
   icon: 'check',
   tone: 'info' as const,
+  money: true,
 }))
 
 const kpiPaid = computed(() => ({
-  label: t('Paid'),
+  label: t('Paid total'),
   value: statusValue('PAID'),
   icon: 'dollar',
   tone: 'success' as const,
+  money: true,
 }))
 
 const kpiTotal = computed(() => ({
   label: t('Total'),
-  value: summary.value?.total_net ?? summary.value?.total_amount ?? null,
+  value: summary.value?.total_net ?? null,
   icon: 'trending-up',
   tone: 'primary' as const,
   money: true,
@@ -630,11 +645,11 @@ function employeeName(row: any): string {
         </template>
 
         <template #cell.bonus="{ row }">
-          <span class="num-tabular t-success">{{ formatCurrency(row.bonus ?? row.bonus_amount ?? 0) }}</span>
+          <span class="num-tabular t-success">{{ formatCurrency(row.bonus ?? 0) }}</span>
         </template>
 
         <template #cell.deduction="{ row }">
-          <span class="num-tabular t-error">{{ formatCurrency(row.deduction ?? row.deduction_amount ?? 0) }}</span>
+          <span class="num-tabular t-error">{{ formatCurrency(row.deduction ?? 0) }}</span>
         </template>
 
         <template #cell.net_salary="{ row }">

@@ -74,7 +74,7 @@ async function loadSuppliers() {
     const d = res.data?.data ?? res.data
 
     suppliers.value = d?.suppliers ?? []
-    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? d?.pagination?.total_suppliers ?? suppliers.value.length
+    total.value = d?.pagination?.total_suppliers ?? suppliers.value.length
   }
   catch {
     notify(t('Failed to load suppliers'), 'error')
@@ -761,7 +761,6 @@ const sourceOptions = computed(() => [
               </th>
               <th>{{ t('Reference') }}</th>
               <th>{{ t('Note') }}</th>
-              <th>{{ t('By') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -776,9 +775,9 @@ const sourceOptions = computed(() => [
               </td>
               <td
                 class="num mono"
-                :style="{ color: Number(r.amount ?? r.delta) > 0 ? 'rgb(var(--v-theme-warning-strong))' : 'rgb(var(--v-theme-success-strong))', fontWeight: 600 }"
+                :style="{ color: Number(r.amount) > 0 ? 'rgb(var(--v-theme-warning-strong))' : 'rgb(var(--v-theme-success-strong))', fontWeight: 600 }"
               >
-                {{ formatCurrency(r.amount ?? r.delta ?? 0) }}
+                {{ formatCurrency(r.amount ?? 0) }}
               </td>
               <td class="num mono">
                 {{ formatCurrency(r.balance_after ?? 0) }}
@@ -790,10 +789,7 @@ const sourceOptions = computed(() => [
                 <span v-else class="cell-muted">—</span>
               </td>
               <td class="cell-muted">
-                {{ r.note || r.description || '—' }}
-              </td>
-              <td class="cell-muted">
-                {{ r.performed_by || '—' }}
+                {{ r.note || '—' }}
               </td>
             </tr>
           </tbody>

@@ -23,7 +23,6 @@ import PageHeader from '@/components/design/PageHeader.vue'
 import Segmented from '@/components/design/Segmented.vue'
 import Select from '@/components/design/Select.vue'
 import StatusBadge from '@/components/design/StatusBadge.vue'
-import Switch from '@/components/design/Switch.vue'
 import { fmtNum, NB } from '@/components/design/utils/format'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -44,9 +43,7 @@ const loadingStatus = ref(false)
 const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
-const currencyFilter = ref<string>('')
 const periodFilter = ref<string>('')
-const activeOnly = ref<boolean>(false)
 
 const tab = ref<'plans' | 'status'>('plans')
 
@@ -58,7 +55,20 @@ const changeNote = ref('')
 const changeErrors = ref<Record<string, string>>({})
 
 const PERIOD_VALUES = ['monthly', 'yearly', 'quarterly', 'lifetime']
-const CURRENCY_VALUES = ['USD', 'UZS', 'RUB', 'EUR']
+
+// Map BE `period_days` integer → categorical period label.
+// BE serializes `period_days` (int) on plans; map to a category so
+// existing i18n keys (`plan_period_monthly` etc.) keep working.
+function periodCategoryFromDays(days: number | null | undefined): string {
+  if (days === null || days === undefined) return ''
+  const n = Number(days)
+  if (!Number.isFinite(n)) return ''
+  if (n <= 31) return 'monthly'
+  if (n <= 95) return 'quarterly'
+  if (n <= 370) return 'yearly'
+
+  return 'lifetime'
+}
 
 // ============================================================
 // Enum -> tone maps (mirror STATUS_TONE convention)
@@ -74,13 +84,6 @@ const CURRENT_TONE: Record<string, 'primary' | 'info' | 'neutral' | 'success' | 
   CURRENT: 'success',
   PENDING: 'warning',
   AVAILABLE: 'neutral',
-}
-
-const CURRENCY_TONE: Record<string, 'primary' | 'info' | 'neutral' | 'success' | 'warning' | 'error'> = {
-  USD: 'success',
-  UZS: 'info',
-  RUB: 'primary',
-  EUR: 'warning',
 }
 
 const PERIOD_TONE: Record<string, 'primary' | 'info' | 'neutral' | 'success' | 'warning' | 'error'> = {
@@ -110,14 +113,6 @@ function fmtMoney(n: number | string | null | undefined, currency?: string): str
   return `${s}${currency ? `${NB}${currency}` : ''}`
 }
 
-function fmtFeatures(f: any): string {
-  if (!f) return '—'
-  if (Array.isArray(f)) return f.length === 0 ? '—' : f.join(', ')
-  if (typeof f === 'object') return Object.keys(f).join(', ') || '—'
-
-  return String(f)
-}
-
 // ============================================================
 // API
 // ============================================================
@@ -139,22 +134,25 @@ async function loadPlans() {
   loadingPlans.value = true
   plansUnreachable.value = false
   try {
+    // BE /api/v1/plans always returns is_active=True plans server-side and
+    // SubscriptionPlan has no `currency` or categorical `period` columns —
+    // currency / is_active filters are no-ops, and period is filtered
+    // client-side from period_days. Only forward search + pagination.
     const params: any = { page: page.value, per_page: itemsPerPage.value }
     if (search.value)
       params.search = search.value
-    if (currencyFilter.value)
-      params.currency = currencyFilter.value
-    if (periodFilter.value)
-      params.period = periodFilter.value
-    if (activeOnly.value)
-      params.is_active = true
 
     const res = await licensingApi.get('/plans', { params })
     const d = res.data?.data ?? res.data
-    const rows = d?.plans ?? d?.results ?? d?.items ?? (Array.isArray(d) ? d : [])
+    const rawRows = d?.plans ?? d?.results ?? d?.items ?? (Array.isArray(d) ? d : [])
+    const rows = periodFilter.value
+      ? rawRows.filter((r: any) => periodCategoryFromDays(r.period_days) === periodFilter.value)
+      : rawRows
 
     plans.value = rows
-    totalPlans.value = d?.pagination?.total_items ?? d?.count ?? d?.total ?? rows.length
+    totalPlans.value = periodFilter.value
+      ? rows.length
+      : (d?.pagination?.total_items ?? d?.count ?? d?.total ?? rows.length)
   }
   catch {
     plans.value = []
@@ -176,7 +174,7 @@ watch([page, itemsPerPage], loadPlans)
 const debouncedSearch = useDebounceFn(() => { page.value = 1; loadPlans() }, 400)
 
 watch(search, debouncedSearch)
-watch([currencyFilter, periodFilter, activeOnly], () => { page.value = 1; loadPlans() })
+watch([periodFilter], () => { page.value = 1; loadPlans() })
 
 // ============================================================
 // Plan-change request
@@ -277,31 +275,22 @@ const activeFilters = computed(() => {
   const out: { k: string; label: string; val: string; clear: () => void }[] = []
   if (search.value)
     out.push({ k: 'q', label: t('Search'), val: search.value, clear: () => { search.value = '' } })
-  if (currencyFilter.value)
-    out.push({ k: 'c', label: t('license_filter_currency'), val: t(`plan_currency_${currencyFilter.value}`), clear: () => { currencyFilter.value = '' } })
   if (periodFilter.value)
     out.push({ k: 'p', label: t('license_filter_period'), val: t(`plan_period_${periodFilter.value}`), clear: () => { periodFilter.value = '' } })
-  if (activeOnly.value)
-    out.push({ k: 'a', label: t('license_filter_active_only'), val: t('Yes'), clear: () => { activeOnly.value = false } })
 
   return out
 })
 
 function clearAllFilters() {
   search.value = ''
-  currencyFilter.value = ''
   periodFilter.value = ''
-  activeOnly.value = false
 }
 
 // ============================================================
 // Filter options
 // ============================================================
-const currencyOptions = computed(() =>
-  CURRENCY_VALUES.map(v => ({ value: v, label: t(`plan_currency_${v}`) })),
-)
 const periodOptions = computed(() =>
-  ['monthly', 'yearly'].map(v => ({ value: v, label: t(`plan_period_${v}`) })),
+  PERIOD_VALUES.map(v => ({ value: v, label: t(`plan_period_${v}`) })),
 )
 
 // ============================================================
@@ -317,14 +306,20 @@ const kpiStatus = computed(() => ({
   sub: '',
 }))
 
-const kpiCurrent = computed(() => ({
-  label: t('license_current_plan'),
-  // BE /status doesn't expose current_plan — derive from plans list only.
-  value: currentPlan.value?.name ?? null,
-  icon: 'star',
-  tone: 'primary' as const,
-  sub: currentPlan.value?.period ? t(`plan_period_${currentPlan.value.period}`) : '',
-}))
+const kpiCurrent = computed(() => {
+  // BE serializes `period_days` (int), not categorical `period`. Map to a
+  // category client-side so the existing i18n keys still resolve.
+  const cat = periodCategoryFromDays(currentPlan.value?.period_days)
+
+  return {
+    label: t('license_current_plan'),
+    // BE /status doesn't expose current_plan — derive from plans list only.
+    value: currentPlan.value?.name ?? null,
+    icon: 'star',
+    tone: 'primary' as const,
+    sub: cat ? t(`plan_period_${cat}`) : '',
+  }
+})
 
 const kpiBalance = computed(() => ({
   label: t('license_balance'),
@@ -350,13 +345,14 @@ const showLowBalance = computed(() => !!licenseState.value?.warn)
 // ============================================================
 // DataTable columns
 // ============================================================
+// BE _serialize_plan exposes: id, name, description, price, period_days, is_active.
+// No `currency`, `features`, or categorical `status` fields — those columns
+// were dropped. `period_days` is mapped to a category client-side.
 const columns: DataTableColumn<any>[] = [
   { key: 'name', label: t('plan_name'), sortable: true },
   { key: 'description', label: t('plan_description'), sortable: false },
   { key: 'price', label: t('plan_price'), sortable: true, align: 'end' },
-  { key: 'currency', label: t('plan_currency_label'), sortable: true },
-  { key: 'period', label: t('plan_period_label'), sortable: true },
-  { key: 'features', label: t('plan_features'), sortable: false },
+  { key: 'period_days', label: t('plan_period_label'), sortable: true },
   { key: 'status', label: t('Status'), sortable: true },
   { key: 'is_current', label: t('license_current_status'), sortable: false },
 ]
@@ -478,29 +474,13 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             :placeholder="t('Search')"
           />
         </div>
-        <div class="control plans-toolbar__select plans-toolbar__select--md">
-          <Select
-            v-model="currencyFilter"
-            icon="filter"
-            :placeholder="t('license_filter_currency')"
-            :options="currencyOptions"
-          />
-        </div>
         <div class="control plans-toolbar__select plans-toolbar__select--lg">
           <Select
             v-model="periodFilter"
+            icon="filter"
             :placeholder="t('license_filter_period')"
             :options="periodOptions"
           />
-        </div>
-        <div
-          class="control plans-toolbar__switch"
-          style="display:flex; gap:10px; align-items:center;"
-        >
-          <Switch v-model="activeOnly" />
-          <span style="font-size:14px; color: var(--text-secondary);">
-            {{ t('license_filter_active_only') }}
-          </span>
         </div>
       </div>
 
@@ -575,26 +555,21 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
           <span class="mono cell-strong">{{ fmtMoney(row.price) }}</span>
         </template>
 
-        <template #cell.currency="{ row }">
-          <Badge :tone="CURRENCY_TONE[row.currency] || 'neutral'">
-            {{ row.currency ? t(`plan_currency_${row.currency}`) : '—' }}
+        <template #cell.period_days="{ row }">
+          <!-- BE returns `period_days` int. Derive a category client-side so
+               existing i18n keys (`plan_period_monthly` etc.) resolve. -->
+          <Badge :tone="PERIOD_TONE[periodCategoryFromDays(row.period_days)] || 'neutral'">
+            {{ periodCategoryFromDays(row.period_days)
+              ? t(`plan_period_${periodCategoryFromDays(row.period_days)}`)
+              : '—' }}
           </Badge>
-        </template>
-
-        <template #cell.period="{ row }">
-          <Badge :tone="PERIOD_TONE[row.period] || 'neutral'">
-            {{ row.period ? t(`plan_period_${row.period}`) : '—' }}
-          </Badge>
-        </template>
-
-        <template #cell.features="{ row }">
-          <span class="cell-muted">{{ fmtFeatures(row.features) }}</span>
         </template>
 
         <template #cell.status="{ row }">
+          <!-- BE plan has no categorical `status` — only `is_active: bool`. -->
           <StatusBadge
-            :tone="STATUS_TONE[row.status] || 'neutral'"
-            :label="row.status ? t(`plan_status_${row.status}`) : '—'"
+            :tone="STATUS_TONE[row.is_active ? 'ACTIVE' : 'INACTIVE'] || 'neutral'"
+            :label="t(`plan_status_${row.is_active ? 'ACTIVE' : 'INACTIVE'}`)"
           />
         </template>
 
@@ -819,13 +794,17 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 
           <Field :label="t('plan_price')">
             <div class="mono cell-strong">
-              {{ fmtMoney(changeTarget?.price, changeTarget?.currency) }}
+              <!-- BE _serialize_plan exposes no currency — drop the suffix. -->
+              {{ fmtMoney(changeTarget?.price) }}
             </div>
           </Field>
 
           <Field :label="t('plan_period_label')">
-            <Badge :tone="PERIOD_TONE[changeTarget?.period] || 'neutral'">
-              {{ changeTarget?.period ? t(`plan_period_${changeTarget.period}`) : '—' }}
+            <!-- BE returns period_days (int) — map to category for i18n key. -->
+            <Badge :tone="PERIOD_TONE[periodCategoryFromDays(changeTarget?.period_days)] || 'neutral'">
+              {{ periodCategoryFromDays(changeTarget?.period_days)
+                ? t(`plan_period_${periodCategoryFromDays(changeTarget?.period_days)}`)
+                : '—' }}
             </Badge>
           </Field>
 

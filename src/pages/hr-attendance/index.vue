@@ -42,9 +42,20 @@ const statusOptions = computed(() => STATUS_VALUES.map(v => ({
 })))
 
 const employeeOptions = computed(() => employees.value.map((e: any) => ({
-  value: String(e.value ?? e.id ?? e.uuid),
+  value: String(e.value ?? e.id),
   label: (e.title ?? (`${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}`.trim() || e.user?.email)) || String(e.id ?? ''),
 })))
+
+function formatTime(val: string | null | undefined): string {
+  if (!val)
+    return '—'
+  const d = new Date(val)
+  if (Number.isNaN(d.getTime()))
+    return String(val)
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${hh}:${mm}`
+}
 
 // ============================================================
 // Tone map
@@ -90,7 +101,7 @@ async function loadEmployees() {
     const d = res.data?.data ?? res.data
     employees.value = (d?.employees ?? d?.items ?? d?.results ?? []).map((e: any) => ({
       title: `${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}`.trim() || e.user?.email || e.id,
-      value: e.id ?? e.uuid,
+      value: e.id,
     }))
   }
   catch {}
@@ -257,11 +268,11 @@ function clearAllFilters() {
         </template>
 
         <template #cell.check_in="{ row }">
-          <span class="mono cell-muted">{{ row.check_in ?? '—' }}</span>
+          <span class="mono cell-muted">{{ formatTime(row.check_in) }}</span>
         </template>
 
         <template #cell.check_out="{ row }">
-          <span class="mono cell-muted">{{ row.check_out ?? '—' }}</span>
+          <span class="mono cell-muted">{{ formatTime(row.check_out) }}</span>
         </template>
 
         <template #cell.status="{ row }">

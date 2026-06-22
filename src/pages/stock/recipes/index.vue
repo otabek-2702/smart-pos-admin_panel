@@ -175,7 +175,7 @@ async function openEdit(item: any) {
     recipe_type: detail.recipe_type ?? 'PRODUCTION',
     output_item_id: detail.output_item_id ?? detail.output_item?.id ?? null,
     output_quantity: detail.output_quantity ?? 1,
-    output_unit_id: detail.output_unit_id ?? detail.output_unit?.id ?? null,
+    output_unit_id: detail.output_unit_id ?? null,
     estimated_time_minutes: detail.estimated_time_minutes ?? null,
     difficulty_level: Number(detail.difficulty_level ?? 1),
     notes: detail.notes ?? '',

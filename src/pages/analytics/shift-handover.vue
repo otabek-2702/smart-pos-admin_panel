@@ -112,7 +112,7 @@ function closeReceipt() {
   selectedItems.value = []
 }
 function receiptId(r: any) {
-  return r.display_id ?? r.order_id ?? r.id ?? '—'
+  return r.order_id ?? '—'
 }
 const distribution = computed<any>(() => data.value?.distribution)
 const settlement = computed<any[]>(() => data.value?.settlement ?? [])
@@ -1282,10 +1282,10 @@ function shiftDurationLabel(): string {
                 <td colspan="4" class="center cell-muted">{{ t('No items') }}</td>
               </tr>
               <tr v-for="(li, i) in selectedItems" v-else :key="i">
-                <td class="cell-strong">{{ li.product__name ?? li.name ?? li.product_name ?? '—' }}</td>
-                <td class="num mono">{{ li.quantity ?? li.qty ?? '—' }}</td>
+                <td class="cell-strong">{{ li.product?.name ?? '—' }}</td>
+                <td class="num mono">{{ li.quantity ?? '—' }}</td>
                 <td class="num mono cell-muted">{{ fmtMoney(li.price ?? 0) }}</td>
-                <td class="num mono cell-strong">{{ fmtMoney((Number(li.price) || 0) * (Number(li.quantity ?? li.qty) || 1)) }}</td>
+                <td class="num mono cell-strong">{{ fmtMoney(li.subtotal) }}</td>
               </tr>
             </tbody>
           </table>

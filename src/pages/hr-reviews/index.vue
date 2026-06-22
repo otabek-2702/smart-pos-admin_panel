@@ -64,7 +64,7 @@ async function load() {
     if (statusFilter.value) params.status = statusFilter.value
     const res = await axios.get('/reviews/', { params })
     const d = res.data?.data ?? res.data
-    let rows = d?.reviews ?? d?.items ?? []
+    let rows = d?.reviews ?? []
     // Client-side filter fallback (BE ignores filter params)
     if (employeeFilter.value) {
       const empId = String(employeeFilter.value).trim()
@@ -73,7 +73,7 @@ async function load() {
     if (statusFilter.value)
       rows = rows.filter((r: any) => r.status === statusFilter.value)
     items.value = rows
-    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? items.value.length
+    total.value = d?.pagination?.total ?? items.value.length
   }
   catch {
     notify(t('Failed to load'), 'error')
@@ -375,7 +375,9 @@ const statusOptions = computed(() => [
 // ============================================================
 const columns: DataTableColumn<any>[] = [
   { key: 'id', label: t('ID'), sortable: true, width: 90 },
-  { key: 'employee_name', label: t('Employee'), sortable: true },
+  // Synthetic keys — BE returns nested `employee: { user: { first_name, last_name } }`
+  // and `reviewer: { first_name, last_name }`; no scalar field exists, so sort is disabled.
+  { key: 'employee_name', label: t('Employee'), sortable: false },
   { key: 'reviewer_name', label: t('Reviewer'), sortable: false },
   { key: 'review_period_start', label: t('Period Start'), sortable: true, width: 130 },
   { key: 'review_period_end', label: t('Period End'), sortable: true, width: 130 },

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import DesignIcon from './DesignIcon.vue'
 import Delta from './Delta.vue'
-import { fmtAbbr, fmtNum } from './utils/format'
+import { fmtAbbr, fmtNum, useFormatMode } from './utils/format'
 import { cx, type Tone } from './utils'
 
 interface KpiData {
@@ -23,15 +23,19 @@ const props = defineProps<Props>()
 
 const tone = computed<Tone>(() => props.data.tone || 'primary')
 
+const { mode } = useFormatMode()
 const display = computed<{ text: string; unit?: string }>(() => {
-  const v = props.data.value
-  if (typeof v === 'string')
-    return { text: v }
-  if (v === null || v === undefined)
+  const raw = props.data.value
+  if (raw === null || raw === undefined)
     return { text: '—' }
-  if (props.data.money)
-    return { text: fmtAbbr(v), unit: 'UZS' }
-  return { text: fmtNum(v) }
+  const n = typeof raw === 'string' ? Number(raw) : raw
+  if (typeof n !== 'number' || Number.isNaN(n))
+    return { text: String(raw) }
+  if (props.data.money) {
+    const fmt = mode.value === 'short' ? fmtAbbr(n) : fmtNum(n)
+    return { text: fmt, unit: 'UZS' }
+  }
+  return { text: mode.value === 'short' && Math.abs(n) >= 10000 ? fmtAbbr(n) : fmtNum(n) }
 })
 </script>
 

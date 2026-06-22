@@ -126,7 +126,7 @@ async function loadTransfers() {
     const d = res.data?.data ?? res.data
 
     transfers.value = d?.transfers ?? []
-    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? transfers.value.length
+    total.value = d?.pagination?.total ?? transfers.value.length
     // List shape is brief; reset detail cache so re-expand re-fetches.
     rowDetailCache.value = {}
   }
@@ -655,12 +655,12 @@ const confirmTitle = computed(() => {
               <tbody>
                 <tr v-for="(li, idx) in ((r.items ?? []) as any[])" :key="idx">
                   <td class="cell-strong">
-                    {{ li.stock_item?.name ?? li.item?.name ?? '—' }}
+                    {{ li.stock_item?.name ?? '—' }}
                   </td>
                   <td class="num mono">{{ li.requested_qty ?? '—' }}</td>
                   <td class="num mono">{{ li.shipped_qty ?? '—' }}</td>
                   <td class="num mono">{{ li.received_qty ?? '—' }}</td>
-                  <td class="cell-muted">{{ li.unit_short ?? li.unit?.short_name ?? '—' }}</td>
+                  <td class="cell-muted">{{ li.unit_short ?? '—' }}</td>
                 </tr>
                 <tr v-if="!(r.items?.length)">
                   <td colspan="5" class="center cell-muted">

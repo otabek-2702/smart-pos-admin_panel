@@ -484,7 +484,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
         </template>
 
         <template #cell.days="{ row }">
-          <span class="mono">{{ row.days_count ?? row.duration ?? '—' }}</span>
+          <span class="mono">{{ row.days_count ?? '—' }}</span>
         </template>
 
         <template #cell.reason="{ row }">

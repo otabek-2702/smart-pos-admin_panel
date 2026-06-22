@@ -36,7 +36,7 @@ const lowStockOnly = ref(false)
 const locationsList = ref<any[]>([])
 const categoriesList = ref<any[]>([])
 
-const MOVEMENT_TYPES = ['ADJUSTMENT', 'WASTE', 'COUNT', 'RETURN', 'PURCHASE', 'SALE']
+const MOVEMENT_TYPES = ['ADJUSTMENT_PLUS', 'ADJUSTMENT_MINUS', 'WASTE', 'SPOILAGE', 'COUNT_ADJUSTMENT', 'RETURN_FROM_CUSTOMER', 'RETURN_TO_SUPPLIER', 'PURCHASE_IN', 'SALE_OUT']
 const ITEM_TYPES = ['RAW', 'SEMI', 'FINISHED', 'PACKAGING']
 
 const debouncedSearch = useDebounceFn(() => {
@@ -165,7 +165,7 @@ const actionLevel = ref<any>(null)
 const actionSaving = ref(false)
 const actionForm = ref({
   quantity: '' as string,
-  movement_type: 'ADJUSTMENT',
+  movement_type: 'ADJUSTMENT_PLUS',
   notes: '',
 })
 
@@ -216,7 +216,7 @@ function openAction(mode: Mode, level: any) {
   actionLevel.value = level
   actionForm.value = {
     quantity: '',
-    movement_type: 'ADJUSTMENT',
+    movement_type: 'ADJUSTMENT_PLUS',
     notes: '',
   }
 }

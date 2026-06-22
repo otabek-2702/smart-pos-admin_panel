@@ -182,14 +182,11 @@ watch([currencyFilter, periodFilter, activeOnly], () => { page.value = 1; loadPl
 // Plan-change request
 // ============================================================
 function openChange(row: any) {
-  // Guards: can't switch to current, can't open while a pending change exists
+  // Guards: can't switch to current, can't open while pending (BE returns
+  // PLAN_CHANGE_ALREADY_PENDING code on submit if a request is in-flight —
+  // /status doesn't expose pending_plan_change, so we can't pre-check here).
   if (isCurrentPlan(row))
     return
-  if (licenseState.value?.pending_plan_change) {
-    notify(t('plan_change_already_pending'), 'error')
-
-    return
-  }
   if (licenseState.value?.status === 'UNREGISTERED') {
     notify(t('plan_change_unregistered'), 'error')
 
@@ -249,14 +246,11 @@ async function submitChange() {
 // ============================================================
 // Derived
 // ============================================================
-function planRowFlag(row: any): 'CURRENT' | 'PENDING' | 'AVAILABLE' {
-  if (!licenseState.value)
-    return 'AVAILABLE'
-  if (licenseState.value.current_plan_id && licenseState.value.current_plan_id === row.id)
-    return 'CURRENT'
-  if (licenseState.value.pending_plan_change?.plan_id === row.id)
-    return 'PENDING'
-
+function planRowFlag(_row: any): 'CURRENT' | 'PENDING' | 'AVAILABLE' {
+  // BE /status doesn't expose current_plan_id or pending_plan_change, so we
+  // can't derive CURRENT/PENDING per-row from the status payload. The page
+  // still keeps the column / Badge so the table layout matches; everything
+  // resolves to AVAILABLE until BE adds those fields.
   return 'AVAILABLE'
 }
 
@@ -318,12 +312,15 @@ const kpiStatus = computed(() => ({
   value: licenseState.value?.status ? t(`license_status_${licenseState.value.status}`) : null,
   icon: 'lock',
   tone: (LICENSE_TONE[licenseState.value?.status] ?? 'neutral') as any,
-  sub: licenseState.value?.tenant?.org_name ?? '',
+  // BE /status intentionally omits tenant identity (org_name/email) — see
+  // docstring. Leave blank rather than reaching for a missing nested object.
+  sub: '',
 }))
 
 const kpiCurrent = computed(() => ({
   label: t('license_current_plan'),
-  value: currentPlan.value?.name ?? (licenseState.value?.current_plan?.name ?? null),
+  // BE /status doesn't expose current_plan — derive from plans list only.
+  value: currentPlan.value?.name ?? null,
   icon: 'star',
   tone: 'primary' as const,
   sub: currentPlan.value?.period ? t(`plan_period_${currentPlan.value.period}`) : '',
@@ -335,7 +332,8 @@ const kpiBalance = computed(() => ({
   icon: 'wallet',
   tone: 'success' as const,
   money: true,
-  sub: licenseState.value?.balance_currency ?? '',
+  // BE returns balance as a bare string — no currency field on /status.
+  sub: '',
 }))
 
 const kpiExpires = computed(() => ({
@@ -346,12 +344,8 @@ const kpiExpires = computed(() => ({
   sub: licenseState.value?.expires_at ? formatDate(licenseState.value.expires_at) : '',
 }))
 
-const showLowBalance = computed(
-  () => !!licenseState.value
-    && typeof licenseState.value.balance === 'number'
-    && licenseState.value.balance > 0
-    && licenseState.value.balance < (licenseState.value.low_balance_threshold ?? 5),
-)
+// BE /status exposes a `warn` boolean — show the low-balance callout when it's set.
+const showLowBalance = computed(() => !!licenseState.value?.warn)
 
 // ============================================================
 // DataTable columns
@@ -364,7 +358,7 @@ const columns: DataTableColumn<any>[] = [
   { key: 'period', label: t('plan_period_label'), sortable: true },
   { key: 'features', label: t('plan_features'), sortable: false },
   { key: 'status', label: t('Status'), sortable: true },
-  { key: 'is_current', label: t('license_current_PENDING'), sortable: false },
+  { key: 'is_current', label: t('license_current_status'), sortable: false },
 ]
 
 const tablePagination = computed(() => ({
@@ -445,9 +439,9 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
       <span>{{ t('license_top_up_warn') }}</span>
     </div>
 
-    <!-- Pending-change notice -->
+    <!-- Pending-change notice (BE /status doesn't expose pending_plan_change) -->
     <div
-      v-if="pendingPlan || licenseState?.pending_plan_change"
+      v-if="pendingPlan"
       class="callout callout--info"
       style="margin-bottom: var(--sp-4); display:flex; gap:10px; align-items:center; padding:12px 14px; border-radius:10px; background: rgba(var(--v-theme-info, 14 165 233) / 0.08); border:1px solid rgba(var(--v-theme-info, 14 165 233) / 0.28);"
     >
@@ -705,16 +699,8 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             class="form-grid"
             style="gap: var(--sp-3);"
           >
-            <Field :label="t('license_organization')">
-              <div class="cell-strong">
-                {{ licenseState.tenant?.org_name ?? '—' }}
-              </div>
-            </Field>
-            <Field :label="t('license_contact_email')">
-              <div class="cell-strong">
-                {{ licenseState.tenant?.email ?? '—' }}
-              </div>
-            </Field>
+            <!-- BE /status intentionally omits tenant identity (org_name/email).
+                 Authenticated callers must use the admin tenant endpoints instead. -->
             <Field :label="t('license_expires_at')">
               <div class="cell-strong">
                 {{ licenseState.expires_at ? formatDate(licenseState.expires_at) : '—' }}
@@ -722,17 +708,33 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             </Field>
             <Field :label="t('license_balance')">
               <div class="mono cell-strong">
-                {{ fmtMoney(licenseState.balance, licenseState.balance_currency) }}
+                {{ fmtMoney(licenseState.balance) }}
               </div>
             </Field>
             <Field :label="t('license_current_plan')">
               <div class="cell-strong">
-                {{ licenseState.current_plan?.name ?? currentPlan?.name ?? '—' }}
+                {{ currentPlan?.name ?? '—' }}
               </div>
             </Field>
             <Field :label="t('license_days_remaining')">
               <div class="mono cell-strong">
                 {{ licenseState.days_remaining ?? '—' }}
+              </div>
+            </Field>
+            <Field
+              v-if="licenseState.last_heartbeat_at"
+              :label="t('license_last_heartbeat')"
+            >
+              <div class="cell-strong">
+                {{ formatDate(licenseState.last_heartbeat_at) }}
+              </div>
+            </Field>
+            <Field
+              v-if="licenseState.grace_until"
+              :label="t('license_grace_until')"
+            >
+              <div class="cell-strong">
+                {{ formatDate(licenseState.grace_until) }}
               </div>
             </Field>
           </div>

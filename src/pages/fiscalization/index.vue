@@ -58,13 +58,12 @@ async function loadReceipts() {
 }
 
 async function setMode(mode: string) {
-  if (mode === status.value?.mode)
+  if (mode === status.value?.config?.mode)
     return
   savingMode.value = true
   try {
-    const res = await axios.post('/mode', { mode })
+    await axios.post('/mode', { mode })
 
-    status.value = res.data?.data ?? res.data
     notify(t('Mode updated'))
     await loadStatus()
   }
@@ -183,7 +182,7 @@ const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'order_id', label: t('Order'), sortable: true, width: 90 },
   { key: 'receipt_type', label: t('Type'), sortable: true, width: 120 },
   { key: 'status', label: t('Status'), sortable: true, width: 130 },
-  { key: 'total', label: t('Total'), sortable: true, align: 'right' as const, width: 130 },
+  { key: 'amount', label: t('Total'), sortable: true, align: 'right' as const, width: 130 },
   { key: 'fiscal_sign', label: t('Fiscal sign'), sortable: false },
   { key: 'qr_url', label: t('QR'), sortable: false, align: 'center' as const, width: 60 },
   { key: 'created_at', label: t('Created'), sortable: true, width: 160 },
@@ -215,9 +214,9 @@ const columns = computed<DataTableColumn<any>[]>(() => [
       <div class="toolbar toolbar--wrap">
         <div class="provider-info">
           <span class="muted">{{ t('Provider') }}:</span>
-          <b>{{ status?.provider ?? '—' }}</b>
+          <b>{{ status?.config?.provider ?? status?.provider ?? '—' }}</b>
           <span class="muted" style="margin-inline-start: var(--sp-3);">{{ t('TIN') }}:</span>
-          <b>{{ status?.tin ?? '—' }}</b>
+          <b>{{ (status?.config?.tin_set ?? false) ? t('TIN set') : t('TIN not set') }}</b>
         </div>
 
         <div style="flex: 1;" />
@@ -228,7 +227,7 @@ const columns = computed<DataTableColumn<any>[]>(() => [
             <button
               type="button"
               class="seg-btn"
-              :class="{ 'is-active': (status?.mode ?? 'off') === 'off' }"
+              :class="{ 'is-active': (status?.config?.mode ?? 'off') === 'off' }"
               :disabled="savingMode"
               @click="setMode('off')"
             >
@@ -237,7 +236,7 @@ const columns = computed<DataTableColumn<any>[]>(() => [
             <button
               type="button"
               class="seg-btn"
-              :class="{ 'is-active': status?.mode === 'mock' }"
+              :class="{ 'is-active': status?.config?.mode === 'mock' }"
               :disabled="savingMode"
               @click="setMode('mock')"
             >
@@ -246,7 +245,7 @@ const columns = computed<DataTableColumn<any>[]>(() => [
             <button
               type="button"
               class="seg-btn"
-              :class="{ 'is-active': status?.mode === 'live' }"
+              :class="{ 'is-active': status?.config?.mode === 'live' }"
               :disabled="savingMode"
               @click="setMode('live')"
             >
@@ -329,8 +328,8 @@ const columns = computed<DataTableColumn<any>[]>(() => [
           </Badge>
         </template>
 
-        <template #cell.total="{ row }">
-          <span class="num-tabular">{{ formatCurrency(row.total ?? 0) }}</span>
+        <template #cell.amount="{ row }">
+          <span class="num-tabular">{{ formatCurrency(row.amount ?? row.total ?? 0) }}</span>
         </template>
 
         <template #cell.fiscal_sign="{ row }">

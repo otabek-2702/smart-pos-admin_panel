@@ -27,8 +27,10 @@ const { notify } = useNotify()
 const { formatDate } = useFormatters()
 
 // ---- state ----
-const locations = ref<any[]>([])
-const total = ref(0)
+// NOTE: BE view (stock/views/location_views.py) only reads `type`, `parent_id`, `tree` from
+// request.GET. It IGNORES page/per_page/include_stats/include_inactive/production_only/search.
+// → All filtering/pagination/search is done CLIENT-SIDE below.
+const allLocations = ref<any[]>([])
 const loading = ref(false)
 
 const page = ref(1)
@@ -80,36 +82,25 @@ const form = ref({
 
 const debouncedSearch = useDebounceFn(() => {
   page.value = 1
-  loadLocations()
 }, 350)
 
 // ---- load ----
+// BE only honors `type`, `parent_id`, `tree`. Everything else is filtered client-side.
 async function loadLocations() {
   loading.value = true
   try {
-    const params: any = {
-      page: page.value,
-      per_page: itemsPerPage.value,
-      include_stats: true,
-    }
+    const params: any = {}
     if (typeFilter.value)
       params.type = typeFilter.value
     if (parentFilter.value)
       params.parent_id = parentFilter.value
-    if (productionOnly.value)
-      params.production_only = 'true'
-    if (includeInactive.value)
-      params.include_inactive = 'true'
     if (treeView.value)
       params.tree = 'true'
-    if (search.value.trim())
-      params.search = search.value.trim()
 
     const res = await axios.get('/locations/', { params })
     const d = res.data?.data ?? res.data
 
-    locations.value = d?.locations ?? []
-    total.value = d?.count ?? d?.pagination?.total ?? locations.value.length
+    allLocations.value = d?.locations ?? []
   }
   catch {
     notify(t('msg_no_locations'), 'error')
@@ -120,10 +111,14 @@ async function loadLocations() {
 }
 
 onMounted(loadLocations)
-watch([page, itemsPerPage], loadLocations)
-watch([typeFilter, parentFilter, productionOnly, includeInactive, treeView], () => {
+// Only re-fetch on filters BE actually honors (type/parent/tree).
+watch([typeFilter, parentFilter, treeView], () => {
   page.value = 1
   loadLocations()
+})
+// Client-side filters: just reset page; computed `locations` reacts.
+watch([productionOnly, includeInactive], () => {
+  page.value = 1
 })
 watch(search, () => debouncedSearch())
 
@@ -132,7 +127,7 @@ const typeOptions = computed(() =>
   locationTypes.map(v => ({ value: v, label: t(`location_type_${v}`) })),
 )
 const parentOptions = computed(() =>
-  locations.value
+  allLocations.value
     .filter(l => selectedItem.value ? l.id !== selectedItem.value.id : true)
     .map(l => ({
       value: String(l.id),
@@ -140,15 +135,34 @@ const parentOptions = computed(() =>
     })),
 )
 const filterParentOptions = computed(() =>
-  locations.value.map(l => ({ value: String(l.id), label: l.name })),
+  allLocations.value.map(l => ({ value: String(l.id), label: l.name })),
 )
 
-// ---- KPI stats ----
-const kpiTotal = computed(() => total.value || locations.value.length)
-const kpiActive = computed(() => locations.value.filter(l => l.is_active).length)
-const kpiProduction = computed(() => locations.value.filter(l => l.is_production_area).length)
+// ---- client-side filtering + pagination ----
+const filteredLocations = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  return allLocations.value.filter((l) => {
+    if (!includeInactive.value && !l.is_active) return false
+    if (productionOnly.value && !l.is_production_area) return false
+    if (q) {
+      const hay = `${l.name ?? ''} ${l.type ?? ''}`.toLowerCase()
+      if (!hay.includes(q)) return false
+    }
+    return true
+  })
+})
+const total = computed(() => filteredLocations.value.length)
+const locations = computed(() => {
+  const start = (page.value - 1) * itemsPerPage.value
+  return filteredLocations.value.slice(start, start + itemsPerPage.value)
+})
+
+// ---- KPI stats (over the full set, not just current page) ----
+const kpiTotal = computed(() => allLocations.value.length)
+const kpiActive = computed(() => allLocations.value.filter(l => l.is_active).length)
+const kpiProduction = computed(() => allLocations.value.filter(l => l.is_production_area).length)
 const kpiDefault = computed(() => {
-  const d = locations.value.find(l => l.is_default)
+  const d = allLocations.value.find(l => l.is_default)
   return d?.name ?? '—'
 })
 
@@ -187,14 +201,30 @@ async function save() {
   if (saving.value) return
   saving.value = true
   try {
+    // BE update whitelist: name, type, is_default, is_production_area, sort_order.
+    // `is_active` is dropped — must use POST /locations/:id/set-default/ or DELETE for deactivate.
     const payload: any = { ...form.value }
     if (!payload.parent_id)
       delete payload.parent_id
+    const desiredActive = !!payload.is_active
+    delete payload.is_active
 
-    if (dialogMode.value === 'create')
+    if (dialogMode.value === 'create') {
       await axios.post('/locations/', payload)
-    else
-      await axios.patch(`/locations/${selectedItem.value.id}/`, payload)
+    }
+    else {
+      // BE detail view accepts GET/PUT/DELETE — NOT PATCH.
+      await axios.put(`/locations/${selectedItem.value.id}/`, payload)
+
+      // Handle is_active separately via dedicated endpoints.
+      const wasActive = !!selectedItem.value?.is_active
+      if (wasActive !== desiredActive) {
+        if (desiredActive)
+          await axios.post(`/locations/${selectedItem.value.id}/activate/`)
+        else
+          await axios.delete(`/locations/${selectedItem.value.id}/`)
+      }
+    }
 
     notify(dialogMode.value === 'create' ? t('msg_location_created') : t('msg_location_updated'))
     dialog.value = false
@@ -301,6 +331,8 @@ function clearAll() {
 }
 
 // ---- DataTable columns ----
+// NOTE: item_count / total_quantity intentionally omitted: BE view doesn't forward
+// include_stats to the service, so `row.stats` is always undefined.
 const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'name', label: t('col_name') },
   { key: 'type', label: t('col_type') },
@@ -308,8 +340,6 @@ const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'is_default', label: t('col_is_default') },
   { key: 'is_production_area', label: t('col_is_production_area') },
   { key: 'is_active', label: t('col_is_active') },
-  { key: 'item_count', label: t('col_item_count'), align: 'right' },
-  { key: 'total_quantity', label: t('col_total_quantity'), align: 'right' },
   { key: 'sort_order', label: t('col_sort_order'), align: 'right' },
   { key: 'created_at', label: t('col_created_at'), align: 'right' },
 ])
@@ -323,9 +353,10 @@ const dtPagination = computed(() => ({
 }))
 
 function parentNameOf(row: any) {
-  if (row.parent?.name) return row.parent.name
+  // BE serializer only emits `parent_id` (no nested `parent` object).
+  // Look up against the full unpaginated set so it resolves even when parent is off the current page.
   if (!row.parent_id) return '—'
-  return locations.value.find(l => l.id === row.parent_id)?.name ?? '—'
+  return allLocations.value.find(l => l.id === row.parent_id)?.name ?? '—'
 }
 </script>
 
@@ -530,16 +561,6 @@ function parentNameOf(row: any) {
           <Badge :tone="row.is_active ? 'success' : 'neutral'" dot>
             {{ row.is_active ? t('status_active') : t('status_inactive') }}
           </Badge>
-        </template>
-
-        <!-- Item count -->
-        <template #cell.item_count="{ row }">
-          <span class="mono cell-muted">{{ fmtNumber(row.stats?.item_count) }}</span>
-        </template>
-
-        <!-- Total qty -->
-        <template #cell.total_quantity="{ row }">
-          <span class="mono cell-muted">{{ fmtDecimal(row.stats?.total_quantity) }}</span>
         </template>
 
         <!-- Sort order -->

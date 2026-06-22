@@ -13,7 +13,6 @@ import Button from '@/components/design/Button.vue'
 import DataTable, { type DataTableColumn } from '@/components/design/DataTable.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import Field from '@/components/design/Field.vue'
-import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
 import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
@@ -185,11 +184,13 @@ async function loadHistory() {
     const params: any = {
       page: historyPage.value,
       per_page: historyPerPage.value,
-      movement_types: MOVEMENT_TYPES_ADJUSTABLE.map(m => m.value).join(','),
     }
     const res = await stockApi.get('/transactions/', { params })
     const d = res.data?.data ?? res.data
-    history.value = d?.transactions ?? d?.items ?? []
+    const all = d?.transactions ?? d?.items ?? []
+    // BE only accepts a single `type` value, not a list — filter adjustable types client-side
+    const allowed = new Set(MOVEMENT_TYPES_ADJUSTABLE.map(m => m.value))
+    history.value = all.filter((r: any) => allowed.has(r.movement_type))
     historyTotal.value = d?.pagination?.total ?? d?.count ?? history.value.length
   }
   catch {
@@ -331,13 +332,11 @@ async function saveCode() {
       notify(t('variance_code_created'))
     }
     else {
-      await stockApi.put(`/variance-codes/${codeSelected.value.id}/`, {
-        name: codeForm.value.name.trim().slice(0, 100),
-        description: codeForm.value.description,
-        requires_approval: codeForm.value.requires_approval,
-        is_active: codeForm.value.is_active,
-      })
-      notify(t('variance_code_updated'))
+      // BE does not currently expose PUT /variance-codes/<id>/ — edit is unavailable.
+      // VarianceReasonCodeService.update exists but no URL is wired in stock/urls.py.
+      notify(t('variance_code_edit_unavailable'), 'error')
+      codeSaving.value = false
+      return
     }
     codeModal.value = false
     await loadCodes()
@@ -576,15 +575,15 @@ watch([historyPage, historyPerPage], () => loadHistory())
         </template>
 
         <template #cell.item="{ row }">
-          <span class="cell-strong">{{ row.stock_item__name ?? row.item__name ?? row.stock_item?.name ?? '—' }}</span>
+          <span class="cell-strong">{{ row.stock_item_name ?? row.stock_item?.name ?? '—' }}</span>
         </template>
 
         <template #cell.location="{ row }">
-          <span class="cell-muted">{{ row.location__name ?? row.location?.name ?? '—' }}</span>
+          <span class="cell-muted">{{ row.location_name ?? row.location?.name ?? '—' }}</span>
         </template>
 
         <template #cell.quantity="{ row }">
-          <span class="mono cell-strong">{{ fmtQty(row.quantity_change ?? row.quantity) }}</span>
+          <span class="mono cell-strong">{{ fmtQty(row.quantity) }}</span>
         </template>
 
         <template #cell.notes="{ row }">
@@ -681,13 +680,10 @@ watch([historyPage, historyPerPage], () => loadHistory())
           </Badge>
         </template>
 
-        <template #cell.actions="{ row }">
+        <template #cell.actions>
           <div class="row" style="gap: 4px; justify-content: flex-end;">
-            <IconAction
-              icon="edit"
-              :title="t('edit')"
-              @click="openCodeEdit(row)"
-            />
+            <!-- Edit disabled: BE has no PUT /variance-codes/<id>/ endpoint wired -->
+            <span class="cell-muted">—</span>
           </div>
         </template>
 

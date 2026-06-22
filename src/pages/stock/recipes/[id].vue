@@ -311,8 +311,8 @@ function openEdit() {
     notes: recipe.value.notes ?? '',
     difficulty_level: recipe.value.difficulty_level ?? '',
     estimated_time_minutes: recipe.value.estimated_time_minutes ?? '',
-    production_location_id: recipe.value.production_location?.id != null
-      ? String(recipe.value.production_location.id)
+    production_location_id: recipe.value.production_location_id != null
+      ? String(recipe.value.production_location_id)
       : '',
     is_scalable: !!recipe.value.is_scalable,
     min_batch_size: recipe.value.min_batch_size ?? 1,
@@ -423,9 +423,11 @@ function openAddIng() {
 function openEditIng(ing: any) {
   selectedIng.value = ing
   ingForm.value = {
-    stock_item_id: ing.stock_item?.id != null ? String(ing.stock_item.id) : '',
+    stock_item_id: ing.stock_item_id != null
+      ? String(ing.stock_item_id)
+      : (ing.stock_item?.id != null ? String(ing.stock_item.id) : ''),
     quantity: ing.quantity ?? 1,
-    unit_id: ing.unit?.id != null ? String(ing.unit.id) : '',
+    unit_id: ing.unit_id != null ? String(ing.unit_id) : '',
     waste_percentage: ing.waste_percentage ?? 0,
     is_optional: !!ing.is_optional,
     is_scalable: ing.is_scalable !== false,
@@ -682,8 +684,8 @@ function onBatchMultiplierInput(v: string) {
             </div>
             <div class="mono">
               {{ fmtDecimal4(recipe.output_quantity) }}
-              <span v-if="recipe.output_unit?.short_name" class="cell-muted" style="margin-left: 4px;">
-                {{ recipe.output_unit.short_name }}
+              <span v-if="recipe.output_unit" class="cell-muted" style="margin-left: 4px;">
+                {{ recipe.output_unit }}
               </span>
             </div>
           </div>
@@ -692,7 +694,7 @@ function onBatchMultiplierInput(v: string) {
               {{ t('recipe_output_unit') }}
             </div>
             <div>
-              {{ recipe.output_unit?.name ?? recipe.output_unit_name ?? '—' }}
+              {{ recipe.output_unit ?? '—' }}
             </div>
           </div>
           <div>
@@ -716,7 +718,7 @@ function onBatchMultiplierInput(v: string) {
               {{ t('recipe_production_location') }}
             </div>
             <div>
-              {{ recipe.production_location?.name ?? '—' }}
+              {{ recipe.production_location_name ?? '—' }}
             </div>
           </div>
           <div>
@@ -880,7 +882,7 @@ function onBatchMultiplierInput(v: string) {
                   {{ fmtDecimal4(ing.quantity) }}
                 </td>
                 <td class="center">
-                  {{ ing.unit?.short_name ?? ing.unit?.name ?? ing.unit_short_name ?? '—' }}
+                  {{ ing.unit ?? '—' }}
                 </td>
                 <td class="num mono">
                   {{ fmtPercent(ing.waste_percentage) }}

@@ -214,8 +214,8 @@ async function createReceiving() {
     if (createForm.value.notes)
       payload.notes = createForm.value.notes
 
-    // PO id is a path param per spec
-    const res = await stockApi.post(`/purchase-orders/${createForm.value.purchase_order_id}/receiving/`, payload)
+    // PO id is a path param per spec (BE route is singular: /purchase-order/<id>/receiving/)
+    const res = await stockApi.post(`/purchase-order/${createForm.value.purchase_order_id}/receiving/`, payload)
     const d = res.data?.data ?? res.data
     notify(t('Receiving created'))
     createOpen.value = false
@@ -786,7 +786,7 @@ function clearAll() {
                 </td>
                 <td class="num mono">
                   {{ li.quantity_received ?? '—' }}
-                  <span v-if="li.unit_name" class="cell-muted">{{ li.unit_name }}</span>
+                  <span v-if="li.unit ?? li.unit_name" class="cell-muted">{{ li.unit ?? li.unit_name }}</span>
                 </td>
                 <td class="num mono cell-muted">
                   {{ li.unit_cost != null ? formatCurrency(li.unit_cost) : '—' }}

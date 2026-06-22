@@ -7,7 +7,7 @@
      PUT    /api/admins/tables/{id}              (edit)
      DELETE /api/admins/tables/{id}              (delete)
      PATCH  /api/admins/tables/{id}/status       (set status)
-     GET    /api/admins/qr/tables/{id}/token/    (mint/fetch token)
+     GET    /api/admins/notifications/qr/tables/{id}/token/  (mint/fetch token)
      GET    /api/admins/places?per_page=100      (place options)
 
    Lazy token fetch — only when the row is expanded or one of the
@@ -20,7 +20,7 @@
    admin volumes). Easy to swap later — keep the URL behind one fn.
    ============================================================ */
 import type { DataTableColumn } from '@/components/design/DataTable.vue'
-import axios from '@/plugins/axios'
+import axios, { notificationsApi } from '@/plugins/axios'
 import Badge from '@/components/design/Badge.vue'
 import Button from '@/components/design/Button.vue'
 import Card from '@/components/design/Card.vue'
@@ -183,7 +183,7 @@ async function fetchToken(row: TableRow): Promise<{ token: string; menu_url_suff
     return tokenCache.value[row.id]
   tokenBusyId.value = row.id
   try {
-    const res = await axios.get(`/qr/tables/${row.id}/token/`)
+    const res = await notificationsApi.get(`/qr/tables/${row.id}/token/`)
     const d = res.data?.data ?? res.data
     const payload = {
       token: d?.token ?? d?.qr_token ?? '',

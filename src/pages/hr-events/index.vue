@@ -101,6 +101,8 @@ const EVENT_TONE: Record<string, 'primary' | 'info' | 'neutral' | 'success' | 'w
 // ============================================================
 function employeeName(e: any): string {
   if (!e) return '—'
+  // BE may return either { id, name } (event rows) or { id, user: { first_name, last_name, email } } (full employee object)
+  if (e.name) return e.name
   const u = e.user ?? e
   const full = `${u?.first_name ?? ''} ${u?.last_name ?? ''}`.trim()
   return full || u?.email || `#${e.id ?? '?'}`
@@ -126,7 +128,7 @@ async function loadEvents() {
     const res = await hrApi.get('/events/', { params })
     const d = res.data?.data ?? res.data
     items.value = d?.events ?? d?.items ?? []
-    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? items.value.length
+    total.value = d?.pagination?.total ?? d?.pagination?.total_items ?? items.value.length
   }
   catch {
     notify(t('Failed to load'), 'error')

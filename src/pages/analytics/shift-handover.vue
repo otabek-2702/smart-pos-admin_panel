@@ -7,6 +7,7 @@
    ============================================================ */
 import axios from '@/plugins/axios'
 import { STATUS_TONE } from '@/constants/statusTones'
+import Modal from '@/components/design/Modal.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -79,6 +80,40 @@ watch(shiftIdInput, load)
 const shift = computed<any>(() => data.value?.shift)
 const receipts = computed<any[]>(() => data.value?.receipts ?? [])
 const products = computed<any[]>(() => data.value?.products ?? [])
+
+const PRODUCTS_PREVIEW = 10
+const showAllProducts = ref(false)
+const productsShown = computed(() => showAllProducts.value
+  ? products.value
+  : products.value.slice(0, PRODUCTS_PREVIEW))
+
+const selectedReceipt = ref<any>(null)
+const selectedItems = ref<any[]>([])
+const selectedLoading = ref(false)
+
+async function openReceipt(r: any) {
+  selectedReceipt.value = r
+  if (Array.isArray(r.items) && r.items.length) {
+    selectedItems.value = r.items
+    return
+  }
+  selectedItems.value = []
+  selectedLoading.value = true
+  try {
+    const res = await axios.get(`/orders/${r.order_id}`)
+    const d = res.data?.data ?? res.data
+    selectedItems.value = d?.items ?? d?.order?.items ?? []
+  }
+  catch { selectedItems.value = [] }
+  finally { selectedLoading.value = false }
+}
+function closeReceipt() {
+  selectedReceipt.value = null
+  selectedItems.value = []
+}
+function receiptId(r: any) {
+  return r.display_id ?? r.order_id ?? r.id ?? '—'
+}
 const distribution = computed<any>(() => data.value?.distribution)
 const settlement = computed<any[]>(() => data.value?.settlement ?? [])
 const cashExpenses = computed<any[]>(() => data.value?.cash_expenses ?? [])
@@ -904,7 +939,7 @@ function shiftDurationLabel(): string {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="p in products" :key="p.product_id">
+                <tr v-for="p in productsShown" :key="p.product_id">
                   <td class="cell-strong">
                     {{ p.name }}
                   </td>
@@ -920,6 +955,19 @@ function shiftDurationLabel(): string {
                 </tr>
               </tbody>
             </table>
+            <div
+              v-if="products.length > PRODUCTS_PREVIEW"
+              style="display: flex; justify-content: center; padding: var(--sp-4) 0;"
+            >
+              <button
+                class="btn btn--secondary btn--sm"
+                @click="showAllProducts = !showAllProducts"
+              >
+                {{ showAllProducts
+                  ? t('Show less')
+                  : t('Show more ({n})', { n: products.length - PRODUCTS_PREVIEW }) }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1139,9 +1187,14 @@ function shiftDurationLabel(): string {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="r in receipts" :key="r.order_id">
+            <tr
+              v-for="r in receipts"
+              :key="r.order_id"
+              style="cursor: pointer;"
+              @click="openReceipt(r)"
+            >
               <td class="cell-strong mono">
-                {{ t('id_prefix') }}{{ r.display_id }}
+                {{ t('id_prefix') }}{{ receiptId(r) }}
               </td>
               <td>
                 <span class="badge badge--dot" :class="`t-${tone(r.status)}`">{{ r.status ? t(`order_status_${r.status}`) : '—' }}</span>
@@ -1175,6 +1228,82 @@ function shiftDurationLabel(): string {
       </div>
     </template>
 
+    <!-- Receipt quick-view modal -->
+    <Modal
+      :open="selectedReceipt !== null"
+      :width="640"
+      :title="selectedReceipt
+        ? t('Order') + ' ' + t('id_prefix') + receiptId(selectedReceipt)
+        : ''"
+      @close="closeReceipt"
+    >
+      <div v-if="selectedReceipt" class="receipt-modal">
+        <div class="receipt-modal__meta">
+          <div class="receipt-modal__cell">
+            <div class="receipt-modal__lbl">{{ t('Status') }}</div>
+            <span class="badge badge--dot" :class="`t-${tone(selectedReceipt.status)}`">
+              {{ selectedReceipt.status ? t(`order_status_${selectedReceipt.status}`) : '—' }}
+            </span>
+          </div>
+          <div class="receipt-modal__cell">
+            <div class="receipt-modal__lbl">{{ t('Type') }}</div>
+            <span class="badge t-neutral">{{ selectedReceipt.order_type ? t(`order_type_${selectedReceipt.order_type}`) : '—' }}</span>
+          </div>
+          <div class="receipt-modal__cell">
+            <div class="receipt-modal__lbl">{{ t('Payment') }}</div>
+            <span class="badge" :class="`t-${tone(selectedReceipt.payment_method)}`">
+              {{ selectedReceipt.payment_method ? t(`payment_method_${selectedReceipt.payment_method}`) : '—' }}
+            </span>
+          </div>
+          <div class="receipt-modal__cell">
+            <div class="receipt-modal__lbl">{{ t('Paid at') }}</div>
+            <div class="cell-muted mono">{{ selectedReceipt.paid_at ? formatDate(selectedReceipt.paid_at) : '—' }}</div>
+          </div>
+        </div>
+
+        <div class="kpi__label" style="margin-top: var(--sp-4); margin-bottom: 8px;">
+          {{ t('Order Items') }}
+        </div>
+        <div class="tablewrap">
+          <table class="dtable">
+            <thead>
+              <tr>
+                <th>{{ t('Product') }}</th>
+                <th class="num">{{ t('Qty') }}</th>
+                <th class="num">{{ t('Price') }}</th>
+                <th class="num">{{ t('Subtotal') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="selectedLoading">
+                <td colspan="4" class="center cell-muted">{{ t('Loading…') }}</td>
+              </tr>
+              <tr v-else-if="!selectedItems.length">
+                <td colspan="4" class="center cell-muted">{{ t('No items') }}</td>
+              </tr>
+              <tr v-for="(li, i) in selectedItems" v-else :key="i">
+                <td class="cell-strong">{{ li.product__name ?? li.name ?? li.product_name ?? '—' }}</td>
+                <td class="num mono">{{ li.quantity ?? li.qty ?? '—' }}</td>
+                <td class="num mono cell-muted">{{ fmtMoney(li.price ?? 0) }}</td>
+                <td class="num mono cell-strong">{{ fmtMoney((Number(li.price) || 0) * (Number(li.quantity ?? li.qty) || 1)) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="receipt-modal__totals">
+          <div v-if="Number(selectedReceipt.discount_amount) > 0" class="row" style="justify-content: space-between;">
+            <span class="cell-muted">{{ t('Discount') }}</span>
+            <span class="mono" style="color: var(--warning);">{{ t('negative_amount', { amount: fmtMoney(selectedReceipt.discount_amount) }) }}</span>
+          </div>
+          <div class="row" style="justify-content: space-between; font-weight: 600; font-size: 16px;">
+            <span>{{ t('Total') }}</span>
+            <span class="mono">{{ fmtMoney(selectedReceipt.total_amount) }}</span>
+          </div>
+        </div>
+      </div>
+    </Modal>
+
     <!-- Snackbar — kept as Vuetify primitive since it's a portal/overlay, not a layout element -->
     <VSnackbar v-model="snackbar" :color="snackbarColor" :timeout="3000">
       {{ snackbarMsg }}
@@ -1186,6 +1315,33 @@ function shiftDurationLabel(): string {
 /* Animated HBar fill width */
 .hbar-fill {
   transition: width .55s cubic-bezier(.2, .8, .3, 1);
+}
+
+.receipt-modal__meta {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+.receipt-modal__cell { min-width: 0; }
+.receipt-modal__lbl {
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+}
+.receipt-modal__totals {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+@media (max-width: 600px) {
+  .receipt-modal__meta { grid-template-columns: 1fr; }
 }
 
 /* Shift handover toolbar — wrap on narrow viewports */

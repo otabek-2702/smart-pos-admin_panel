@@ -331,7 +331,7 @@ const pagination = computed(() => ({
         </template>
 
         <template #cell.total="{ row }">
-          <span class="mono num-tabular">{{ formatCurrency(row.total ?? row.subtotal ?? 0) }}</span>
+          <span class="mono num-tabular">{{ formatCurrency(row.total ?? 0) }}</span>
         </template>
 
         <template #cell.order_date="{ row }">
@@ -379,7 +379,7 @@ const pagination = computed(() => ({
               </span>
               <span>
                 <span class="cell-muted">{{ t('Location') }}: </span>
-                <strong>{{ typeof row.delivery_location === 'string' ? row.delivery_location : row.delivery_location?.name ?? '—' }}</strong>
+                <strong>{{ row.delivery_location ?? '—' }}</strong>
               </span>
               <span v-if="row.expected_date">
                 <span class="cell-muted">{{ t('Expected') }}: </span>
@@ -408,24 +408,24 @@ const pagination = computed(() => ({
                 </thead>
                 <tbody>
                   <tr
-                    v-for="(li, idx) in ((row.items ?? row.line_items ?? []) as any[])"
+                    v-for="(li, idx) in ((row.items ?? []) as any[])"
                     :key="idx"
                   >
-                    <td>{{ li.item?.name ?? li.stock_item?.name ?? '—' }}</td>
+                    <td>{{ li.stock_item?.name ?? '—' }}</td>
                     <td class="num mono">
-                      {{ li.quantity_ordered ?? li.quantity ?? '—' }}
+                      {{ li.quantity_ordered ?? '—' }}
                     </td>
                     <td class="num mono">
                       {{ li.quantity_received ?? '—' }}
                     </td>
                     <td class="num mono">
-                      {{ formatCurrency(li.unit_price ?? li.price ?? 0) }}
+                      {{ formatCurrency(li.unit_price ?? 0) }}
                     </td>
                     <td class="num mono">
-                      {{ formatCurrency((li.unit_price ?? li.price ?? 0) * (li.quantity_ordered ?? li.quantity ?? 1)) }}
+                      {{ formatCurrency(Number(li.unit_price ?? 0) * Number(li.quantity_ordered ?? 1)) }}
                     </td>
                   </tr>
-                  <tr v-if="!(row.items?.length ?? row.line_items?.length)">
+                  <tr v-if="!row.items?.length">
                     <td
                       colspan="5"
                       class="po-lines__empty"

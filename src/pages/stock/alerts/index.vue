@@ -140,7 +140,7 @@ async function loadAlerts() {
     const d = res.data?.data ?? res.data
 
     alerts.value = d?.alerts ?? d?.results ?? d?.items ?? (Array.isArray(d) ? d : [])
-    totalAlerts.value = d?.pagination?.total_items ?? d?.pagination?.total ?? alerts.value.length
+    totalAlerts.value = d?.count ?? d?.pagination?.total_items ?? d?.pagination?.total ?? alerts.value.length
   }
   catch {
     notify(t('Failed to load alert rules'), 'error')
@@ -163,8 +163,8 @@ async function loadLowStock() {
     const res = await stockApi.get('/low-stock/', { params })
     const d = res.data?.data ?? res.data
 
-    lowStock.value = d?.items ?? d?.low_stock ?? d?.results ?? (Array.isArray(d) ? d : [])
-    totalLow.value = d?.pagination?.total_items ?? d?.pagination?.total ?? lowStock.value.length
+    lowStock.value = d?.alerts ?? d?.items ?? d?.low_stock ?? d?.results ?? (Array.isArray(d) ? d : [])
+    totalLow.value = d?.count ?? d?.pagination?.total_items ?? d?.pagination?.total ?? lowStock.value.length
   }
   catch {
     notify(t('Failed to load low-stock items'), 'error')

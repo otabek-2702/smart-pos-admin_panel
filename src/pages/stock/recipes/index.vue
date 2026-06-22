@@ -49,7 +49,8 @@ const itemsList = ref<any[]>([])
 const unitsList = ref<any[]>([])
 
 const recipeTypes = ['PRODUCTION', 'ASSEMBLY', 'PREPARATION', 'DISASSEMBLY']
-const difficultyLevels = ['EASY', 'MEDIUM', 'HARD']
+// BE: difficulty_level is PositiveSmallIntegerField (1..5)
+const difficultyLevels = [1, 2, 3, 4, 5]
 
 const typeBadgeTone: Record<string, 'primary' | 'success' | 'warning' | 'error' | 'neutral'> = {
   PRODUCTION: 'primary',
@@ -66,7 +67,7 @@ const form = ref({
   output_quantity: 1,
   output_unit_id: null as number | null,
   estimated_time_minutes: null as number | null,
-  difficulty_level: 'MEDIUM',
+  difficulty_level: 1 as number,
   notes: '',
   is_active: true,
 })
@@ -113,8 +114,10 @@ async function loadMeta() {
       axios.get('/locations/', { params: { per_page: 200 } }),
     ])
 
-    itemsList.value = itemsRes.data.items ?? []
-    unitsList.value = unitsRes.data.units ?? []
+    const itemsD = itemsRes.data?.data ?? itemsRes.data
+    itemsList.value = itemsD?.items ?? []
+    const unitsD = unitsRes.data?.data ?? unitsRes.data
+    unitsList.value = unitsD?.units ?? []
     const locD = locRes.data?.data ?? locRes.data
     locationsList.value = locD?.locations ?? []
   }
@@ -143,30 +146,40 @@ const recipeTypeOptions = computed(() =>
   recipeTypes.map(v => ({ value: v, label: t(`recipe_type_${v}`) })),
 )
 const difficultyOptions = computed(() =>
-  difficultyLevels.map(v => ({ value: v, label: t(`difficulty_${v}`) })),
+  difficultyLevels.map(v => ({ value: String(v), label: t(`difficulty_level_${v}`) })),
 )
 
 /* ---------------- create / edit / delete / toggle ---------------- */
 function openCreate() {
   dialogMode.value = 'create'
-  form.value = { name: '', code: '', recipe_type: 'PRODUCTION', output_item_id: null, output_quantity: 1, output_unit_id: null, estimated_time_minutes: null, difficulty_level: 'MEDIUM', notes: '', is_active: true }
+  form.value = { name: '', code: '', recipe_type: 'PRODUCTION', output_item_id: null, output_quantity: 1, output_unit_id: null, estimated_time_minutes: null, difficulty_level: 1, notes: '', is_active: true }
   dialog.value = true
 }
 
-function openEdit(item: any) {
+async function openEdit(item: any) {
   dialogMode.value = 'edit'
   selectedItem.value = item
+
+  // BE list rows return output_item_name (string) + output_unit (short_name string) — no ids.
+  // Fetch full detail so output_item_id / output_unit_id populate the selects.
+  let detail: any = item
+  try {
+    const res = await axios.get(`/recipes/${item.id}/`)
+    detail = res.data?.data ?? res.data ?? item
+  }
+  catch { /* fall back to list row */ }
+
   form.value = {
-    name: item.name ?? '',
-    code: item.code ?? '',
-    recipe_type: item.recipe_type ?? 'PRODUCTION',
-    output_item_id: item.output_item?.id ?? null,
-    output_quantity: item.output_quantity ?? 1,
-    output_unit_id: item.output_unit?.id ?? null,
-    estimated_time_minutes: item.estimated_time_minutes ?? null,
-    difficulty_level: item.difficulty_level ?? 'MEDIUM',
-    notes: item.notes ?? '',
-    is_active: item.is_active ?? true,
+    name: detail.name ?? '',
+    code: detail.code ?? '',
+    recipe_type: detail.recipe_type ?? 'PRODUCTION',
+    output_item_id: detail.output_item_id ?? detail.output_item?.id ?? null,
+    output_quantity: detail.output_quantity ?? 1,
+    output_unit_id: detail.output_unit_id ?? detail.output_unit?.id ?? null,
+    estimated_time_minutes: detail.estimated_time_minutes ?? null,
+    difficulty_level: Number(detail.difficulty_level ?? 1),
+    notes: detail.notes ?? '',
+    is_active: detail.is_active ?? true,
   }
   dialog.value = true
 }
@@ -191,10 +204,17 @@ async function save() {
     if (!payload.code)
       delete payload.code
 
-    if (dialogMode.value === 'create')
+    // Ensure difficulty_level is an integer for BE PositiveSmallIntegerField
+    if (payload.difficulty_level != null)
+      payload.difficulty_level = Number(payload.difficulty_level)
+
+    if (dialogMode.value === 'create') {
       await axios.post('/recipes/', payload)
-    else
-      await axios.patch(`/recipes/${selectedItem.value.id}/`, payload)
+    }
+    else {
+      // BE: recipe_detail allows GET/PUT/DELETE only — PATCH returns 405
+      await axios.put(`/recipes/${selectedItem.value.id}/`, payload)
+    }
     notify(dialogMode.value === 'create' ? t('Recipe created') : t('Recipe updated'))
     dialog.value = false
     await loadRecipes()
@@ -229,9 +249,16 @@ async function doDelete() {
 }
 
 async function toggleActive(item: any) {
+  // BE: recipe_detail blocks PATCH and RecipeService.update() ignores is_active.
+  // Deactivation lives at DELETE /recipes/{id}/. No activate endpoint is exposed,
+  // so activating an inactive recipe is currently unsupported on the BE.
+  if (!item.is_active) {
+    notify(t('recipes_activate_unsupported'), 'error')
+    return
+  }
   try {
-    await axios.patch(`/recipes/${item.id}/`, { is_active: !item.is_active })
-    notify(item.is_active ? t('Recipe deactivated') : t('Recipe activated'))
+    await axios.delete(`/recipes/${item.id}/`)
+    notify(t('Recipe deactivated'))
     await loadRecipes()
   }
   catch (e: any) {
@@ -280,6 +307,10 @@ const formOutputItemStr = computed<string>({
 const formOutputUnitStr = computed<string>({
   get: () => form.value.output_unit_id == null ? '' : String(form.value.output_unit_id),
   set: v => { form.value.output_unit_id = v === '' ? null : Number(v) },
+})
+const formDifficultyStr = computed<string>({
+  get: () => form.value.difficulty_level == null ? '' : String(form.value.difficulty_level),
+  set: v => { form.value.difficulty_level = v === '' ? 1 : Number(v) },
 })
 </script>
 
@@ -468,7 +499,7 @@ const formOutputUnitStr = computed<string>({
         <div class="span-6">
           <Field :label="t('Difficulty')">
             <Select
-              v-model="form.difficulty_level"
+              v-model="formDifficultyStr"
               :options="difficultyOptions"
               icon="bolt"
             />

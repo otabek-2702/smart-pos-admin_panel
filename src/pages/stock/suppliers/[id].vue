@@ -163,7 +163,7 @@ async function loadLedger() {
     })
     const d = res.data?.data ?? res.data
     ledgerRows.value = d?.transactions ?? d?.entries ?? d?.items ?? []
-    ledgerTotal.value = d?.pagination?.total_items ?? d?.pagination?.total ?? ledgerRows.value.length
+    ledgerTotal.value = d?.pagination?.total ?? d?.pagination?.total_items ?? ledgerRows.value.length
   }
   catch {
     notify(t('supplier_failed_load_ledger'), 'error')
@@ -204,20 +204,20 @@ const kpiCreditLimit = computed(() => ({
 }))
 const kpiTotalOrders = computed(() => ({
   label: t('supplier_kpi_total_orders'),
-  value: supplier.value ? Number(supplier.value.total_orders ?? supplier.value.stats?.total_orders ?? 0) : null,
+  value: supplier.value ? Number(supplier.value.stats?.total_orders ?? supplier.value.total_orders ?? 0) : null,
   icon: 'box',
   tone: 'primary' as const,
 }))
 const kpiTotalValue = computed(() => ({
   label: t('supplier_kpi_total_value'),
-  value: supplier.value ? Number(supplier.value.total_value ?? supplier.value.stats?.total_value ?? 0) : null,
+  value: supplier.value ? Number(supplier.value.stats?.total_value ?? supplier.value.total_value ?? 0) : null,
   icon: 'cart',
   tone: 'success' as const,
   money: true,
 }))
 const kpiAvgOrder = computed(() => ({
   label: t('supplier_kpi_avg_order'),
-  value: supplier.value ? Number(supplier.value.avg_order_value ?? supplier.value.stats?.avg_order_value ?? 0) : null,
+  value: supplier.value ? Number(supplier.value.stats?.avg_order_value ?? supplier.value.avg_order_value ?? 0) : null,
   icon: 'trend',
   tone: 'info' as const,
   money: true,

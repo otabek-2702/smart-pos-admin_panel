@@ -79,7 +79,11 @@ interface QueueItem {
 }
 
 const items = ref<QueueItem[]>([])
-const capacity = ref<number | null>(null)
+// Mirrors QueueService.MAX_PENDING in alpha_pos/notifications/services/queue_service.py.
+// BE doesn't surface the cap in any response, so we mirror the constant here so the
+// "Capacity" KPI shows a real number instead of "—". Update if BE constant changes.
+const QUEUE_MAX_PENDING = 500
+const capacity = ref<number | null>(QUEUE_MAX_PENDING)
 const loading = ref(false)
 
 // filters (client-side)
@@ -126,7 +130,10 @@ async function loadQueue() {
       idx: i + 1,
     }))
 
-    // Capacity may live on the same payload or in a sibling field
+    // Capacity may live on the same payload or in a sibling field. BE
+    // (alpha_pos QueueService) currently doesn't surface the cap, so we keep
+    // the QUEUE_MAX_PENDING fallback. If/when BE adds a capacity field, it
+    // wins automatically.
     if (typeof d?.capacity === 'number')
       capacity.value = d.capacity
     else if (typeof d?.max === 'number')
@@ -134,7 +141,7 @@ async function loadQueue() {
     else if (typeof d?.limit === 'number')
       capacity.value = d.limit
     else
-      capacity.value = capacity.value // keep last known
+      capacity.value = QUEUE_MAX_PENDING
   }
   catch {
     notify(t('Failed to load queue'), 'error')
@@ -148,17 +155,34 @@ async function loadQueue() {
 async function processQueue() {
   if (processing.value)
     return
+  // Snapshot queue size BEFORE the call — used to detect the Telegram-offline
+  // case. BE (alpha_pos QueueService.process) silently returns sent=0,failed=0
+  // when TelegramService.is_online() is False — there is no `offline` flag in
+  // the response. Heuristic: if we had pending items going in but nothing was
+  // sent or failed coming out, the bot was offline.
+  const hadPending = items.value.length
   processing.value = true
   try {
     const res = await notificationsApi.post('/queue/process/')
-    const d = res.data?.data ?? res.data
+    // Response shape (alpha_pos): { success, data: { sent, failed } }
+    // `success` lives on the wrapper, NOT inside `data`.
+    const body = res.data ?? {}
+    const d = body?.data ?? body
     const sent = Number(d?.sent ?? 0)
     const failed = Number(d?.failed ?? 0)
+    const wrapperSuccess = body?.success
 
-    // Detect Telegram-offline result: nothing was sent and nothing
-    // failed because the bot couldn't reach Telegram. Backend usually
-    // sets a `telegram_offline` / `offline` flag or returns success:false.
-    if (d?.telegram_offline || d?.offline || (sent === 0 && failed === 0 && d?.success === false))
+    // Offline detection. Priority:
+    //   1. explicit flag (future-proof if BE adds one)
+    //   2. wrapper success=false
+    //   3. had pending items but BE reports 0 processed and 0 failed
+    const looksOffline
+      = d?.telegram_offline === true
+      || d?.offline === true
+      || wrapperSuccess === false
+      || (hadPending > 0 && sent === 0 && failed === 0)
+
+    if (looksOffline)
       notify(t('notif_queue_toast_offline'), 'warning')
     else
       notify(t('notif_queue_toast_processed', { sent, failed }))

@@ -82,13 +82,13 @@ async function loadLevels() {
     if (itemTypeFilter.value)
       params.item_type = itemTypeFilter.value
     if (lowStockOnly.value)
-      params.low_stock = true
+      params.low_stock_only = 'true'
 
     const res = await axios.get('/levels/', { params })
     const d = readData<any>(res)
 
     levels.value = d?.levels ?? []
-    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? levels.value.length
+    total.value = d?.pagination?.total ?? levels.value.length
   }
   catch {
     notify(t('stock_levels_load_failed'), 'error')
@@ -154,9 +154,6 @@ const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'reserved_quantity', label: t('Reserved'), align: 'right' },
   { key: 'available_quantity', label: t('Available'), align: 'right' },
   { key: 'pending_in_quantity', label: t('Pending In'), align: 'right' },
-  { key: 'reorder_point', label: t('Reorder Point'), align: 'right' },
-  { key: 'max_quantity', label: t('Max Qty'), align: 'right' },
-  { key: 'avg_daily_usage', label: t('Avg Daily Usage'), align: 'right' },
   { key: 'last_movement_at', label: t('Last Movement') },
 ])
 
@@ -385,7 +382,7 @@ function clearFilters() {
         </template>
 
         <template #cell.location="{ row }">
-          <span class="cell-strong">{{ row.location?.name ?? row.location_name ?? '—' }}</span>
+          <span class="cell-strong">{{ row.location?.name ?? '—' }}</span>
         </template>
 
         <template #cell.quantity="{ row }">
@@ -410,18 +407,6 @@ function clearFilters() {
 
         <template #cell.pending_in_quantity="{ row }">
           <span class="mono">{{ formatQty(row.pending_in_quantity) }}</span>
-        </template>
-
-        <template #cell.reorder_point="{ row }">
-          <span class="mono cell-muted">{{ formatQty(row.reorder_point) }}</span>
-        </template>
-
-        <template #cell.max_quantity="{ row }">
-          <span class="mono cell-muted">{{ formatQty(row.max_quantity) }}</span>
-        </template>
-
-        <template #cell.avg_daily_usage="{ row }">
-          <span class="mono cell-muted">{{ formatQty(row.avg_daily_usage) }}</span>
         </template>
 
         <template #cell.last_movement_at="{ row }">
@@ -477,9 +462,9 @@ function clearFilters() {
     >
       <div v-if="actionLevel" class="lvl-context">
         <p class="lvl-context__title">
-          {{ actionLevel.stock_item?.name ?? actionLevel.item?.name ?? '—' }}
+          {{ actionLevel.stock_item?.name ?? '—' }}
           <span class="cell-muted">
-            · {{ actionLevel.location?.name ?? actionLevel.location_name ?? '—' }}
+            · {{ actionLevel.location?.name ?? '—' }}
           </span>
         </p>
         <p class="lvl-context__meta">

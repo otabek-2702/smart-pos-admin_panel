@@ -90,6 +90,24 @@ const quickErrors = ref<Record<string, string>>({})
 
 const actingId = ref<number | null>(null)
 
+// Cache enriched rows (list returns brief shape only). Indexed by id.
+const rowDetailCache = ref<Record<number, any>>({})
+async function ensureRowDetail(row: any) {
+  if (!row?.id) return
+  if (rowDetailCache.value[row.id]) return
+  try {
+    const res = await axios.get(`/transfers/${row.id}/`)
+    const detail = res.data?.data?.transfer ?? res.data?.transfer ?? res.data?.data ?? res.data
+    if (!detail) return
+    rowDetailCache.value = { ...rowDetailCache.value, [row.id]: detail }
+    // Merge in-place so columns relying on transfer_type/requested_at/etc. populate.
+    const idx = transfers.value.findIndex(t => t.id === row.id)
+    if (idx !== -1)
+      transfers.value[idx] = { ...transfers.value[idx], ...detail }
+  }
+  catch { /* swallow; keep brief row */ }
+}
+
 // ---------------- loaders ----------------
 async function loadTransfers() {
   loading.value = true
@@ -109,6 +127,8 @@ async function loadTransfers() {
 
     transfers.value = d?.transfers ?? []
     total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? transfers.value.length
+    // List shape is brief; reset detail cache so re-expand re-fetches.
+    rowDetailCache.value = {}
   }
   catch {
     notify(t('transfer_ext_empty'), 'error')
@@ -280,7 +300,7 @@ async function openReceive(row: any) {
   receivedQtys.value = {}
   try {
     const res = await axios.get(`/transfers/${row.id}/`)
-    const detail = res.data?.data ?? res.data
+    const detail = res.data?.data?.transfer ?? res.data?.transfer ?? res.data?.data ?? res.data
     receiveDialog.value = { row: detail, loading: false }
     const items = (detail.items ?? []) as any[]
     const map: Record<number, string> = {}
@@ -304,7 +324,7 @@ async function openDetail(row: any) {
   detailDialog.value = { row, loading: true }
   try {
     const res = await axios.get(`/transfers/${row.id}/`)
-    const detail = res.data?.data ?? res.data
+    const detail = res.data?.data?.transfer ?? res.data?.transfer ?? res.data?.data ?? res.data
     detailDialog.value = { row: detail, loading: false }
   }
   catch {
@@ -522,6 +542,7 @@ const confirmTitle = computed(() => {
         :per-page-options="[10, 25, 50, 100]"
         :empty-title="t('transfer_ext_empty')"
         empty-icon="box"
+        @row-click="(r: any) => ensureRowDetail(r)"
       >
         <template #cell.transfer_number="{ row: r }">
           <span class="cell-strong mono">{{ r.transfer_number }}</span>

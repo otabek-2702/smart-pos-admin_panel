@@ -109,7 +109,7 @@ async function load() {
     if (dateTo.value)
       rows = rows.filter((r: any) => (r.end_date ?? '') <= dateTo.value)
     items.value = rows
-    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? items.value.length
+    total.value = d?.pagination?.total ?? d?.pagination?.total_items ?? items.value.length
   }
   catch {
     notify(t('Failed to load'), 'error')
@@ -328,7 +328,7 @@ function employeeName(row: any): string {
   if (!u)
     return '—'
   const full = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim()
-  return full || u.email || '—'
+  return full || '—'
 }
 
 function approverName(row: any): string {
@@ -336,7 +336,7 @@ function approverName(row: any): string {
   if (!a)
     return '—'
   const full = `${a.first_name ?? ''} ${a.last_name ?? ''}`.trim()
-  return full || a.email || '—'
+  return full || '—'
 }
 
 // ============================================================

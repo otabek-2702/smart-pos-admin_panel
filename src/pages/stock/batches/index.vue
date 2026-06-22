@@ -597,7 +597,7 @@ function clearAll() {
         </template>
 
         <template #cell.received_date="{ row }">
-          <span class="cell-muted">{{ row.received_date ? formatDateShort(row.received_date) : '—' }}</span>
+          <span class="cell-muted">{{ (row.received_at ?? row.received_date) ? formatDateShort(row.received_at ?? row.received_date) : '—' }}</span>
         </template>
 
         <template #cell.initial_quantity="{ row }">

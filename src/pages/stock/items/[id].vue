@@ -157,9 +157,9 @@ async function loadLevels() {
     const d = res.data?.data ?? res.data
     levels.value = d?.levels ?? []
     levelsSummary.value = {
-      total_quantity: d?.total_quantity ?? 0,
-      total_reserved: d?.total_reserved ?? 0,
-      total_available: d?.total_available ?? 0,
+      total_quantity: Number(d?.total_quantity ?? 0),
+      total_reserved: Number(d?.total_reserved ?? 0),
+      total_available: Number(d?.total_available ?? 0),
     }
   }
   catch {
@@ -238,7 +238,7 @@ const filteredTransactions = computed(() => {
     arr = arr.filter(tx => tx.movement_type === movementTypeFilter.value)
   if (locationFilter.value) {
     const lid = Number(locationFilter.value)
-    arr = arr.filter(tx => Number(tx.location_id ?? tx.location?.id) === lid)
+    arr = arr.filter(tx => Number(tx.location_id) === lid)
   }
   if (search.value.trim()) {
     const q = search.value.trim().toLowerCase()
@@ -573,7 +573,7 @@ const levelsSkeletonRows = computed(() => 3)
           icon: 'dollar',
           tone: 'info',
           money: true,
-          value: item ? (item.cost_price ?? 0) : null,
+          value: item ? Number(item.avg_cost_price ?? item.cost_price ?? 0) : null,
         }"
       />
     </div>
@@ -637,7 +637,7 @@ const levelsSkeletonRows = computed(() => 3)
         </div>
         <div>
           <div class="cell-muted" style="font-size: var(--fs-sm); margin-bottom: 4px;">{{ t('item_drill_last_cost') }}</div>
-          <div class="mono">{{ formatMoney(item.last_cost ?? item.last_purchase_price) }}</div>
+          <div class="mono">{{ formatMoney(item.last_cost_price) }}</div>
         </div>
         <div>
           <div class="cell-muted" style="font-size: var(--fs-sm); margin-bottom: 4px;">{{ t('Status') }}</div>
@@ -702,12 +702,12 @@ const levelsSkeletonRows = computed(() => 3)
             </tr>
           </thead>
           <tbody>
-            <tr v-for="lvl in levels" :key="lvl.id ?? lvl.location?.id">
-              <td>{{ lvl.location?.name ?? lvl.location_name ?? '—' }}</td>
+            <tr v-for="lvl in levels" :key="lvl.id">
+              <td>{{ lvl.location_name ?? '—' }}</td>
               <td class="num mono cell-strong">{{ formatQty(lvl.quantity) }}</td>
-              <td class="num mono">{{ formatQty(lvl.reserved_quantity ?? lvl.reserved) }}</td>
-              <td class="num mono">{{ formatQty(lvl.available_quantity ?? lvl.available) }}</td>
-              <td class="num mono">{{ formatMoney(lvl.last_cost ?? lvl.unit_cost) }}</td>
+              <td class="num mono">{{ formatQty(lvl.reserved_quantity) }}</td>
+              <td class="num mono">{{ formatQty(lvl.available_quantity) }}</td>
+              <td class="num mono">{{ formatMoney(item?.last_cost_price) }}</td>
             </tr>
           </tbody>
         </table>
@@ -816,7 +816,7 @@ const levelsSkeletonRows = computed(() => 3)
           </Badge>
         </template>
         <template #cell.location_name="{ row }">
-          <span>{{ row.location_name ?? row.location?.name ?? '—' }}</span>
+          <span>{{ row.location_name ?? '—' }}</span>
         </template>
         <template #cell.quantity="{ row }">
           <span class="mono cell-strong">

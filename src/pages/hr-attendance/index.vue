@@ -26,8 +26,6 @@ const total = ref(0)
 const loading = ref(false)
 const page = ref(1)
 const itemsPerPage = ref(20)
-const dateFrom = ref('')
-const dateTo = ref('')
 const dateFilter = ref('')
 const statusFilter = ref<string>('')
 const employeeFilter = ref<string>('')
@@ -66,10 +64,6 @@ async function load() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (dateFrom.value)
-      params.date_from = dateFrom.value
-    if (dateTo.value)
-      params.date_to = dateTo.value
     if (dateFilter.value)
       params.date = dateFilter.value
     if (statusFilter.value)
@@ -80,7 +74,7 @@ async function load() {
     const d = res.data?.data ?? res.data
 
     items.value = d?.attendances ?? d?.attendance ?? d?.records ?? d?.items ?? []
-    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? items.value.length
+    total.value = d?.pagination?.total ?? items.value.length
   }
   catch {
     notify(t('Failed to load'), 'error')
@@ -104,7 +98,7 @@ async function loadEmployees() {
 
 onMounted(() => { load(); loadEmployees() })
 watch([page, itemsPerPage], load)
-watch([dateFrom, dateTo, dateFilter, statusFilter, employeeFilter], () => { page.value = 1; load() })
+watch([dateFilter, statusFilter, employeeFilter], () => { page.value = 1; load() })
 
 // ============================================================
 // Columns
@@ -133,22 +127,6 @@ const tablePagination = computed(() => ({
 // ============================================================
 const activeFilters = computed(() => {
   const out: { k: string; label: string; val: string; clear: () => void }[] = []
-  if (dateFrom.value) {
-    out.push({
-      k: 'df',
-      label: t('From'),
-      val: dateFrom.value,
-      clear: () => { dateFrom.value = '' },
-    })
-  }
-  if (dateTo.value) {
-    out.push({
-      k: 'dt',
-      label: t('To'),
-      val: dateTo.value,
-      clear: () => { dateTo.value = '' },
-    })
-  }
   if (dateFilter.value) {
     out.push({
       k: 'don',
@@ -178,8 +156,6 @@ const activeFilters = computed(() => {
 })
 
 function clearAllFilters() {
-  dateFrom.value = ''
-  dateTo.value = ''
   dateFilter.value = ''
   statusFilter.value = ''
   employeeFilter.value = ''
@@ -196,22 +172,6 @@ function clearAllFilters() {
     <Card>
       <!-- Toolbar with filters -->
       <div class="toolbar hr-att__toolbar">
-        <div class="hr-att__filter">
-          <Input
-            v-model="dateFrom"
-            type="date"
-            icon="calendar"
-            :placeholder="t('From')"
-          />
-        </div>
-        <div class="hr-att__filter">
-          <Input
-            v-model="dateTo"
-            type="date"
-            icon="calendar"
-            :placeholder="t('To')"
-          />
-        </div>
         <div class="hr-att__filter">
           <Input
             v-model="dateFilter"
@@ -294,21 +254,14 @@ function clearAllFilters() {
           <div class="cell-strong">
             {{ `${row.employee?.user?.first_name ?? ''} ${row.employee?.user?.last_name ?? ''}`.trim() || '—' }}
           </div>
-          <div
-            v-if="row.employee?.user?.email"
-            class="cell-muted"
-            style="font-size:12px;"
-          >
-            {{ row.employee.user.email }}
-          </div>
         </template>
 
         <template #cell.check_in="{ row }">
-          <span class="mono cell-muted">{{ row.check_in_time ?? row.check_in ?? '—' }}</span>
+          <span class="mono cell-muted">{{ row.check_in ?? '—' }}</span>
         </template>
 
         <template #cell.check_out="{ row }">
-          <span class="mono cell-muted">{{ row.check_out_time ?? row.check_out ?? '—' }}</span>
+          <span class="mono cell-muted">{{ row.check_out ?? '—' }}</span>
         </template>
 
         <template #cell.status="{ row }">

@@ -166,10 +166,6 @@ const shiftColumns = computed(() => [
             <span class="strong">{{ fmtSec(summary.prep_time.avg_seconds) }}</span>
           </div>
           <div class="row-line">
-            <span class="muted">{{ t('Median') }}</span>
-            <span class="strong">{{ fmtSec(summary.prep_time.median_seconds) }}</span>
-          </div>
-          <div class="row-line">
             <span class="t-success">{{ t('Best shift') }}</span>
             <span>{{ fmtSec(summary.prep_time.best_shift_avg_seconds) }}</span>
           </div>

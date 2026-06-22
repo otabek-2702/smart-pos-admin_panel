@@ -202,7 +202,7 @@ async function openDetail(row: any) {
   detailLoading.value = true
   try {
     const res = await axios.get(`/cash/${row.id}/`)
-    detail.value = res.data?.data ?? res.data ?? row
+    detail.value = res.data?.data?.transaction ?? res.data?.data ?? res.data ?? row
   }
   catch { /* keep row */ }
   finally {
@@ -250,25 +250,25 @@ const kpiBalance = computed(() => ({
 }))
 const kpiDeposits = computed(() => ({
   label: t('hr_cash_total_deposits'),
-  value: stats.value ? Number(stats.value.total_deposits ?? 0) : null,
+  value: stats.value ? Number(stats.value.totals_by_type?.DEPOSIT ?? stats.value.total_deposits ?? 0) : null,
   icon: 'arrowup',
   tone: 'success' as const,
   money: true,
 }))
 const kpiWithdrawals = computed(() => ({
   label: t('hr_cash_total_withdrawals'),
-  value: stats.value ? Number(stats.value.total_withdrawals ?? 0) : null,
+  value: stats.value ? Number(stats.value.totals_by_type?.WITHDRAWAL ?? stats.value.total_withdrawals ?? 0) : null,
   icon: 'arrowdown',
   tone: 'warning' as const,
   money: true,
 }))
 const kpiOutflow = computed(() => ({
   label: t('hr_cash_total_expenses'),
-  value: stats.value ? Number(stats.value.total_expenses ?? 0) : null,
+  value: stats.value ? Number(stats.value.totals_by_type?.EXPENSE_PAYMENT ?? stats.value.total_expenses ?? 0) : null,
   icon: 'receipt',
   tone: 'error' as const,
   money: true,
-  sub: t('hr_cash_total_salaries') + ': ' + fmtMoney(stats.value?.total_salaries ?? 0),
+  sub: t('hr_cash_total_salaries') + ': ' + fmtMoney(stats.value?.totals_by_type?.SALARY_PAYMENT ?? stats.value?.total_salaries ?? 0),
 }))
 
 // ============================================================
@@ -781,11 +781,11 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
           </div>
         </Field>
         <Field
-          v-if="detail.approved_by"
+          v-if="detail.approved_by || detail.approved_by_id"
           :label="t('hr_cash_approved_by')"
         >
           <div class="cell-muted">
-            {{ performerName(detail.approved_by) }}
+            {{ performerName(detail.approved_by ?? detail.approved_by_id) }}
           </div>
         </Field>
         <Field

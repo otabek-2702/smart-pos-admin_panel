@@ -81,7 +81,7 @@ async function load() {
     const d = res.data?.data ?? res.data
 
     items.value = d?.departments ?? d?.items ?? []
-    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? items.value.length
+    total.value = d?.pagination?.total ?? d?.pagination?.total_items ?? items.value.length
   }
   catch {
     notify(t('Failed to load'), 'error')
@@ -276,7 +276,7 @@ function managerName(row: any): string {
   if (!m)
     return '—'
   const full = `${m.first_name ?? ''} ${m.last_name ?? ''}`.trim()
-  return full || m.email || '—'
+  return full || '—'
 }
 
 // ============================================================

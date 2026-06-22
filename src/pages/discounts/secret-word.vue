@@ -46,6 +46,26 @@ function resultTone(s?: string) {
   return RESULT_TONE[s] ?? 'neutral'
 }
 
+/* Map BE prose error messages → symbolic status codes used by RESULT_TONE/i18n.
+   BE only returns ServiceResponse {success, message} — no symbolic code field.
+   String-match the canonical messages emitted by DiscountService. */
+function deriveStatusFromMessage(msg?: string | null): string {
+  if (!msg) return 'ERROR'
+  const m = msg.toLowerCase()
+  if (m.includes('invalid secret word')) return 'INVALID_WORD'
+  if (m.includes('order not found')) return 'ORDER_NOT_FOUND'
+  if (m.includes('paid order')) return 'ORDER_PAID'
+  if (m.includes('cancelled order') || m.includes('canceled order')) return 'ORDER_CANCELED'
+  if (m.includes('reached its usage limit')) return 'USAGE_LIMIT_REACHED'
+  if (m.includes('usage limit for this discount')) return 'USER_LIMIT_REACHED'
+  if (m.includes('minimum order amount')) return 'MIN_AMOUNT_NOT_MET'
+  if (m.includes('already applied')) return 'ALREADY_APPLIED'
+  if (m.includes('cannot be combined') || m.includes('non-stackable')) return 'NOT_STACKABLE'
+  if (m.includes('does not apply')) return 'NO_EFFECT'
+  if (m.includes('discount code not found')) return 'INVALID_WORD'
+  return 'ERROR'
+}
+
 /* ---------- form state ---------- */
 interface FormShape {
   word: string
@@ -122,16 +142,18 @@ async function redeem(opts?: { word?: string, order_id?: string }) {
       word: payloadWord,
       order_id: Number(payloadOrderId),
     })
+    // BE wraps as {success, message, data: {...}}; envelope is unwrapped by axios layer in some setups.
     const d = res.data?.data ?? res.data
     serverPayload = d ?? {}
-    status = (serverPayload?.result ?? serverPayload?.status ?? 'SUCCESS') as string
+    status = 'SUCCESS'
     notify(t('discount_secret_success_toast'))
   }
   catch (e: any) {
     const data = e?.response?.data
-    serverPayload = data?.data ?? data ?? null
-    status = (serverPayload?.result ?? data?.code ?? 'ERROR') as string
+    serverPayload = data?.data ?? null
     serverMsg = data?.message ?? null
+    // BE never returns a symbolic code — derive status from the prose message
+    status = deriveStatusFromMessage(serverMsg)
     notify(serverMsg ?? t('discount_secret_error_toast'), 'error')
   }
   finally {
@@ -141,10 +163,10 @@ async function redeem(opts?: { word?: string, order_id?: string }) {
   const entry: Attempt = {
     id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     order_id: payloadOrderId,
-    discount_code: serverPayload?.discount_code ?? serverPayload?.discount?.code ?? null,
+    discount_code: serverPayload?.discount_code ?? null,
     discount_amount: numberOrNull(serverPayload?.discount_amount),
-    order_total: numberOrNull(serverPayload?.order_total ?? serverPayload?.new_order_total),
-    order_discount_total: numberOrNull(serverPayload?.order_discount_total ?? serverPayload?.total_discount),
+    order_total: numberOrNull(serverPayload?.order_total),
+    order_discount_total: numberOrNull(serverPayload?.order_discount_total),
     status,
     created_at: new Date().toISOString(),
     request_word: payloadWord,

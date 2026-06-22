@@ -241,9 +241,9 @@ const extraKpis = computed(() => [
 const categoryStatsToday = computed<any[]>(() => data.value?.category_stats_today ?? [])
 const categoryMixData = computed(() =>
   categoryStatsToday.value.slice(0, 6).map((c: any) => ({
-    name: String(c.category_name ?? c.name ?? '—'),
+    name: String(c.category ?? c.category_name ?? c.name ?? '—'),
     value: Number(c.revenue) || 0,
-    units: Number(c.units) || Number(c.quantity) || 0,
+    units: Number(c.quantity) || Number(c.units) || 0,
   })),
 )
 const categoryMixInsight = computed(() =>

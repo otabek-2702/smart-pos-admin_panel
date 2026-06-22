@@ -84,13 +84,33 @@ const dtPagination = computed(() => ({
   onPerPage: (n: number) => { itemsPerPage.value = n; page.value = 1 },
 }))
 
+// Lookup map: product_id (number) -> product name
+const productNameById = computed<Record<string, string>>(() => {
+  const m: Record<string, string> = {}
+  for (const p of products.value)
+    m[String(p.value)] = String(p.label)
+  return m
+})
+
+function resolveProductName(l: any): string {
+  if (l == null)
+    return ''
+  if (l.product_id != null) {
+    const n = productNameById.value[String(l.product_id)]
+    if (n)
+      return n
+    return `#${l.product_id}`
+  }
+  return ''
+}
+
 const filteredLinks = computed(() => {
   const q = (search.value ?? '').trim().toLowerCase()
   if (!q)
     return links.value
   return links.value.filter((l: any) => {
-    const product = (l.product?.name ?? l.product_name ?? '').toLowerCase()
-    const linked = (l.recipe?.name ?? l.stock_item?.name ?? l.linked_name ?? '').toLowerCase()
+    const product = resolveProductName(l).toLowerCase()
+    const linked = (l.recipe_name ?? l.stock_item_name ?? '').toLowerCase()
     return product.includes(q) || linked.includes(q)
   })
 })
@@ -217,7 +237,7 @@ function confirmUnlink(item: any) {
 async function doUnlink() {
   unlinking.value = true
   try {
-    await axios.delete(`/products/${selectedItem.value.product_id ?? selectedItem.value.product?.id}/unlink/`)
+    await axios.delete(`/products/${selectedItem.value.product_id}/unlink/`)
     notify(t('Product unlinked'))
     unlinkDialog.value = false
     await loadLinks()
@@ -292,7 +312,7 @@ async function doUnlink() {
         :per-page-options="[10, 25, 50, 100]"
       >
         <template #cell.product="{ row }">
-          <span class="cell-strong">{{ row.product?.name ?? row.product_name ?? '—' }}</span>
+          <span class="cell-strong">{{ resolveProductName(row) || '—' }}</span>
         </template>
 
         <template #cell.link_type="{ row }">
@@ -302,7 +322,7 @@ async function doUnlink() {
         </template>
 
         <template #cell.linked_to="{ row }">
-          <span>{{ row.recipe?.name ?? row.stock_item?.name ?? row.linked_name ?? '—' }}</span>
+          <span>{{ row.recipe_name ?? row.stock_item_name ?? '—' }}</span>
         </template>
 
         <template #cell.deduct_on_status="{ row }">
@@ -449,7 +469,7 @@ async function doUnlink() {
         </div>
         <div>
           <p style="margin: 0; font-weight: 600;">
-            {{ selectedItem?.product?.name ?? selectedItem?.product_name }}
+            {{ resolveProductName(selectedItem) }}
           </p>
           <p
             class="muted"

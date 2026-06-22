@@ -55,9 +55,6 @@ const loading = ref(false)
 const page = ref(1)
 const itemsPerPage = ref(20)
 
-const employeeFilter = ref<string>('')
-const statusFilter = ref<string>('')
-
 // Create modal
 const createOpen = ref(false)
 const createBusy = ref(false)
@@ -100,22 +97,12 @@ const progressForm = ref<{ progress_percent: number, status: GoalStatus }>({
   status: 'IN_PROGRESS',
 })
 
-// Delete modal
-const deleteOpen = ref(false)
-const deleteBusy = ref(false)
-const deleting = ref<any>(null)
-
 // Per-row action lock
 const actingOnId = ref<number | string | null>(null)
 
 // ----------------------------------------------------------------
 // Option lists
 // ----------------------------------------------------------------
-const statusFilterOptions = computed(() => GOAL_STATUSES.map(s => ({
-  value: s,
-  label: t(`goal_status_${s}`),
-})))
-
 const statusFormOptions = computed(() => GOAL_STATUSES.map(s => ({
   value: s,
   label: t(`goal_status_${s}`),
@@ -128,11 +115,6 @@ async function load() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
-
-    if (employeeFilter.value.trim())
-      params.employee_id = employeeFilter.value.trim()
-    if (statusFilter.value)
-      params.status = statusFilter.value
 
     const res = await axios.get('/goals/', { params })
     const d = res.data?.data ?? res.data
@@ -147,28 +129,9 @@ async function load() {
   }
 }
 
-const debouncedEmployeeReload = useDebounceFn(() => {
-  page.value = 1
-  load()
-}, 350)
-
 onMounted(load)
 
 watch([page, itemsPerPage], load)
-watch(statusFilter, () => {
-  page.value = 1
-  load()
-})
-watch(employeeFilter, () => debouncedEmployeeReload())
-
-// ----------------------------------------------------------------
-// Filter chips
-// ----------------------------------------------------------------
-const hasFilters = computed(() => !!(employeeFilter.value.trim() || statusFilter.value))
-function clearAll() {
-  employeeFilter.value = ''
-  statusFilter.value = ''
-}
 
 // ----------------------------------------------------------------
 // Create
@@ -336,48 +299,11 @@ async function submitProgress() {
 }
 
 // ----------------------------------------------------------------
-// Delete
-// ----------------------------------------------------------------
-function openDelete(row: any) {
-  deleting.value = row
-  deleteOpen.value = true
-}
-function closeDelete() {
-  if (deleteBusy.value)
-    return
-  deleteOpen.value = false
-  deleting.value = null
-}
-async function confirmDelete() {
-  if (!deleting.value)
-    return
-  deleteBusy.value = true
-  actingOnId.value = deleting.value.id
-  try {
-    await axios.delete(`/goals/${deleting.value.id}/`)
-    notify(t('Deleted'))
-    deleteOpen.value = false
-    deleting.value = null
-    await load()
-  }
-  catch (e: any) {
-    notify(e?.response?.data?.message ?? t('Error'), 'error')
-  }
-  finally {
-    deleteBusy.value = false
-    actingOnId.value = null
-  }
-}
-
-// ----------------------------------------------------------------
 // ESC handler
 // ----------------------------------------------------------------
 function onKeydown(e: KeyboardEvent) {
   if (e.key !== 'Escape')
     return
-  if (deleteOpen.value) {
-    closeDelete(); e.preventDefault(); return
-  }
   if (progressOpen.value) {
     closeProgress(); e.preventDefault(); return
   }
@@ -397,12 +323,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 // ----------------------------------------------------------------
 const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'id', label: t('ID'), width: 90 },
-  { key: 'employee_name', label: t('hr_goals_employee') },
+  { key: 'employee', label: t('hr_goals_employee') },
   { key: 'title', label: t('hr_goals_title_field') },
   { key: 'target_date', label: t('hr_goals_target_date') },
   { key: 'status', label: t('hr_goals_status') },
   { key: 'progress_percent', label: t('hr_goals_progress_percent'), align: 'right' },
-  { key: 'created_by_name', label: t('hr_goals_created_by') },
+  { key: 'created_by', label: t('hr_goals_created_by') },
 ])
 
 const dtPagination = computed(() => ({
@@ -417,35 +343,27 @@ const dtPagination = computed(() => ({
 // Field helpers
 // ----------------------------------------------------------------
 function employeeOf(row: any): string {
-  if (row.employee_name)
-    return row.employee_name
   const e = row.employee
   if (e) {
-    const u = e.user ?? e
-    const name = [u?.first_name, u?.last_name].filter(Boolean).join(' ').trim()
-    if (name)
-      return name
-    if (u?.email)
-      return u.email
+    const u = e.user
+    if (u) {
+      const name = [u.first_name, u.last_name].filter(Boolean).join(' ').trim()
+      if (name)
+        return name
+    }
     if (e.id)
       return `#${e.id}`
   }
-  if (row.employee_id)
-    return `#${row.employee_id}`
 
   return '—'
 }
 
 function creatorOf(row: any): string {
-  if (row.created_by_name)
-    return row.created_by_name
   const cb = row.created_by
   if (cb) {
     const name = [cb.first_name, cb.last_name].filter(Boolean).join(' ').trim()
     if (name)
       return name
-    if (cb.email)
-      return cb.email
   }
 
   return '—'
@@ -478,75 +396,6 @@ function progressOf(row: any): number {
 
     <!-- Main card -->
     <Card>
-      <!-- Toolbar -->
-      <div class="toolbar tb-wrap">
-        <div class="tb-search">
-          <Input
-            v-model="employeeFilter"
-            icon="search"
-            :placeholder="t('hr_goals_filter_employee')"
-            :aria-label="t('hr_goals_filter_employee')"
-          />
-        </div>
-        <div class="tb-status">
-          <Select
-            v-model="statusFilter"
-            icon="filter"
-            :placeholder="t('hr_goals_filter_status')"
-            :options="statusFilterOptions"
-          />
-        </div>
-      </div>
-
-      <!-- Active filter chips -->
-      <div
-        v-if="hasFilters"
-        class="toolbar tb-wrap"
-        style="padding-top:0;"
-      >
-        <div class="chips">
-          <span
-            class="tertiary"
-            style="font-size:13px;margin-right:2px;"
-          >{{ t('filters_label_colon') }}</span>
-
-          <span
-            v-if="employeeFilter.trim()"
-            class="chip"
-          >
-            <span>{{ t('hr_goals_employee') }}: <b>{{ employeeFilter }}</b></span>
-            <span
-              class="chip__x"
-              @click="employeeFilter = ''"
-            >
-              <DesignIcon name="close" :size="13" />
-            </span>
-          </span>
-
-          <span
-            v-if="statusFilter"
-            class="chip"
-          >
-            <span>{{ t('hr_goals_status') }}: <b>{{ t(`goal_status_${statusFilter}`) }}</b></span>
-            <span
-              class="chip__x"
-              @click="statusFilter = ''"
-            >
-              <DesignIcon name="close" :size="13" />
-            </span>
-          </span>
-
-          <button
-            class="chip--clear"
-            @click="clearAll"
-          >
-            {{ t('Clear all') }}
-          </button>
-        </div>
-      </div>
-
-      <div class="card__divider" />
-
       <!-- DataTable -->
       <DataTable
         :columns="columns"
@@ -560,7 +409,7 @@ function progressOf(row: any): number {
           <span class="mono cell-muted">#{{ row.id }}</span>
         </template>
 
-        <template #cell.employee_name="{ row }">
+        <template #cell.employee="{ row }">
           <span class="cell-strong nowrap">{{ employeeOf(row) }}</span>
         </template>
 
@@ -601,7 +450,7 @@ function progressOf(row: any): number {
           </div>
         </template>
 
-        <template #cell.created_by_name="{ row }">
+        <template #cell.created_by="{ row }">
           <span class="cell-muted">{{ creatorOf(row) }}</span>
         </template>
 
@@ -621,13 +470,6 @@ function progressOf(row: any): number {
             :disabled="actingOnId === row.id"
             @click="openEdit(row)"
           />
-          <IconAction
-            icon="trash"
-            tone="danger"
-            :title="t('Delete')"
-            :disabled="actingOnId === row.id"
-            @click="openDelete(row)"
-          />
         </template>
 
         <!-- Empty state -->
@@ -637,12 +479,7 @@ function progressOf(row: any): number {
             :title="t('hr_goals_empty')"
             :sub="t('hr_goals_empty_hint')"
           >
-            <div v-if="hasFilters" style="margin-top:12px;">
-              <Button variant="secondary" @click="clearAll">
-                {{ t('Clear filters') }}
-              </Button>
-            </div>
-            <div v-else style="margin-top:12px;">
+            <div style="margin-top:12px;">
               <Button variant="primary" icon="plus" @click="openCreate">
                 {{ t('hr_goals_new') }}
               </Button>
@@ -909,52 +746,6 @@ function progressOf(row: any): number {
       </template>
     </Modal>
 
-    <!-- Delete confirm -->
-    <Modal
-      :open="deleteOpen"
-      :title="t('Delete')"
-      :subtitle="t('This action cannot be undone')"
-      :width="440"
-      @close="closeDelete"
-    >
-      <div class="row" style="gap:14px;align-items:flex-start;">
-        <div
-          class="kpi__icon t-error"
-          style="width:44px;height:44px;flex:0 0 44px;"
-        >
-          <DesignIcon name="alert" :size="22" />
-        </div>
-        <div>
-          <p style="margin:0;font-weight:600;">
-            <template v-if="deleting">
-              #{{ deleting.id }} · {{ deleting.title ?? '' }}
-            </template>
-          </p>
-          <p class="muted" style="margin:6px 0 0;font-size:14px;">
-            {{ t('This action cannot be undone') }}
-          </p>
-        </div>
-      </div>
-
-      <template #footer>
-        <Button
-          variant="ghost"
-          :disabled="deleteBusy"
-          @click="closeDelete"
-        >
-          {{ t('hr_goals_cancel') }}
-        </Button>
-        <Button
-          variant="danger"
-          icon="trash"
-          :loading="deleteBusy"
-          :disabled="deleteBusy"
-          @click="confirmDelete"
-        >
-          {{ t('Delete') }}
-        </Button>
-      </template>
-    </Modal>
   </div>
 </template>
 

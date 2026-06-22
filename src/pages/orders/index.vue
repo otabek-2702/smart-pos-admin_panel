@@ -325,7 +325,7 @@ const rangeEnd = computed(() => Math.min(page.value * itemsPerPage.value, totalO
 // ---- filter chips ----
 const hasFilters = computed(() =>
   !!(search.value || statusFilter.value.length || paymentFilter.value || dateFrom.value || dateTo.value
-    || orderTypeFilter.value || cashierFilter.value || categoryFilter.value.length || includeDeleted.value),
+    || orderTypeFilter.value || cashierFilter.value || categoryFilter.value.length),
 )
 function clearAll() {
   search.value = ''
@@ -336,7 +336,6 @@ function clearAll() {
   orderTypeFilter.value = undefined
   cashierFilter.value = undefined
   categoryFilter.value = []
-  includeDeleted.value = false
 }
 function cashierLabel(id: string | undefined) {
   if (!id) return ''
@@ -364,7 +363,6 @@ const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'cashier', label: t('Cashier') },
   { key: 'status', label: t('Status'), sortable: true },
   { key: 'payment', label: t('Payment') },
-  { key: 'payment_method', label: t('Payment method') },
   { key: 'total', label: t('Total'), sortable: true, align: 'right' },
   { key: 'items', label: t('Items'), align: 'right' },
   { key: 'at', label: t('Date'), sortable: true, align: 'right' },
@@ -710,14 +708,6 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
           <Badge :tone="o.is_paid ? 'success' : 'error'">
             {{ t(`payment_status_${o.is_paid ? 'PAID' : 'UNPAID'}`) }}
           </Badge>
-        </template>
-
-        <!-- Payment method -->
-        <template #cell.payment_method="{ row: o }">
-          <Badge v-if="o.is_paid && o.payment_method" tone="info">
-            {{ t(`payment_method_${o.payment_method}`) }}
-          </Badge>
-          <span v-else class="cell-muted">—</span>
         </template>
 
         <!-- Paid at -->

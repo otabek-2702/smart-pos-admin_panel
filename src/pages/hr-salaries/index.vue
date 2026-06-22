@@ -173,30 +173,47 @@ function clearAllFilters() {
 // ============================================================
 // KPI cards
 // ============================================================
+// BE /salaries/summary/ returns { year, month, count, total_base, total_bonus,
+// total_deduction, total_net, by_status }. Derive per-status values from by_status
+// (keyed by status string). Fall back to legacy *_count fields if present.
+function statusValue(status: string): number | null {
+  const s = summary.value
+  if (!s)
+    return null
+  // Legacy/flat field shapes first
+  const flat = s[`${status.toLowerCase()}_count`]
+  if (flat != null)
+    return Number(flat)
+  const bs = s.by_status
+  if (bs && bs[status] != null)
+    return Number(bs[status])
+  return null
+}
+
 const kpiPending = computed(() => ({
   label: t('Pending'),
-  value: summary.value?.pending_count ?? null,
+  value: statusValue('PENDING'),
   icon: 'clock',
   tone: 'warning' as const,
 }))
 
 const kpiApproved = computed(() => ({
   label: t('Approved'),
-  value: summary.value?.approved_count ?? null,
+  value: statusValue('APPROVED'),
   icon: 'check',
   tone: 'info' as const,
 }))
 
 const kpiPaid = computed(() => ({
   label: t('Paid'),
-  value: summary.value?.paid_count ?? null,
+  value: statusValue('PAID'),
   icon: 'dollar',
   tone: 'success' as const,
 }))
 
 const kpiTotal = computed(() => ({
   label: t('Total'),
-  value: summary.value?.total_amount ?? null,
+  value: summary.value?.total_net ?? summary.value?.total_amount ?? null,
   icon: 'trending-up',
   tone: 'primary' as const,
   money: true,

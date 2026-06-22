@@ -99,8 +99,9 @@ async function load() {
 async function loadStats() {
   try {
     const res = await axios.get('/expenses/stats/')
+    const d = res.data?.data ?? res.data
 
-    stats.value = res.data?.data ?? res.data
+    stats.value = d?.stats ?? d
   }
   catch { /* ignore */ }
 }
@@ -508,15 +509,16 @@ function statusTooltip(row: any): string {
       <Kpi
         :data="{
           label: t('Pending'),
-          value: stats?.pending_count ?? null,
+          value: stats?.by_status?.PENDING ?? null,
           icon: 'time',
           tone: 'warning',
+          money: true,
         }"
       />
       <Kpi
         :data="{
           label: t('Total'),
-          value: stats?.total_amount ?? null,
+          value: stats?.total ?? null,
           icon: 'wallet',
           tone: 'primary',
           money: true,
@@ -524,8 +526,8 @@ function statusTooltip(row: any): string {
       />
       <Kpi
         :data="{
-          label: t('This Month'),
-          value: stats?.this_month ?? null,
+          label: t('Approved'),
+          value: stats?.by_status?.APPROVED ?? null,
           icon: 'calendar',
           tone: 'info',
           money: true,
@@ -534,7 +536,7 @@ function statusTooltip(row: any): string {
       <Kpi
         :data="{
           label: t('Paid'),
-          value: stats?.paid_amount ?? null,
+          value: stats?.by_status?.PAID ?? null,
           icon: 'check',
           tone: 'success',
           money: true,

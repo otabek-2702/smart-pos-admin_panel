@@ -247,12 +247,12 @@ const pagination = computed<DataTablePagination>(() => ({
         <div class="perf-list">
           <div
             v-for="p in stats.top_products"
-            :key="p.id"
+            :key="p.product_id ?? p.id"
             class="perf-row"
           >
             <div class="perf-row__left">
               <div>
-                <div class="perf-name">{{ p.name }}</div>
+                <div class="perf-name">{{ p.product_name ?? p.name }}</div>
                 <div class="perf-sub">{{ p.total_quantity }} {{ t('sold').toLowerCase() }}</div>
               </div>
             </div>

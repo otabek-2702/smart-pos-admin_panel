@@ -122,7 +122,7 @@ async function loadOrders() {
     const d = res.data?.data ?? res.data
 
     orders.value = d?.orders ?? []
-    total.value = d.pagination?.total_items ?? d.pagination?.total ?? orders.value.length
+    total.value = d?.pagination?.total ?? d?.pagination?.total_items ?? orders.value.length
   }
   catch {
     notify(t('Failed to load production orders'), 'error')
@@ -175,6 +175,11 @@ function closeCreate() {
 }
 
 async function createOrder() {
+  if (!form.value.recipe_id) {
+    notify(t('Recipe is required'), 'error')
+
+    return
+  }
   if (!form.value.source_location_id || !form.value.output_location_id) {
     notify(t('Source and output locations are required'), 'error')
 
@@ -184,7 +189,7 @@ async function createOrder() {
   try {
     const userData = getStoredUserData()
     const payload: any = {
-      recipe_id: form.value.recipe_id ? Number(form.value.recipe_id) : null,
+      recipe_id: Number(form.value.recipe_id),
       batch_multiplier: form.value.batch_multiplier,
       source_location_id: Number(form.value.source_location_id),
       output_location_id: Number(form.value.output_location_id),
@@ -192,7 +197,7 @@ async function createOrder() {
       created_by_id: userData.id,
     }
     if (form.value.planned_start_date)
-      payload.planned_start_date = form.value.planned_start_date
+      payload.planned_start = new Date(form.value.planned_start_date).toISOString()
     if (form.value.notes)
       payload.notes = form.value.notes
     await axios.post('/production-orders/', payload)
@@ -263,8 +268,29 @@ function locationName(loc: any): string {
   return typeof loc === 'string' ? loc : (loc?.name ?? '—')
 }
 
-function toggleExpand(row: any) {
-  expandedRow.value = expandedRow.value?.id === row.id ? null : row
+const expandLoading = ref(false)
+
+async function toggleExpand(row: any) {
+  if (expandedRow.value?.id === row.id) {
+    expandedRow.value = null
+
+    return
+  }
+  // List endpoint returns serialize_brief (missing batch_multiplier, source_location,
+  // output_location, notes). Fetch the full record on expand.
+  expandedRow.value = { ...row }
+  expandLoading.value = true
+  try {
+    const res = await axios.get(`/production-orders/${row.id}/`)
+    const d = res.data?.data ?? res.data
+    const full = d?.order ?? d
+    if (full && expandedRow.value?.id === row.id)
+      expandedRow.value = { ...row, ...full }
+  }
+  catch { /* keep brief data on failure */ }
+  finally {
+    expandLoading.value = false
+  }
 }
 
 // ============================================================

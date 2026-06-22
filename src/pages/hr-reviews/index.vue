@@ -58,11 +58,21 @@ async function load() {
   loading.value = true
   try {
     const params: Record<string, any> = { page: page.value, per_page: itemsPerPage.value }
+    // BE GET /reviews/ does NOT currently filter by employee_id/status, but
+    // we still pass them in case BE adds support. Client-side filter applied below.
     if (employeeFilter.value) params.employee_id = employeeFilter.value
     if (statusFilter.value) params.status = statusFilter.value
     const res = await axios.get('/reviews/', { params })
     const d = res.data?.data ?? res.data
-    items.value = d?.reviews ?? d?.items ?? []
+    let rows = d?.reviews ?? d?.items ?? []
+    // Client-side filter fallback (BE ignores filter params)
+    if (employeeFilter.value) {
+      const empId = String(employeeFilter.value).trim()
+      rows = rows.filter((r: any) => String(r.employee?.id ?? '') === empId)
+    }
+    if (statusFilter.value)
+      rows = rows.filter((r: any) => r.status === statusFilter.value)
+    items.value = rows
     total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? items.value.length
   }
   catch {
@@ -321,7 +331,8 @@ async function openView(row: any) {
   viewLoading.value = true
   try {
     const res = await axios.get(`/reviews/${row.id}/`)
-    viewDetail.value = res.data?.data ?? res.data ?? row
+    // BE returns { success, message, data: { review: {...} } } — unwrap .review
+    viewDetail.value = res.data?.data?.review ?? res.data?.data ?? res.data ?? row
   }
   catch { /* keep row */ }
   finally {
@@ -386,8 +397,13 @@ function nameOf(row: any, fullKey: string, emp?: any): string {
   const direct = row[fullKey]
   if (direct) return String(direct)
   if (emp && typeof emp === 'object') {
-    const full = `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim()
-    return full || emp.email || (emp.id != null ? `#${emp.id}` : '—')
+    // BE shapes:
+    //   employee: { id, position, user: { first_name, last_name } }
+    //   reviewer: { id, first_name, last_name }
+    const first = emp.user?.first_name ?? emp.first_name ?? ''
+    const last = emp.user?.last_name ?? emp.last_name ?? ''
+    const full = `${first} ${last}`.trim()
+    return full || emp.user?.email || emp.email || (emp.id != null ? `#${emp.id}` : '—')
   }
   return '—'
 }

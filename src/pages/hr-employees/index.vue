@@ -121,8 +121,11 @@ async function load() {
 async function loadStats() {
   try {
     const res = await axios.get('/employees/stats/')
+    const d = res.data?.data ?? res.data
 
-    stats.value = res.data?.data ?? res.data
+    // BE returns { data: { stats: { total, active, inactive, by_contract_type, by_department } } }
+    // Unwrap the inner `stats` wrapper so template can read stats.value.total directly.
+    stats.value = d?.stats ?? d ?? null
   }
   catch { /* ignore */ }
 }
@@ -314,15 +317,15 @@ const kpiActive = computed(() => ({
 }))
 const kpiDepartments = computed(() => ({
   label: t('Departments'),
-  value: stats.value
-    ? Number(stats.value.departments ?? departments.value.length)
-    : (departments.value.length || null),
+  // BE stats does not return a department count — derive from loaded departments list.
+  value: departments.value.length || (stats.value ? 0 : null),
   icon: 'building',
   tone: 'info' as const,
 }))
 const kpiAvgSalary = computed(() => ({
   label: t('hr_employees_kpi_avg_salary'),
-  value: stats.value ? Number(stats.value.avg_salary ?? 0) : null,
+  // BE stats does not return avg_salary; show null (dash) until BE provides it.
+  value: stats.value?.avg_salary != null ? Number(stats.value.avg_salary) : null,
   icon: 'wallet',
   tone: 'warning' as const,
   money: true,

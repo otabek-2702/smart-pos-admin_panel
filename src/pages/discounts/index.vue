@@ -59,7 +59,7 @@ const columns = computed<DataTableColumn<any>[]>(() => [
 function methodTone(method?: string): 'success' | 'info' | 'neutral' {
   if (method === 'PERCENTAGE')
     return 'success'
-  if (method === 'FIXED')
+  if (method === 'FIXED_AMOUNT')
     return 'info'
   return 'neutral'
 }
@@ -69,6 +69,8 @@ function formatValue(row: any): string {
   const value = row.value ?? 0
   if (method === 'PERCENTAGE')
     return `${value}%`
+  if (method === 'FIXED_AMOUNT')
+    return formatCurrency(value)
   return formatCurrency(value)
 }
 
@@ -151,7 +153,9 @@ function openEdit(d: any) {
     is_active: d.is_active ?? true,
     start_date: d.start_date ?? '',
     end_date: d.end_date ?? '',
-    secret_word: d.secret_word ?? '',
+    // BE never returns secret_word (only has_secret_word: bool). Leave blank;
+    // payload omits the field on PUT unless user types a new value.
+    secret_word: '',
   }
   dialog.value = true
 }
@@ -159,10 +163,15 @@ function openEdit(d: any) {
 async function save() {
   saving.value = true
   try {
+    // Build payload — when editing, omit secret_word if blank so we don't
+    // overwrite the stored secret (BE never returns it, so it can't be repopulated).
+    const payload: any = { ...form.value }
+    if (editing.value && !payload.secret_word)
+      delete payload.secret_word
     if (editing.value)
-      await axios.put(`/discounts/${editing.value.id}/`, form.value)
+      await axios.put(`/discounts/${editing.value.id}/`, payload)
     else
-      await axios.post('/discounts/', form.value)
+      await axios.post('/discounts/', payload)
     notify(t(editing.value ? 'Discount updated' : 'Discount created'))
     dialog.value = false
     await loadDiscounts()
@@ -384,7 +393,7 @@ function clearAllFilters() {
         >
           <Input
             v-model="form.secret_word"
-            :placeholder="t('Secret Word (optional)')"
+            :placeholder="editing && editing.has_secret_word ? t('Leave blank to keep existing') : t('Secret Word (optional)')"
           />
         </Field>
         <Field

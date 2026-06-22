@@ -46,12 +46,6 @@ const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.su
         >
           {{ t('Forecast for {date}', { date: data.tomorrow }) }}
         </div>
-        <div
-          v-if="data?.window_days"
-          class="page-head__subtitle"
-        >
-          {{ t('Based on last {n} days', { n: data.window_days }) }}
-        </div>
       </div>
       <div class="page-head__actions">
         <VBtn
@@ -117,16 +111,16 @@ const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.su
                 {{ p.product_name }}
               </div>
               <div
-                v-if="p.confidence"
+                v-if="p.reason"
                 class="text-caption text-disabled"
               >
-                {{ t('Confidence') }}: {{ p.confidence }}
+                {{ t('Reason') }}: {{ p.reason }}
               </div>
             </div>
             <div class="flex-grow-1 forecast-row__bar">
               <VProgressLinear
-                :model-value="((p.predicted_quantity ?? 0) / maxQty) * 100"
-                :color="p.predicted_quantity > maxQty * 0.7 ? 'success' : p.predicted_quantity > maxQty * 0.3 ? 'info' : 'default'"
+                :model-value="(((p.suggested_qty ?? p.predicted_quantity) ?? 0) / maxQty) * 100"
+                :color="(p.suggested_qty ?? p.predicted_quantity) > maxQty * 0.7 ? 'success' : (p.suggested_qty ?? p.predicted_quantity) > maxQty * 0.3 ? 'info' : 'default'"
                 height="8"
                 rounded
               />
@@ -134,7 +128,7 @@ const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.su
             <div
               class="text-end forecast-row__qty"
             >
-              <span class="text-h6 font-weight-bold num-tabular">{{ p.predicted_quantity }}</span>
+              <span class="text-h6 font-weight-bold num-tabular">{{ p.suggested_qty ?? p.predicted_quantity }}</span>
               <div class="text-caption text-disabled">
                 {{ t('units') }}
               </div>

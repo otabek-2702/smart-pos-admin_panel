@@ -151,12 +151,13 @@ async function loadUsers() {
     totalUsers.value = d?.pagination?.total_users ?? d?.pagination?.total ?? users.value.length
 
     // Derive light stats from list — backend doesn't expose /users/stats yet.
+    // NOTE: total_salary was removed because BE _serialize_user() doesn't return
+    // a 'salary' field; payroll lives at /api/admins/hr/salaries instead.
     const distinctRoles = new Set(users.value.map((u: any) => u.role).filter(Boolean))
     stats.value = {
       total_users: totalUsers.value,
       active_users: users.value.filter((u: any) => u.status === 'ACTIVE').length,
       total_roles: distinctRoles.size,
-      total_salary: users.value.reduce((s: number, u: any) => s + (Number(u.salary) || 0), 0),
     }
   }
   catch {
@@ -407,14 +408,8 @@ const kpiRoles = computed(() => ({
   tone: 'info' as const,
   sub: t('distinct'),
 }))
-const kpiSalary = computed(() => ({
-  label: t('Total Salary'),
-  value: stats.value ? stats.value.total_salary : null,
-  icon: 'wallet',
-  tone: 'neutral' as const,
-  money: true,
-  sub: t('payroll'),
-}))
+// kpiSalary removed: /users response has no salary field. Payroll lives on
+// the dedicated HR salaries page (/api/admins/hr/salaries).
 
 // ============================================================
 // DataTable column definitions — matches Users.jsx columns 1:1
@@ -499,13 +494,12 @@ onBeforeUnmount(() => {
 
     <!-- KPI strip -->
     <div
-      class="grid cols-4 users-kpi-grid"
+      class="grid cols-3 users-kpi-grid"
       style="margin-bottom: var(--sp-5);"
     >
       <Kpi :data="kpiTotal" />
       <Kpi :data="kpiActive" />
       <Kpi :data="kpiRoles" />
-      <Kpi :data="kpiSalary" />
     </div>
 
     <!-- Toolbar + table -->
@@ -966,7 +960,7 @@ onBeforeUnmount(() => {
 /* Tablet (canonical 1024px) — KPI strip drops to 2 columns; filters shrink to fit */
 @media (max-width: 1024px) {
   .users-kpi-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, 1fr) !important;
   }
   .users-toolbar__search {
     min-width: 180px;
@@ -991,7 +985,7 @@ onBeforeUnmount(() => {
 /* Small phone (canonical 420px) — KPI collapses to single column */
 @media (max-width: 420px) {
   .users-kpi-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
   }
 }
 </style>

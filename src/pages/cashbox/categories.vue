@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { cashboxApi as axios } from '@/plugins/axios'
-import Badge from '@/components/design/Badge.vue'
 import Button from '@/components/design/Button.vue'
 import Card from '@/components/design/Card.vue'
 import DataTable, { type DataTableColumn } from '@/components/design/DataTable.vue'
@@ -68,7 +67,6 @@ const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'id', label: t('cashbox_cat_col_id'), sortable: true, align: 'right', width: 80 },
   { key: 'name', label: t('Name'), sortable: true },
   { key: 'sort_order', label: t('Sort order'), sortable: true, align: 'right' },
-  { key: 'is_active', label: t('Active'), sortable: true },
 ])
 </script>
 
@@ -149,15 +147,6 @@ const columns = computed<DataTableColumn<any>[]>(() => [
 
         <template #cell.sort_order="{ row }">
           <span class="num-tabular">{{ row.sort_order ?? 0 }}</span>
-        </template>
-
-        <template #cell.is_active="{ row }">
-          <Badge
-            :tone="row.is_active === false ? 'neutral' : 'success'"
-            dot
-          >
-            {{ t(`active_${row.is_active !== false}`) }}
-          </Badge>
         </template>
       </DataTable>
     </Card>

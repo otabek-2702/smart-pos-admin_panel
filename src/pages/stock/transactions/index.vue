@@ -83,12 +83,32 @@ function formatQty(val: any) {
   return Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/\.?0+$/, '')
 }
 
+// BE has no quantity_change field. Derive: after - before. Fallback to signed
+// base_quantity based on movement_type sign (OUT/MINUS/WASTE/SPOILAGE → negative).
+function qtyChange(row: any): number {
+  if (row?.quantity_change !== undefined && row?.quantity_change !== null)
+    return Number(row.quantity_change) || 0
+
+  const before = Number(row?.quantity_before)
+  const after = Number(row?.quantity_after)
+  if (!Number.isNaN(before) && !Number.isNaN(after))
+    return after - before
+
+  const base = Number(row?.base_quantity ?? row?.quantity)
+  if (Number.isNaN(base))
+    return 0
+
+  const mt = String(row?.movement_type ?? '')
+  const isNegative = /(_OUT$|MINUS$|WASTE|SPOILAGE|RETURN_TO_SUPPLIER)/.test(mt)
+  return isNegative ? -Math.abs(base) : Math.abs(base)
+}
+
 async function loadTransactions() {
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
     if (typeFilter.value)
-      params.movement_type = typeFilter.value
+      params.type = typeFilter.value
     if (locationFilter.value)
       params.location_id = locationFilter.value
     if (stockItemFilter.value)
@@ -288,26 +308,26 @@ function refUserName(u: any) {
 
         <template #cell.item="{ row }">
           <span class="cell-strong tx-item-cell">
-            {{ row.stock_item?.name ?? row.item?.name ?? '—' }}
+            {{ row.stock_item_name ?? row.stock_item?.name ?? row.item?.name ?? '—' }}
             <span
-              v-if="row.batch?.batch_number"
+              v-if="row.batch_id"
               class="cell-muted tx-item-batch"
             >
-              · {{ t('Batch #') }}{{ row.batch.batch_number }}
+              · {{ t('Batch #') }}{{ row.batch_id }}
             </span>
           </span>
         </template>
 
         <template #cell.location="{ row }">
-          <span class="cell-muted">{{ row.location?.name ?? '—' }}</span>
+          <span class="cell-muted">{{ row.location_name ?? row.location?.name ?? '—' }}</span>
         </template>
 
         <template #cell.quantity_change="{ row }">
           <span
             class="mono num-tabular cell-strong"
-            :style="{ color: Number(row.quantity_change) >= 0 ? 'rgb(var(--v-theme-success-strong))' : 'rgb(var(--v-theme-error-strong))' }"
+            :style="{ color: qtyChange(row) >= 0 ? 'rgb(var(--v-theme-success-strong))' : 'rgb(var(--v-theme-error-strong))' }"
           >
-            {{ Number(row.quantity_change) >= 0 ? '+' : '' }}{{ formatQty(row.quantity_change) }}
+            {{ qtyChange(row) >= 0 ? '+' : '' }}{{ formatQty(qtyChange(row)) }}
           </span>
         </template>
 
@@ -332,7 +352,7 @@ function refUserName(u: any) {
         </template>
 
         <template #cell.user="{ row }">
-          <span class="cell-muted">{{ refUserName(row.user) }}</span>
+          <span class="cell-muted">{{ row.user ? refUserName(row.user) : (row.user_id ? `#${row.user_id}` : '—') }}</span>
         </template>
 
         <template #row-actions="{ row }">

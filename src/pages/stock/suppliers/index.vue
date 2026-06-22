@@ -101,7 +101,8 @@ async function openDetail(item: any) {
   try {
     const res = await axios.get(`/suppliers/${item.id}/`)
 
-    detailItem.value = res.data?.supplier ?? res.data?.data ?? item
+    // BE wrapper: { success, message, data: { supplier: {...} } }
+    detailItem.value = res.data?.data?.supplier ?? item
   }
   catch { /* keep basic data */ }
   finally {
@@ -121,7 +122,8 @@ function openEdit(item: any) {
 
   // Load detail first to get all fields
   axios.get(`/suppliers/${item.id}/`).then(res => {
-    const d = res.data?.data ?? res.data?.supplier ?? res.data?.data ?? item
+    // BE wrapper: { success, message, data: { supplier: {...} } }
+    const d = res.data?.data?.supplier ?? item
 
     form.value = {
       name: d.name ?? '',
@@ -190,6 +192,14 @@ function openPay(s: any) {
   paying.value = s
   payForm.value = { amount: 0, source_account: 'BANK', commission: 0, note: '' }
   payDialog.value = true
+
+  // List rows (serialize_brief) don't include current_balance — fetch the
+  // detail so the modal header can show what we owe this supplier.
+  axios.get(`/suppliers/${s.id}/`).then(res => {
+    const full = res.data?.data?.supplier
+    if (full)
+      paying.value = { ...s, ...full }
+  }).catch(() => { /* keep basic info */ })
 }
 
 async function doPay() {
@@ -244,7 +254,11 @@ async function loadLedger() {
 
     ledgerRows.value = d?.transactions ?? d?.entries ?? d?.items ?? []
     ledgerTotal.value = d?.pagination?.total ?? ledgerRows.value.length
-    ledgerBalance.value = d?.current_balance ?? d?.balance ?? null
+    // BE only returns { transactions, pagination } — derive current balance
+    // from the most recent transaction's balance_after (rows are time-DESC).
+    const firstRow = ledgerRows.value[0]
+
+    ledgerBalance.value = firstRow?.balance_after ?? d?.current_balance ?? d?.balance ?? null
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Failed to load'), 'error')
@@ -264,13 +278,13 @@ const ledgerTypeTone: Record<string, 'warning' | 'success' | 'info' | 'neutral'>
 }
 
 // ---- DataTable columns ----
+// BE list endpoint (serialize_brief) only returns:
+// { id, uuid, code, name, city, rating, is_active } — do not add columns for
+// phone / contact_person / current_balance here; they're undefined on rows.
 const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'name', label: t('supplier_col_name') },
-  { key: 'phone', label: t('supplier_col_phone') },
-  { key: 'contact_person', label: t('supplier_col_contact_person') },
   { key: 'city', label: t('supplier_col_city') },
   { key: 'rating', label: t('supplier_col_rating') },
-  { key: 'current_balance', label: t('supplier_col_outstanding'), align: 'right' },
   { key: 'is_active', label: t('supplier_col_status') },
 ])
 
@@ -350,16 +364,6 @@ const sourceOptions = computed(() => [
           <span class="cell-strong">{{ row.name }}</span>
         </template>
 
-        <!-- Phone -->
-        <template #cell.phone="{ row }">
-          <span class="cell-muted">{{ row.phone || '—' }}</span>
-        </template>
-
-        <!-- Contact -->
-        <template #cell.contact_person="{ row }">
-          <span class="cell-muted">{{ row.contact_person || '—' }}</span>
-        </template>
-
         <!-- City -->
         <template #cell.city="{ row }">
           <span class="cell-muted">{{ row.city || '—' }}</span>
@@ -375,16 +379,6 @@ const sourceOptions = computed(() => [
             />
             <span>{{ row.rating ?? '—' }}</span>
           </div>
-        </template>
-
-        <!-- Outstanding balance -->
-        <template #cell.current_balance="{ row }">
-          <span
-            class="mono"
-            :style="{ color: Number(row.current_balance) > 0 ? 'rgb(var(--v-theme-warning-strong))' : 'var(--text-tertiary)' }"
-          >
-            {{ formatCurrency(row.current_balance ?? 0) }}
-          </span>
         </template>
 
         <!-- Status -->

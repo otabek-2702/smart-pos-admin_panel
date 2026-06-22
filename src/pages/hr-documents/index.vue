@@ -78,11 +78,16 @@ async function loadEmployees() {
   catch { /* ignore */ }
 }
 
+// Raw items from BE (before client-side search filtering)
+const rawItems = ref<any[]>([])
+
 async function load() {
   loading.value = true
   try {
+    // NOTE: BE DocumentService.list only filters by employee_id + document_type.
+    // The 'search' param is silently ignored server-side, so we don't send it
+    // and instead filter on title/notes/employee name client-side via `items`.
     const params: Record<string, any> = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value) params.search = search.value
     if (employeeFilter.value) params.employee_id = employeeFilter.value
     if (typeFilter.value) params.document_type = typeFilter.value
 
@@ -95,21 +100,44 @@ async function load() {
 
     const res = await axios.get(endpoint, { params })
     const d = res.data?.data ?? res.data
-    items.value = d?.documents ?? d?.items ?? d ?? []
-    if (!Array.isArray(items.value)) items.value = []
-    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? items.value.length
+    let arr = d?.documents ?? d?.items ?? d ?? []
+    if (!Array.isArray(arr)) arr = []
+    rawItems.value = arr
+    total.value = d?.pagination?.total_items ?? d?.pagination?.total ?? arr.length
   }
   catch {
     notify(t('Failed to load'), 'error')
+    rawItems.value = []
+    total.value = 0
   }
   finally {
     loading.value = false
   }
 }
 
+// Client-side search across title/notes/employee name — BE has no search kwarg.
+watch(rawItems, () => {
+  applySearch()
+})
+
+function applySearch() {
+  const q = search.value.trim().toLowerCase()
+  if (!q) {
+    items.value = rawItems.value
+    return
+  }
+  items.value = rawItems.value.filter((r: any) => {
+    const title = (r.title ?? '').toString().toLowerCase()
+    const notes = (r.notes ?? '').toString().toLowerCase()
+    const emp = employeeLabel(r.employee).toLowerCase()
+    return title.includes(q) || notes.includes(q) || emp.includes(q)
+  })
+}
+
 onMounted(() => { load(); loadEmployees() })
 watch([page, itemsPerPage], load)
-const debouncedSearch = useDebounceFn(() => { page.value = 1; load() }, 400)
+// Search is client-side (BE ignores ?search=), debounce purely for UX.
+const debouncedSearch = useDebounceFn(() => { applySearch() }, 300)
 watch(search, debouncedSearch)
 watch([employeeFilter, typeFilter, expiringOnly], () => { page.value = 1; load() })
 const debouncedDays = useDebounceFn(() => { if (expiringOnly.value) { page.value = 1; load() } }, 400)

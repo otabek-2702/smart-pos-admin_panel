@@ -64,15 +64,26 @@ function fmtPeak(p: any): string {
   const h = String(p.hour).padStart(2, '0')
   return p.orders !== undefined ? `${h}:00 (${p.orders})` : `${h}:00`
 }
-function initialsOf(first?: string, last?: string, email?: string): string {
+function initialsOf(first?: string, last?: string, email?: string, name?: string): string {
+  // BE list serializer returns user as { id, uuid, name } only (no first_name/last_name/email).
+  // Prefer the combined `name` field; fall back to first/last/email for other endpoints (e.g. /users).
   const f = (first || '').trim()
   const l = (last || '').trim()
   if (f || l) return ((f[0] || '') + (l[0] || '')).toUpperCase() || '?'
+  const combined = (name || '').trim()
+  if (combined) {
+    const parts = combined.split(/\s+/)
+    const a = parts[0]?.[0] || ''
+    const b = parts[1]?.[0] || ''
+    return (a + b).toUpperCase() || '?'
+  }
   if (email) return email.slice(0, 2).toUpperCase()
   return '?'
 }
 function fullName(u: any): string {
   if (!u) return t('Unknown')
+  // BE shift serializer returns { id, uuid, name }. Other endpoints (e.g. /users) return first/last/email.
+  if (u.name) return String(u.name).trim() || `#${u.id}`
   const n = `${u.first_name || ''} ${u.last_name || ''}`.trim()
   return n || u.email || `#${u.id}`
 }
@@ -166,26 +177,37 @@ watch(staffRole, () => { loadCashiers() })
 // ============================================================
 function shiftState(s: any): 'active' | 'awaiting' | 'reconciled' {
   if (s.status === 'ACTIVE') return 'active'
-  if (s.reconciliation && (s.reconciliation.id || s.reconciliation.counted_cash !== undefined || s.reconciliation.reported !== undefined)) return 'reconciled'
+  // BE reconciliation shape: { id, expected_cash, actual_cash, difference, notes, reconciled_by, created_at }.
+  // Old keys (counted_cash, reported) kept as soft fallback for any cached/older response.
+  if (s.reconciliation && (s.reconciliation.id || s.reconciliation.actual_cash !== undefined || s.reconciliation.counted_cash !== undefined || s.reconciliation.reported !== undefined)) return 'reconciled'
   return 'awaiting'
 }
 function expectedCash(s: any): number {
+  // BE reconciliation carries the authoritative expected_cash (cash_collected - expenses). The list
+  // serializer omits expenses_total, so without this fallback expected==cash_collected. Mirror BE.
+  if (s.reconciliation?.expected_cash !== undefined && s.reconciliation?.expected_cash !== null)
+    return num(s.reconciliation.expected_cash)
   return num(s.cash_collected) - num(s.expenses_total)
 }
 function reportedCash(s: any): number {
   const r = s.reconciliation || {}
-  return num(r.counted_cash ?? r.reported ?? r.amount)
+  // BE returns `actual_cash`. Old fallback keys retained for safety.
+  return num(r.actual_cash ?? r.counted_cash ?? r.reported ?? r.amount)
 }
 function reportedBy(s: any): string {
   const r = s.reconciliation || {}
-  const u = r.reported_by_user || r.reported_by || r.user
+  // BE returns `reconciled_by: { id, name }`. Keep legacy fallbacks for older data shapes.
+  const u = r.reconciled_by || r.reported_by_user || r.reported_by || r.user
   if (typeof u === 'string') return u
   return u ? fullName(u) : t('Manager')
 }
 function varianceOf(s: any): number {
   const r = s.reconciliation || {}
+  // BE returns `difference` (actual - expected); old client code used `variance`. Use either.
+  if (r.difference !== undefined && r.difference !== null) return num(r.difference)
   if (r.variance !== undefined && r.variance !== null) return num(r.variance)
-  if (r.counted_cash !== undefined) return num(r.counted_cash) - expectedCash(s)
+  const counted = r.actual_cash ?? r.counted_cash
+  if (counted !== undefined) return num(counted) - expectedCash(s)
   return 0
 }
 // Returns [{ method, amount }] sorted desc, excluding zero entries.
@@ -416,10 +438,13 @@ async function confirmReceive() {
           ...x,
           reconciliation: {
             ...(x.reconciliation || {}),
+            // Mirror BE reconciliation shape: actual_cash + difference + reconciled_by {id,name}.
             counted_cash: countedParsed.value,
             actual_cash: countedParsed.value,
+            expected_cash: expectedCash(x),
             variance,
             difference: variance,
+            reconciled_by: { id: 0, name: 'Manager' },
             reported_by_user: { first_name: 'Manager' },
             notes: note.value || undefined,
             created_at: new Date().toISOString(),
@@ -843,7 +868,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         <!-- header: avatar + name + status pill -->
         <div class="row" style="gap:12px;padding: var(--sp-5) var(--sp-5) var(--sp-4);">
           <div class="avatar">
-            {{ initialsOf(s.user?.first_name, s.user?.last_name, s.user?.email) }}
+            {{ initialsOf(s.user?.first_name, s.user?.last_name, s.user?.email, s.user?.name) }}
           </div>
           <div style="flex:1;min-width:0;">
             <div style="font-weight:700;font-size:15px;">
@@ -968,7 +993,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               <span class="mono" style="font-weight:600;font-size:12px;">{{ fmtMoney(m.amount) }}</span>
             </div>
           </div>
-          <div class="row between" style="padding:5px 0;">
+          <div v-if="s.expenses_total !== undefined && num(s.expenses_total) > 0" class="row between" style="padding:5px 0;">
             <span class="row" style="gap:8px;color:var(--text-secondary);font-size:13px;">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);">
                 <path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2z" /><line x1="9" y1="7" x2="15" y2="7" /><line x1="9" y1="11" x2="15" y2="11" />
@@ -977,7 +1002,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
             </span>
             <span class="mono" style="font-weight:600;font-size:13px;">− {{ fmtMoney(s.expenses_total) }}</span>
           </div>
-          <div class="row between" style="padding:5px 0;">
+          <div v-if="s.cancelled_orders_count !== undefined && num(s.cancelled_orders_count) > 0" class="row between" style="padding:5px 0;">
             <span class="row" style="gap:8px;color:var(--text-secondary);font-size:13px;">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -1105,7 +1130,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               </span>
               <span class="mono" style="font-weight:600;font-size:13px;">{{ fmtMoney(receiving.cash_collected) }}</span>
             </div>
-            <div class="row between" style="padding:5px 0;">
+            <div v-if="num(receiving.expenses_total) > 0" class="row between" style="padding:5px 0;">
               <span class="row" style="gap:8px;color:var(--text-secondary);font-size:13px;">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);">
                   <path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2z" /><line x1="9" y1="7" x2="15" y2="7" /><line x1="9" y1="11" x2="15" y2="11" />

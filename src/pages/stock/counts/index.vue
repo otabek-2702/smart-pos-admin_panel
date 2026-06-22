@@ -75,7 +75,7 @@ async function loadCounts() {
     const d = res.data?.data ?? res.data
 
     counts.value = d?.counts ?? []
-    total.value = d.pagination?.total_items ?? d.pagination?.total ?? counts.value.length
+    total.value = d.pagination?.total ?? counts.value.length
   }
   catch {
     notify(t('Failed to load stock counts'), 'error')
@@ -368,7 +368,7 @@ const itemFilterOptions = computed(() => [
         </template>
 
         <template #cell.items_counted="{ row: r }">
-          <span class="mono num">{{ r.items_counted ?? r.count_items?.length ?? '—' }}</span>
+          <span class="mono num">{{ r.items_counted ?? '—' }}</span>
         </template>
 
         <template #cell.created_at="{ row: r }">
@@ -557,7 +557,7 @@ const itemFilterOptions = computed(() => [
           <tbody>
             <tr v-for="i in filteredItems" :key="i.id">
               <td class="cell-strong">{{ i.stock_item?.name ?? i.item?.name ?? '—' }}</td>
-              <td class="num mono">{{ i.system_quantity }} {{ i.stock_item?.unit?.short_name ?? '' }}</td>
+              <td class="num mono">{{ i.system_quantity }} {{ i.stock_item?.unit ?? '' }}</td>
               <td class="num">
                 <Input
                   :model-value="i._input ?? ''"

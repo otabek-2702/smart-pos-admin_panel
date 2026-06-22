@@ -73,8 +73,25 @@ async function loadCategories() {
     const res = await axios.get('/categories/', { params })
     const d = res.data?.data ?? res.data
 
-    categories.value = d?.categories ?? []
-    total.value = d?.pagination?.total_items ?? d?.count ?? categories.value.length
+    // BE returns { tree, total_count } when tree=true, else { categories, count }
+    // Flatten tree to a list so the DataTable can render rows consistently.
+    if (treeView.value) {
+      const flat: any[] = []
+      const walk = (nodes: any[], depth = 0) => {
+        for (const n of nodes ?? []) {
+          flat.push({ ...n, _depth: depth })
+          if (n.children?.length)
+            walk(n.children, depth + 1)
+        }
+      }
+      walk(d?.tree ?? [])
+      categories.value = flat
+      total.value = d?.total_count ?? flat.length
+    }
+    else {
+      categories.value = d?.categories ?? []
+      total.value = d?.count ?? categories.value.length
+    }
   }
   catch {
     notify(t('Failed to load categories'), 'error')
@@ -115,10 +132,15 @@ async function save() {
     const payload: any = { ...form.value }
     if (!payload.parent_id)
       delete payload.parent_id
-    if (dialogMode.value === 'create')
+    if (dialogMode.value === 'create') {
       await axios.post('/categories/', payload)
-    else
-      await axios.patch(`/categories/${selectedItem.value.id}/`, payload)
+    }
+    else {
+      // BE category_detail accepts PUT (not PATCH).
+      // is_active is not processed by service.update() — toggle goes through DELETE.
+      const { is_active: _ignore, ...putPayload } = payload
+      await axios.put(`/categories/${selectedItem.value.id}/`, putPayload)
+    }
     notify(dialogMode.value === 'create' ? t('Category created') : t('Category updated'))
     dialog.value = false
     await loadCategories()
@@ -154,9 +176,15 @@ async function doDelete() {
 }
 
 async function toggleActive(item: any) {
+  // BE: deactivate = DELETE /categories/{id}/?cascade=false.
+  // Activation has no exposed URL in stock/urls.py — surface a clear message instead of a silent 404/405.
+  if (!item.is_active) {
+    notify(t('stock_categories_activate_unavailable'), 'error')
+    return
+  }
   try {
-    await axios.patch(`/categories/${item.id}/`, { is_active: !item.is_active })
-    notify(item.is_active ? t('Category deactivated') : t('Category activated'))
+    await axios.delete(`/categories/${item.id}/`, { params: { cascade: false } })
+    notify(t('Category deactivated'))
     await loadCategories()
   }
   catch (e: any) {

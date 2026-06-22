@@ -75,7 +75,7 @@ async function loadItems() {
     if (search.value)
       params.search = search.value
     if (typeFilter.value)
-      params.item_type = typeFilter.value
+      params.type = typeFilter.value
     if (categoryFilter.value)
       params.category_id = categoryFilter.value
     if (lowStockOnly.value)

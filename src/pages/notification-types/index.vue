@@ -46,6 +46,7 @@ const statusFilter = ref('')
 const editOpen = ref(false)
 const editing = ref<NotifType | null>(null)
 const editSaving = ref(false)
+const editLoading = ref(false)
 const form = ref({ is_enabled: true, template_text: '' })
 const errors = ref<Record<string, string>>({})
 
@@ -174,7 +175,7 @@ const statusOptions = computed(() => [
 // ============================================================
 // Edit modal
 // ============================================================
-function openEdit(row: NotifType) {
+async function openEdit(row: NotifType) {
   editing.value = row
   form.value = {
     is_enabled: Boolean(row.is_enabled),
@@ -182,6 +183,29 @@ function openEdit(row: NotifType) {
   }
   errors.value = {}
   editOpen.value = true
+
+  // BE GET /types/ omits template_text — fetch from /templates/?notification_type=<slug>
+  // so the textarea opens with the actual stored template instead of empty.
+  editLoading.value = true
+  try {
+    const res = await notificationsApi.get('/templates/', {
+      params: { notification_type: row.notification_type },
+    })
+    const d = res.data?.data ?? res.data
+    const list = Array.isArray(d) ? d : (d?.templates ?? d?.items ?? d?.results ?? [])
+    const tpl = (list as any[])[0]
+    if (tpl) {
+      form.value.template_text = tpl.template_text ?? ''
+      // also cache on the row so re-open is instant
+      row.template_text = tpl.template_text ?? ''
+    }
+  }
+  catch {
+    // Silent: textarea stays empty, user can still author a fresh template
+  }
+  finally {
+    editLoading.value = false
+  }
 }
 
 function closeEdit() {
@@ -554,7 +578,8 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
                 v-model="form.template_text"
                 rows="8"
                 class="nt-textarea"
-                :placeholder="t('notif_field_template_text')"
+                :placeholder="editLoading ? t('notif_template_loading') : t('notif_field_template_text')"
+                :disabled="editLoading"
               />
             </div>
           </Field>
@@ -573,7 +598,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
           variant="primary"
           icon="check"
           :loading="editSaving"
-          :disabled="editSaving"
+          :disabled="editSaving || editLoading"
           @click="saveEdit"
         >
           {{ t('notif_btn_save') }}

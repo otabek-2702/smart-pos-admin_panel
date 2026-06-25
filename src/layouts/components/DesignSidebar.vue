@@ -165,11 +165,8 @@ function onWidgetGo() {
       </template>
     </nav>
 
-    <!-- v3 decision #6: ambient Today widget pinned to foot of sidebar (hidden when collapsed) -->
-    <SidebarLiveWidget
-      :collapsed="collapsed"
-      @nav-go="onWidgetGo"
-    />
+    <!-- v3 #6 SidebarLiveWidget hidden per Jason: not needed in sidebar foot. -->
+    <!-- <SidebarLiveWidget :collapsed="collapsed" @nav-go="onWidgetGo" /> -->
   </aside>
 </template>
 

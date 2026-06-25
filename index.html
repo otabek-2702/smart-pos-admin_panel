@@ -15,6 +15,12 @@
         var t = localStorage.getItem('alphapos-theme');
         if (t === 'dark' || t === 'light')
           document.documentElement.setAttribute('data-theme', t);
+        // Sync the loader background to the theme so the first paint doesn't flash white in dark mode.
+        var bg = (t === 'dark') ? '#0d1117' : '#FFFFFF';
+        var fg = (t === 'dark') ? '#8AB4FF' : '#696CFF';
+        document.documentElement.style.setProperty('--initial-loader-bg', bg);
+        document.documentElement.style.setProperty('--initial-loader-color', fg);
+        document.documentElement.style.background = bg;
       } catch (e) {}
     })();
   </script>
@@ -75,14 +81,8 @@
   </div>
   <script type="module" src="/src/main.ts"></script>
   <script>
-    const loaderColor = localStorage.getItem('sneat-initial-loader-bg') || '#FFFFFF'
-    const primaryColor = localStorage.getItem('sneat-initial-loader-color') || '#696CFF'
-
-    if (loaderColor)
-      document.documentElement.style.setProperty('--initial-loader-bg', loaderColor)
-
-    if (primaryColor)
-      document.documentElement.style.setProperty('--initial-loader-color', primaryColor)
+    // Theme-aware loader bg already set by the head bootstrap. Legacy Sneat overrides
+    // are intentionally ignored here so dark theme doesn't flash white on first paint.
   </script>
 </body>
 

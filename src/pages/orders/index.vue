@@ -21,6 +21,8 @@ import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
 import DateRangePicker from '@/components/design/DateRangePicker.vue'
+import OrdersInsights from '@/components/design/OrdersInsights.vue'
+import PaymentBreakdown from '@/components/design/PaymentBreakdown.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { notify } = useNotify()
@@ -406,6 +408,19 @@ const dtPagination = computed(() => ({
 
 const noResultsMsg = computed(() => t('No orders match your filters'))
 const noResultsSub = computed(() => t('Adjust the search, status or date range to see results.'))
+
+// ---- OrdersInsights bridge ----
+// Click a status segment/legend: toggle membership in the multi-status array.
+function onStatusToggle(s: string) {
+  if (statusFilter.value.includes(s))
+    statusFilter.value = statusFilter.value.filter(x => x !== s)
+  else
+    statusFilter.value = [...statusFilter.value, s]
+}
+// Click a payment legend: set, or clear if already that value.
+function onPaymentToggle(p: string) {
+  paymentFilter.value = paymentFilter.value === p ? undefined : p
+}
 </script>
 
 <template>
@@ -453,6 +468,16 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
         }"
       />
     </div>
+
+    <!-- Insights strip (additive port from v3) -->
+    <OrdersInsights
+      v-if="!loading && orders.length"
+      :orders="orders"
+      :status="statusFilter"
+      :payment="paymentFilter"
+      @status="onStatusToggle"
+      @payment="onPaymentToggle"
+    />
 
     <!-- Main table card -->
     <div class="card">
@@ -848,6 +873,17 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
               </tbody>
             </table>
           </div>
+
+          <!-- Per-method payment breakdown (additive port from v3) -->
+          <div
+            v-if="o.is_paid && o.payments?.length"
+            class="orders-paybreak-wrap"
+          >
+            <PaymentBreakdown
+              :methods="o.payments"
+              :total="Number(o.total_amount) || 0"
+            />
+          </div>
         </template>
 
         <!-- Empty state -->
@@ -1120,6 +1156,15 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
 :deep(.confirm-modal .modal__panel),
 :deep(.confirm-modal .modal) {
   max-width: calc(100vw - 24px);
+}
+
+/* --- Expanded row: payment breakdown wrapper --- */
+.orders-paybreak-wrap {
+  margin-block-start: var(--sp-4);
+  max-width: 480px;
+}
+@media (max-width: 768px) {
+  .orders-paybreak-wrap { max-width: 100%; }
 }
 </style>
 

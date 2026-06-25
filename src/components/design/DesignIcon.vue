@@ -72,6 +72,10 @@ export const ICON_PATHS: Record<string, string> = {
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   pencil: '<path d="M4 20h4L18.5 9.5a2 2 0 0 0 0-2.8l-1.2-1.2a2 2 0 0 0-2.8 0L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
   retry: '<path d="M20 11a8 8 0 0 0-14-5l-2 2M4 13a8 8 0 0 0 14 5l2-2"/><path d="M4 5v3.5h3.5M20 19v-3.5h-3.5"/>',
+  gear: '<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.4M12 19.1v2.4M21.5 12h-2.4M4.9 12H2.5M18.7 5.3l-1.7 1.7M7 17l-1.7 1.7M18.7 18.7 17 17M7 7 5.3 5.3"/>',
+  list: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+  bars: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
+  hourglass: '<path d="M7 4h10M7 20h10M8 4c0 4 8 4 8 8s-8 4-8 8M16 4c0 4-8 4-8 8s8 4 8 8"/>',
 }
 
 export const ICON_NAMES: string[] = Object.keys(ICON_PATHS)

@@ -69,6 +69,31 @@ Plus: keep dates ISO, money w/ space-thousands separator (FE post-processes comm
 
 **Need:** Add `payment_breakdown: { CASH: { count, revenue }, CARD: {…}, … }` to existing `/orders/stats` response. Same date filter behavior.
 
+### 9. Products / Menu performance analytics (Products dashboard)
+**Why:** New FE page `src/pages/dash/products.vue` ports the v3 Products & Menu performance dashboard (KPI row + revenue treemap + category donut + pareto + 14-day sparkline trends table). It needs four BE endpoints. Currently the page soft-degrades to an empty state when these 404.
+
+**Need:**
+- `GET /analytics/products/overview?range=30d` →
+  `{ menuItems: int, categoryCount: int, bestSellerName: str, bestSellerUnits: int, units30d: int, units30dDelta: float|null, menuRevenue: decimal, menuRevenueDelta: float|null }`
+- `GET /analytics/products/categories?range=30d` →
+  `[{ label: str, value: decimal, color?: str }]` (top 6 used; revenue per category over the range)
+- `GET /analytics/products/pareto?range=30d` →
+  `[{ label: str, value: decimal }]` (per-product revenue; FE sorts + cumulates to 80% reference)
+- `GET /analytics/products/trends?days=14` →
+  `[{ name: str, units: int, revenue: decimal, delta: float, spark: [int x days] }]` (top movers; `spark` is per-day units, length = `days`)
+
+`range` accepts the same tokens as other analytics endpoints (`30d`, `7d`, etc.); calendar boundaries should respect the `business_day_start` setting from item #8 above when that lands.
+
+### 10. Staff performance endpoint (Staff & Shifts dashboard)
+**Why:** FE page `src/pages/dash/staff.vue` (v3 port) renders a 4-tile KPI strip + leaderboard + skill-radar + orders-vs-revenue scatter + hours/punctuality stacked bar. Currently consumes the static fixture in `src/pages/dash/_mock/dashdata.ts` (`staff` array). No BE endpoint exists.
+
+**Need:** `GET /staff/performance?range=30d` →
+`[{ id: int, name: str, initials: str, revenue: decimal, orders: int, aov: decimal, hours: int, speed: int (0-100), accuracy: int (0-100), upsell: int (0-100), attendance: int (0-100) }]`
+
+Rows pre-sorted by `revenue` desc preferred but FE re-sorts defensively. `range` accepts the same tokens as other analytics endpoints (`30d`, `7d`, etc.); calendar boundaries should respect the `business_day_start` setting from item #8 when that lands.
+
+Stretch (future): aggregated `/staff/performance/summary?range=30d` returning `{ active_count, top_performer: {name, revenue}, avg_accuracy: pct, total_hours: int }` for the KPI tiles so FE doesn't recompute on the client.
+
 ---
 
 ## Done — verified

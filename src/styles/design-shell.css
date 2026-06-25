@@ -754,6 +754,8 @@ button { font-family: inherit; }
 .control--select { position: relative; cursor: pointer; }
 .control--select .chev { margin-left: auto; color: var(--text-tertiary); flex: 0 0 18px; }
 .control--sm { height: 36px; }
+.control--time { width: auto; }
+.control--time input[type="time"] { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 
 textarea.control { height: auto; padding: var(--sp-2) var(--sp-3); resize: vertical; min-height: 84px; line-height: var(--lh-body); }
 
@@ -1166,3 +1168,166 @@ textarea.control { height: auto; padding: var(--sp-2) var(--sp-3); resize: verti
 html, body, #root { min-height: 100vh; }
     #root { background: var(--bg); }
     .boot { display: grid; place-items: center; min-height: 100vh; color: var(--text-tertiary); font-family: sans-serif; }
+
+/* ============================================================
+   Sidebar ambient "Today" widget — SidebarLiveWidget.vue
+   (handoff v3: shell.jsx lines 137-162)
+   ============================================================ */
+.sidewidget {
+  margin: var(--sp-3) var(--sp-3) var(--sp-2);
+  padding: var(--sp-3) var(--sp-3) var(--sp-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background var(--anim-fast) ease, border-color var(--anim-fast) ease, transform var(--anim-fast) ease;
+}
+.sidewidget:hover { background: var(--surface-2); border-color: var(--border-strong); }
+.sidewidget:active { transform: scale(0.99); }
+.sidewidget__label {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: var(--fw-semibold);
+  color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.sidewidget__value {
+  font-size: var(--fs-lg); font-weight: var(--fw-semibold);
+  color: var(--text); line-height: 1.15; margin-bottom: 4px;
+}
+.sidewidget__unit {
+  font-size: 11px; font-weight: var(--fw-medium);
+  color: var(--text-tertiary); margin-left: 4px;
+}
+.sidewidget__spark {
+  margin: 4px 0 2px;
+  overflow: hidden;
+}
+.sidewidget__meta {
+  font-size: 11px; color: var(--text-secondary);
+}
+.livedot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 0 var(--success);
+  animation: livedot-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes livedot-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(var(--v-theme-success), 0.4); }
+  70%  { box-shadow: 0 0 0 6px rgba(var(--v-theme-success), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--v-theme-success), 0); }
+}
+
+/* ============================================================
+   SettingsMenu popover — SettingsMenu.vue
+   (handoff v3: shell.jsx lines 192-233)
+   ============================================================ */
+.iconbtn.is-active {
+  background: var(--primary-weak);
+  color: var(--primary);
+  border-color: var(--primary-weak);
+}
+.setmenu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  width: 360px;
+  max-width: calc(100vw - var(--sp-4));
+  z-index: 40;
+  padding: var(--sp-3);
+  box-shadow: var(--shadow-lg);
+}
+.setmenu__title {
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold);
+  color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 0 var(--sp-2) var(--sp-2);
+}
+.setmenu__row {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-2);
+}
+.setmenu__main { flex: 1; min-width: 0; }
+.setmenu__label {
+  font-size: var(--fs-md); font-weight: var(--fw-medium);
+  color: var(--text); margin-bottom: 2px;
+}
+.setmenu__hint {
+  font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.4;
+}
+.setmenu__time {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+}
+.setmenu__time::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: pointer; }
+.setmenu__time::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+
+/* ============================================================
+   Orders insights strip (additive port from v3 Orders.jsx)
+   - .distbar / .distbar__seg: clickable status distribution bar
+   - .distlegend: pill-style legend button (status/payment toggles)
+   - .paybreak / .paybreak__bar / .paybreak__seg: per-method
+     payment breakdown shown in the expanded row.
+   Lifted verbatim from
+   .tmp-handoff-v3/pos-admin-panel/project/styles/dashboards.css
+   lines 80-100 (with --chart-track fallback for current tokens).
+   ============================================================ */
+.distbar {
+  display: flex;
+  height: 14px;
+  border-radius: var(--r-pill, 999px);
+  overflow: hidden;
+  background: var(--chart-track, var(--surface-2, rgba(0, 0, 0, 0.05)));
+  gap: 2px;
+}
+.distbar__seg {
+  height: 100%;
+  cursor: pointer;
+  transition: opacity .15s, filter .15s;
+  min-width: 4px;
+}
+.distbar__seg:hover { filter: brightness(1.08); }
+.distbar__seg:first-child { border-radius: var(--r-pill, 999px) 0 0 var(--r-pill, 999px); }
+.distbar__seg:last-child { border-radius: 0 var(--r-pill, 999px) var(--r-pill, 999px) 0; }
+.distbar__seg.is-dim { opacity: .32; }
+
+.distlegend {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  font-weight: var(--fw-medium);
+  padding: 4px 8px;
+  border-radius: var(--r-sm, 6px);
+  transition: background .13s, color .13s;
+  font-family: inherit;
+}
+.distlegend:hover { background: var(--surface-2, rgba(0, 0, 0, 0.04)); color: var(--text); }
+.distlegend.is-active { background: var(--primary-weak, rgba(var(--v-theme-primary, 99, 102, 241), 0.12)); color: var(--primary); }
+.distlegend b { font-weight: var(--fw-bold, 700); color: var(--text); }
+.distlegend.is-active b { color: var(--primary); }
+
+/* payment breakdown (order detail) */
+.paybreak {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md, 10px);
+  padding: var(--sp-4);
+}
+.paybreak__bar {
+  display: flex;
+  height: 12px;
+  border-radius: var(--r-pill, 999px);
+  overflow: hidden;
+  background: var(--chart-track, var(--surface-2, rgba(0, 0, 0, 0.05)));
+  gap: 2px;
+}
+.paybreak__seg {
+  height: 100%;
+  min-width: 4px;
+  transition: filter .13s;
+}
+.paybreak__seg:hover { filter: brightness(1.08); }

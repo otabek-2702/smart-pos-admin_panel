@@ -4,6 +4,8 @@ import axios from '@/plugins/axios'
 export interface NavCounts {
   shifts: number | null
   orders: number | null
+  todayRevenue: number | null
+  revenueSeries: number[]
 }
 
 function todayIso(): string {
@@ -12,7 +14,7 @@ function todayIso(): string {
 }
 
 export const useNavCountsStore = defineStore('navCounts', () => {
-  const counts = ref<NavCounts>({ shifts: null, orders: null })
+  const counts = ref<NavCounts>({ shifts: null, orders: null, todayRevenue: null, revenueSeries: [] })
   const refreshing = ref(false)
   let timer: number | null = null
 
@@ -33,6 +35,12 @@ export const useNavCountsStore = defineStore('navCounts', () => {
       if (ordersRes.status === 'fulfilled') {
         const d = ordersRes.value.data?.data ?? ordersRes.value.data
         counts.value.orders = typeof d?.total_orders === 'number' ? d.total_orders : 0
+        const rev = d?.total_revenue ?? d?.revenue ?? d?.gross_revenue
+        const revNum = typeof rev === 'string' ? Number(rev) : rev
+        counts.value.todayRevenue = typeof revNum === 'number' && !Number.isNaN(revNum) ? revNum : null
+        const series = d?.revenue_series ?? d?.hourly_revenue ?? d?.series
+        if (Array.isArray(series))
+          counts.value.revenueSeries = series.map((v: any) => Number(v) || 0).filter((v: number) => !Number.isNaN(v))
       }
     }
     finally {

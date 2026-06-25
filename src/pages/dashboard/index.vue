@@ -735,6 +735,8 @@ function initial(s: string | undefined | null): string {
 <style scoped>
 .split-1-7 { grid-template-columns: 1.7fr 1fr; }
 .split-1-4 { grid-template-columns: 1.4fr 1fr; }
+/* Prevent wide table contents from blowing out grid tracks */
+.split-1-7 > *, .split-1-4 > * { min-width: 0; }
 
 /* Allow PageHeader action buttons (Refresh + Export) to wrap on narrow screens */
 .page :deep(.page__head-actions) {

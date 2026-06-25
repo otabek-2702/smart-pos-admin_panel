@@ -20,6 +20,7 @@ const store = useAIAssistantStore()
 const { chats, activeId, generating, notify, permission } = storeToRefs(store)
 
 const draft = ref('')
+const draftRestoreLock = ref(false)
 const query = ref('')
 const scrollRef = ref<HTMLElement | null>(null)
 const taRef = ref<HTMLTextAreaElement | null>(null)
@@ -63,7 +64,9 @@ watch([() => messages.value.length, () => messages.value[messages.value.length -
     el.scrollTop = el.scrollHeight
 })
 
-watch(draft, async () => {
+watch(draft, async (v) => {
+  if (!draftRestoreLock.value && activeId.value)
+    store.setDraft(activeId.value, v)
   await nextTick()
   const ta = taRef.value
 
@@ -73,6 +76,13 @@ watch(draft, async () => {
   ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`
 })
 
+watch(activeId, (id) => {
+  draftRestoreLock.value = true
+  const c = chats.value.find(x => x.id === id)
+  draft.value = c?.draft ?? ''
+  nextTick(() => { draftRestoreLock.value = false })
+}, { immediate: true })
+
 function submit() {
   const text = draft.value.trim()
 
@@ -80,6 +90,8 @@ function submit() {
     return
   store.send(text)
   draft.value = ''
+  if (activeId.value)
+    store.setDraft(activeId.value, '')
 }
 
 function onKey(e: KeyboardEvent) {

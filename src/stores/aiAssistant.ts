@@ -24,6 +24,7 @@ export interface Chat {
   title: string
   messages: ChatMessage[]
   updatedAt: number
+  draft?: string
 }
 
 export interface QuickAction { id: string; label: string; icon: string; query: string }
@@ -331,6 +332,10 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
     deleteChat(activeId.value)
   }
 
+  function setDraft(id: string, text: string) {
+    chats.value = chats.value.map(c => c.id === id ? { ...c, draft: text } : c)
+  }
+
   if (typeof window !== 'undefined') {
     window.addEventListener('ai-open-chat', ((ev: CustomEvent) => {
       if (ev.detail) {
@@ -359,6 +364,7 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
     stop,
     send,
     clearChat,
+    setDraft,
     loadMeta,
   }
 })

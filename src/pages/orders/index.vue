@@ -20,6 +20,7 @@ import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
+import DateRangePicker from '@/components/design/DateRangePicker.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { notify } = useNotify()
@@ -36,8 +37,9 @@ const itemsPerPage = ref(10)
 const statusFilter = ref<string[]>([])
 const paymentFilter = ref<string | undefined>(undefined)
 const search = ref('')
-const dateFrom = ref('')
-const dateTo = ref('')
+const dateRange = ref<{ from: string, to: string, preset?: string }>({ from: '', to: '', preset: 'all' })
+const dateFrom = computed({ get: () => dateRange.value.from, set: v => dateRange.value = { ...dateRange.value, from: v } })
+const dateTo = computed({ get: () => dateRange.value.to, set: v => dateRange.value = { ...dateRange.value, to: v } })
 // New filters mirroring BE /orders query params
 const orderTypeFilter = ref<string | undefined>(undefined)
 const cashierFilter = ref<string | undefined>(undefined)
@@ -127,7 +129,11 @@ async function loadOrders() {
 
 async function loadStats() {
   try {
-    const res = await axios.get('/orders/stats')
+    const params: any = {}
+    if (dateFrom.value) params.date_from = dateFrom.value
+    if (dateTo.value) params.date_to = dateTo.value
+    if (cashierFilter.value) params.cashier_id = cashierFilter.value
+    const res = await axios.get('/orders/stats', { params })
 
     stats.value = res.data?.data ?? res.data
   }
@@ -168,9 +174,10 @@ onMounted(() => {
 })
 
 watch([page, itemsPerPage], loadOrders)
-watch([statusFilter, paymentFilter, dateFrom, dateTo, orderTypeFilter, cashierFilter, categoryFilter], () => {
+watch([statusFilter, paymentFilter, dateRange, orderTypeFilter, cashierFilter, categoryFilter], () => {
   page.value = 1
   loadOrders()
+  loadStats()
 })
 watch(search, () => debouncedSearch())
 
@@ -331,8 +338,7 @@ function clearAll() {
   search.value = ''
   statusFilter.value = []
   paymentFilter.value = undefined
-  dateFrom.value = ''
-  dateTo.value = ''
+  dateRange.value = { from: '', to: '', preset: 'all' }
   orderTypeFilter.value = undefined
   cashierFilter.value = undefined
   categoryFilter.value = []
@@ -503,14 +509,6 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
           </div>
         </div>
 
-        <div class="tb-filter tb-filter--sm">
-          <Select
-            :model-value="paymentFilter ?? ''"
-            :placeholder="t('Payment Status')"
-            :options="paymentStatuses.map(p => ({ value: p, label: t(`payment_status_${p}`) }))"
-            @update:model-value="(v: string) => paymentFilter = v ? v : undefined"
-          />
-        </div>
 
         <!-- Order type (HALL / DELIVERY / PICKUP) -->
         <div class="tb-filter tb-filter--xs">
@@ -573,13 +571,40 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
           </div>
         </div>
 
-        <div class="row tb-daterange" style="gap: 8px;">
-          <div class="control control--sm tb-date">
-            <input v-model="dateFrom" type="date" :aria-label="t('Date from')">
-          </div>
-          <span class="tertiary" aria-hidden="true">→</span>
-          <div class="control control--sm tb-date">
-            <input v-model="dateTo" type="date" :aria-label="t('Date to')">
+      </div>
+
+      <!-- Compact filter strip: single date range popover + payment segmented control -->
+      <div class="filterstrip">
+        <div class="filterstrip__group">
+          <span class="filterstrip__lbl">{{ t('Period') }}</span>
+          <DateRangePicker
+            v-model="dateRange"
+            align="left"
+            :placeholder="t('All time')"
+          />
+        </div>
+
+        <div class="filterstrip__group">
+          <span class="filterstrip__lbl">{{ t('Payment') }}</span>
+          <div class="segctl">
+            <button
+              type="button"
+              class="segctl__btn"
+              :class="{ 'is-active': !paymentFilter }"
+              @click="paymentFilter = undefined"
+            >
+              {{ t('All') }}
+            </button>
+            <button
+              v-for="p in paymentStatuses"
+              :key="p"
+              type="button"
+              class="segctl__btn"
+              :class="{ 'is-active': paymentFilter === p }"
+              @click="paymentFilter = p"
+            >
+              {{ t(`payment_status_${p}`) }}
+            </button>
           </div>
         </div>
       </div>
@@ -934,6 +959,67 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
 .row {
   display: flex;
   align-items: center;
+}
+
+/* Compact filter strip — segmented controls for date + payment */
+.filterstrip {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.filterstrip--date {
+  padding-top: 10px;
+  padding-bottom: 14px;
+}
+.filterstrip__group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.filterstrip__lbl {
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.segctl {
+  display: inline-flex;
+  background: var(--surface-inset);
+  border-radius: var(--r-sm);
+  padding: 3px;
+  gap: 2px;
+}
+.segctl__btn {
+  border: none;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background .12s, color .12s;
+  white-space: nowrap;
+}
+.segctl__btn:hover:not(.is-active) {
+  color: var(--text);
+}
+.segctl__btn.is-active {
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: var(--shadow-xs);
+  font-weight: var(--fw-semibold);
+}
+@media (max-width: 768px) {
+  .filterstrip { gap: 12px; padding: 10px 14px; }
+  .filterstrip__group { flex: 1 1 100%; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .segctl { overflow-x: auto; max-width: 100%; }
+  .segctl__btn { padding: 6px 10px; }
 }
 
 /* --- Responsive toolbar --- */

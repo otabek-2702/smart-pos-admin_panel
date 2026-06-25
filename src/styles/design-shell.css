@@ -816,6 +816,9 @@ textarea.control { height: auto; padding: var(--sp-2) var(--sp-3); resize: verti
 .chips { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 6px 0 10px; border-radius: var(--r-pill); background: var(--primary-weak); color: var(--primary); border: 1px solid var(--primary-border); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
 .chip b { font-weight: var(--fw-semibold); }
+.chip.is-active { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+.chip.is-active:hover { background: var(--primary-hover); }
+.chip:not(.is-active):hover { background: var(--primary-weak-2); }
 .chip__x { width: 18px; height: 18px; border-radius: 99px; display: grid; place-items: center; cursor: pointer; color: var(--primary); }
 .chip__x:hover { background: var(--primary-weak-2); }
 .chip--clear { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-weight: var(--fw-medium); padding: 0 8px; }

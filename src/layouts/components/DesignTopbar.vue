@@ -338,16 +338,7 @@ onBeforeUnmount(() => {
       <DesignIcon :name="theme === 'dark' ? 'sun' : 'moon'" :size="18" />
     </button>
 
-    <!-- Notifications (kept from source) -->
-    <button
-      class="iconbtn"
-      :title="t('Notifications')"
-    >
-      <DesignIcon name="bell" :size="18" />
-      <span class="iconbtn__dot" />
-    </button>
-
-    <!-- Language switcher (preserved from prior version, not in source) -->
+<!-- Language switcher (preserved from prior version, not in source) -->
     <div
       ref="langRoot"
       style="position: relative;"

@@ -10,7 +10,7 @@ import { defineComponent, h } from 'vue'
 import Button from './Button.vue'
 import Checkbox from './Checkbox.vue'
 import DesignIcon from './DesignIcon.vue'
-import Select from './Select.vue'
+import Pagination from './Pagination.vue'
 import Skeleton from './Skeleton.vue'
 import StateFill from './StateFill.vue'
 import { cx } from './utils'
@@ -193,32 +193,7 @@ function setPp(n: number) {
   emit('per-page', n)
 }
 
-const pageNums = computed<(number | '…')[]>(() => {
-  const pages = totalPages.value
-  const page = curPage.value
-  if (pages <= 7)
-    return Array.from({ length: pages }, (_, i) => i + 1)
-  if (page <= 4)
-    return [1, 2, 3, 4, 5, '…', pages]
-  if (page >= pages - 3)
-    return [1, '…', pages - 4, pages - 3, pages - 2, pages - 1, pages]
-  return [1, '…', page - 1, page, page + 1, '…', pages]
-})
-
-const rangeStart = computed(() =>
-  totalItems.value === 0 ? 0 : (curPage.value - 1) * pp.value + 1,
-)
-const rangeEnd = computed(() =>
-  Math.min(curPage.value * pp.value, totalItems.value),
-)
-function fmtNum(n: number) {
-  if (n === null || n === undefined || Number.isNaN(n))
-    return ''
-  const neg = n < 0
-  const s = Math.round(Math.abs(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
-
-  return (neg ? '-' : '') + s
-}
+/* Pagination range, page-number list, and total formatting are owned by <Pagination>. */
 
 /* ---------- selection (controlled / uncontrolled) ---------- */
 const internalSelection = ref<Set<string | number>>(new Set())
@@ -282,7 +257,8 @@ function toggleExpand(id: string | number) {
 const colCount = computed(() =>
   props.columns.length
   + (isSelectable.value ? 1 : 0)
-  + (hasRowActions.value ? 1 : 0),
+  + (hasRowActions.value ? 1 : 0)
+  + (props.expandable ? 1 : 0),
 )
 
 const slots = useSlots()
@@ -312,15 +288,17 @@ function thStyle(c: DataTableColumn<R>): CSSProperties {
 }
 
 function rowStyle(): CSSProperties {
-  return props.expandable || hasOnRowClick.value ? { cursor: 'pointer' } : { cursor: 'default' }
+  /* v3 decision #2: row click no longer toggles expand — pointer cursor only when
+     a real row-click handler is wired. */
+  return hasOnRowClick.value ? { cursor: 'pointer' } : { cursor: 'default' }
 }
 
 const attrs = useAttrs()
 const hasOnRowClick = computed(() => !!(attrs as any).onRowClick)
 
 function emitRowClick(row: R) {
-  if (props.expandable)
-    toggleExpand(idOf(row))
+  /* v3 decision #2: chevron is the canonical expand toggle.
+     Row clicks no longer toggle expand when expandable. */
   emit('row-click', row)
 }
 
@@ -388,6 +366,10 @@ function skeletonWidth(c: number) {
         <thead>
           <tr>
             <th
+              v-if="expandable"
+              style="width: 40px;"
+            />
+            <th
               v-if="isSelectable"
               style="width: 44px;"
             >
@@ -431,6 +413,10 @@ function skeletonWidth(c: number) {
             v-for="r in skeletonRowCount"
             :key="`sk-${r}`"
           >
+            <td
+              v-if="expandable"
+              style="width: 40px;"
+            />
             <td
               v-if="isSelectable"
               style="width: 44px;"
@@ -491,6 +477,25 @@ function skeletonWidth(c: number) {
               :style="rowStyle()"
               @click="emitRowClick(r)"
             >
+              <td
+                v-if="expandable"
+                style="width: 40px;"
+              >
+                <button
+                  class="iconaction"
+                  :title="t('Expand')"
+                  @click.stop="toggleExpand(idOf(r))"
+                >
+                  <DesignIcon
+                    name="chevright"
+                    :size="16"
+                    :style="{
+                      transform: expanded.has(idOf(r)) ? 'rotate(90deg)' : 'none',
+                      transition: 'transform .15s',
+                    }"
+                  />
+                </button>
+              </td>
               <td v-if="isSelectable">
                 <Checkbox
                   :model-value="selection.has(idOf(r))"
@@ -550,67 +555,17 @@ function skeletonWidth(c: number) {
       </table>
     </div>
 
-    <!-- Pagination footer -->
-    <div
+    <!-- Pagination footer (decision #3: delegated to <Pagination>) -->
+    <Pagination
       v-if="!loading && totalItems > 0"
-      class="pagination"
-    >
-      <div
-        class="row"
-        style="gap: 8px;"
-      >
-        <span>{{ t('Rows per page') }}:</span>
-        <div style="width: 96px;">
-          <Select
-            size="sm"
-            :model-value="String(pp)"
-            :options="perPageOptions.map(n => String(n))"
-            @update:model-value="(v) => setPp(Number(v))"
-          />
-        </div>
-      </div>
-      <div class="pagination__spacer" />
-      <span class="num">{{ rangeStart }}–{{ rangeEnd }} {{ t('of') }} {{ fmtNum(totalItems) }}</span>
-      <div class="pglist">
-        <button
-          class="pgbtn"
-          :disabled="curPage <= 1"
-          @click="goPage(curPage - 1)"
-        >
-          <DesignIcon
-            name="chevleft"
-            :size="16"
-          />
-        </button>
-        <template
-          v-for="(n, i) in pageNums"
-          :key="n === '…' ? `e-${i}` : n"
-        >
-          <span
-            v-if="n === '…'"
-            class="pgbtn"
-            style="pointer-events: none;"
-          >…</span>
-          <button
-            v-else
-            :class="cx('pgbtn', n === curPage && 'is-active')"
-            @click="goPage(n as number)"
-          >
-            {{ n }}
-          </button>
-        </template>
-        <button
-          class="pgbtn"
-          :disabled="curPage >= totalPages"
-          @click="goPage(curPage + 1)"
-        >
-          <DesignIcon
-            name="chevright"
-            :size="16"
-          />
-        </button>
-      </div>
-    </div>
+      :page="curPage"
+      :per-page="pp"
+      :pages="totalPages"
+      :total="totalItems"
+      :per-page-options="perPageOptions"
+      @page="goPage"
+      @per-page="setPp"
+    />
   </div>
 </template>
 

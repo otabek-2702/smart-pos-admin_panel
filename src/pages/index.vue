@@ -1,445 +1,178 @@
 <script setup lang="ts">
-import axios from '@/plugins/axios'
+/* ============================================================
+   ALPHA POS — Dashboards hub (5 switchable dashboard views)
+   1:1 port of .tmp-handoff-v3/.../pages/Dashboard.jsx
+   Replaces the previous "Today's Snapshot" page per Jason's call
+   (locked decision #7 v3). Tabbed shell, shared header, date range,
+   refresh + export. Sub-dashboards live in src/pages/dash/*.vue
+   and are lazy-loaded via defineAsyncComponent.
+   ============================================================ */
+import { defineAsyncComponent } from 'vue'
+import Button from '@/components/design/Button.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import DateRangePicker, { type DateRangeValue } from '@/components/design/DateRangePicker.vue'
+import { useToast } from '@/components/design/useToast'
+import { fmtDateTime } from '@/components/design/utils/format'
+import { cx } from '@/components/design/utils'
 
 const { t } = useI18n({ useScope: 'global' })
-const { formatCurrency, formatDate } = useFormatters()
-const router = useRouter()
+const toast = useToast()
 
-const data = ref<any>(null)
-const loading = ref(true)
+// ---------- View registry ----------
+type ViewId = 'exec' | 'sales' | 'ops' | 'products' | 'staff'
 
-async function load() {
-  loading.value = true
-  try {
-    const res = await axios.get('/dashboard/today')
-
-    data.value = res.data?.data ?? res.data
-  }
-  finally {
-    loading.value = false
-  }
+interface DashView {
+  id: ViewId
+  labelKey: string
+  subtitleKey: string
+  icon: string
+  comp: ReturnType<typeof defineAsyncComponent>
 }
 
-onMounted(load)
+const DASH_VIEWS: DashView[] = [
+  {
+    id: 'exec',
+    labelKey: 'Executive',
+    subtitleKey: 'dash_subtitle_exec',
+    icon: 'dashboard',
+    comp: defineAsyncComponent(() => import('@/pages/dash/executive.vue')),
+  },
+  {
+    id: 'sales',
+    labelKey: 'Sales & Revenue',
+    subtitleKey: 'dash_subtitle_sales',
+    icon: 'trend',
+    comp: defineAsyncComponent(() => import('@/pages/dash/sales.vue')),
+  },
+  {
+    id: 'ops',
+    labelKey: 'Operations',
+    subtitleKey: 'dash_subtitle_ops',
+    icon: 'clock',
+    comp: defineAsyncComponent(() => import('@/pages/dash/operations.vue')),
+  },
+  {
+    id: 'products',
+    labelKey: 'Products',
+    subtitleKey: 'dash_subtitle_products',
+    icon: 'box',
+    comp: defineAsyncComponent(() => import('@/pages/dash/products.vue')),
+  },
+  {
+    id: 'staff',
+    labelKey: 'Staff & Shifts',
+    subtitleKey: 'dash_subtitle_staff',
+    icon: 'users',
+    comp: defineAsyncComponent(() => import('@/pages/dash/staff.vue')),
+  },
+]
 
-const today = computed(() => data.value?.today ?? null)
-const topProducts = computed(() => data.value?.top_products_today ?? [])
-const lowStock = computed(() => data.value?.low_stock_count ?? null)
-const clockedIn = computed(() => data.value?.clocked_in ?? [])
+// ---------- State ----------
+const LS_KEY = 'alphapos-dashview'
 
-const paidPercentage = computed(() => {
-  if (!today.value)
-    return 0
-  const total = today.value.orders || 0
-  if (!total)
-    return 0
-  return Math.round((today.value.paid_orders / total) * 100)
+function readStoredView(): ViewId {
+  try {
+    const v = localStorage.getItem(LS_KEY)
+    if (v && DASH_VIEWS.some(x => x.id === v))
+      return v as ViewId
+  }
+  catch {}
+  return 'exec'
+}
+
+const view = ref<ViewId>(readStoredView())
+const loading = ref(false)
+const dateRange = ref<DateRangeValue>({ from: '', to: '', preset: '30d' })
+
+watch(view, (v) => {
+  try { localStorage.setItem(LS_KEY, v) }
+  catch {}
 })
 
-const avgOrderValue = computed(() => {
-  if (!today.value)
-    return 0
-  const paid = today.value.paid_orders || 0
-  const revenue = Number(today.value.revenue) || 0
-  if (!paid)
-    return 0
-  return Math.round(revenue / paid)
-})
+const current = computed(() => DASH_VIEWS.find(v => v.id === view.value) ?? DASH_VIEWS[0])
+
+// ---------- Actions ----------
+function selectView(id: ViewId) {
+  if (view.value === id)
+    return
+  view.value = id
+}
+
+function refresh() {
+  loading.value = true
+  // Sub-pages handle their own load; just flash the spinner briefly
+  // and surface a confirmation toast.
+  setTimeout(() => {
+    loading.value = false
+    toast({
+      tone: 'success',
+      title: t('Dashboard refreshed'),
+      msg: t('Updated {datetime}', { datetime: fmtDateTime(new Date()) }),
+    })
+  }, 380)
+}
 </script>
 
 <template>
-  <div>
-    <div class="page-head">
-      <div style="min-width:0;">
-        <h1 class="page-head__title">
-          {{ t("Today's Snapshot") }}
+  <div class="page">
+    <div class="page__head">
+      <div style="min-width: 0;">
+        <h1 class="page__title">
+          {{ t('Dashboards') }}
         </h1>
-        <div class="page-head__subtitle">
-          {{ formatDate(new Date().toISOString()) }}
+        <div class="page__subtitle">
+          {{ t(current.subtitleKey) }}
         </div>
       </div>
-      <div class="page-head__actions">
-        <VBtn
-          variant="tonal"
-          prepend-icon="bx-refresh"
+      <div class="page__head-actions">
+        <DateRangePicker
+          v-model="dateRange"
+          align="right"
+          :placeholder="t('Last 30 days')"
+        />
+        <Button
+          variant="secondary"
+          icon="refresh"
           :loading="loading"
-          @click="load"
+          @click="refresh"
         >
           {{ t('Refresh') }}
-        </VBtn>
+        </Button>
+        <Button
+          variant="primary"
+          icon="download"
+        >
+          {{ t('Export') }}
+        </Button>
       </div>
     </div>
 
-    <VRow class="mb-4">
-      <VCol
-        cols="6"
-        sm="6"
-        lg="3"
+    <div
+      class="dashtabs"
+      style="margin-bottom: var(--sp-6);"
+    >
+      <button
+        v-for="v in DASH_VIEWS"
+        :key="v.id"
+        type="button"
+        :class="cx('dashtab', view === v.id && 'is-active')"
+        @click="selectView(v.id)"
       >
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-success">
-              <VIcon icon="bx-money" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t("Today's Revenue") }}
-            </div>
-          </div>
-          <div
-            v-if="today"
-            class="kpi-card__value"
-          >
-            {{ formatCurrency(today.revenue ?? 0) }}<span class="kpi-card__unit">{{ t('currency_short') }}</span>
-          </div>
-          <div
-            v-else
-            class="sk-box"
-            style="width:140px;height:32px;border-radius:4px;"
-          />
-        </div>
-      </VCol>
+        <DesignIcon
+          :name="v.icon"
+          :size="17"
+        />
+        <span>{{ t(v.labelKey) }}</span>
+      </button>
+    </div>
 
-      <VCol
-        cols="6"
-        sm="6"
-        lg="3"
-      >
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-primary">
-              <VIcon icon="bx-receipt" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Orders Today') }}
-            </div>
-          </div>
-          <div
-            v-if="today"
-            class="kpi-card__value"
-          >
-            {{ today.orders ?? 0 }}
-          </div>
-          <div
-            v-else
-            class="sk-box"
-            style="width:80px;height:32px;border-radius:4px;"
-          />
-        </div>
-      </VCol>
-
-      <VCol
-        cols="6"
-        sm="6"
-        lg="3"
-      >
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-info">
-              <VIcon icon="bx-trending-up" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Avg Order Value') }}
-            </div>
-          </div>
-          <div
-            v-if="today"
-            class="kpi-card__value"
-          >
-            {{ formatCurrency(avgOrderValue) }}<span class="kpi-card__unit">{{ t('currency_short') }}</span>
-          </div>
-          <div
-            v-else
-            class="sk-box"
-            style="width:120px;height:32px;border-radius:4px;"
-          />
-        </div>
-      </VCol>
-
-      <VCol
-        cols="6"
-        sm="6"
-        lg="3"
-      >
-        <div
-          class="kpi-card"
-          :class="{ 'cursor-pointer': lowStock && lowStock > 0 }"
-          @click="lowStock && lowStock > 0 && router.push('/stock/items')"
-        >
-          <div class="kpi-card__top">
-            <div
-              class="kpi-card__icon"
-              :class="lowStock && lowStock > 0 ? 't-warning' : 't-success'"
-            >
-              <VIcon icon="bx-package" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Low Stock Items') }}
-            </div>
-          </div>
-          <div
-            v-if="lowStock !== null"
-            class="kpi-card__value"
-          >
-            {{ lowStock }}
-          </div>
-          <div
-            v-else
-            class="sk-box"
-            style="width:60px;height:32px;border-radius:4px;"
-          />
-        </div>
-      </VCol>
-    </VRow>
-
-    <VRow class="mb-4">
-      <VCol
-        cols="6"
-        md="3"
-      >
-        <VCard>
-          <VCardText class="text-center pa-3">
-            <div
-              v-if="today"
-              class="text-h5 font-weight-bold text-primary"
-            >
-              {{ today.open ?? 0 }}
-            </div>
-            <div
-              v-else
-              class="sk-box mx-auto mb-1"
-              style="width:30px;height:20px;border-radius:4px;"
-            />
-            <div class="text-caption text-disabled">
-              {{ t('Open Orders') }}
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-      <VCol
-        cols="6"
-        md="3"
-      >
-        <VCard>
-          <VCardText class="text-center pa-3">
-            <div
-              v-if="today"
-              class="text-h5 font-weight-bold text-error"
-            >
-              {{ today.cancelled ?? 0 }}
-            </div>
-            <div
-              v-else
-              class="sk-box mx-auto mb-1"
-              style="width:30px;height:20px;border-radius:4px;"
-            />
-            <div class="text-caption text-disabled">
-              {{ t('Cancelled') }}
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-      <VCol
-        cols="6"
-        md="3"
-      >
-        <VCard>
-          <VCardText class="text-center pa-3">
-            <div
-              v-if="today"
-              class="text-h5 font-weight-bold text-success"
-            >
-              {{ paidPercentage }}%
-            </div>
-            <div
-              v-else
-              class="sk-box mx-auto mb-1"
-              style="width:40px;height:20px;border-radius:4px;"
-            />
-            <div class="text-caption text-disabled">
-              {{ t('Paid') }} ({{ today?.paid_orders ?? 0 }}/{{ today?.orders ?? 0 }})
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-      <VCol
-        cols="6"
-        md="3"
-      >
-        <VCard>
-          <VCardText class="text-center pa-3">
-            <div class="text-h5 font-weight-bold text-info">
-              {{ clockedIn.length }}
-            </div>
-            <div class="text-caption text-disabled">
-              {{ t('Clocked In') }}
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-    </VRow>
-
-    <VRow>
-      <VCol
-        cols="12"
-        lg="7"
-      >
-        <VCard :title="t('Top Products Today')">
-          <VCardText>
-            <template v-if="topProducts.length">
-              <div
-                v-for="(p, idx) in topProducts"
-                :key="p.product_id"
-                class="d-flex align-center gap-3 py-2 flex-wrap dash-list-row"
-                style="border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);"
-              >
-                <VAvatar
-                  size="32"
-                  color="primary"
-                  variant="tonal"
-                >
-                  <span class="text-caption font-weight-bold">{{ idx + 1 }}</span>
-                </VAvatar>
-                <div class="flex-grow-1">
-                  <div class="text-body-2 font-weight-medium">
-                    {{ p.product_name }}
-                  </div>
-                  <div class="text-caption text-disabled">
-                    {{ p.quantity }} {{ t('sold') }}
-                  </div>
-                </div>
-                <span class="text-body-2 font-weight-medium text-success">
-                  {{ formatCurrency(p.revenue) }}
-                </span>
-              </div>
-            </template>
-            <template v-else-if="loading">
-              <div
-                v-for="n in 5"
-                :key="n"
-                class="d-flex gap-3 py-2"
-              >
-                <div
-                  class="sk-box"
-                  style="width:32px;height:32px;border-radius:50%;"
-                />
-                <div
-                  class="sk-box flex-grow-1"
-                  style="height:14px;border-radius:4px;"
-                />
-                <div
-                  class="sk-box"
-                  style="width:80px;height:14px;border-radius:4px;"
-                />
-              </div>
-            </template>
-            <div
-              v-else
-              class="text-center text-disabled py-4"
-            >
-              {{ t('No sales yet today') }}
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-
-      <VCol
-        cols="12"
-        lg="5"
-      >
-        <VCard :title="t('Clocked In')">
-          <VCardText>
-            <template v-if="clockedIn.length">
-              <div
-                v-for="s in clockedIn"
-                :key="s.shift_id"
-                class="d-flex align-center gap-3 py-2 flex-wrap dash-list-row"
-                style="border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);cursor:pointer;"
-                @click="router.push('/shifts')"
-              >
-                <VAvatar
-                  size="36"
-                  color="success"
-                  variant="tonal"
-                >
-                  <VIcon icon="bx-user" />
-                </VAvatar>
-                <div class="flex-grow-1">
-                  <div class="text-body-2 font-weight-medium">
-                    {{ s.name }}
-                  </div>
-                  <div class="text-caption text-disabled">
-                    {{ t('Since') }} {{ formatDate(s.start_time) }}
-                  </div>
-                </div>
-                <VIcon
-                  icon="bx-chevron-right"
-                  size="18"
-                />
-              </div>
-            </template>
-            <template v-else-if="loading">
-              <div
-                v-for="n in 3"
-                :key="n"
-                class="d-flex gap-3 py-2"
-              >
-                <div
-                  class="sk-box"
-                  style="width:36px;height:36px;border-radius:50%;"
-                />
-                <div class="flex-grow-1">
-                  <div
-                    class="sk-box mb-1"
-                    style="width:120px;height:14px;border-radius:4px;"
-                  />
-                  <div
-                    class="sk-box"
-                    style="width:80px;height:11px;border-radius:4px;"
-                  />
-                </div>
-              </div>
-            </template>
-            <div
-              v-else
-              class="text-center text-disabled py-4"
-            >
-              {{ t('No active shifts') }}
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-    </VRow>
+    <component
+      :is="current.comp"
+      :date-range="dateRange"
+      :loading="loading"
+    />
   </div>
 </template>
-
-<style scoped>
-.dash-list-row {
-  min-width: 0;
-}
-
-.dash-list-row .flex-grow-1 {
-  min-width: 0;
-  word-break: break-word;
-}
-
-@media (max-width: 768px) {
-  .kpi-card__value {
-    font-size: 1.25rem;
-  }
-
-  .dash-list-row > span,
-  .dash-list-row > .text-body-2 {
-    inline-size: 100%;
-    text-align: end;
-  }
-}
-
-@media (max-width: 420px) {
-  .dash-list-row {
-    gap: 8px !important;
-  }
-}
-</style>
 
 <route lang="yaml">
 meta:

@@ -94,6 +94,35 @@ Rows pre-sorted by `revenue` desc preferred but FE re-sorts defensively. `range`
 
 Stretch (future): aggregated `/staff/performance/summary?range=30d` returning `{ active_count, top_performer: {name, revenue}, avg_accuracy: pct, total_hours: int }` for the KPI tiles so FE doesn't recompute on the client.
 
+### 11. Shifts list — extra reconciliation + perf fields for v3 card UI
+**Why:** FE `src/pages/shifts/index.vue` was rewritten to a v3 single card grid (KPI strip + filter toolbar + per-cashier ShiftCard + ReceiveCashModal). The card surfaces several fields the current `/shifts` / `/shifts/active` payloads do not return, so those cells render `—` until BE supplies them.
+
+**Need:** Add the following per-shift fields to both `GET /shifts/active` and `GET /shifts` response items (snake_case, consistent w/ existing nested shape):
+- `gross_revenue` (decimal) — gross sales for the shift (kept separate from `total_orders_revenue` if differentiation exists; otherwise alias is fine).
+- `net_revenue` (decimal) — gross minus refunds/cancellations/expenses, whatever BE considers "net".
+- `card_collected` (decimal) — non-cash payments tendered during the shift.
+- `expenses_total` (decimal) — sum of drawer expenses recorded against the shift.
+- `cancelled_count` (int) — number of cancelled orders during the shift.
+- `cancelled_amount` (decimal) — total monetary value of those cancelled orders.
+- `expected_cash` (decimal) — what the drawer SHOULD contain (cash_collected − expenses_total), so FE doesn't recompute and drift.
+- `variance` (decimal, nullable) — once reconciled: `actual_cash − expected_cash`.
+- `reported` (decimal, nullable) — the `actual_cash` value passed in the reconcile POST, echoed back on subsequent reads.
+- `reported_by` (string or `{ name }`) — manager who confirmed the handover.
+- `avg_ticket` (decimal) — gross_revenue / total_orders.
+- `items_sold` (int) — total quantity across all order lines in the shift.
+- `avg_prep_time` (seconds, nullable) — average kitchen prep duration.
+- `peak_hour` (string, e.g. `"13:00–14:00"`) — busiest hour of the shift.
+- `is_live_stats` (bool) — true while the shift is still OPEN and stats stream live (already returned on `/shifts/active`, please also return on `/shifts` so history view can mark in-progress rows).
+
+**Status enum:** FE renders three buckets — `active` (status `OPEN` or `is_live_stats`), `awaiting` (status `AWAITING_CASH` or `ENDED`), `reconciled` (status `CLOSED`, `COMPLETED`, `RECONCILED`, or `reported` truthy). Confirm canonical enum + transitions so we can simplify the FE mapping.
+
+**Dropped from FE pending separate decisions** (do NOT remove BE endpoints — FE will re-consume later):
+- Shift templates CRUD (`/shift-templates` GET/POST/PUT/DELETE) — UI removed, BE retained.
+- Drawer-expense management on the shift card (`/shifts/{id}/expenses/`, `/categories/`, `/recipients/search/` via cashboxApi) — UI removed, BE retained.
+- Per-shift performance scorecard (`GET /analytics/shifts/{id}`) — UI removed, BE retained.
+
+If any of those endpoints are slated for deprecation, tag here and we'll wire up the replacement.
+
 ---
 
 ## Done — verified

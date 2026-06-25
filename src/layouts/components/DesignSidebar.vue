@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import DesignIcon from '@/components/design/DesignIcon.vue'
+import SidebarLiveWidget from '@/components/design/SidebarLiveWidget.vue'
 import { useNavCountsStore } from '@/stores/navCounts'
 
 /* ============================================================
@@ -106,6 +107,12 @@ function onNavClick(e: MouseEvent, navigate: (e?: MouseEvent) => void) {
   navigate(e)
   emit('nav-go')
 }
+
+function onWidgetGo() {
+  if (route.path !== '/dashboard')
+    router.push('/dashboard')
+  emit('nav-go')
+}
 </script>
 
 <template>
@@ -157,6 +164,12 @@ function onNavClick(e: MouseEvent, navigate: (e?: MouseEvent) => void) {
         </template>
       </template>
     </nav>
+
+    <!-- v3 decision #6: ambient Today widget pinned to foot of sidebar (hidden when collapsed) -->
+    <SidebarLiveWidget
+      :collapsed="collapsed"
+      @nav-go="onWidgetGo"
+    />
   </aside>
 </template>
 

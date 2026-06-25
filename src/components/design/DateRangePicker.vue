@@ -1,16 +1,25 @@
 <script setup lang="ts">
 /* ============================================================
-   ALPHA POS — DateRangePicker (reusable)
-   1:1 port of .tmp-cal-design/.../app/datepicker.jsx
+   ALPHA POS — DateRangePicker (reusable, v3 single-pane)
+   1:1 port of .tmp-handoff-v3/pos-admin-panel/project/app/datepicker.jsx
+   - Single MonthGrid (prev/next nav)
+   - presetRange uses raw today (no businessToday)
+   - 'mode' state: 'date' | 'time' with segctl
+   - TIME_PRESETS + Custom TimeRange
+   - Click-outside uses pointerdown-capture (Teleport-safe)
+   value: { from, to, preset?, mode?, fromTime?, toTime? }
    ============================================================ */
 import DesignIcon from './DesignIcon.vue'
+import TimeRange from './TimeRange.vue'
 import { cx } from './utils'
-import { businessToday as _businessToday } from '@/composables/useBusinessDay'
 
 export interface DateRangeValue {
   from: string
   to: string
   preset?: string
+  mode?: 'date' | 'time'
+  fromTime?: string
+  toTime?: string
 }
 
 interface Props {
@@ -19,11 +28,13 @@ interface Props {
   align?: 'left' | 'right'
   size?: 'sm'
   placeholder?: string
+  enableTime?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   align: 'left',
   placeholder: 'All time',
+  enableTime: true,
 })
 const emit = defineEmits<{
   (e: 'update:modelValue', v: DateRangeValue): void
@@ -57,8 +68,8 @@ const WD = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 
 type PresetKey = 'today' | 'yesterday' | '7d' | '30d' | 'month' | 'prevmonth' | 'year' | 'all'
 
-function presetRange(key: PresetKey, _today: Date): [Date | null, Date | null] {
-  const tt = startOfDay(_businessToday())
+function presetRange(key: PresetKey, today: Date): [Date | null, Date | null] {
+  const tt = startOfDay(today)
   switch (key) {
     case 'today': return [tt, tt]
     case 'yesterday': { const y = addDays(tt, -1); return [y, y] }
@@ -87,6 +98,14 @@ const PRESETS: { key: PresetKey, label: string }[] = [
   { key: 'all', label: 'All time' },
 ]
 
+const TIME_PRESETS: { key: string, label: string, from: string, to: string }[] = [
+  { key: 'open', label: 'Open hours', from: '09:00', to: '23:00' },
+  { key: 'lunch', label: 'Lunch', from: '12:00', to: '15:00' },
+  { key: 'dinner', label: 'Dinner', from: '18:00', to: '22:00' },
+  { key: 'late', label: 'Late night', from: '22:00', to: '02:00' },
+  { key: 'allday', label: 'All day', from: '00:00', to: '23:59' },
+]
+
 function fmtShort(d: Date): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getFullYear()}`
 }
@@ -105,8 +124,11 @@ const today = startOfDay(new Date())
 const open = ref(false)
 const root = ref<HTMLElement | null>(null)
 
+const mode = ref<'date' | 'time'>((current.value.mode as any) || 'date')
 const from = ref<Date | null>(parseYmd(current.value.from))
 const to = ref<Date | null>(parseYmd(current.value.to))
+const fromTime = ref<string>(current.value.fromTime || '')
+const toTime = ref<string>(current.value.toTime || '')
 const hover = ref<Date | null>(null)
 const view = ref<Date>(
   from.value ? new Date(from.value.getFullYear(), from.value.getMonth(), 1)
@@ -120,16 +142,20 @@ watch(open, (v) => {
     from.value = vf
     to.value = vt
     hover.value = null
+    mode.value = (current.value.mode as any) || 'date'
+    fromTime.value = current.value.fromTime || ''
+    toTime.value = current.value.toTime || ''
     view.value = vf
       ? new Date(vf.getFullYear(), vf.getMonth(), 1)
       : new Date(today.getFullYear(), today.getMonth(), 1)
   }
 })
 
+/* Click-outside: pointerdown-capture (Teleport-safe) — Jason's carve-out */
 function onDocPointer(e: PointerEvent) {
   if (!open.value) return
-  const t = e.target as Node | null
-  if (t && root.value?.contains(t)) return
+  const tgt = e.target as Node | null
+  if (tgt && root.value?.contains(tgt)) return
   open.value = false
 }
 function onKey(e: KeyboardEvent) {
@@ -176,20 +202,52 @@ function apply() {
     from: f ? ymd(f) : '',
     to: tval ? ymd(tval) : '',
     preset: matchPreset(f, tval, today) ?? undefined,
+    mode: 'date',
+    fromTime: '',
+    toTime: '',
   })
   open.value = false
+}
+
+function applyTime() {
+  const vf = parseYmd(current.value.from)
+  const vt = parseYmd(current.value.to)
+  emitChange({
+    from: vf ? ymd(vf) : '',
+    to: vt ? ymd(vt) : '',
+    preset: matchPreset(vf, vt, today) ?? undefined,
+    mode: 'time',
+    fromTime: fromTime.value,
+    toTime: toTime.value,
+  })
+  open.value = false
+}
+
+function applyTimePreset(p: { from: string, to: string }) {
+  fromTime.value = p.from
+  toTime.value = p.to
 }
 
 function clear() {
   from.value = null; to.value = null; hover.value = null
 }
+function clearTime() {
+  fromTime.value = ''; toTime.value = ''
+}
 
 const valFrom = computed(() => parseYmd(current.value.from))
 const valTo = computed(() => parseYmd(current.value.to))
+const valMode = computed<'date' | 'time'>(() => (current.value.mode as any) || 'date')
 const activePreset = computed(() => matchPreset(valFrom.value, valTo.value, today))
 const draftActive = computed(() => matchPreset(from.value, to.value, today))
 
 const triggerLabel = computed(() => {
+  // time-mode display takes priority when active + has values
+  if (valMode.value === 'time' && (current.value.fromTime || current.value.toTime)) {
+    const tp = TIME_PRESETS.find(x => x.from === current.value.fromTime && x.to === current.value.toTime)
+    if (tp) return t(tp.label)
+    return `${current.value.fromTime || '00:00'} – ${current.value.toTime || '23:59'}`
+  }
   if (activePreset.value && activePreset.value !== 'all') {
     const p = PRESETS.find(x => x.key === activePreset.value)
     if (p) return t(p.label)
@@ -202,7 +260,11 @@ const triggerLabel = computed(() => {
   return t(props.placeholder)
 })
 
-const hasValue = computed(() => !!(valFrom.value || valTo.value))
+const hasValue = computed(() => !!(
+  valFrom.value
+  || valTo.value
+  || (valMode.value === 'time' && (current.value.fromTime || current.value.toTime))
+))
 
 const draftLabel = computed(() => {
   if (from.value && to.value)
@@ -211,6 +273,12 @@ const draftLabel = computed(() => {
       : `${fmtShort(from.value)} – ${fmtShort(to.value)}`
   if (from.value) return `${fmtShort(from.value)} – …`
   return t('Select a start date')
+})
+
+const draftTimeLabel = computed(() => {
+  if (fromTime.value || toTime.value)
+    return `${fromTime.value || '00:00'} – ${toTime.value || '23:59'}`
+  return t('Any time')
 })
 
 interface Cell { date: Date | null }
@@ -261,7 +329,10 @@ function cellDisabled(d: Date): boolean {
 
 function gotoPrev() { view.value = addMonths(view.value, -1) }
 function gotoNext() { view.value = addMonths(view.value, 1) }
-const nextView = computed(() => addMonths(view.value, 1))
+
+function setMode(m: 'date' | 'time') {
+  mode.value = m
+}
 </script>
 
 <template>
@@ -271,88 +342,137 @@ const nextView = computed(() => addMonths(view.value, 1))
       :class="cx('drp-trigger', hasValue && 'has-value', open && 'is-open')"
       @click="open = !open"
     >
-      <DesignIcon name="calendar" :size="17" />
+      <DesignIcon :name="valMode === 'time' ? 'clock' : 'calendar'" :size="17" />
       <span class="drp-trigger__label">{{ triggerLabel }}</span>
       <DesignIcon name="chevdown" :size="15" class="drp-trigger__chev" />
     </button>
 
     <div
       v-if="open"
-      :class="cx('drp-pop', align === 'right' && 'drp-pop--right')"
+      :class="cx('drp-pop', 'drp-pop--col', align === 'right' && 'drp-pop--right')"
     >
-      <div class="drp-presets">
-        <button
-          v-for="p in PRESETS"
-          :key="p.key"
-          type="button"
-          :class="cx('drp-preset', draftActive === p.key && 'is-active')"
-          @click="applyPreset(p.key)"
-        >
-          {{ t(p.label) }}
-        </button>
+      <div v-if="enableTime" class="drp-modebar">
+        <div class="seg" style="width: 100%;">
+          <button
+            type="button"
+            :class="cx('seg__btn', mode === 'date' && 'is-active')"
+            style="flex: 1;"
+            @click="setMode('date')"
+          >
+            <DesignIcon name="calendar" :size="15" />
+            {{ t('Date range') }}
+          </button>
+          <button
+            type="button"
+            :class="cx('seg__btn', mode === 'time' && 'is-active')"
+            style="flex: 1;"
+            @click="setMode('time')"
+          >
+            <DesignIcon name="clock" :size="15" />
+            {{ t('Time of day') }}
+          </button>
+        </div>
       </div>
 
-      <div class="drp-cal">
-        <div class="drp-cal__head">
-          <button type="button" class="drp-nav" :title="t('Previous month')" @click="gotoPrev">
-            <DesignIcon name="chevleft" :size="17" />
-          </button>
-          <div class="drp-cal__titles">
-            <span>{{ t(MONTHS[view.getMonth()]) }} {{ view.getFullYear() }}</span>
-            <span>{{ t(MONTHS[nextView.getMonth()]) }} {{ nextView.getFullYear() }}</span>
-          </div>
-          <button type="button" class="drp-nav" :title="t('Next month')" @click="gotoNext">
-            <DesignIcon name="chevright" :size="17" />
+      <div v-if="mode === 'date'" class="drp-body">
+        <div class="drp-presets">
+          <button
+            v-for="p in PRESETS"
+            :key="p.key"
+            type="button"
+            :class="cx('drp-preset', draftActive === p.key && 'is-active')"
+            @click="applyPreset(p.key)"
+          >
+            {{ t(p.label) }}
           </button>
         </div>
 
-        <div class="drp-months" @mouseleave="hover = null">
-          <div class="drp-month">
-            <div class="drp-wd">
-              <span v-for="w in WD" :key="`a-${w}`">{{ t(`wd_${w}`) }}</span>
+        <div class="drp-cal">
+          <div class="drp-cal__head">
+            <button type="button" class="drp-nav" :title="t('Previous month')" @click="gotoPrev">
+              <DesignIcon name="chevleft" :size="17" />
+            </button>
+            <div class="drp-cal__titles">
+              <span>{{ t(MONTHS[view.getMonth()]) }} {{ view.getFullYear() }}</span>
             </div>
-            <div class="drp-grid">
-              <template v-for="(c, i) in buildCells(view)" :key="`a${i}`">
-                <span v-if="!c.date" class="drp-cell is-empty" />
-                <button
-                  v-else
-                  type="button"
-                  :class="cellClass(c.date)"
-                  :disabled="cellDisabled(c.date)"
-                  @click="pick(c.date)"
-                  @mouseenter="hover = c.date"
-                >
-                  <span class="drp-num">{{ c.date.getDate() }}</span>
-                </button>
-              </template>
+            <button type="button" class="drp-nav" :title="t('Next month')" @click="gotoNext">
+              <DesignIcon name="chevright" :size="17" />
+            </button>
+          </div>
+
+          <div class="drp-months" @mouseleave="hover = null">
+            <div class="drp-month">
+              <div class="drp-wd">
+                <span v-for="w in WD" :key="w">{{ t(`wd_${w}`) }}</span>
+              </div>
+              <div class="drp-grid">
+                <template v-for="(c, i) in buildCells(view)" :key="i">
+                  <span v-if="!c.date" class="drp-cell is-empty" />
+                  <button
+                    v-else
+                    type="button"
+                    :class="cellClass(c.date)"
+                    :disabled="cellDisabled(c.date)"
+                    @click="pick(c.date)"
+                    @mouseenter="hover = c.date"
+                  >
+                    <span class="drp-num">{{ c.date.getDate() }}</span>
+                  </button>
+                </template>
+              </div>
             </div>
           </div>
-          <div class="drp-month">
-            <div class="drp-wd">
-              <span v-for="w in WD" :key="`b-${w}`">{{ t(`wd_${w}`) }}</span>
-            </div>
-            <div class="drp-grid">
-              <template v-for="(c, i) in buildCells(nextView)" :key="`b${i}`">
-                <span v-if="!c.date" class="drp-cell is-empty" />
-                <button
-                  v-else
-                  type="button"
-                  :class="cellClass(c.date)"
-                  :disabled="cellDisabled(c.date)"
-                  @click="pick(c.date)"
-                  @mouseenter="hover = c.date"
-                >
-                  <span class="drp-num">{{ c.date.getDate() }}</span>
-                </button>
-              </template>
+
+          <div class="drp-foot">
+            <span class="drp-foot__draft">{{ draftLabel }}</span>
+            <div class="drp-foot__actions">
+              <button v-if="from || to" type="button" class="drp-clear" @click="clear">
+                {{ t('Clear') }}
+              </button>
+              <button type="button" class="btn btn--ghost btn--sm" @click="open = false">
+                {{ t('Cancel') }}
+              </button>
+              <button
+                type="button"
+                class="btn btn--primary btn--sm"
+                :disabled="!from"
+                @click="apply"
+              >
+                {{ t('Apply') }}
+              </button>
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="drp-foot">
-          <span class="drp-foot__draft">{{ draftLabel }}</span>
+      <div v-else class="drp-time">
+        <div class="drp-time__label">
+          {{ t('Filter by time of day') }}
+        </div>
+        <div class="drp-time__chips">
+          <button
+            v-for="p in TIME_PRESETS"
+            :key="p.key"
+            type="button"
+            :class="cx('drp-timechip', fromTime === p.from && toTime === p.to && 'is-active')"
+            @click="applyTimePreset(p)"
+          >
+            {{ t(p.label) }}
+          </button>
+        </div>
+        <div class="drp-time__custom">
+          <span class="drp-time__customlabel">{{ t('Custom') }}</span>
+          <TimeRange
+            :from="fromTime"
+            :to="toTime"
+            @update:from="(v: string) => fromTime = v"
+            @update:to="(v: string) => toTime = v"
+          />
+        </div>
+        <div class="drp-foot" style="margin-top: auto;">
+          <span class="drp-foot__draft">{{ draftTimeLabel }}</span>
           <div class="drp-foot__actions">
-            <button v-if="from || to" type="button" class="drp-clear" @click="clear">
+            <button v-if="fromTime || toTime" type="button" class="drp-clear" @click="clearTime">
               {{ t('Clear') }}
             </button>
             <button type="button" class="btn btn--ghost btn--sm" @click="open = false">
@@ -361,8 +481,7 @@ const nextView = computed(() => addMonths(view.value, 1))
             <button
               type="button"
               class="btn btn--primary btn--sm"
-              :disabled="!from"
-              @click="apply"
+              @click="applyTime"
             >
               {{ t('Apply') }}
             </button>

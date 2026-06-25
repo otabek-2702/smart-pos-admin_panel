@@ -1171,50 +1171,47 @@ html, body, #root { min-height: 100vh; }
 
 /* ============================================================
    Sidebar ambient "Today" widget — SidebarLiveWidget.vue
-   (handoff v3: shell.jsx lines 137-162)
+   (handoff v3: shell.jsx lines 137-162, styles/app.css lines 86-94)
+   v3 selectors ported verbatim.
    ============================================================ */
 .sidewidget {
-  margin: var(--sp-3) var(--sp-3) var(--sp-2);
-  padding: var(--sp-3) var(--sp-3) var(--sp-2);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  margin: 8px 12px 14px;
+  padding: 14px;
   border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: linear-gradient(160deg, var(--primary-weak), var(--surface-2));
   cursor: pointer;
-  transition: background var(--anim-fast) ease, border-color var(--anim-fast) ease, transform var(--anim-fast) ease;
+  transition: border-color .16s, box-shadow .16s, transform .16s;
 }
-.sidewidget:hover { background: var(--surface-2); border-color: var(--border-strong); }
-.sidewidget:active { transform: scale(0.99); }
+.sidewidget:hover { border-color: var(--primary-border); box-shadow: var(--shadow-sm); transform: translateY(-2px); }
 .sidewidget__label {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 11px; font-weight: var(--fw-semibold);
-  color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em;
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text-secondary);
 }
 .sidewidget__value {
-  font-size: var(--fs-lg); font-weight: var(--fw-semibold);
-  color: var(--text); line-height: 1.15; margin-bottom: 4px;
+  font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: var(--text);
 }
 .sidewidget__unit {
-  font-size: 11px; font-weight: var(--fw-medium);
-  color: var(--text-tertiary); margin-left: 4px;
+  font-size: 10px; color: var(--text-tertiary); font-weight: 500;
+  margin-left: 4px; font-family: var(--font-sans);
 }
-.sidewidget__spark {
-  margin: 4px 0 2px;
-  overflow: hidden;
-}
-.sidewidget__meta {
-  font-size: 11px; color: var(--text-secondary);
-}
+.sidewidget__spark { margin-top: 6px; }
+.sidewidget__meta { font-size: 11px; color: var(--text-tertiary); }
 .livedot {
-  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  display: inline-block; width: 7px; height: 7px; border-radius: 99px;
   background: var(--success);
-  box-shadow: 0 0 0 0 var(--success);
-  animation: livedot-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  box-shadow: 0 0 0 3px var(--success-weak);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .livedot { animation: livedot-pulse 1.8s ease-in-out infinite; }
 }
 @keyframes livedot-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(var(--v-theme-success), 0.4); }
-  70%  { box-shadow: 0 0 0 6px rgba(var(--v-theme-success), 0); }
-  100% { box-shadow: 0 0 0 0 rgba(var(--v-theme-success), 0); }
+  0%, 100% { box-shadow: 0 0 0 3px var(--success-weak); }
+  50%      { box-shadow: 0 0 0 5px rgba(var(--v-theme-success), 0.18); }
 }
+/* hide the widget entirely when the rail is collapsed */
+.sidebar.is-collapsed .sidewidget { display: none; }
 
 /* ============================================================
    SettingsMenu popover — SettingsMenu.vue

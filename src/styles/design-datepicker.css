@@ -1,6 +1,5 @@
 /* ============================================================
    ALPHA POS — DateRangePicker styles
-   Verbatim port of .tmp-cal-design/.../styles/datepicker.css
    ============================================================ */
 
 .drp { position: relative; display: inline-block; }
@@ -25,7 +24,7 @@
 
 /* popover */
 .drp-pop {
-  position: absolute; top: calc(100% + 8px); left: 0; z-index: 50;
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 200;
   display: flex; background: var(--surface);
   border: 1px solid var(--border); border-radius: var(--r-lg);
   box-shadow: var(--shadow-lg); overflow: hidden;
@@ -33,6 +32,26 @@
 }
 .drp-pop--right { left: auto; right: 0; }
 @keyframes drp-in { from { opacity: 0; transform: translateY(-6px); } }
+
+/* unified column layout (mode toggle on top) — fixed footprint so toggling Date/Time never resizes the popover */
+.drp-pop--col { flex-direction: column; width: 480px; }
+.drp-modebar { padding: var(--sp-3) var(--sp-3) 0; }
+.drp-body { display: flex; width: 100%; min-height: 384px; }
+
+/* time-of-day panel */
+.drp-time { padding: var(--sp-4); width: 100%; min-height: 384px; display: flex; flex-direction: column; }
+.drp-time__customRow { margin-top: auto; }
+.drp-time__label { font-size: var(--fs-label); font-weight: var(--fw-semibold); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-tertiary); margin-bottom: var(--sp-3); }
+.drp-time__chips { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.drp-timechip {
+  height: 40px; border-radius: var(--r-sm); border: 1px solid var(--border-strong); background: var(--surface);
+  color: var(--text); font-family: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium); cursor: pointer;
+  transition: all .13s;
+}
+.drp-timechip:hover { border-color: var(--text-tertiary); background: var(--surface-2); }
+.drp-timechip.is-active { background: var(--primary-weak); border-color: var(--primary-border); color: var(--primary); font-weight: var(--fw-semibold); }
+.drp-time__custom { margin-top: var(--sp-4); }
+.drp-time__customlabel { display: block; font-size: var(--fs-label); font-weight: var(--fw-semibold); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px; }
 
 /* presets rail */
 .drp-presets {
@@ -50,10 +69,10 @@
 .drp-preset.is-active { background: var(--primary-weak); color: var(--primary); font-weight: var(--fw-semibold); }
 
 /* calendar side */
-.drp-cal { padding: var(--sp-4); width: 588px; }
+.drp-cal { padding: var(--sp-4); flex: 1; min-width: 0; }
 .drp-cal__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-3); }
-.drp-cal__titles { display: flex; flex: 1; justify-content: space-around; }
-.drp-cal__titles span { font-size: var(--fs-h3); font-weight: var(--fw-semibold); letter-spacing: -0.01em; color: var(--text); width: 50%; text-align: center; }
+.drp-cal__titles { display: flex; flex: 1; justify-content: center; }
+.drp-cal__titles span { font-size: var(--fs-h3); font-weight: var(--fw-semibold); letter-spacing: -0.01em; color: var(--text); text-align: center; }
 .drp-nav {
   width: 32px; height: 32px; flex: 0 0 32px; border-radius: var(--r-sm);
   border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary);
@@ -62,7 +81,7 @@
 .drp-nav:hover { background: var(--surface-2); color: var(--text); border-color: var(--border-strong); }
 
 .drp-months { display: flex; gap: var(--sp-5); }
-.drp-month { width: 50%; }
+.drp-month { width: 100%; }
 
 .drp-wd { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 6px; }
 .drp-wd span { text-align: center; font-size: var(--fs-micro); font-weight: var(--fw-semibold); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-tertiary); padding: 4px 0; }

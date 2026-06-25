@@ -268,6 +268,11 @@ async function bulkCancel() {
   }
 }
 
+function onBulkExport() {
+  notify(t('Exporting {n} orders…', { n: selected.value.size }), 'info')
+  // BE endpoint pending — no actual export call
+}
+
 function toggleRow(id: number | string) {
   if (expanded.value.has(id)) expanded.value.delete(id)
   else expanded.value.add(id)
@@ -297,7 +302,7 @@ const sortedOrders = computed(() => {
   const dir = sortDir.value === 'asc' ? 1 : -1
   arr.sort((a: any, b: any) => {
     let av: any, bv: any
-    if (k === 'id') { av = a.id; bv = b.id }
+    if (k === 'id') { av = a.display_id ?? 0; bv = b.display_id ?? 0 }
     else if (k === 'total') { av = Number(a.total_amount) || 0; bv = Number(b.total_amount) || 0 }
     else if (k === 'at') { av = new Date(a.created_at).getTime(); bv = new Date(b.created_at).getTime() }
     else if (k === 'status') { av = a.status; bv = b.status }
@@ -721,8 +726,7 @@ function onPaymentToggle(p: string) {
       >
         <!-- Order # -->
         <template #cell.id="{ row: o }">
-          <span class="cell-strong mono">#{{ o.id }}</span>
-          <span v-if="o.display_id" class="cell-muted mono" style="margin-left: 4px; font-size: 11px;">· {{ o.display_id }}</span>
+          <span class="cell-strong mono">#{{ o.display_id ?? '—' }}</span>
         </template>
 
         <!-- Type -->
@@ -802,6 +806,14 @@ function onPaymentToggle(p: string) {
             @click="openConfirm('cancel-bulk')"
           >
             {{ t('Cancel') }}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="download"
+            @click="onBulkExport"
+          >
+            {{ t('Export') }}
           </Button>
         </template>
 
@@ -927,7 +939,7 @@ function onPaymentToggle(p: string) {
         </div>
         <div>
           <p v-if="confirmDialog.order" style="margin:0;font-weight:600;">
-            #{{ confirmDialog.order.id }}
+            #{{ confirmDialog.order.display_id ?? '—' }}
             · {{ formatCurrency(confirmDialog.order.total_amount ?? 0) }}
           </p>
           <p v-else style="margin:0;font-weight:600;">

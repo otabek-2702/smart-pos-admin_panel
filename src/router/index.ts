@@ -8,16 +8,13 @@ import { armMotion, replayMotion } from '@/composables/useAlphaMotion'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    // ℹ️ We are redirecting to different pages based on role.
-    // NOTE: Role is just for UI purposes. ACL is based on abilities.
+    // Logged-out → /login. Logged-in → render the index.vue Dashboards hub.
+    // (per v3 design decision #7).
     {
       path: '/',
-      redirect: to => {
-        if (isUserLoggedIn())
-          return { name: 'dashboard', query: to.query }
-
-        return { name: 'login', query: to.query }
-      },
+      redirect: to => isUserLoggedIn()
+        ? { name: 'index', query: to.query }
+        : { name: 'login', query: to.query },
     },
     ...setupLayouts(routes),
   ],

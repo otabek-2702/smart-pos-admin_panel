@@ -356,11 +356,14 @@ const ordersByHourInsight = computed(() =>
 )
 
 const topProductsData = computed(() =>
-  topProducts.value.slice(0, 5).map((p: any) => ({
-    name: String(p.product_name ?? ''),
-    value: Number(p.revenue) || 0,
-    units: Number(p.quantity) || 0,
-  })),
+  topProducts.value
+    .map((p: any) => ({
+      name: String(p.product_name ?? ''),
+      value: Number(p.revenue) || 0,
+      units: Number(p.quantity) || 0,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5),
 )
 const topProductInsight = computed(() =>
   topProductsData.value.length

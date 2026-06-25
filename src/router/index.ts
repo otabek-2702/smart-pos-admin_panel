@@ -16,6 +16,8 @@ const router = createRouter({
         ? { name: 'index', query: to.query }
         : { name: 'login', query: to.query },
     },
+    // Old /dashboard snapshot page is hidden — redirect anyone landing on it to the hub.
+    { path: '/dashboard', redirect: '/' },
     ...setupLayouts(routes),
   ],
 })

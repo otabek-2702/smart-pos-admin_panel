@@ -1,0 +1,35 @@
+- generic [ref=e1]:
+  - generic [ref=e9]:
+    - generic [ref=e10]:
+      - button [ref=e12] [cursor=pointer]:
+        - img [ref=e14]
+      - generic [ref=e17]:
+        - button "Tilni almashtirish" [ref=e18] [cursor=pointer]:
+          - generic [ref=e19]: O'zbek
+        - button "Tilni almashtirish" [ref=e20] [cursor=pointer]:
+          - generic [ref=e21]: Русский
+        - button "Tilni almashtirish" [ref=e22] [cursor=pointer]:
+          - generic [ref=e23]: English
+    - generic [ref=e24]:
+      - img [ref=e28]
+      - generic [ref=e33]: pos system
+    - generic [ref=e34]:
+      - heading "pos systemga xush kelibsiz!" [level=6] [ref=e35]
+      - paragraph [ref=e36]: Hisobingizga kiring va boshqaruv paneliga o'ting
+    - generic [ref=e39]:
+      - textbox [ref=e43]:
+        - textbox "Elektron pochta Elektron pochta" [ref=e45]: admin@alpha.local
+        - generic:
+          - generic:
+            - generic: Elektron pochta
+      - generic [ref=e46]:
+        - textbox [ref=e49]:
+          - textbox "Parol Parol" [ref=e51]: root1234
+          - button "Parol appended action" [ref=e53] [cursor=pointer]
+          - generic:
+            - generic:
+              - generic: Parol
+        - button "Kirish" [active] [ref=e56] [cursor=pointer]:
+          - generic [ref=e57]: Kirish
+  - generic:
+    - tooltip

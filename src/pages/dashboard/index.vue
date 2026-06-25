@@ -601,7 +601,7 @@ function initial(s: string | undefined | null): string {
                 </Badge>
               </td>
               <td>
-                <StatusBadge :value="o.status ? t(`status_${String(o.status).toUpperCase()}`) : ''" dot />
+                <StatusBadge :value="o.status ? t(`order_status_${String(o.status).toUpperCase()}`) : ''" dot />
               </td>
               <td>
                 <StatusBadge :value="o.is_paid ? t('payment_status_PAID') : t('payment_status_UNPAID')" />

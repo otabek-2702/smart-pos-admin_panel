@@ -74,6 +74,10 @@
 .staff-row-2 {
   grid-template-columns: 1fr 1fr;
 }
+/* Prevent wide chart cards from blowing out grid tracks */
+.staff-hero > *,
+.staff-row-1 > *,
+.staff-row-2 > * { min-width: 0; }
 
 @media (max-width: 1100px) {
   .staff-hero { grid-template-columns: repeat(2, 1fr); }

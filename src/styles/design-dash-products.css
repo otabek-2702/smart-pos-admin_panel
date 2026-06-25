@@ -15,6 +15,9 @@
 /* Treemap + donut 2-col layout, collapses on mobile via grid utility */
 .dashprod-grid--mix { grid-template-columns: 1.6fr 1fr; }
 .dashprod-grid--pareto { grid-template-columns: 1fr 1fr; }
+/* Prevent wide chart cards from blowing out grid tracks below their min-content */
+.dashprod-grid--mix > *,
+.dashprod-grid--pareto > * { min-width: 0; }
 @media (max-width: 1100px) {
   .dashprod-grid--mix,
   .dashprod-grid--pareto { grid-template-columns: 1fr; }

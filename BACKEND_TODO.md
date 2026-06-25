@@ -45,6 +45,25 @@ Tag the answer here so we close the loop.
 - (a) `/orders` list response include `items: [{product__name, quantity, price}]` inline (LIGHT serializer — name + qty + price only, no nested product objects).
 - (b) Or confirm `GET /orders/{id}` returns `data.items` array w/ those fields. Currently FE expects `data.items` or `data.order.items`.
 
+### 7. AI system prompt: instruct markdown output
+**Why:** FE now renders AI replies as full markdown (headings, bold, lists, tables, fenced code w/ syntax highlight). BE system prompt currently says "Use simple text formatting with dashes and line breaks" — FE wants richer formatting.
+
+**Need:** In `stock/services/ai_assistant_service.py` SYSTEM_PROMPT, replace the formatting line w/:
+> Format your responses in Markdown. Use headings, **bold**, bullet and numbered lists, tables, and fenced code blocks with a language tag where relevant. Keep formatting purposeful, not excessive.
+
+Plus: keep dates ISO, money w/ space-thousands separator (FE post-processes commas → spaces), units suffix (kg, g, dona).
+
+### 8. Business-day boundary setting (configurable day start)
+**Why:** Restaurants run overnight shifts past midnight. Splitting by calendar midnight assigns sales to wrong day.
+
+**Need:**
+- Add per-restaurant setting `business_day_start` (TimeField, default `03:00`).
+- Helper: given a calendar date + day-start + restaurant timezone, return window `[date @ start, date+1 @ start)`. Tashkent = UTC+5 fixed, no DST.
+- ALL dashboard / statistics / shift queries currently filtering by date use this window. Single source of truth.
+- Expose `business_day_start` on `/auth/me` (or settings endpoint) so FE can compute the current business date for the preset chips.
+
+**Acceptance:** selecting June 25 → BE returns `2026-06-25 03:00 → 2026-06-26 03:00`. Overnight shift past midnight on the 25th counts toward the 25th.
+
 ### 6. Sales stats by payment method
 **Why:** Orders page may add payment-method breakdown KPIs (Cash vs Card vs Digital). Today's `/orders/stats` returns totals only.
 

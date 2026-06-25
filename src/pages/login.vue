@@ -8,6 +8,7 @@ import { themeConfig } from '@themeConfig'
 import axiosIns from '@/plugins/axios'
 import ability from '@/plugins/casl/ability'
 import { useApiError } from '@/composables/useApiError'
+import { setBusinessDayStart } from '@/composables/useBusinessDay'
 
 const { t, locale } = useI18n({ useScope: 'global' })
 const { translate } = useApiError()
@@ -46,6 +47,12 @@ const login = async () => {
 
     localStorage.setItem('accessToken', JSON.stringify(token))
     localStorage.setItem('userData', JSON.stringify(user))
+
+    // Per-restaurant overnight-shift boundary (default 03:00). BE exposes it
+    // on the user / settings payload when set; consumed by date presets.
+    const bds = user?.business_day_start ?? user?.restaurant?.business_day_start
+    if (typeof bds === 'string' && /^\d{1,2}:\d{2}/.test(bds))
+      setBusinessDayStart(bds.slice(0, 5))
 
     // Temporary: grant manage-all to every authenticated user. Backend still
     // enforces per-endpoint via @admin_required / @permission_required, so

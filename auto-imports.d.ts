@@ -9,6 +9,8 @@ declare global {
   const armMotion: typeof import('./src/composables/useDesignMotion')['armMotion']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
   const autoResetRef: typeof import('@vueuse/core')['autoResetRef']
+  const businessPreset: typeof import('./src/composables/useBusinessDay')['businessPreset']
+  const businessToday: typeof import('./src/composables/useBusinessDay')['businessToday']
   const computed: typeof import('vue')['computed']
   const computedAsync: typeof import('@vueuse/core')['computedAsync']
   const computedEager: typeof import('@vueuse/core')['computedEager']
@@ -100,6 +102,7 @@ declare global {
   const resolveRef: typeof import('@vueuse/core')['resolveRef']
   const resolveUnref: typeof import('@vueuse/core')['resolveUnref']
   const setActivePinia: typeof import('pinia')['setActivePinia']
+  const setBusinessDayStart: typeof import('./src/composables/useBusinessDay')['setBusinessDayStart']
   const setMapStoreSuffix: typeof import('pinia')['setMapStoreSuffix']
   const shallowReactive: typeof import('vue')['shallowReactive']
   const shallowReadonly: typeof import('vue')['shallowReadonly']
@@ -150,6 +153,7 @@ declare global {
   const useBreakpoints: typeof import('@vueuse/core')['useBreakpoints']
   const useBroadcastChannel: typeof import('@vueuse/core')['useBroadcastChannel']
   const useBrowserLocation: typeof import('@vueuse/core')['useBrowserLocation']
+  const useBusinessDay: typeof import('./src/composables/useBusinessDay')['useBusinessDay']
   const useCached: typeof import('@vueuse/core')['useCached']
   const useCeil: typeof import('@vueuse/math')['useCeil']
   const useClamp: typeof import('@vueuse/math')['useClamp']
@@ -339,6 +343,8 @@ declare module 'vue' {
     readonly armMotion: UnwrapRef<typeof import('./src/composables/useDesignMotion')['armMotion']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
     readonly autoResetRef: UnwrapRef<typeof import('@vueuse/core')['autoResetRef']>
+    readonly businessPreset: UnwrapRef<typeof import('./src/composables/useBusinessDay')['businessPreset']>
+    readonly businessToday: UnwrapRef<typeof import('./src/composables/useBusinessDay')['businessToday']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly computedAsync: UnwrapRef<typeof import('@vueuse/core')['computedAsync']>
     readonly computedEager: UnwrapRef<typeof import('@vueuse/core')['computedEager']>
@@ -430,6 +436,7 @@ declare module 'vue' {
     readonly resolveRef: UnwrapRef<typeof import('@vueuse/core')['resolveRef']>
     readonly resolveUnref: UnwrapRef<typeof import('@vueuse/core')['resolveUnref']>
     readonly setActivePinia: UnwrapRef<typeof import('pinia')['setActivePinia']>
+    readonly setBusinessDayStart: UnwrapRef<typeof import('./src/composables/useBusinessDay')['setBusinessDayStart']>
     readonly setMapStoreSuffix: UnwrapRef<typeof import('pinia')['setMapStoreSuffix']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
@@ -480,6 +487,7 @@ declare module 'vue' {
     readonly useBreakpoints: UnwrapRef<typeof import('@vueuse/core')['useBreakpoints']>
     readonly useBroadcastChannel: UnwrapRef<typeof import('@vueuse/core')['useBroadcastChannel']>
     readonly useBrowserLocation: UnwrapRef<typeof import('@vueuse/core')['useBrowserLocation']>
+    readonly useBusinessDay: UnwrapRef<typeof import('./src/composables/useBusinessDay')['useBusinessDay']>
     readonly useCached: UnwrapRef<typeof import('@vueuse/core')['useCached']>
     readonly useCeil: UnwrapRef<typeof import('@vueuse/math')['useCeil']>
     readonly useClamp: UnwrapRef<typeof import('@vueuse/math')['useClamp']>

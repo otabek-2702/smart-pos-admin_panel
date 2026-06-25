@@ -12,6 +12,7 @@ import { useAIAssistantStore } from '@/stores/aiAssistant'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import Button from '@/components/design/Button.vue'
 import Input from '@/components/design/Input.vue'
+import MarkdownMessage from '@/components/design/MarkdownMessage.vue'
 import { Fmt } from '@/components/design/utils/format'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -388,31 +389,7 @@ function selectChat(id: string) {
                       <span class="typing"><span /><span /><span /></span>
                     </template>
                     <template v-else>
-                      <div class="md">
-                        <template
-                          v-for="(b, bi) in parseMd(m.content)"
-                          :key="bi"
-                        >
-                          <p
-                            v-if="b.t === 'p'"
-                            v-html="mdInline(b.text || '')"
-                          />
-                          <ul v-else-if="b.t === 'ul'">
-                            <li
-                              v-for="(it, j) in b.items || []"
-                              :key="j"
-                              v-html="mdInline(it)"
-                            />
-                          </ul>
-                          <ol v-else>
-                            <li
-                              v-for="(it, j) in b.items || []"
-                              :key="j"
-                              v-html="mdInline(it)"
-                            />
-                          </ol>
-                        </template>
-                      </div>
+                      <MarkdownMessage :content="m.content" :streaming="!!m.streaming" />
                     </template>
                     <span
                       v-if="m.streaming && m.content"

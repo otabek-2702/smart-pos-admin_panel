@@ -5,6 +5,7 @@
    ============================================================ */
 import DesignIcon from './DesignIcon.vue'
 import { cx } from './utils'
+import { businessToday as _businessToday } from '@/composables/useBusinessDay'
 
 export interface DateRangeValue {
   from: string
@@ -56,8 +57,8 @@ const WD = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 
 type PresetKey = 'today' | 'yesterday' | '7d' | '30d' | 'month' | 'prevmonth' | 'year' | 'all'
 
-function presetRange(key: PresetKey, today: Date): [Date | null, Date | null] {
-  const tt = startOfDay(today)
+function presetRange(key: PresetKey, _today: Date): [Date | null, Date | null] {
+  const tt = startOfDay(_businessToday())
   switch (key) {
     case 'today': return [tt, tt]
     case 'yesterday': { const y = addDays(tt, -1); return [y, y] }

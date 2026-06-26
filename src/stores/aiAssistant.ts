@@ -4,6 +4,23 @@
    AIProvider. Generation runs in this store, so it keeps streaming
    when the user navigates to other pages. Browser notifications
    fire when a reply finishes and the user isn't watching the chat.
+
+   --- BE PERSISTENCE (added 2026-06) ---
+   Server is the source of truth when reachable. localStorage cache
+   stays as offline fallback. Each local Chat may carry a `serverId`
+   linking it to a server-side conversation (POST /ai/chats/). The
+   /ai/query/ call attaches `conversation_id` so the BE can persist
+   the message under that conversation.
+
+   BE endpoints (per Abrorbek, prefix /api/admins/stock/ via stockApi):
+   - GET    /ai/chats/            → list  [{id, title, updated_at, message_count}]
+   - GET    /ai/chats/{id}/       → detail { id, title, messages: [{id, role, content, ts}] }
+   - POST   /ai/chats/            → create empty, returns { id }
+   - PATCH  /ai/chats/{id}/       → rename { title }
+   - DELETE /ai/chats/{id}/       → remove
+   - POST   /ai/query/            → existing, now accepts { conversation_id?, ... }
+
+   On unknown shapes / network errors we degrade silently to local-only.
    ============================================================ */
 import { defineStore } from 'pinia'
 import { stockApi } from '@/plugins/axios'
@@ -21,10 +38,14 @@ export interface ChatMessage {
 
 export interface Chat {
   id: string
+  /** Server-side conversation id (string|number). undefined when chat is local-only. */
+  serverId?: string | number
   title: string
   messages: ChatMessage[]
   updatedAt: number
   draft?: string
+  /** Set when we know the server has more messages than we've hydrated. */
+  needsHydration?: boolean
 }
 
 export interface QuickAction { id: string; label: string; icon: string; query: string }
@@ -66,6 +87,72 @@ function loadNotify(): boolean {
   catch { return false }
 }
 
+// --- BE shape coercion helpers (forgiving of unexpected payloads) ---
+
+function toTs(v: any): number {
+  if (typeof v === 'number')
+    return v > 1e12 ? v : v * 1000 // accept seconds or ms
+  if (typeof v === 'string') {
+    const n = Date.parse(v)
+
+    if (!Number.isNaN(n))
+      return n
+  }
+  return nowTs()
+}
+
+interface RemoteChatSummary { id: string | number; title?: string; updated_at?: any; message_count?: number }
+interface RemoteChatDetail { id: string | number; title?: string; messages?: any[] }
+
+function coerceSummary(raw: any): RemoteChatSummary | null {
+  if (!raw || (raw.id === undefined || raw.id === null))
+    return null
+  return {
+    id: raw.id,
+    title: typeof raw.title === 'string' ? raw.title : '',
+    updated_at: raw.updated_at ?? raw.updatedAt ?? null,
+    message_count: typeof raw.message_count === 'number'
+      ? raw.message_count
+      : (typeof raw.messages_count === 'number' ? raw.messages_count : 0),
+  }
+}
+
+function coerceMessage(raw: any): ChatMessage | null {
+  if (!raw)
+    return null
+  const role: 'user' | 'assistant' = raw.role === 'user' ? 'user' : 'assistant'
+  const content = typeof raw.content === 'string'
+    ? raw.content
+    : (typeof raw.text === 'string' ? raw.text : '')
+  const id = raw.id !== undefined && raw.id !== null ? String(raw.id) : uid()
+
+  return { id, role, content, ts: toTs(raw.ts ?? raw.created_at ?? raw.createdAt) }
+}
+
+function coerceDetail(raw: any): RemoteChatDetail | null {
+  if (!raw || (raw.id === undefined || raw.id === null))
+    return null
+  const msgsRaw = Array.isArray(raw.messages) ? raw.messages : []
+
+  return {
+    id: raw.id,
+    title: typeof raw.title === 'string' ? raw.title : '',
+    messages: msgsRaw.map(coerceMessage).filter(Boolean),
+  }
+}
+
+function pickArray(payload: any): any[] {
+  if (Array.isArray(payload))
+    return payload
+  if (Array.isArray(payload?.results))
+    return payload.results
+  if (Array.isArray(payload?.chats))
+    return payload.chats
+  if (Array.isArray(payload?.data))
+    return payload.data
+  return []
+}
+
 export const useAIAssistantStore = defineStore('aiAssistant', () => {
   const chats = ref<Chat[]>(loadChats())
   const activeId = ref<string | null>(chats.value[0]?.id ?? null)
@@ -79,6 +166,12 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
   const quickActions = ref<QuickAction[]>([])
   const suggestions = ref<Suggestion[]>([])
   const loadingMeta = ref(false)
+
+  // Server sync state
+  const remoteChats = ref<RemoteChatSummary[]>([])
+  const remoteLoading = ref(false)
+  const remoteError = ref<string | null>(null)
+  let remoteListed = false // guard so we don't re-list on every visibility toggle
 
   const chatVisible = ref(false)
   let stopRequested = false
@@ -94,6 +187,11 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
 
   function setChatVisible(v: boolean) {
     chatVisible.value = v
+    if (v && !remoteListed) {
+      remoteListed = true
+      // fire and forget — local cache is shown immediately; server merges in.
+      listRemote().catch(() => { /* graceful */ })
+    }
   }
 
   function fireNotification(_chatId: string, title: string, body: string) {
@@ -151,20 +249,26 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
     return c.id
   }
 
-  function selectChat(id: string) {
-    activeId.value = id
-  }
-
   function deleteChat(id: string) {
-    const next = chats.value.filter(c => c.id !== id)
+    const c = chats.value.find(x => x.id === id)
+    const next = chats.value.filter(x => x.id !== id)
 
     chats.value = next
     if (activeId.value === id)
       activeId.value = next[0]?.id ?? null
+
+    // Best-effort remote delete; local removal already happened.
+    if (c?.serverId !== undefined && c.serverId !== null)
+      deleteRemote(c.serverId).catch(() => { /* graceful */ })
   }
 
   function renameChat(id: string, title: string) {
-    chats.value = chats.value.map(c => c.id === id ? { ...c, title } : c)
+    const c = chats.value.find(x => x.id === id)
+
+    chats.value = chats.value.map(x => x.id === id ? { ...x, title } : x)
+
+    if (c?.serverId !== undefined && c.serverId !== null)
+      renameRemote(c.serverId, title).catch(() => { /* graceful */ })
   }
 
   function stop() {
@@ -188,6 +292,163 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
     }
     finally { loadingMeta.value = false }
   }
+
+  // ----------------------------------------------------------------
+  // Remote (server) sync
+  // ----------------------------------------------------------------
+
+  /** GET /ai/chats/ — list server conversations and merge into local chats[]. */
+  async function listRemote(): Promise<RemoteChatSummary[]> {
+    remoteLoading.value = true
+    remoteError.value = null
+    try {
+      const res = await stockApi.get('/ai/chats/')
+      const arr = pickArray(res.data).map(coerceSummary).filter(Boolean) as RemoteChatSummary[]
+
+      remoteChats.value = arr
+      mergeRemoteIntoLocal(arr)
+
+      return arr
+    }
+    catch (e: any) {
+      remoteError.value = e?.response?.data?.message || e?.message || 'failed'
+
+      return []
+    }
+    finally {
+      remoteLoading.value = false
+    }
+  }
+
+  /** Merge server summaries into local chats[]. Server is source of truth for order/title. */
+  function mergeRemoteIntoLocal(remote: RemoteChatSummary[]) {
+    if (!remote.length)
+      return
+
+    const byServerId = new Map<string, Chat>()
+    const localOnly: Chat[] = []
+
+    for (const c of chats.value) {
+      if (c.serverId !== undefined && c.serverId !== null)
+        byServerId.set(String(c.serverId), c)
+      else
+        localOnly.push(c)
+    }
+
+    const merged: Chat[] = []
+
+    for (const r of remote) {
+      const key = String(r.id)
+      const existing = byServerId.get(key)
+
+      if (existing) {
+        // Server title wins (unless empty); preserve local messages cache.
+        merged.push({
+          ...existing,
+          title: r.title || existing.title,
+          updatedAt: toTs(r.updated_at) || existing.updatedAt,
+          needsHydration: (r.message_count ?? 0) > existing.messages.length,
+        })
+      }
+      else {
+        // Server-only chat — placeholder until user opens it (then hydrate).
+        merged.push({
+          id: uid(),
+          serverId: r.id,
+          title: r.title || 'Chat',
+          messages: [],
+          updatedAt: toTs(r.updated_at),
+          needsHydration: (r.message_count ?? 0) > 0,
+        })
+      }
+    }
+
+    // Keep purely-local chats (no serverId) at the bottom — usually transient.
+    chats.value = [...merged, ...localOnly]
+
+    if (activeId.value && !chats.value.some(c => c.id === activeId.value))
+      activeId.value = chats.value[0]?.id ?? null
+  }
+
+  /** GET /ai/chats/{id}/ — hydrate one chat's messages from server. */
+  async function getRemote(serverId: string | number): Promise<RemoteChatDetail | null> {
+    try {
+      const res = await stockApi.get(`/ai/chats/${serverId}/`)
+      const detail = coerceDetail(res.data)
+
+      if (!detail)
+        return null
+
+      // Splice messages into the matching local chat (if any).
+      chats.value = chats.value.map(c => {
+        if (String(c.serverId) !== String(detail.id))
+          return c
+        return {
+          ...c,
+          title: detail.title || c.title,
+          messages: detail.messages as ChatMessage[],
+          needsHydration: false,
+        }
+      })
+
+      return detail
+    }
+    catch {
+      return null
+    }
+  }
+
+  /** POST /ai/chats/ — create empty server conversation, return its id. */
+  async function createRemote(title?: string): Promise<string | number | null> {
+    try {
+      const res = await stockApi.post('/ai/chats/', title ? { title } : {})
+      const id = res.data?.id ?? res.data?.data?.id ?? null
+
+      return id !== undefined && id !== null ? id : null
+    }
+    catch {
+      return null
+    }
+  }
+
+  /** PATCH /ai/chats/{id}/ */
+  async function renameRemote(serverId: string | number, title: string): Promise<boolean> {
+    try {
+      await stockApi.patch(`/ai/chats/${serverId}/`, { title })
+
+      return true
+    }
+    catch {
+      return false
+    }
+  }
+
+  /** DELETE /ai/chats/{id}/ */
+  async function deleteRemote(serverId: string | number): Promise<boolean> {
+    try {
+      await stockApi.delete(`/ai/chats/${serverId}/`)
+
+      return true
+    }
+    catch {
+      return false
+    }
+  }
+
+  function selectChat(id: string) {
+    activeId.value = id
+
+    // Lazy-hydrate from server if this chat has a serverId but no messages yet
+    // (or the server-side message_count exceeds what we have cached).
+    const c = chats.value.find(x => x.id === id)
+
+    if (c && c.serverId !== undefined && c.serverId !== null && (c.messages.length === 0 || c.needsHydration))
+      getRemote(c.serverId).catch(() => { /* graceful */ })
+  }
+
+  // ----------------------------------------------------------------
+  // Streaming reply
+  // ----------------------------------------------------------------
 
   function streamWords(convoId: string, msgId: string, fullText: string) {
     const words = fullText.split(/(\s+)/)
@@ -296,16 +557,39 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
     activeId.value = convoId
     generating.value = convoId
 
+    // Ensure the active chat has a server-side conversation id before posting
+    // the query — so the BE attaches the message to the right conversation.
+    // Failure to create remote is non-fatal; we just send without conversation_id.
+    let active = chats.value.find(c => c.id === convoId) || null
+    let conversationId: string | number | undefined = active?.serverId
+
+    if (active && (active.serverId === undefined || active.serverId === null)) {
+      const newServerId = await createRemote(active.title)
+
+      if (newServerId !== null) {
+        conversationId = newServerId
+        chats.value = chats.value.map(c => c.id !== convoId
+          ? c
+          : ({ ...c, serverId: newServerId }))
+        active = chats.value.find(c => c.id === convoId) || null
+      }
+    }
+
     // Real BE call, then stream the result word-by-word for the typing UX.
     try {
       const locale = localStorage.getItem('appLocale') || 'uz'
       const user = getUserPayload()
-      const res = await stockApi.post('/ai/query/', {
+      const payload: Record<string, any> = {
         query: text,
         context: null,
         locale,
         user,
-      })
+      }
+
+      if (conversationId !== undefined && conversationId !== null)
+        payload.conversation_id = conversationId
+
+      const res = await stockApi.post('/ai/query/', payload)
       const reply = res.data?.response || 'No response'
 
       streamWords(convoId!, aMsg.id, reply)
@@ -354,6 +638,9 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
     quickActions,
     suggestions,
     loadingMeta,
+    remoteChats,
+    remoteLoading,
+    remoteError,
     setChatVisible,
     requestPermission,
     toggleNotify,
@@ -366,5 +653,10 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
     clearChat,
     setDraft,
     loadMeta,
+    listRemote,
+    getRemote,
+    createRemote,
+    renameRemote,
+    deleteRemote,
   }
 })

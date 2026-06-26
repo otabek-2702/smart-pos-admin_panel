@@ -10,9 +10,10 @@
    Until then we read the static fixture from src/pages/dash/_mock/dashdata.ts
    (mirrors window.DASH.staff in the handoff source).
    ============================================================ */
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import axiosIns from '@/plugins/axios'
 import Card from '@/components/design/Card.vue'
 import HeroKpi from '@/components/design/HeroKpi.vue'
 import Skeleton from '@/components/design/Skeleton.vue'
@@ -29,6 +30,7 @@ const { formatCurrency } = useFormatters()
 
 /* ---------- Data shape (mirrors window.DASH.staff in handoff v3) ---------- */
 interface StaffRow {
+  id?: number | null
   name: string
   initials: string
   revenue: number
@@ -41,8 +43,88 @@ interface StaffRow {
   attendance: number
 }
 
-const loading = ref(false)
-const staff = ref<StaffRow[]>(staffFixture as unknown as StaffRow[])
+const loading = ref(true)
+const staff = ref<StaffRow[]>([])
+
+/* ---------- BE → FE mapper ----------
+   Confirmed contract (alpha_pos_server/admins/services/analytics_service.py
+   → staff_performance):
+     GET /staff/performance?range=30d  (or ?from=&to=)
+       → { range, window_days,
+            staff[{ user_id, name, role,
+                    orders_total, orders_completed, orders_cancelled,
+                    orders_paid, cancel_rate_pct,
+                    revenue, avg_order_value, units_sold,
+                    shifts_worked, hours_worked }],
+            summary }
+   BE does NOT compute speed / accuracy / upsell / attendance — they are
+   derivations only the operator can score. We synthesise sane defaults so
+   the radar/scatter still render, and leave the door open for a BE update.
+*/
+
+function initialsOf(name: string): string {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return '?'
+  if (parts.length === 1) return parts[0][0]!.toUpperCase()
+  return (parts[0][0]! + parts[parts.length - 1]![0]!).toUpperCase()
+}
+
+function num(v: unknown): number {
+  const n = typeof v === 'string' ? Number(v) : (v as number)
+  return Number.isFinite(n) ? n : 0
+}
+
+function mapStaffPerformance(raw: any): StaffRow[] {
+  const list = Array.isArray(raw?.staff) ? raw.staff : []
+  return list.map((r: any) => {
+    const revenue = num(r?.revenue)
+    const orders = num(r?.orders_total)
+    const aov = num(r?.avg_order_value)
+    const hours = num(r?.hours_worked)
+    const cancelRate = num(r?.cancel_rate_pct)
+    // Derive plausible scores from real BE signals.
+    //   accuracy ← 100 - cancel rate (clamped)
+    //   attendance ← shifts worked normalised (1 shift ≈ 75%, 4+ shifts → 100)
+    //   speed / upsell ← not derivable; leave neutral defaults so radar renders.
+    const accuracy = Math.max(0, Math.min(100, Math.round(100 - cancelRate)))
+    const shifts = num(r?.shifts_worked)
+    const attendance = Math.max(0, Math.min(100, Math.round(75 + Math.min(25, shifts * 6))))
+    return {
+      id: r?.user_id ?? null,
+      name: r?.name?.trim() || '—',
+      initials: initialsOf(r?.name || ''),
+      revenue,
+      orders,
+      aov,
+      hours: Math.round(hours),
+      speed: 80,
+      accuracy,
+      upsell: 60,
+      attendance,
+    }
+  })
+}
+
+async function loadStaff() {
+  loading.value = true
+  try {
+    const res = await axiosIns.get('/staff/performance', { params: { range: '30d' } })
+    const raw = res.data?.data ?? res.data
+    const mapped = mapStaffPerformance(raw)
+    // Fail gracefully if BE returned an empty list — fall back to the demo
+    // fixture so the page is still illustrative on a fresh deployment.
+    staff.value = mapped.length ? mapped : (staffFixture as unknown as StaffRow[])
+  }
+  catch {
+    // BE 404 / network — preserve the demo fixture rendering.
+    staff.value = staffFixture as unknown as StaffRow[]
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadStaff)
 
 /* Defensive ranks — fixture is pre-sorted by revenue desc, but normalise here
    so the leaderboard is correct whatever the BE returns. */
@@ -58,6 +140,11 @@ const maxRev = computed(() => {
 const totalHours = computed(() => ranked.value.reduce((acc, s) => acc + s.hours, 0))
 
 /* ---------- HeroKpi tiles (4) ---------- */
+const avgAccuracy = computed(() => {
+  if (!ranked.value.length) return 0
+  return Math.round(ranked.value.reduce((acc, s) => acc + s.accuracy, 0) / ranked.value.length)
+})
+
 const heroKpis = computed(() => {
   const top = ranked.value[0]
   return [
@@ -66,7 +153,7 @@ const heroKpis = computed(() => {
       value: ranked.value.length,
       icon: 'users',
       tone: 'primary' as const,
-      sub: t('on shift now'),
+      sub: t('in last 30 days'),
     },
     {
       label: t('Top performer'),
@@ -77,10 +164,9 @@ const heroKpis = computed(() => {
     },
     {
       label: t('Avg accuracy'),
-      value: '92%',
+      value: `${avgAccuracy.value}%`,
       icon: 'check',
       tone: 'success' as const,
-      delta: 1.4,
     },
     {
       label: t('Total hours (30d)'),

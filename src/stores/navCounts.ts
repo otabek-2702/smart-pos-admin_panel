@@ -8,11 +8,6 @@ export interface NavCounts {
   revenueSeries: number[]
 }
 
-function todayIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 /**
  * Synthesised flat-ish 12-point fallback when BE doesn't expose hourly_revenue.
  * NOT random — deterministic so the sparkline doesn't twitch between polls.
@@ -27,6 +22,12 @@ function synthSeries(total: number | null): number[] {
   return shape.map(k => base * k)
 }
 
+function toNum(v: unknown): number | null {
+  if (v == null) return null
+  const n = typeof v === 'string' ? Number(v) : (v as number)
+  return typeof n === 'number' && Number.isFinite(n) ? n : null
+}
+
 export const useNavCountsStore = defineStore('navCounts', () => {
   const counts = ref<NavCounts>({ shifts: null, orders: null, todayRevenue: null, revenueSeries: [] })
   const refreshing = ref(false)
@@ -36,36 +37,35 @@ export const useNavCountsStore = defineStore('navCounts', () => {
     if (refreshing.value) return
     refreshing.value = true
     try {
-      const today = todayIso()
-      const [shiftsRes, ordersRes] = await Promise.allSettled([
-        axios.get('/shifts/active'),
-        axios.get('/orders/stats', { params: { date_from: today, date_to: today } }),
-      ])
+      // Single-call sidebar counters — BE shape: { success, data: { active_shifts, today_orders, today_revenue } }
+      // Replaces the previous two polls (/shifts/active + /orders/stats).
+      const res = await axios.get('/sidebar-counts')
+      const d = res?.data?.data ?? res?.data ?? {}
 
-      if (shiftsRes.status === 'fulfilled') {
-        const d = shiftsRes.value.data?.data ?? shiftsRes.value.data
-        counts.value.shifts = Array.isArray(d) ? d.length : (Array.isArray(d?.shifts) ? d.shifts.length : 0)
+      const shifts = toNum(d.active_shifts)
+      counts.value.shifts = shifts ?? 0
+
+      const orders = toNum(d.today_orders)
+      counts.value.orders = orders ?? 0
+
+      // BE returns today_revenue as an integer-so'm string (e.g. "150000").
+      const todayRev = toNum(d.today_revenue)
+      counts.value.todayRevenue = todayRev
+
+      // BE may later expose hourly_revenue / revenue_series / series — honour it if
+      // present, else synth a deterministic curve scaled to todayRevenue.
+      const series = d.hourly_revenue ?? d.revenue_series ?? d.series
+      if (Array.isArray(series) && series.length >= 2) {
+        counts.value.revenueSeries = series
+          .map((v: any) => Number(v))
+          .filter((v: number) => Number.isFinite(v))
       }
-      if (ordersRes.status === 'fulfilled') {
-        const d = ordersRes.value.data?.data ?? ordersRes.value.data
-        counts.value.orders = typeof d?.total_orders === 'number' ? d.total_orders : 0
-        const rev = d?.total_revenue ?? d?.revenue ?? d?.gross_revenue
-        const revNum = typeof rev === 'string' ? Number(rev) : rev
-        const todayRev = typeof revNum === 'number' && !Number.isNaN(revNum) ? revNum : null
-        counts.value.todayRevenue = todayRev
-        // Prefer BE-provided hourly_revenue (or revenue_series / series). If BE omits the
-        // field, fall back to a synthesised flat-ish curve scaled to todayRevenue — never
-        // Math.random (the sparkline must be deterministic between polls).
-        const series = d?.hourly_revenue ?? d?.revenue_series ?? d?.series
-        if (Array.isArray(series) && series.length >= 2) {
-          counts.value.revenueSeries = series
-            .map((v: any) => Number(v))
-            .filter((v: number) => Number.isFinite(v))
-        }
-        else {
-          counts.value.revenueSeries = synthSeries(todayRev)
-        }
+      else {
+        counts.value.revenueSeries = synthSeries(todayRev)
       }
+    }
+    catch {
+      // Fail-soft: leave previous values in place so the sidebar doesn't flicker.
     }
     finally {
       refreshing.value = false

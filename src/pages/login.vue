@@ -49,10 +49,24 @@ const login = async () => {
     localStorage.setItem('userData', JSON.stringify(user))
 
     // Per-restaurant overnight-shift boundary (default 03:00). BE exposes it
-    // on the user / settings payload when set; consumed by date presets.
-    const bds = user?.business_day_start ?? user?.restaurant?.business_day_start
-    if (typeof bds === 'string' && /^\d{1,2}:\d{2}/.test(bds))
-      setBusinessDayStart(bds.slice(0, 5))
+    // on /auth-me (top-level) and /app-settings (under data.settings). The
+    // /auth-login response does NOT carry it, so we fan out to /auth-me after
+    // login. Best-effort: failure here is non-fatal — useBusinessDay falls
+    // back to its 03:00 default.
+    try {
+      const meRes = await axiosIns.get('/auth-me')
+      const me = meRes?.data?.data ?? {}
+      const bds: unknown = me?.business_day_start
+        ?? me?.user?.business_day_start
+        ?? me?.restaurant?.business_day_start
+      if (typeof bds === 'string' && /^\d{1,2}:\d{2}/.test(bds))
+        setBusinessDayStart(bds.slice(0, 5))
+      // Refresh cached userData with the fuller /auth-me payload so other
+      // pages that read userData see the new field too.
+      if (me && typeof me === 'object')
+        localStorage.setItem('userData', JSON.stringify({ ...user, ...me }))
+    }
+    catch { /* noop — keep prior default */ }
 
     // Temporary: grant manage-all to every authenticated user. Backend still
     // enforces per-endpoint via @admin_required / @permission_required, so

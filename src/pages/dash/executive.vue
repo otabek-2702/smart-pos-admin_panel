@@ -204,35 +204,129 @@ const barData = computed(() => {
 const insightStr = computed(() => t('Revenue is up {pct}% this month', { pct: 12 }))
 
 // ---------- Data loader ----------
+// Backend reality (alpha_pos_server/admins/urls.py): there is NO
+// `/dashboard/executive?range=30d` route. Only `/dashboard/today` and
+// `/dashboard?from=YYYY-MM-DD&to=YYYY-MM-DD` exist. We consume those and
+// map their payloads onto the existing DashData shape so the v3-port UI
+// keeps rendering. Series the BE doesn't ship yet (revenue30, orders30,
+// aov30, lastMonthRev, dayLabels) are zero-filled — replace once the BE
+// adds time-series rollups.
+function defaultLast30Labels(): string[] {
+  const labels: string[] = []
+  for (let i = 29; i >= 0; i--) labels.push(`D-${i}`)
+  return labels
+}
+
+function emptyDash(): DashData {
+  return {
+    monthRevenue: 0,
+    monthOrders: 0,
+    avgAov: 0,
+    grossMargin: 0,
+    repeatRate: 0,
+    monthTarget: 0,
+    revenue30: Array.from({ length: 30 }, () => 0),
+    orders30: Array.from({ length: 30 }, () => 0),
+    aov30: Array.from({ length: 30 }, () => 0),
+    lastMonthRev: Array.from({ length: 30 }, () => 0),
+    dayLabels: defaultLast30Labels(),
+    paymentMix: [],
+    categories: [],
+    liveFeed: [],
+  }
+}
+
+// BE returns money as integer-so'm strings (see dashboard_service._uzs).
+function asNum(v: unknown): number {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+// Payment mix colors (kept stable across renders so DonutChart legend is consistent).
+const PAY_COLORS: Record<string, string> = {
+  CASH: 'rgb(var(--v-theme-success))',
+  UZCARD: 'rgb(var(--v-theme-info))',
+  HUMO: 'rgb(var(--v-theme-warning))',
+  PAYME: 'rgb(var(--v-theme-primary))',
+  MIXED: 'rgb(var(--v-theme-text-tertiary))',
+}
+
+function mapRangePayload(p: any): DashData {
+  const d = emptyDash()
+  const rev = asNum(p?.revenue)
+  const orders = asNum(p?.paid_orders ?? p?.orders)
+  d.monthRevenue = rev
+  d.monthOrders = orders
+  d.avgAov = orders > 0 ? Math.round(rev / orders) : 0
+
+  const pay = p?.payment_breakdown ?? {}
+  d.paymentMix = Object.entries(pay)
+    .map(([k, v]) => ({ label: k, value: asNum(v), color: PAY_COLORS[k] ?? 'rgb(var(--v-theme-neutral))' }))
+    .filter(s => s.value > 0)
+
+  // /dashboard (range) doesn't return category stats — leave empty.
+  d.categories = []
+  return d
+}
+
+function mapTodayPayload(p: any): DashData {
+  const d = emptyDash()
+  const today = p?.today ?? {}
+  const rev = asNum(today.revenue)
+  const orders = asNum(today.paid_orders ?? today.orders)
+  d.monthRevenue = rev
+  d.monthOrders = orders
+  d.avgAov = orders > 0 ? Math.round(rev / orders) : 0
+
+  const pay = p?.payment_breakdown_today ?? {}
+  d.paymentMix = Object.entries(pay)
+    .map(([k, v]) => ({ label: k, value: asNum(v), color: PAY_COLORS[k] ?? 'rgb(var(--v-theme-neutral))' }))
+    .filter(s => s.value > 0)
+
+  const cats = Array.isArray(p?.category_stats_today) ? p.category_stats_today : []
+  d.categories = cats
+    .map((c: any) => ({ label: String(c?.category ?? '—'), value: asNum(c?.revenue) }))
+    .filter((c: { value: number }) => c.value > 0)
+
+  return d
+}
+
+function isoDateExec(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+
+function rangeDatesExec(days: number): { from: string; to: string } {
+  const to = new Date()
+  const from = new Date(to)
+  from.setDate(to.getDate() - (days - 1))
+  return { from: isoDateExec(from), to: isoDateExec(to) }
+}
+
 async function loadDashboard() {
   loading.value = true
   try {
-    // TODO(BE): replace with real endpoint once available.
-    // Coordinate via dev-bot if `/dashboard/executive?range=30d` does not exist.
-    const res = await axiosIns.get('/dashboard/executive', { params: { range: '30d' } })
-    data.value = res.data?.data ?? res.data
+    // Page labels read "Performance · last 30 days", so consume the
+    // 30-day range endpoint. Category card falls back to /dashboard/today
+    // because /dashboard (range) does not return category stats.
+    const { from, to } = rangeDatesExec(30)
+    const [rangeRes, todayRes] = await Promise.all([
+      axiosIns.get('/dashboard', { params: { from, to } }),
+      axiosIns.get('/dashboard/today').catch(() => null),
+    ])
+    const rangePayload = rangeRes.data?.data ?? rangeRes.data ?? {}
+    const mapped = mapRangePayload(rangePayload)
+    const todayPayload = todayRes?.data?.data ?? todayRes?.data
+    if (todayPayload) {
+      const todayMapped = mapTodayPayload(todayPayload)
+      if (todayMapped.categories.length)
+        mapped.categories = todayMapped.categories
+    }
+    data.value = mapped
   }
   catch (err) {
     // Soft-degrade: synthesise an empty/zeroed shape so the page can render
-    // skeletons rather than throw. BE will return the real shape in phase 2.
-    const labels: string[] = []
-    for (let i = 29; i >= 0; i--) labels.push(`D-${i}`)
-    data.value = {
-      monthRevenue: 0,
-      monthOrders: 0,
-      avgAov: 0,
-      grossMargin: 0,
-      repeatRate: 0,
-      monthTarget: 0,
-      revenue30: Array.from({ length: 30 }, () => 0),
-      orders30: Array.from({ length: 30 }, () => 0),
-      aov30: Array.from({ length: 30 }, () => 0),
-      lastMonthRev: Array.from({ length: 30 }, () => 0),
-      dayLabels: labels,
-      paymentMix: [],
-      categories: [],
-      liveFeed: [],
-    }
+    // skeletons rather than throw.
+    data.value = emptyDash()
     void err
   }
   finally {

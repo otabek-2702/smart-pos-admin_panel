@@ -414,6 +414,23 @@ const dtPagination = computed(() => ({
 const noResultsMsg = computed(() => t('No orders match your filters'))
 const noResultsSub = computed(() => t('Adjust the search, status or date range to see results.'))
 
+// ---- Stats-level payment breakdown ----
+// BE shape (per /orders/stats): payment_breakdown: { CASH: '<dec>', CARD: '<dec>', DIGITAL: '<dec>' }
+// Adapt flat object to PaymentBreakdown's Array<{ type, amount }> shape.
+const statsPaymentMethods = computed(() => {
+  const pb = stats.value?.payment_breakdown
+  if (!pb || typeof pb !== 'object') return []
+  const out: Array<{ type: string, amount: number }> = []
+  for (const [k, v] of Object.entries(pb)) {
+    const amount = Number(v) || 0
+    if (amount > 0) out.push({ type: k, amount })
+  }
+  return out
+})
+const statsPaymentTotal = computed(() =>
+  statsPaymentMethods.value.reduce((a, m) => a + m.amount, 0),
+)
+
 // ---- OrdersInsights bridge ----
 // Click a status segment/legend: toggle membership in the multi-status array.
 function onStatusToggle(s: string) {
@@ -483,6 +500,20 @@ function onPaymentToggle(p: string) {
       @status="onStatusToggle"
       @payment="onPaymentToggle"
     />
+
+    <!-- Stats-level payment breakdown (from /orders/stats payment_breakdown) -->
+    <div
+      v-if="statsPaymentMethods.length"
+      class="card stats-paybreak-card"
+    >
+      <div class="stats-paybreak-head">
+        <span class="kpi__label">{{ t('Payment breakdown') }}</span>
+      </div>
+      <PaymentBreakdown
+        :methods="statsPaymentMethods"
+        :total="statsPaymentTotal"
+      />
+    </div>
 
     <!-- Main table card -->
     <div class="card">
@@ -1177,6 +1208,18 @@ function onPaymentToggle(p: string) {
 }
 @media (max-width: 768px) {
   .orders-paybreak-wrap { max-width: 100%; }
+}
+
+/* --- Stats-level payment breakdown card --- */
+.stats-paybreak-card {
+  padding: var(--sp-4);
+  margin-block-end: var(--sp-5);
+}
+.stats-paybreak-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: var(--sp-2);
 }
 </style>
 

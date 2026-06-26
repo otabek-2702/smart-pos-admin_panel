@@ -14,9 +14,11 @@ import DateRangePicker, { type DateRangeValue } from '@/components/design/DateRa
 import { useToast } from '@/components/design/useToast'
 import { fmtDateTime } from '@/components/design/utils/format'
 import { cx } from '@/components/design/utils'
+import { useDashboardData } from '@/composables/useDashboardData'
 
 const { t } = useI18n({ useScope: 'global' })
 const toast = useToast()
+const { shared: sharedDash, loading: sharedLoading, fetchShared } = useDashboardData()
 
 // ---------- View registry ----------
 type ViewId = 'exec' | 'sales' | 'ops' | 'products' | 'staff'
@@ -81,8 +83,12 @@ function readStoredView(): ViewId {
 }
 
 const view = ref<ViewId>(readStoredView())
-const loading = ref(false)
+const localLoading = ref(false)
 const dateRange = ref<DateRangeValue>({ from: '', to: '', preset: '30d' })
+
+// Loading flag the page exposes to the UI = either the hub-level shared
+// fetch OR an in-flight manual refresh.
+const loading = computed(() => localLoading.value || sharedLoading.value)
 
 watch(view, (v) => {
   try { localStorage.setItem(LS_KEY, v) }
@@ -91,6 +97,28 @@ watch(view, (v) => {
 
 const current = computed(() => DASH_VIEWS.find(v => v.id === view.value) ?? DASH_VIEWS[0])
 
+// ---------- Hub-level shared fetch ----------
+// Hits GET /dashboard?from&to when a range is selected, falls back to
+// /dashboard/today when no range provided. Shape verified against
+// alpha_pos_server/admins/services/dashboard_service.py:get_range() /
+// get_today() — same `{ success, data }` envelope. Stored into the
+// shared composable so any sub-dashboard can opt in via
+// `useDashboardData()` without re-fetching.
+async function loadShared(): Promise<void> {
+  await fetchShared({
+    from: dateRange.value?.from ?? '',
+    to: dateRange.value?.to ?? '',
+    preset: dateRange.value?.preset,
+  })
+}
+
+watch(
+  () => [dateRange.value?.from, dateRange.value?.to],
+  () => { void loadShared() },
+)
+
+onMounted(() => { void loadShared() })
+
 // ---------- Actions ----------
 function selectView(id: ViewId) {
   if (view.value === id)
@@ -98,19 +126,29 @@ function selectView(id: ViewId) {
   view.value = id
 }
 
-function refresh() {
-  loading.value = true
-  // Sub-pages handle their own load; just flash the spinner briefly
-  // and surface a confirmation toast.
-  setTimeout(() => {
-    loading.value = false
+async function refresh() {
+  localLoading.value = true
+  try {
+    await loadShared()
     toast({
       tone: 'success',
       title: t('Dashboard refreshed'),
       msg: t('Updated {datetime}', { datetime: fmtDateTime(new Date()) }),
     })
-  }, 380)
+  }
+  catch {
+    toast({
+      tone: 'error',
+      title: t('Could not refresh dashboard'),
+    })
+  }
+  finally {
+    localLoading.value = false
+  }
 }
+
+// Suppress unused-warning when sub-dashboards opt out of the prop.
+void sharedDash
 </script>
 
 <template>

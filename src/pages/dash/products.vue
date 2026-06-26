@@ -121,27 +121,145 @@ const categoryDonut = computed(() =>
   })),
 )
 
+/* ---------- BE → FE shape mappers ----------
+   Confirmed BE contracts (alpha_pos_server/admins/views/analytics_views.py
+   + admins/services/product_analytics_service.py):
+     GET /analytics/products/overview?from=YYYY-MM-DD&to=YYYY-MM-DD
+       → { range, window_days, total_revenue, total_units, distinct_products_sold,
+            order_lines, orders, avg_line_revenue,
+            top_products[{ product_id, product_name, qty_sold, revenue }],
+            slowest_products[...] }
+     GET /analytics/products/categories?from=&to=
+       → { range, total_revenue, categories[{ category_id, category, units, revenue, pct_of_revenue }] }
+     GET /analytics/products/pareto?from=&to=
+       → { range, total_revenue, products[{ product_id, product_name, qty_sold,
+           revenue, pct_of_revenue, cumulative_pct, class }], summary }
+     GET /analytics/products/trends?from=&to=&top_n=5
+       → { range, daily[{ date, units, revenue }],
+            top_products_trend[{ product_id, product_name, total_revenue,
+              points[{ date, qty, revenue }] }] }
+   NOTE: BE returns money as integer-so'm STRINGS; coerce with Number().
+   BE does NOT support `?range=30d` for products — compute the [from, to] window.
+*/
+
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+
+function rangeDates(days: number): { from: string; to: string } {
+  const to = new Date()
+  const from = new Date(to)
+  from.setDate(to.getDate() - (days - 1))
+  return { from: isoDate(from), to: isoDate(to) }
+}
+
+function num(v: unknown): number {
+  const n = typeof v === 'string' ? Number(v) : (v as number)
+  return Number.isFinite(n) ? n : 0
+}
+
+function mapOverview(raw: any, catCount: number, deltas: { units?: number | null; revenue?: number | null }): Overview {
+  const top = Array.isArray(raw?.top_products) ? raw.top_products[0] : null
+  return {
+    menuItems: num(raw?.distinct_products_sold),
+    categoryCount: catCount,
+    bestSellerName: top?.product_name ?? '—',
+    bestSellerUnits: num(top?.qty_sold),
+    units30d: num(raw?.total_units),
+    units30dDelta: deltas.units ?? null,
+    menuRevenue: num(raw?.total_revenue),
+    menuRevenueDelta: deltas.revenue ?? null,
+  }
+}
+
+function mapCategories(raw: any): CategoryRow[] {
+  const rows = Array.isArray(raw?.categories) ? raw.categories : []
+  return rows.map((c: any) => ({
+    label: c?.category ?? '—',
+    value: num(c?.revenue),
+  }))
+}
+
+function mapPareto(raw: any): ParetoRow[] {
+  const products = Array.isArray(raw?.products) ? raw.products : []
+  return products.map((p: any) => ({
+    label: p?.product_name ?? '—',
+    value: num(p?.revenue),
+  }))
+}
+
+function mapTrends(raw: any): TrendRow[] {
+  const series = Array.isArray(raw?.top_products_trend) ? raw.top_products_trend : []
+  return series.map((s: any) => {
+    const points: any[] = Array.isArray(s?.points) ? s.points : []
+    const spark = points.map(p => num(p?.revenue))
+    const total = num(s?.total_revenue)
+    const units = points.reduce((acc, p) => acc + num(p?.qty), 0)
+    // Delta = first-half vs second-half % change over the points array.
+    let delta = 0
+    if (spark.length >= 2) {
+      const mid = Math.floor(spark.length / 2)
+      const a = spark.slice(0, mid).reduce((x, y) => x + y, 0) || 0
+      const b = spark.slice(mid).reduce((x, y) => x + y, 0) || 0
+      delta = a > 0 ? Math.round(((b - a) / a) * 1000) / 10 : 0
+    }
+    return {
+      name: s?.product_name ?? '—',
+      units,
+      revenue: total,
+      delta,
+      spark,
+    }
+  })
+}
+
 /* ---------- Loader ---------- */
 async function loadDashboard() {
   loading.value = true
   try {
-    // BE endpoint shape (REQUEST BACKEND):
-    //   GET /analytics/products/overview?range=30d   → Overview
-    //   GET /analytics/products/categories?range=30d → CategoryRow[]
-    //   GET /analytics/products/pareto?range=30d     → ParetoRow[]
-    //   GET /analytics/products/trends?days=14       → TrendRow[]
-    // Until BE ships, fall through to the empty-state branch below.
-    const [ovRes, catRes, parRes, trRes] = await Promise.all([
-      axiosIns.get('/analytics/products/overview', { params: { range: '30d' } }),
-      axiosIns.get('/analytics/products/categories', { params: { range: '30d' } }),
-      axiosIns.get('/analytics/products/pareto', { params: { range: '30d' } }),
-      axiosIns.get('/analytics/products/trends', { params: { days: 14 } }),
+    const { from, to } = rangeDates(30)
+    const prev = (() => {
+      const prevTo = new Date(from)
+      prevTo.setDate(prevTo.getDate() - 1)
+      const prevFrom = new Date(prevTo)
+      prevFrom.setDate(prevTo.getDate() - 29)
+      return { from: isoDate(prevFrom), to: isoDate(prevTo) }
+    })()
+
+    const [ovRes, catRes, parRes, trRes, ovPrevRes] = await Promise.all([
+      axiosIns.get('/analytics/products/overview', { params: { from, to } }),
+      axiosIns.get('/analytics/products/categories', { params: { from, to } }),
+      axiosIns.get('/analytics/products/pareto', { params: { from, to } }),
+      axiosIns.get('/analytics/products/trends', { params: { from, to, top_n: 6 } }),
+      // Previous-period overview so we can compute units30dDelta + menuRevenueDelta.
+      // Best-effort: if it fails, deltas stay null.
+      axiosIns.get('/analytics/products/overview', { params: { from: prev.from, to: prev.to } }).catch(() => null),
     ])
+
+    const ovRaw = ovRes.data?.data ?? ovRes.data
+    const catRaw = catRes.data?.data ?? catRes.data
+    const parRaw = parRes.data?.data ?? parRes.data
+    const trRaw = trRes.data?.data ?? trRes.data
+    const ovPrevRaw = ovPrevRes?.data?.data ?? ovPrevRes?.data ?? null
+
+    const categories = mapCategories(catRaw)
+    let deltas: { units: number | null; revenue: number | null } = { units: null, revenue: null }
+    if (ovPrevRaw) {
+      const prevUnits = num(ovPrevRaw.total_units)
+      const prevRev = num(ovPrevRaw.total_revenue)
+      const curUnits = num(ovRaw?.total_units)
+      const curRev = num(ovRaw?.total_revenue)
+      deltas = {
+        units: prevUnits > 0 ? Math.round(((curUnits - prevUnits) / prevUnits) * 1000) / 10 : null,
+        revenue: prevRev > 0 ? Math.round(((curRev - prevRev) / prevRev) * 1000) / 10 : null,
+      }
+    }
+
     data.value = {
-      overview: ovRes.data?.data ?? ovRes.data,
-      categories: catRes.data?.data ?? catRes.data,
-      pareto: parRes.data?.data ?? parRes.data,
-      trends: trRes.data?.data ?? trRes.data,
+      overview: mapOverview(ovRaw, categories.length, deltas),
+      categories,
+      pareto: mapPareto(parRaw),
+      trends: mapTrends(trRaw),
     }
   }
   catch (err) {

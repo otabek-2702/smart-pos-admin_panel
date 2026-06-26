@@ -23,7 +23,7 @@ import StackedBar from '@/components/design/charts/StackedBar.vue'
 
 import { fmtAbbr, fmtNum } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
-import { staff as staffFixture } from '@/pages/dash/_mock/dashdata'
+// staffFixture mock dropped — real BE data only (Abrorbek deployed /staff/performance 2026-06-25).
 
 const { t } = useI18n({ useScope: 'global' })
 const { formatCurrency } = useFormatters()
@@ -110,14 +110,11 @@ async function loadStaff() {
   try {
     const res = await axiosIns.get('/staff/performance', { params: { range: '30d' } })
     const raw = res.data?.data ?? res.data
-    const mapped = mapStaffPerformance(raw)
-    // Fail gracefully if BE returned an empty list — fall back to the demo
-    // fixture so the page is still illustrative on a fresh deployment.
-    staff.value = mapped.length ? mapped : (staffFixture as unknown as StaffRow[])
+    staff.value = mapStaffPerformance(raw)
   }
   catch {
-    // BE 404 / network — preserve the demo fixture rendering.
-    staff.value = staffFixture as unknown as StaffRow[]
+    // Real data only — empty list renders the empty-state, no mock fallback.
+    staff.value = []
   }
   finally {
     loading.value = false

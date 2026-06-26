@@ -10,10 +10,8 @@ import LineAreaChart from '@/components/design/LineAreaChart.vue'
 import { fmtAbbr, fmtNum } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
 import type { Tone } from '@/components/design/utils'
-import {
-  DASH as MOCK_DASH,
-  type ChannelDay,
-} from '@/pages/dash/_mock/dashdata'
+// MOCK_DASH dropped — real BE data only. /dashboard/sales endpoint pending (BACKEND_TODO item 11).
+export interface ChannelDay { day: string; hall: number; delivery: number; pickup: number }
 
 /* ============================================================
    ALPHA POS — Sales & Revenue Dashboard (v3 port)
@@ -230,27 +228,15 @@ function sparkTrend(values: number[]): 'up' | 'down' | 'flat' {
 async function loadDashboard() {
   loading.value = true
   try {
-    // TODO(BE): replace with real endpoint once available.
-    // Coordinate via dev-bot if `/dashboard/sales?range=30d` does not exist.
+    // Pending BACKEND_TODO item 11: GET /dashboard/sales?range=30d returning
+    // monthRevenue, grossMargin, revenue30[], expense30[], lastMonthRev[],
+    // dayLabels[], HM_DAYS[], HM_HOURS[], heatMatrix[][], channelDays[].
     const res = await axiosIns.get('/dashboard/sales', { params: { range: '30d' } })
     data.value = res.data?.data ?? res.data
   }
-  catch (err) {
-    // Soft-degrade: fall back to mock so the page can render its design surface
-    // rather than throw. Replace with real BE shape when phase 2 ships.
-    data.value = {
-      monthRevenue: MOCK_DASH.monthRevenue,
-      grossMargin: MOCK_DASH.grossMargin,
-      revenue30: MOCK_DASH.revenue30,
-      expense30: MOCK_DASH.expense30,
-      lastMonthRev: MOCK_DASH.lastMonthRev,
-      dayLabels: MOCK_DASH.dayLabels,
-      HM_DAYS: MOCK_DASH.HM_DAYS,
-      HM_HOURS: MOCK_DASH.HM_HOURS,
-      heatMatrix: MOCK_DASH.heatMatrix,
-      channelDays: MOCK_DASH.channelDays,
-    }
-    void err
+  catch {
+    // Real data only — leave null so the page shows the empty state.
+    data.value = null
   }
   finally {
     loading.value = false

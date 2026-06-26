@@ -157,5 +157,26 @@ If any of those endpoints are slated for deprecation, tag here and we'll wire up
 
 ---
 
+### 12. Sales & Revenue dashboard endpoint (last mock-data page)
+**Why:** FE page `src/pages/dash/sales.vue` is the last page still showing mock data (heatmap, channel split, 30-day revenue/expense, gross margin). User wants 100% real data. Mock import has been removed — page now renders empty state until BE provides the data.
+
+**Need:** `GET /api/admins/dashboard/sales?range=30d` (or `?from=&to=` to match other dashboards) returning:
+```
+{
+  monthRevenue: decimal,
+  grossMargin: float (0..1),
+  revenue30: [decimal x days],
+  expense30: [decimal x days],
+  lastMonthRev: [decimal x days],
+  dayLabels: [str x days],     // e.g. ["May 27", "May 28", ...]
+  HM_DAYS: [str x 7],          // ["Mon","Tue",...]
+  HM_HOURS: [str x N],         // e.g. ["09","10","11",...]
+  heatMatrix: [[int x len(HM_HOURS)] x len(HM_DAYS)],  // order volume by day×hour
+  channelDays: [{ day: str, hall: int, delivery: int, pickup: int }],
+}
+```
+
+`range` should respect `business_day_start` (item 8) when computing the window.
+
 ## Done — verified
 *(none yet — items 1, 2, 3, 5, 6, 7, 8, 9, 10 are shipped BE-side but stay in Open until FE wiring is verified end-to-end.)*

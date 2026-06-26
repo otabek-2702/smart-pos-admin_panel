@@ -99,12 +99,13 @@ function go(item: NavItem) {
   emit('nav-go')
 }
 
-function onNavClick(e: MouseEvent, navigate: (e?: MouseEvent) => void) {
-  // Honor modifier / middle clicks — let the browser open in new tab/window.
+function onNavClick(e: MouseEvent, item: NavItem) {
+  // Honor modifier / middle clicks — let the browser open in new tab/window via the anchor's href.
   if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button === 1)
     return
   e.preventDefault()
-  navigate(e)
+  if (!isActive(item))
+    router.push(item.to)
   emit('nav-go')
 }
 
@@ -142,25 +143,19 @@ function onWidgetGo() {
           <div v-else class="hr" style="margin: 10px 8px;" />
         </template>
         <template v-else-if="isItem(n)">
-          <router-link
-            :to="n.to"
-            custom
-            v-slot="{ href, navigate }"
+          <a
+            :href="n.to"
+            class="nav-item"
+            :class="{ 'is-active': isActive(n) }"
+            :title="collapsed ? t(n.label) : ''"
+            @click="onNavClick($event, n)"
           >
-            <a
-              :href="href"
-              class="nav-item"
-              :class="{ 'is-active': isActive(n) }"
-              :title="collapsed ? t(n.label) : ''"
-              @click="onNavClick($event, navigate)"
-            >
-              <span class="nav-item__icon">
-                <DesignIcon :name="n.icon" :size="20" />
-              </span>
-              <span v-if="!collapsed" style="flex:1;">{{ t(n.label) }}</span>
-              <span v-if="!collapsed && (n.badge || badgeFor(n.id))" class="nav-item__badge">{{ badgeFor(n.id) ?? n.badge }}</span>
-            </a>
-          </router-link>
+            <span class="nav-item__icon">
+              <DesignIcon :name="n.icon" :size="20" />
+            </span>
+            <span v-if="!collapsed" style="flex:1;">{{ t(n.label) }}</span>
+            <span v-if="!collapsed && (n.badge || badgeFor(n.id))" class="nav-item__badge">{{ badgeFor(n.id) ?? n.badge }}</span>
+          </a>
         </template>
       </template>
     </nav>

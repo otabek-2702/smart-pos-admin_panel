@@ -66,22 +66,16 @@ function onTap(e: MouseEvent, tab: Tab) {
         <span class="mtab__icon"><DesignIcon :name="tab.icon" :size="22" /></span>
         <span class="mtab__label">{{ t(tab.label) }}</span>
       </button>
-      <router-link
+      <a
         v-else-if="tab.to"
-        :to="tab.to"
-        custom
-        v-slot="{ href }"
+        :href="tab.to"
+        class="mtab"
+        :class="{ 'is-active': isActive(tab) }"
+        @click="onTap($event, tab)"
       >
-        <a
-          :href="href"
-          class="mtab"
-          :class="{ 'is-active': isActive(tab) }"
-          @click="onTap($event, tab)"
-        >
-          <span class="mtab__icon"><DesignIcon :name="tab.icon" :size="22" /></span>
-          <span class="mtab__label">{{ t(tab.label) }}</span>
-        </a>
-      </router-link>
+        <span class="mtab__icon"><DesignIcon :name="tab.icon" :size="22" /></span>
+        <span class="mtab__label">{{ t(tab.label) }}</span>
+      </a>
     </template>
   </nav>
 </template>

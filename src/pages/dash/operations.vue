@@ -164,13 +164,12 @@ const liveValues = liveCounts.value.map(c => useCountUp(() => c.value))
       </div>
     </div>
 
-    <!-- funnel + prep gauge + service rings -->
-    <div class="grid" style="grid-template-columns: 1.3fr 1fr 1fr;">
-      <Card>
+    <!-- funnel + prep gauge + service rings — only when BE item 17 (/dashboard/operations) ships data -->
+    <div v-if="funnelData.length || ordersByHour.length" class="grid" style="grid-template-columns: 1.3fr 1fr 1fr;">
+      <Card v-if="funnelData.length">
         <div class="card__head">
           <div class="card__head-text">
             <div class="kpi__label">{{ t('Order pipeline · today') }}</div>
-            <h3 class="card__insight">{{ t('94% of orders close cleanly') }}</h3>
           </div>
         </div>
         <div class="card__body">
@@ -203,7 +202,7 @@ const liveValues = liveCounts.value.map(c => useCountUp(() => c.value))
         </div>
       </Card>
 
-      <Card>
+      <Card v-if="false">
         <div class="card__head">
           <div class="card__head-text">
             <div class="kpi__label">{{ t('Kitchen speed') }}</div>
@@ -211,7 +210,7 @@ const liveValues = liveCounts.value.map(c => useCountUp(() => c.value))
           </div>
         </div>
         <div class="card__body">
-          <!-- Gauge (inline SVG) -->
+          <!-- Gauge (inline SVG, hardcoded 8:20 — disabled until BE ships /dashboard/operations) -->
           <div :style="{ position: 'relative', width: gauge.size + 'px', height: (gauge.size * 0.82) + 'px', margin: '0 auto' }">
             <svg
               :width="gauge.size"
@@ -313,13 +312,12 @@ const liveValues = liveCounts.value.map(c => useCountUp(() => c.value))
       </Card>
     </div>
 
-    <!-- prep by category + table occupancy -->
-    <div class="grid" style="grid-template-columns: 1fr 1fr;">
-      <Card>
+    <!-- prep by category + table occupancy — only when their data arrives -->
+    <div v-if="prepByCategory.length || tableGrid.length" class="grid" style="grid-template-columns: 1fr 1fr;">
+      <Card v-if="prepByCategory.length">
         <div class="card__head">
           <div class="card__head-text">
             <div class="kpi__label">{{ t('Avg prep time by category') }}</div>
-            <h3 class="card__insight">{{ t('Pizza runs over target') }}</h3>
           </div>
         </div>
         <div class="card__body">
@@ -367,10 +365,10 @@ const liveValues = liveCounts.value.map(c => useCountUp(() => c.value))
         </div>
       </Card>
 
-      <Card>
+      <Card v-if="tableGrid.length">
         <div class="card__head between">
           <div class="card__head-text">
-            <div class="kpi__label">{{ t('Floor · 16 tables') }}</div>
+            <div class="kpi__label">{{ t('Floor · {n} tables', { n: tableGrid.length }) }}</div>
             <h3 class="card__title">{{ t('Table occupancy') }}</h3>
           </div>
           <div class="row" style="gap: 10px; font-size: 11px;">
@@ -404,11 +402,10 @@ const liveValues = liveCounts.value.map(c => useCountUp(() => c.value))
     </div>
 
     <!-- orders by hour full width -->
-    <Card>
+    <Card v-if="ordersByHour.length">
       <div class="card__head">
         <div class="card__head-text">
           <div class="kpi__label">{{ t('Orders by hour · today') }}</div>
-          <h3 class="card__insight">{{ t('Peak trade at 19:00') }}</h3>
         </div>
       </div>
       <div class="card__body">

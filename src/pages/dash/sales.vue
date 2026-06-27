@@ -152,6 +152,26 @@ function heatOpacity(v: number): number {
   return 0.12 + (v / heatMaxVal.value) * 0.88
 }
 
+// Peak (day, hour) computed from real heatMatrix. Headline reads "{Day} at {Hour}
+// peak" instead of the previous hardcoded "Fri & Sat dinner drive volume" line.
+const heatPeak = computed<{ day: string; hour: string } | null>(() => {
+  const D = data.value
+  if (!D?.heatMatrix?.length) return null
+  let best = 0
+  let row = 0
+  let col = 0
+  for (let r = 0; r < D.heatMatrix.length; r++) {
+    const cells = D.heatMatrix[r]
+    if (!cells) continue
+    for (let c = 0; c < cells.length; c++) {
+      const v = Number(cells[c]) || 0
+      if (v > best) { best = v; row = r; col = c }
+    }
+  }
+  if (!best) return null
+  return { day: D.HM_DAYS?.[row] || '', hour: D.HM_HOURS?.[col] || '' }
+})
+
 // ---------- StackedBar helpers (inline fallback) ----------
 interface ChannelSeries {
   key: 'hall' | 'delivery' | 'pickup'
@@ -488,8 +508,8 @@ onMounted(() => {
               <div class="kpi__label">
                 {{ t('When sales happen') }}
               </div>
-              <h3 class="card__insight">
-                {{ t('Fri & Sat dinner drive volume') }}
+              <h3 v-if="heatPeak" class="card__insight">
+                {{ t('Peak {day} at {hour}', { day: heatPeak.day, hour: heatPeak.hour }) }}
               </h3>
             </div>
           </div>

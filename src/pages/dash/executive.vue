@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import axiosIns from '@/plugins/axios'
 import { useI18n } from 'vue-i18n'
 import Card from '@/components/design/Card.vue'
@@ -68,15 +68,18 @@ const data = ref<DashData | null>(null)
 const loading = ref(true)
 
 // Heroes are derived from `data`. Spark = last 14 of the 30d series.
+// Delta vs. previous period is BE-dependent; until /dashboard ships period-over-period
+// fields, we render null deltas (HeroKpi's Delta component hides on null). Previously this
+// emitted hardcoded +12.4/+8.1/+3.9/+1.6/+4.2 over zero data — green pills next to 0 UZS.
 const heroKpis = computed(() => {
   const D = data.value
   if (!D) return []
   return [
-    { label: t('Revenue (30d)'), value: D.monthRevenue, money: true, unit: 'UZS', delta: 12.4, icon: 'wallet', tone: 'primary' as Tone, spark: D.revenue30.slice(-14) },
-    { label: t('Orders (30d)'), value: D.monthOrders, money: false, delta: 8.1, icon: 'receipt', tone: 'info' as Tone, spark: D.orders30.slice(-14) },
-    { label: t('Avg Order Value'), value: D.avgAov, money: true, unit: 'UZS', delta: 3.9, icon: 'trend', tone: 'success' as Tone, spark: D.aov30.slice(-14) },
-    { label: t('Gross Margin'), value: `${D.grossMargin}%`, money: false, delta: 1.6, icon: 'coins', tone: 'warning' as Tone, sub: t('of revenue') },
-    { label: t('Repeat Rate'), value: `${D.repeatRate}%`, money: false, delta: 4.2, icon: 'users', tone: 'primary' as Tone, sub: t('returning guests') },
+    { label: t('Revenue (30d)'), value: D.monthRevenue, money: true, unit: 'UZS', delta: null, icon: 'wallet', tone: 'primary' as Tone, spark: D.revenue30.slice(-14) },
+    { label: t('Orders (30d)'), value: D.monthOrders, money: false, delta: null, icon: 'receipt', tone: 'info' as Tone, spark: D.orders30.slice(-14) },
+    { label: t('Avg Order Value'), value: D.avgAov, money: true, unit: 'UZS', delta: null, icon: 'trend', tone: 'success' as Tone, spark: D.aov30.slice(-14) },
+    { label: t('Gross Margin'), value: `${D.grossMargin}%`, money: false, delta: null, icon: 'coins', tone: 'warning' as Tone, sub: t('of revenue') },
+    { label: t('Repeat Rate'), value: `${D.repeatRate}%`, money: false, delta: null, icon: 'users', tone: 'primary' as Tone, sub: t('returning guests') },
   ]
 })
 
@@ -151,9 +154,12 @@ const gaugeArc = computed(() => {
   }
 })
 
-// ---------- Live feed (animated, identical to v3 source) ----------
+// ---------- Live feed ----------
+// Display whatever BE returns in data.liveFeed (empty by default until that
+// endpoint exists). The 3.8s Math.random() faker that used to live here was
+// generating green-badged "live" orders that never happened — removed. The
+// template's empty-state ("Waiting for orders…") becomes reachable instead.
 const feed = ref<LiveOrder[]>([])
-let feedTimer: number | null = null
 
 function tone(o: LiveOrder): Tone {
   if (o.status === 'READY') return 'success'
@@ -173,25 +179,6 @@ function ago(ts: number): string {
   return t('{n}m ago', { n: Math.round(s / 60) })
 }
 
-function startLiveFeed() {
-  const names = [t('Table 7'), t('Table 3'), 'Chilonzor', '—', t('Table 12'), 'Yunusobod', t('Table 1')]
-  const types: LiveOrder['type'][] = ['HALL', 'DELIVERY', 'PICKUP']
-  feedTimer = window.setInterval(() => {
-    const first = feed.value[0]
-    const id = (first ? first.id : 1000) + 1
-    const next: LiveOrder = {
-      id,
-      type: types[Math.floor(Math.random() * 3)],
-      info: names[Math.floor(Math.random() * names.length)],
-      total: (20 + Math.floor(Math.random() * 200)) * 1000,
-      ts: Date.now(),
-      status: 'PREPARING',
-      _new: true,
-    }
-    feed.value = [next, ...feed.value].slice(0, 6)
-  }, 3800)
-}
-
 // ---------- Bar fallback (for SwitchChart metric switch) ----------
 const barData = computed(() => {
   const D = data.value
@@ -201,7 +188,20 @@ const barData = computed(() => {
 })
 
 // ---------- Locale-aware insight string ----------
-const insightStr = computed(() => t('Revenue is up {pct}% this month', { pct: 12 }))
+// Only render the "Revenue is up X% this month" headline when we can ACTUALLY
+// compute it from BE data (current monthRevenue vs sum of lastMonthRev). Returns
+// null otherwise — template hides the line on null. Previously hardcoded "12%".
+const insightStr = computed<string | null>(() => {
+  const D = data.value
+  if (!D) return null
+  const last = Array.isArray(D.lastMonthRev) ? D.lastMonthRev.reduce((a, b) => a + (Number(b) || 0), 0) : 0
+  const cur = Number(D.monthRevenue) || 0
+  if (!last || !cur) return null
+  const pct = Math.round(((cur - last) / last) * 100)
+  if (pct >= 0)
+    return t('Revenue is up {pct}% this month', { pct })
+  return t('Revenue is down {pct}% this month', { pct: Math.abs(pct) })
+})
 
 // ---------- Data loader ----------
 // Backend reality (alpha_pos_server/admins/urls.py): there is NO
@@ -382,15 +382,7 @@ onMounted(() => {
   loadDashboard().then(() => {
     if (data.value?.liveFeed?.length)
       feed.value = data.value.liveFeed
-    startLiveFeed()
   })
-})
-
-onUnmounted(() => {
-  if (feedTimer !== null) {
-    clearInterval(feedTimer)
-    feedTimer = null
-  }
 })
 
 // `locale` is read so live `ago()` re-renders when language changes via key.
@@ -512,7 +504,7 @@ void locale
               >
                 {{ t('Performance · last 30 days') }}
               </div>
-              <h3 class="card__insight">
+              <h3 v-if="insightStr" class="card__insight">
                 {{ insightStr }}
               </h3>
             </div>

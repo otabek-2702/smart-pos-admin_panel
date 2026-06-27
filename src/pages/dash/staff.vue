@@ -286,6 +286,18 @@ function intFmt(v: number): string {
       </div>
     </div>
 
+    <!-- Empty state: no staff returned (BE error or empty payload). Render single empty card,
+         not a full grid of '—'/'0%' that looks like real-but-zero data. -->
+    <div
+      v-else-if="!staff.length"
+      class="card"
+      style="padding: 48px 24px; text-align: center;"
+    >
+      <div class="muted" style="font-size: 14px;">
+        {{ t('No staff data for this range') }}
+      </div>
+    </div>
+
     <!-- Loaded state -->
     <div
       v-else

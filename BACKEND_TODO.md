@@ -178,5 +178,29 @@ If any of those endpoints are slated for deprecation, tag here and we'll wire up
 
 `range` should respect `business_day_start` (item 8) when computing the window.
 
+### 13. Product affinity (market-basket / co-occurrence) endpoint
+**Why:** New "Frequently bought together" card embedded in `src/pages/dash/products.vue` (between the treemap/donut row and the pareto/sparkline row) needs product co-occurrence data that no existing endpoint exposes. The existing `/analytics/products/*` endpoints return per-product KPIs only (units, revenue, deltas) — they don't surface which products are bought together. Computing co-occurrence server-side requires scanning all `order_items` grouped by `order_id` within the window and counting unordered pairs `(a, b)` where `a < b`. `limit` caps the number of products returned (top-N by orders) so the chord / matrix stays readable (design uses 10).
+
+**Need:** `GET /api/admins/analytics/products/affinity?from=YYYY-MM-DD&to=YYYY-MM-DD&limit=10` returning:
+```
+{
+  products: [
+    { id: int, name: str, color: str|null, orders: int, price: decimal }
+  ],
+  pairs: [
+    { a: int (index into products[]), b: int (index into products[]), count: int (orders containing both) }
+  ],
+  totalOrders: int  // total orders in window — used as N in the lift calculation count*N/(A.orders*B.orders)
+}
+```
+
+FE constraints:
+- `a < b`, `count > 0` only.
+- `products` sorted by `orders` desc.
+- `color` optional — FE falls back to palette `--c1..--c5` when null.
+- Window defaults to last 30 days when params absent.
+
+Until this endpoint ships, the FE card renders an empty state (DashSection wrapper) and degrades gracefully.
+
 ## Done — verified
 *(none yet — items 1, 2, 3, 5, 6, 7, 8, 9, 10 are shipped BE-side but stay in Open until FE wiring is verified end-to-end.)*

@@ -96,6 +96,47 @@
 .distlegend b { font-weight: var(--fw-bold); color: var(--text); }
 .distlegend.is-active b { color: var(--primary); }
 
+/* ---------- Affinity card (frequently bought together) ---------- */
+.viewtoggle { display: inline-flex; padding: 3px; gap: 2px; background: var(--surface-inset); border-radius: var(--r-sm); border: 1px solid var(--border); }
+.viewtoggle__btn { width: 32px; height: 28px; border: none; background: transparent; color: var(--text-tertiary); border-radius: 6px; cursor: pointer; display: grid; place-items: center; transition: all .13s; }
+.viewtoggle__btn:hover { color: var(--text); background: var(--surface-2); }
+.viewtoggle__btn.is-active { background: var(--surface); color: var(--primary); box-shadow: var(--shadow-xs); }
+
+.affinity-body { display: grid; grid-template-columns: 1fr 240px; gap: var(--sp-6); align-items: start; }
+.affinity-viz { min-width: 0; }
+.affinity-list { border-left: 1px solid var(--border); padding-left: var(--sp-5); }
+.afflist__row { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px; border: none; background: transparent; border-radius: var(--r-sm); cursor: pointer; text-align: left; transition: background .12s; }
+.afflist__row:hover { background: var(--surface-2); }
+.afflist__row.is-active { background: var(--primary-weak); }
+.afflist__name { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.afflist__count { font-size: 12px; font-weight: 700; color: var(--text-secondary); }
+.afflist__row.is-active .afflist__count { color: var(--primary); }
+
+/* affinity drill-down panels */
+.afflist__go { color: var(--text-tertiary); opacity: 0; margin-left: 2px; transition: opacity .12s; }
+.afflist__row:hover .afflist__go { opacity: 1; }
+.affcrumb { display: inline-flex; align-items: center; gap: 3px; border: none; background: transparent; color: var(--primary); font-size: var(--fs-sm); font-weight: var(--fw-semibold); cursor: pointer; padding: 0; }
+.affcrumb:hover { text-decoration: underline; }
+.affdot { width: 28px; height: 28px; border-radius: var(--r-sm); flex: 0 0 28px; }
+.affstats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.affstat { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 10px; text-align: center; }
+.affstat__v { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+.affstat__l { font-size: 10.5px; color: var(--text-tertiary); margin-top: 2px; line-height: 1.2; }
+.affbar { flex: 1; height: 6px; border-radius: 99px; background: var(--chart-track); overflow: hidden; min-width: 30px; }
+.affbar--lg { height: 9px; display: block; }
+.affbar__fill { display: block; height: 100%; border-radius: 99px; background: var(--c4); transition: width .5s cubic-bezier(.2,.8,.2,1); }
+.affpairhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.affchip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--border-strong); background: var(--surface); border-radius: var(--r-pill); font-size: 12.5px; font-weight: 600; color: var(--text); cursor: pointer; transition: all .13s; }
+.affchip:hover { border-color: var(--primary); color: var(--primary); }
+.affconf { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 14px; }
+.affsuggest { display: flex; align-items: flex-start; gap: 9px; margin-top: 14px; padding: 11px 13px; border-radius: var(--r-md); font-size: 12.5px; line-height: 1.45; }
+.affsuggest.is-good { background: var(--success-weak); border: 1px solid var(--success-border); color: var(--success-strong); }
+.affsuggest.is-soft { background: var(--info-weak); border: 1px solid var(--info-border); color: var(--info-strong); }
+.affsuggest .ic { flex: 0 0 16px; margin-top: 1px; }
+.pairrow { display: block; width: 100%; text-align: left; border: none; background: transparent; padding: 7px 8px; border-radius: var(--r-sm); cursor: pointer; transition: background .12s, opacity .15s; }
+.pairrow:hover { background: var(--surface-2); }
+.pairrow.is-active { background: var(--primary-weak); }
+
 /* payment breakdown (order detail) */
 .paybreak { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-4); }
 .paybreak__bar { display: flex; height: 12px; border-radius: var(--r-pill); overflow: hidden; background: var(--chart-track); gap: 2px; }
@@ -106,6 +147,10 @@
 @media (max-width: 1100px) {
   .grid[style*="repeat(5"] { grid-template-columns: repeat(2, 1fr) !important; }
   .tablegrid { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 920px) {
+  .affinity-body { grid-template-columns: 1fr; }
+  .affinity-list { border-left: none; border-top: 1px solid var(--border); padding-left: 0; padding-top: var(--sp-4); }
 }
 @media (max-width: 768px) {
   .grid[style*="repeat(5"], .grid[style*="repeat(3"] { grid-template-columns: 1fr 1fr !important; }

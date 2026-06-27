@@ -76,6 +76,7 @@ export const ICON_PATHS: Record<string, string> = {
   list: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
   bars: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
   hourglass: '<path d="M7 4h10M7 20h10M8 4c0 4 8 4 8 8s-8 4-8 8M16 4c0 4-8 4-8 8s8 4 8 8"/>',
+  share: '<circle cx="6" cy="12" r="2.4"/><circle cx="17" cy="6" r="2.4"/><circle cx="17" cy="18" r="2.4"/><path d="m8.2 10.8 6.6-3.6M8.2 13.2l6.6 3.6"/>',
 }
 
 export const ICON_NAMES: string[] = Object.keys(ICON_PATHS)

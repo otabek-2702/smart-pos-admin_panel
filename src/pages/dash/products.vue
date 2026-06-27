@@ -20,6 +20,7 @@ import DonutChart from '@/components/design/DonutChart.vue'
 import Treemap from '@/components/design/Treemap.vue'
 import ComboPareto from '@/components/design/ComboPareto.vue'
 import Sparkline from '@/components/design/Sparkline.vue'
+import Affinity from '@/components/design/Affinity.vue'
 import { fmtAbbr } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
 
@@ -393,6 +394,9 @@ onMounted(() => {
           </div>
         </Card>
       </div>
+
+      <!-- Frequently bought together — switchable views -->
+      <Affinity :loading="loading" />
 
       <!-- Pareto + sparkline-trends table -->
       <div class="grid dashprod-grid--pareto">

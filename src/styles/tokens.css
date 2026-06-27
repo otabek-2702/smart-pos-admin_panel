@@ -105,6 +105,7 @@
   --chart-axis: #9AA2AE;
   --chart-track: #EEF1F5;     /* unfilled bar / donut track */
   --chart-target: #8A929E;    /* target / reference line */
+  --chord-ribbon: #8A93A3;    /* affinity chord ribbon */
 
   /* Categorical (payment mix etc.) — max 5, calm not rainbow */
   --c1: #3A5BDB;   /* blue   */
@@ -183,6 +184,7 @@
   --chart-axis: #5B6572;
   --chart-track: #222A36;
   --chart-target: #6B7585;
+  --chord-ribbon: #5B6678;
 
   --c1: #6E8BFF;
   --c2: #36C07E;

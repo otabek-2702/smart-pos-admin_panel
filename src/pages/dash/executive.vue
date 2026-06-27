@@ -383,7 +383,7 @@ void locale
 </script>
 
 <template>
-  <div class="page exec-dash">
+  <div class="exec-dash">
     <!-- Loading state -->
     <div
       v-if="loading"

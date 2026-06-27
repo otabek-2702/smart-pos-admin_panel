@@ -293,7 +293,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page dashprod">
+  <div class="dashprod">
     <!-- Loading state — skeletons mirror final layout shape -->
     <div
       v-if="loading"

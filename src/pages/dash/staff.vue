@@ -252,7 +252,7 @@ function intFmt(v: number): string {
 </script>
 
 <template>
-  <div class="page staff-dash">
+  <div class="staff-dash">
     <!-- Loading state -->
     <div
       v-if="loading"

@@ -260,7 +260,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page sales-dash">
+  <div class="sales-dash">
     <!-- Loading state (DashLoading fallback) -->
     <div
       v-if="loading"

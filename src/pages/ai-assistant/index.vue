@@ -57,13 +57,53 @@ onMounted(() => {
   })
 })
 
-watch([() => messages.value.length, () => messages.value[messages.value.length - 1]?.content, activeId], async () => {
+// Track whether user has manually scrolled up — if so, don't fight them by
+// snapping back to bottom on every streamed token. Resume auto-scroll only
+// when they scroll back near the bottom themselves.
+const autoFollow = ref(true)
+function onScroll() {
+  const el = scrollRef.value
+  if (!el) return
+  const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+  autoFollow.value = distFromBottom < 80 // within 80px counts as "at bottom"
+}
+watch(activeId, async () => {
+  // Force-scroll on chat switch.
+  autoFollow.value = true
   await nextTick()
   const el = scrollRef.value
-
-  if (el)
-    el.scrollTop = el.scrollHeight
+  if (el) el.scrollTop = el.scrollHeight
 })
+watch([() => messages.value.length, () => messages.value[messages.value.length - 1]?.content], async () => {
+  await nextTick()
+  if (!autoFollow.value) return
+  const el = scrollRef.value
+  if (el) el.scrollTop = el.scrollHeight
+})
+
+// Themed "thinking" status messages cycled while AI is generating.
+// Picked one per phase so user sees motion that maps to what the bot is doing.
+const THINKING_STATUSES = [
+  'thinking_fetching',     // Maʼlumotlar bazasidan olinmoqda…
+  'thinking_calculating',  // Hisoblanmoqda…
+  'thinking_analyzing',    // Tahlil qilinmoqda…
+  'thinking_composing',    // Javob tayyorlanmoqda…
+]
+const thinkingIdx = ref(0)
+let thinkingTimer: number | null = null
+watch(isGenerating, (g) => {
+  if (g) {
+    thinkingIdx.value = 0
+    if (thinkingTimer) window.clearInterval(thinkingTimer)
+    thinkingTimer = window.setInterval(() => {
+      thinkingIdx.value = (thinkingIdx.value + 1) % THINKING_STATUSES.length
+    }, 1800)
+  }
+  else {
+    if (thinkingTimer) { window.clearInterval(thinkingTimer); thinkingTimer = null }
+  }
+})
+const thinkingLabel = computed(() => t(THINKING_STATUSES[thinkingIdx.value]))
 
 watch(draft, async (v) => {
   if (!draftRestoreLock.value && activeId.value)
@@ -312,7 +352,7 @@ function selectChat(id: string) {
               {{ active ? active.title : t('AI Assistant') }}
             </div>
             <div class="tertiary" style="font-size: 12px; white-space: nowrap;">
-              {{ isGenerating ? t('Thinking…') : t('POS analyst · always-on') }}
+              {{ isGenerating ? thinkingLabel : t('POS analyst · always-on') }}
             </div>
           </div>
         </div>
@@ -331,7 +371,7 @@ function selectChat(id: string) {
         </div>
       </div>
 
-      <div ref="scrollRef" class="aithread__scroll">
+      <div ref="scrollRef" class="aithread__scroll" @scroll="onScroll">
         <div class="aithread__inner">
           <!-- ===== Empty state ===== -->
           <div

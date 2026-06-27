@@ -67,8 +67,13 @@ const heroKpis = computed<HeroKpiData[]>(() => {
   const revenue30 = toNumArr(D.revenue30)
   const expense30 = toNumArr(D.expense30)
   const lastMonth = toNumArr(D.lastMonthRev)
+  const lastMonthSum = lastMonth.reduce((a, b) => a + b, 0)
   const monthRevenue = Number(D.monthRevenue) || 0
-  const vsLastMonthDiff = monthRevenue - lastMonth.reduce((a, b) => a + b, 0)
+  // Diff is only meaningful if we ACTUALLY have a prior-month baseline. Otherwise
+  // "+360.9M vs last month" is a confident lie — it's just the current value with
+  // a green plus sign. When lastMonthSum is 0 we hide the comparison (— UZS).
+  const hasLastMonth = lastMonthSum > 0
+  const vsLastMonthDiff = monthRevenue - lastMonthSum
   return [
     {
       label: t('This month'),
@@ -81,10 +86,10 @@ const heroKpis = computed<HeroKpiData[]>(() => {
     },
     {
       label: t('vs last month'),
-      value: `${vsLastMonthDiff >= 0 ? '+' : ''}${fmtAbbr(vsLastMonthDiff)}`,
-      unit: 'UZS',
+      value: hasLastMonth ? `${vsLastMonthDiff >= 0 ? '+' : ''}${fmtAbbr(vsLastMonthDiff)}` : '—',
+      unit: hasLastMonth ? 'UZS' : '',
       icon: 'trend',
-      tone: vsLastMonthDiff >= 0 ? 'success' : 'error',
+      tone: hasLastMonth ? (vsLastMonthDiff >= 0 ? 'success' : 'error') : 'neutral',
     },
     {
       label: t('Best day'),

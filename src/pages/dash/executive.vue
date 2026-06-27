@@ -74,13 +74,20 @@ const loading = ref(true)
 const heroKpis = computed(() => {
   const D = data.value
   if (!D) return []
-  return [
+  // Repeat rate ("Qaytish darajasi") is hidden until BE ships it — the existing path zero-filled the field,
+  // which rendered "0%" + green "+4.2%" pill on every dashboard for every restaurant. Same for Gross Margin
+  // if BE hasn't shipped sales endpoint yet (we only show it when > 0). Revenue / Orders / AOV stay always
+  // since /dashboard (range) is guaranteed to return them.
+  const rows: Array<Record<string, unknown>> = [
     { label: t('Revenue (30d)'), value: D.monthRevenue, money: true, unit: 'UZS', delta: null, icon: 'wallet', tone: 'primary' as Tone, spark: D.revenue30.slice(-14) },
     { label: t('Orders (30d)'), value: D.monthOrders, money: false, delta: null, icon: 'receipt', tone: 'info' as Tone, spark: D.orders30.slice(-14) },
     { label: t('Avg Order Value'), value: D.avgAov, money: true, unit: 'UZS', delta: null, icon: 'trend', tone: 'success' as Tone, spark: D.aov30.slice(-14) },
-    { label: t('Gross Margin'), value: `${D.grossMargin}%`, money: false, delta: null, icon: 'coins', tone: 'warning' as Tone, sub: t('of revenue') },
-    { label: t('Repeat Rate'), value: `${D.repeatRate}%`, money: false, delta: null, icon: 'users', tone: 'primary' as Tone, sub: t('returning guests') },
   ]
+  if (D.grossMargin > 0)
+    rows.push({ label: t('Gross Margin'), value: `${D.grossMargin}%`, money: false, delta: null, icon: 'coins', tone: 'warning' as Tone, sub: t('of revenue') })
+  if (D.repeatRate > 0)
+    rows.push({ label: t('Repeat Rate'), value: `${D.repeatRate}%`, money: false, delta: null, icon: 'users', tone: 'primary' as Tone, sub: t('returning guests') })
+  return rows
 })
 
 // ---------- SwitchChart-lite state (inline until phase 2) ----------

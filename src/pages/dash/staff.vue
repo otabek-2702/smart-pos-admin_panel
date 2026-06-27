@@ -185,31 +185,41 @@ const leaderInsight = computed(() => {
   return t('{name} leads by {pct}%', { name: a.name, pct })
 })
 
-/* ---------- Radar series (Top vs steady performer) ---------- */
+/* ---------- Radar series (Top vs steady performer) ----------
+   Only axes backed by real BE signal: Accuracy (100 - cancel_rate_pct), Attendance
+   (shifts_worked), Volume (revenue share). Speed and Upsell were hardcoded to 80 / 60
+   for every cashier with no BE field to source from, so they painted identical radar
+   shapes regardless of actual performance — dropped until BE ships those metrics. */
 const radarAxes = computed(() => [
-  t('Speed'),
   t('Accuracy'),
-  t('Upsell'),
   t('Attendance'),
   t('Volume'),
 ])
 
+// Volume = each cashier's revenue share of the total team revenue, scaled 0..100 so
+// the radar dimension is comparable to accuracy / attendance.
+function volumeFor(row: StaffRow, total: number): number {
+  if (!total) return 0
+  return Math.round(Math.min(100, (row.revenue / total) * 100 * (ranked.value.length || 1)))
+}
+
 const radarSeries = computed(() => {
   const top = ranked.value[0]
-  // "Steady performer" — in the source this was staff[3] (4th by order in fixture).
-  // Use original array order so we keep the same demo persona.
-  const steady = staff.value[3] || ranked.value[ranked.value.length - 1]
-  if (!top || !steady) return []
+  // "Steady performer" — second-tier reference (median-by-revenue cashier) so the
+  // top performer has a comparable, NOT-bottom-tier silhouette.
+  const median = ranked.value[Math.floor(ranked.value.length / 2)]
+  if (!top || !median || top === median) return []
+  const totalRev = ranked.value.reduce((a, b) => a + b.revenue, 0)
   return [
     {
       label: top.name,
       color: 'var(--c1)',
-      values: [top.speed, top.accuracy, top.upsell, top.attendance, 92],
+      values: [top.accuracy, top.attendance, volumeFor(top, totalRev)],
     },
     {
-      label: steady.name,
+      label: median.name,
       color: 'var(--c2)',
-      values: [steady.speed, steady.accuracy, steady.upsell, steady.attendance, 70],
+      values: [median.accuracy, median.attendance, volumeFor(median, totalRev)],
     },
   ]
 })

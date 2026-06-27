@@ -147,6 +147,45 @@ async function refresh() {
   }
 }
 
+// CSV export of the current dashboard's headline metrics. Writes a UTF-8 BOM so
+// Excel on Russian / Uzbek Windows opens the file with the correct encoding.
+// One row per metric — keeps the file readable when copy-pasted into a chat.
+function exportCsv() {
+  const d = sharedDash.value as any
+  if (!d) {
+    toast({ tone: 'warning', title: t('Nothing to export yet'), msg: t('Wait for the dashboard to load first') })
+    return
+  }
+  const rows: [string, unknown][] = [
+    [t('Generated'), fmtDateTime(new Date())],
+    [t('Range'), d.range ? `${d.range.from ?? ''} → ${d.range.to ?? ''}` : t('Today')],
+    [t('View'), t(current.value.labelKey)],
+    [t('Revenue'), d.revenue ?? d.today?.revenue ?? ''],
+    [t('Orders'), d.orders ?? d.today?.orders ?? ''],
+    [t('Paid orders'), d.paid_orders ?? d.today?.paid_orders ?? ''],
+    [t('Cancelled orders'), d.cancelled ?? d.today?.cancelled ?? ''],
+    [t('Units sold'), d.units_sold ?? d.today?.units_sold ?? ''],
+  ]
+  const breakdown = d.payment_breakdown ?? d.payment_breakdown_today ?? {}
+  for (const [k, v] of Object.entries(breakdown))
+    rows.push([`${t('Payment')} · ${k}`, v as any])
+  const tops = d.top_products ?? d.top_products_today ?? []
+  for (const tp of (tops as any[]).slice(0, 10))
+    rows.push([`${t('Top product')} · ${tp.product_name ?? tp.name ?? ''}`, tp.revenue ?? tp.quantity ?? ''])
+  const csv = `﻿${rows.map(r => `"${String(r[0]).replace(/"/g, '""')}","${String(r[1] ?? '').replace(/"/g, '""')}"`).join('\n')}\n`
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const stamp = new Date().toISOString().slice(0, 10)
+  a.href = url
+  a.download = `dashboard-${stamp}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  toast({ tone: 'success', title: t('Exported'), msg: `dashboard-${stamp}.csv` })
+}
+
 // Suppress unused-warning when sub-dashboards opt out of the prop.
 void sharedDash
 </script>
@@ -179,6 +218,8 @@ void sharedDash
         <Button
           variant="primary"
           icon="download"
+          :disabled="loading"
+          @click="exportCsv"
         >
           {{ t('Export') }}
         </Button>

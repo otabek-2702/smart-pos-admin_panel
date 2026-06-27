@@ -137,9 +137,15 @@ async function refresh() {
     })
   }
   catch {
-    toast({
-      tone: 'error',
-      title: t('Could not refresh dashboard'),
+    // Use vue-sonner directly so the user can retry from the failure toast.
+    // The project's wrapper doesn't carry an action payload yet.
+    const { toast: sonner } = await import('vue-sonner')
+    sonner.error(t('Could not refresh dashboard'), {
+      description: t('Check your connection and try again.'),
+      action: {
+        label: t('Retry'),
+        onClick: () => { void refresh() },
+      },
     })
   }
   finally {

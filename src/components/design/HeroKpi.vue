@@ -43,12 +43,14 @@ const tone = computed(() => {
 })
 
 const displayValue = computed<string>(() => {
-  const v = props.data.value
+  const raw = props.data.value
+  // BE returns Decimal as string. Coerce so the formatters can group thousands.
+  const n = typeof raw === 'string' ? Number(raw) : raw
   if (props.data.money)
-    return fmtMoneyAbbr(typeof v === 'string' ? Number(v) : v)
-  if (typeof v === 'number')
-    return fmtNum(v)
-  return String(v)
+    return fmtMoneyAbbr(typeof n === 'number' && !Number.isNaN(n) ? n : null)
+  if (typeof n === 'number' && !Number.isNaN(n))
+    return fmtNum(n)
+  return String(raw)
 })
 </script>
 

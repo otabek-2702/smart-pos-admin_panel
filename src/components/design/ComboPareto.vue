@@ -125,7 +125,8 @@ function truncate(s: string): string {
     <svg
       :width="w"
       :height="height"
-      style="display: block;"
+      overflow="visible"
+      style="display: block; overflow: visible;"
     >
       <!-- left-axis ticks -->
       <g v-for="(tval, i) in ticks.ticks" :key="`gp${i}`">

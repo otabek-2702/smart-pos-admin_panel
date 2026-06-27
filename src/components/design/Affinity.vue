@@ -597,7 +597,8 @@ function firstWord(s: string): string {
               v-if="view === 'chord'"
               width="100%"
               :viewBox="`0 0 ${CHORD_SIZE} ${CHORD_SIZE}`"
-              :style="{ display: 'block', maxWidth: `${CHORD_SIZE}px`, margin: '0 auto' }"
+              overflow="visible"
+              :style="{ display: 'block', maxWidth: `${CHORD_SIZE}px`, margin: '0 auto', overflow: 'visible' }"
             >
               <path
                 v-for="r in chordRibbons"

@@ -113,7 +113,8 @@ function stackRows(d: Datum) {
     <svg
       :width="w"
       :height="height"
-      style="display: block;"
+      overflow="visible"
+      style="display: block; overflow: visible;"
       @mouseleave="hide"
     >
       <g v-for="(t, i) in layout.ticks" :key="`t${i}`">

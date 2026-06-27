@@ -94,6 +94,8 @@ function vertexPt(s: Series, ai: number) {
     <svg
       :width="size"
       :height="size"
+      overflow="visible"
+      style="overflow: visible;"
     >
       <polygon
         v-for="(r, i) in rings"

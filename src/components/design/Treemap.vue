@@ -136,7 +136,8 @@ const tipRows = computed(() => {
     <svg
       :width="w"
       :height="height"
-      style="display: block;"
+      overflow="visible"
+      style="display: block; overflow: visible;"
     >
       <g v-for="(r, i) in rects" :key="`tm${i}`">
         <rect

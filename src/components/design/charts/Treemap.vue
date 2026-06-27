@@ -95,6 +95,8 @@ const labelRevenue = computed(() => t('Revenue'))
     <svg
       :width="w"
       :height="height"
+      overflow="visible"
+      style="overflow: visible;"
       @mouseleave="hide"
     >
       <g

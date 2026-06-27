@@ -362,7 +362,7 @@ onMounted(() => {
       <!-- Row 2: Revenue vs Expenses chart + Category targets bullets -->
       <div
         class="grid"
-        :style="{ gridTemplateColumns: '1.5fr 1fr' }"
+        :style="{ gridTemplateColumns: bullets.length ? '1.5fr 1fr' : '1fr' }"
       >
         <Card>
           <div class="card__head">
@@ -403,7 +403,7 @@ onMounted(() => {
           </div>
         </Card>
 
-        <Card>
+        <Card v-if="bullets.length">
           <div class="card__head">
             <div class="card__head-text">
               <div class="kpi__label">

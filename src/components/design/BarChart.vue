@@ -127,7 +127,8 @@ const tipTitle = computed(() => hover.value !== null ? props.data[hover.value].l
     <svg
       :width="w"
       :height="height"
-      style="display: block;"
+      overflow="visible"
+      style="display: block; overflow: visible;"
     >
       <!-- gridlines + ticks -->
       <g v-for="(t, i) in ticks.ticks" :key="`g${i}`">

@@ -86,6 +86,8 @@ const labelY = computed(() => props.yLabel || t('Y'))
     <svg
       :width="w"
       :height="height"
+      overflow="visible"
+      style="overflow: visible;"
       @mouseleave="hide"
     >
       <g v-for="(tk, i) in layout.ny.ticks" :key="`yt${i}`">

@@ -97,10 +97,12 @@ const tipTitle = computed(() => hover.value !== null ? props.data[hover.value].l
     class="donut-row"
     @mouseleave="reset"
   >
-    <div style="position: relative; flex: 0 0 auto;">
+    <div style="position: relative; flex: 0 0 auto; overflow: visible;">
       <svg
         :width="size"
         :height="size"
+        overflow="visible"
+        style="overflow: visible;"
       >
         <g v-for="(a, i) in arcs" :key="`a${i}`">
           <path

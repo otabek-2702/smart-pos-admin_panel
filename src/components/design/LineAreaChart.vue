@@ -149,7 +149,8 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
     <svg
       :width="w"
       :height="height"
-      style="display:block;"
+      overflow="visible"
+      style="display:block; overflow: visible;"
     >
       <defs>
         <linearGradient :id="id" x1="0" y1="0" x2="0" y2="1">

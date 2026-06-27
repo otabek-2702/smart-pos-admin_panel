@@ -1,13 +1,29 @@
 <script setup lang="ts">
+/* ============================================================
+   ALPHA POS — MarkdownMessage
+   Renders an assistant message as markdown. Splits the content
+   into ordered text and chart segments so AI replies can embed
+   inline charts via a fenced "chart" code block:
+
+     ```chart
+     { "type": "bar", "title": "...", "data": [...] }
+     ```
+
+   Text segments go through markdown-it + DOMPurify (unchanged).
+   Chart segments are JSON-parsed and handed to <AIChartBlock>.
+
+   When streaming, an incomplete chart block (partial JSON) renders
+   a placeholder; once the AI finishes the block, JSON.parse runs
+   and the real chart appears.
+   ============================================================ */
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js/lib/common'
 import 'highlight.js/styles/github-dark.css'
-import DesignIcon from './DesignIcon.vue'
+import AIChartBlock, { type AIChartConfig } from './AIChartBlock.vue'
 
 interface Props {
   content: string
-  /** When true, suppress code highlight + copy buttons (mid-stream perf). Set false on stream end. */
   streaming?: boolean
 }
 
@@ -37,7 +53,6 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-// Pre-normalize: AI tends to ship comma-thousands numbers — convert to space sep.
 function spaceifyNumbers(s: string): string {
   return s.replace(/(\d{1,3}(?:,\d{3})+)(?:\.(\d+))?/g, (_m, intPart: string, dec?: string) => {
     const spaced = intPart.replace(/,/g, ' ')
@@ -45,15 +60,57 @@ function spaceifyNumbers(s: string): string {
   })
 }
 
-const html = computed(() => {
-  const raw = md.render(spaceifyNumbers(props.content || ''))
-  return DOMPurify.sanitize(raw, {
+// ---------- Segment splitter ----------
+// Splits the assistant content into ordered text/chart segments. A "chart"
+// fence is recognised when the language tag is exactly `chart` (case-insensitive)
+// and the body parses as JSON. If JSON.parse fails (mid-stream) we tag it
+// pending so a placeholder renders until the stream completes.
+type Segment =
+  | { type: 'text'; content: string }
+  | { type: 'chart'; config: AIChartConfig; pending?: boolean }
+
+const CHART_FENCE = /```chart\s*\n([\s\S]*?)(?:```|$)/gi
+
+const segments = computed<Segment[]>(() => {
+  const raw = props.content || ''
+  const out: Segment[] = []
+  let last = 0
+  let match: RegExpExecArray | null
+  CHART_FENCE.lastIndex = 0
+  while ((match = CHART_FENCE.exec(raw)) !== null) {
+    if (match.index > last)
+      out.push({ type: 'text', content: raw.slice(last, match.index) })
+    const body = (match[1] || '').trim()
+    const closed = match[0].endsWith('```')
+    let cfg: AIChartConfig | null = null
+    if (body) {
+      try { cfg = JSON.parse(body) as AIChartConfig }
+      catch { /* mid-stream — leave cfg null */ }
+    }
+    if (cfg && closed)
+      out.push({ type: 'chart', config: cfg })
+    else
+      out.push({ type: 'chart', config: cfg ?? ({ type: 'bar' } as AIChartConfig), pending: true })
+    last = match.index + match[0].length
+  }
+  if (last < raw.length)
+    out.push({ type: 'text', content: raw.slice(last) })
+  if (!out.length)
+    out.push({ type: 'text', content: raw })
+  return out
+})
+
+function renderText(s: string): string {
+  const html = md.render(spaceifyNumbers(s))
+  return DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true },
     ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'title'],
     ADD_ATTR: ['target', 'rel'],
   })
-})
+}
 
+// Attach code-block "Copy" + lang chip to <pre> elements after each text segment
+// has been v-html'd. Runs once per content change after nextTick.
 const root = ref<HTMLElement | null>(null)
 
 function attachCodeActions() {
@@ -89,7 +146,6 @@ function attachCodeActions() {
     wrap.appendChild(head)
     wrap.appendChild(pre)
   })
-  // open external links in new tab
   el.querySelectorAll('a[href]').forEach((a) => {
     const h = a.getAttribute('href') || ''
     if (/^https?:\/\//.test(h)) {
@@ -109,7 +165,16 @@ onMounted(() => {
 </script>
 
 <template>
-  <div ref="root" class="md" v-html="html" />
+  <div ref="root" class="md">
+    <template v-for="(seg, i) in segments" :key="i">
+      <div v-if="seg.type === 'text'" v-html="renderText(seg.content)" />
+      <AIChartBlock
+        v-else
+        :config="seg.config"
+        :streaming="!!seg.pending || streaming"
+      />
+    </template>
+  </div>
 </template>
 
 <style>

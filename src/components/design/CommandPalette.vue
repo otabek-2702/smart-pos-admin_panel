@@ -16,9 +16,13 @@ import stockNav from '@/navigation/vertical/stock'
 import systemNav from '@/navigation/vertical/system'
 import analyticsNav from '@/navigation/vertical/analytics'
 import DesignIcon from './DesignIcon.vue'
+import { useTheme } from 'vuetify'
+import ability from '@/plugins/casl/ability'
+import { initialAbility } from '@/plugins/casl/ability'
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, locale } = useI18n({ useScope: 'global' })
 const router = useRouter()
+const vuetifyTheme = useTheme()
 
 interface NavItem {
   title: string
@@ -31,7 +35,8 @@ interface NavItem {
 interface CmdItem {
   title: string
   group: string
-  to: string
+  to?: string
+  action?: () => void
   icon?: string
   searchKey: string
 }
@@ -70,7 +75,44 @@ function buildItem(group: string, n: NavItem): CmdItem {
   }
 }
 
+// Action commands — non-route commands the palette can fire (theme, lang, logout).
+function setLocale(code: string) {
+  locale.value = code as any
+  localStorage.setItem('appLocale', code)
+}
+
+function toggleTheme() {
+  const cur = vuetifyTheme.global.current.value.dark ? 'light' : 'dark'
+  vuetifyTheme.global.name.value = cur
+  try { localStorage.setItem('pos system-theme', cur) }
+  catch { /* noop */ }
+}
+
+function logout() {
+  localStorage.removeItem('accessToken')
+  localStorage.removeItem('userData')
+  localStorage.removeItem('userAbilities')
+  ability.update(initialAbility)
+  router.push('/login')
+}
+
+function actionsGroup(): CmdItem[] {
+  const group = t('Actions')
+  const mkActionItem = (title: string, icon: string, action: () => void): CmdItem => ({
+    title, group, icon, action,
+    searchKey: `${title} ${group}`.toLowerCase(),
+  })
+  return [
+    mkActionItem(t('Toggle dark mode'), 'moon', toggleTheme),
+    mkActionItem(t('Switch to O\'zbek'), 'translate', () => setLocale('uz')),
+    mkActionItem(t('Switch to Русский'), 'translate', () => setLocale('ru')),
+    mkActionItem(t('Switch to English'), 'translate', () => setLocale('en')),
+    mkActionItem(t('Sign out'), 'logout', logout),
+  ]
+}
+
 const items = computed<CmdItem[]>(() => [
+  ...actionsGroup(),
   ...flattenNav(t('Dashboard'), dashboardNav as any),
   ...flattenNav(t('Management'), managementNav as any),
   ...flattenNav(t('HR'), hrNav as any),
@@ -105,9 +147,13 @@ watch(open, async (v) => {
 })
 
 function go(it: CmdItem) {
-  if (!it.to) return
   open.value = false
-  router.push({ name: it.to }).catch(() => {})
+  if (it.action) {
+    it.action()
+    return
+  }
+  if (it.to)
+    router.push({ name: it.to }).catch(() => {})
 }
 
 function onGlobalKey(e: KeyboardEvent) {

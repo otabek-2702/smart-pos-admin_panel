@@ -1,6 +1,12 @@
 {
   "2": "2",
   "time_minute_short": "m",
+  "Command palette": "Command palette",
+  "Jump to anywhere…": "Jump to anywhere…",
+  "No matches": "No matches",
+  "navigate": "navigate",
+  "open": "open",
+  "close": "close",
   "time_hour_short": "h",
   "time_day_short": "d",
   "filters_label_colon": "Filters:",

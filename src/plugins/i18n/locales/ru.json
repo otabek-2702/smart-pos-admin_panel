@@ -1,6 +1,12 @@
 {
   "time_minute_short": "мин",
   "time_hour_short": "ч",
+  "Command palette": "Командная панель",
+  "Jump to anywhere…": "Перейти куда угодно…",
+  "No matches": "Ничего не найдено",
+  "navigate": "перемещение",
+  "open": "открыть",
+  "close": "закрыть",
   "time_day_short": "д",
   "filters_label_colon": "Фильтры:",
   "progress_min_pct": "0%",

@@ -2,6 +2,7 @@
 import { useTheme } from 'vuetify'
 import { Toaster } from 'vue-sonner'
 import 'vue-sonner/style.css'
+import CommandPalette from '@/components/design/CommandPalette.vue'
 import ScrollToTop from '@core/components/ScrollToTop.vue'
 import { useThemeConfig } from '@core/composable/useThemeConfig'
 import { hexToRgb } from '@layouts/utils'
@@ -25,6 +26,8 @@ const sonnerTheme = computed<'dark' | 'light'>(() => global.current.value.dark ?
     <VApp :style="`--v-global-theme-primary: ${hexToRgb(global.current.value.colors.primary)}`">
       <RouterView />
       <ScrollToTop />
+      <!-- Global Cmd/Ctrl+K command palette (mount-once; listens at the window level). -->
+      <CommandPalette />
       <!-- vue-sonner: replaces the per-page VSnackbar plumbing. useNotify() now dispatches to toast(). -->
       <Toaster
         :theme="sonnerTheme"

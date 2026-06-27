@@ -46,8 +46,12 @@ const pageNums = computed<(number | '…')[]>(() => {
   return [1, '…', page - 1, page, page + 1, '…', pages]
 })
 
+import { fmtNum } from './utils/format'
+
 function fmtTotal(n: number) {
-  return new Intl.NumberFormat('en-US').format(n)
+  // Locale-aware via the project formatter (uses non-breaking space — matches
+  // the rest of the UI). Previously hardcoded en-US comma separator.
+  return fmtNum(n)
 }
 
 function goPage(n: number) {
@@ -140,9 +144,9 @@ function onPpChange(e: Event) {
   height: 32px;
   padding: 0 8px;
   border-radius: 8px;
-  border: 1px solid rgba(var(--v-theme-on-surface, 0 0 0), 0.16);
-  background: rgba(var(--v-theme-surface, 255 255 255), 1);
-  color: inherit;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
   font: inherit;
   font-size: 13px;
   cursor: pointer;

@@ -151,7 +151,7 @@ function heatOpacity(v: number): number {
 
 // ---------- StackedBar helpers (inline fallback) ----------
 interface ChannelSeries {
-  key: keyof ChannelDay['values']
+  key: 'hall' | 'delivery' | 'pickup'
   label: string
   color: string
 }
@@ -171,7 +171,7 @@ const STACK_HEIGHT = 260
 const stackTotals = computed(() => {
   const D = data.value
   if (!D) return [] as number[]
-  return D.channelDays.map(d => d.values.hall + d.values.delivery + d.values.pickup)
+  return D.channelDays.map((d: any) => (d.values?.hall ?? 0) + (d.values?.delivery ?? 0) + (d.values?.pickup ?? 0))
 })
 
 const stackMax = computed(() => {
@@ -228,11 +228,22 @@ function sparkTrend(values: number[]): 'up' | 'down' | 'flat' {
 async function loadDashboard() {
   loading.value = true
   try {
-    // Pending BACKEND_TODO item 11: GET /dashboard/sales?range=30d returning
-    // monthRevenue, grossMargin, revenue30[], expense30[], lastMonthRev[],
-    // dayLabels[], HM_DAYS[], HM_HOURS[], heatMatrix[][], channelDays[].
     const res = await axiosIns.get('/dashboard/sales', { params: { range: '30d' } })
-    data.value = res.data?.data ?? res.data
+    const raw = res.data?.data ?? res.data
+    // BE channelDays shape: { day, hall, delivery, pickup }. FE stacked-bar
+    // template uses { label, values: { hall, delivery, pickup } }. Adapt here
+    // instead of touching N template bindings.
+    const channelDays = Array.isArray(raw?.channelDays)
+      ? raw.channelDays.map((d: any) => ({
+          label: String(d.day || '').slice(5), // 'MM-DD'
+          values: {
+            hall: Number(d.hall) || 0,
+            delivery: Number(d.delivery) || 0,
+            pickup: Number(d.pickup) || 0,
+          },
+        }))
+      : []
+    data.value = { ...raw, channelDays }
   }
   catch {
     // Real data only — leave null so the page shows the empty state.

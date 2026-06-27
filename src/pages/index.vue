@@ -187,7 +187,7 @@ void sharedDash
 
     <div
       class="dashtabs"
-      style="margin-bottom: var(--sp-6);"
+      style="margin-bottom: var(--sp-3);"
     >
       <button
         v-for="v in DASH_VIEWS"

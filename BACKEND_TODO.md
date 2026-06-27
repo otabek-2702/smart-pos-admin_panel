@@ -6,15 +6,21 @@ Backend repo: `C:\Users\Jason\Desktop\Projects\alpha_pos_server\` (Django REST).
 
 ---
 
-## Recent updates from Abrorbek (2026-06-25)
+## Recent updates from Abrorbek (2026-06-25 + 2026-06-27)
 
-Abrorbek (BE) confirmed via dev-bot that he shipped items **1, 2, 3, 5 (inline items already present), 6, 7, 8, 9, 10** on the `alpha_pos_server` repo. FE wiring is in progress — items are flagged "Shipped" below but stay in the **Open** section until FE-side wiring is verified end-to-end (request issued, response shape matches, page renders without fallback).
+**2026-06-25:** items **1, 2, 3, 5, 6, 7, 8, 9, 10** shipped.
+**2026-06-27:** items **4** (order_number — assigned + exposed), **11** (shift fields + filters), **12** (sales dashboard), **13** (product affinity / chord), **14** (orders include_items) shipped. Verified locally end-to-end against a 827-order / 30-day seed:
+- Item 4: `/orders` payload exposes `order_number` (null on pre-migration rows); FE renders `#order_number ?? #display_id`.
+- Item 11: all 14 fields present in `/shifts` list; active shift correctly rolls up live (Nico shift = 6 orders / 1.24M gross / 84k cash / 1.155M card).
+- Item 12: `/dashboard/sales` keys exact spec match; hub Sotuvlar tab populated.
+- Item 13: chord diagram renders pairs (Classic Combo #61 + House Cheesecake #76).
+- Item 14: `/orders` list response includes `items[]` inline; no more N+1.
 
-**Repo clarification:** the canonical backend is now `C:\Users\Jason\Desktop\Projects\alpha_pos_server\`. The older `C:\Users\Jason\Desktop\Projects\alpha_pos\` monolith on the `prelaunch-fixes` branch is **superseded** — do not read it for current shapes. All references in this file and in memory have been (or are being) updated to point at `alpha_pos_server`.
+**Repo clarification:** canonical backend is `C:\Users\Jason\Desktop\Projects\alpha_pos_server\`. The older `C:\Users\Jason\Desktop\Projects\alpha_pos\` monolith on `prelaunch-fixes` is superseded.
 
-Still open after this deploy:
-- **Item 4** (stable order display number / `order_number` decision) — Abrorbek did not address it in his reply. Awaiting decision.
-- **Item 11** (shifts list extra reconciliation + perf fields) — not part of this deploy batch.
+Open questions sent back to Abrorbek (msg 35):
+- Shift status enum: `OPEN` vs `ACTIVE` for running shifts (`_serialize_shift` checks `status == 'ACTIVE'`).
+- `/shifts/active` returns 0 items while `/shifts` list returns running rows.
 
 ---
 
@@ -48,15 +54,7 @@ Still open after this deploy:
 **Status:** ✅ Shipped on alpha_pos_server (Abrorbek 2026-06-25). FE wiring in progress.
 
 ### 4. Stable order display number
-**Why:** `display_id` is a kitchen-handoff counter that wraps at `DISPLAY_ID_WRAP_AT` (~100). Two orders can share `display_id=1`. FE currently shows `#{o.id}` (DB PK) as primary which is correct but exposes internal sequence.
-
-**Need:** Decide one of:
-- (a) Add a non-wrapping `order_number` field to Order model + serializer (per-day or per-shift sequence that doesn't reset until you choose).
-- (b) Document `display_id` as kitchen-only, keep FE on `o.id`. No code change, just confirm.
-
-Tag the answer here so we close the loop.
-
-**Status:** Awaiting decision from Abrorbek.
+**Status:** ✅ Shipped on alpha_pos_server (Abrorbek 2026-06-27, commit da234fb). Added non-wrapping `order_number` PositiveIntegerField + migration 0034. FE wired (orders list + confirm dialog prefer `order_number ?? display_id`). Verified locally.
 
 ### 5. Orders list — include items inline OR provide cheap detail endpoint
 **Why:** FE shift-handover quick-view modal lazy-fetches `/orders/{id}` to show line items. Each receipt row click = one request. List view also expands rows to show items via `o.items` field if present.
@@ -155,6 +153,27 @@ Stretch (future): aggregated `/staff/performance/summary?range=30d` returning `{
 
 If any of those endpoints are slated for deprecation, tag here and we'll wire up the replacement.
 
+**Status:** ✅ Shipped on alpha_pos_server (Abrorbek 2026-06-27, commit f3a3cef). All 14 fields confirmed present in `/shifts` list response; live aggregation works for ACTIVE shifts. **Open question to BE:** canonical `status` enum (`OPEN` vs `ACTIVE` for running, etc.) — sent via dev-bot.
+
+---
+
+### 17. Operations dashboard endpoint
+**Why:** Operations tab of the new dashboards hub (`src/pages/dash/operations.vue`) renders empty state today. Mock arrays were stripped. Needs operational metrics for tables/funnel/prep/hours.
+
+**Need:** `GET /api/admins/dashboard/operations?from=&to=` returning:
+```
+{
+  tableGrid: [{ id: int, label: str, status: 'free'|'occupied'|'ready', orders: int }],
+  funnel: [{ status: str, count: int }],
+  prepByCategory: [{ category: str, count: int, avg_prep_seconds: int|null }],
+  ordersByHour: [{ hour: '09'..'22', orders: int }]
+}
+```
+
+Window defaults to today; respects `business_day_start` (item 8).
+
+**Status:** Sent to Abrorbek via dev-bot 2026-06-27 (msg 35).
+
 ---
 
 ### 12. Sales & Revenue dashboard endpoint (last mock-data page)
@@ -177,6 +196,8 @@ If any of those endpoints are slated for deprecation, tag here and we'll wire up
 ```
 
 `range` should respect `business_day_start` (item 8) when computing the window.
+
+**Status:** ✅ Shipped on alpha_pos_server (Abrorbek 2026-06-27, commit f3a3cef). All 11 response keys verified to match the spec. Hub Sotuvlar tab renders 30-day revenue chart + 7×14 heatmap + 30-day channel stacked bars from live BE data.
 
 ### 13. Product affinity (market-basket / co-occurrence) endpoint
 **Why:** New "Frequently bought together" card embedded in `src/pages/dash/products.vue` (between the treemap/donut row and the pareto/sparkline row) needs product co-occurrence data that no existing endpoint exposes. The existing `/analytics/products/*` endpoints return per-product KPIs only (units, revenue, deltas) — they don't surface which products are bought together. Computing co-occurrence server-side requires scanning all `order_items` grouped by `order_id` within the window and counting unordered pairs `(a, b)` where `a < b`. `limit` caps the number of products returned (top-N by orders) so the chord / matrix stays readable (design uses 10).
@@ -202,5 +223,11 @@ FE constraints:
 
 Until this endpoint ships, the FE card renders an empty state (DashSection wrapper) and degrades gracefully.
 
+**Status:** ✅ Shipped on alpha_pos_server (Abrorbek 2026-06-27, commit a9316bc). Response shape (`range, products, pairs, totalOrders`) verified. Chord diagram in Mahsulotlar dashboard renders pairs from live BE data.
+
 ## Done — verified
-*(none yet — items 1, 2, 3, 5, 6, 7, 8, 9, 10 are shipped BE-side but stay in Open until FE wiring is verified end-to-end.)*
+- **Item 4** — `order_number` field on Order (migration 0034, commit da234fb). FE wired (`orders/index.vue`, `types/order.ts`).
+- **Item 11** — Shift list 14-field expansion (commit f3a3cef). FE consumes via shifts/index.vue. Open: confirm canonical status enum.
+- **Item 12** — `/dashboard/sales` 11-key endpoint (commit f3a3cef). FE consumes via dash/sales.vue + composables/useDashboardData.ts.
+- **Item 13** — `/analytics/products/affinity` chord endpoint (commit a9316bc). FE consumes via components/design/Affinity.vue.
+- **Item 14** — `/orders` list response includes inline `items[]` (commit f3a3cef). FE shift-handover modal no longer N+1.

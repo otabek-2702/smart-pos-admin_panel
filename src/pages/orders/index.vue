@@ -51,6 +51,15 @@ const cashierOptions = ref<{ value: string, label: string }[]>([])
 const categoryOptions = ref<{ value: string, label: string }[]>([])
 const statusPickerOpen = ref(false)
 const categoryPickerOpen = ref(false)
+const statusPickerRef = ref<HTMLElement | null>(null)
+const categoryPickerRef = ref<HTMLElement | null>(null)
+
+// Close popovers when clicking outside their root + close one when opening
+// the other (so they don't stack overlapping content).
+onClickOutside(statusPickerRef, () => { statusPickerOpen.value = false })
+onClickOutside(categoryPickerRef, () => { categoryPickerOpen.value = false })
+watch(statusPickerOpen, (v) => { if (v) categoryPickerOpen.value = false })
+watch(categoryPickerOpen, (v) => { if (v) statusPickerOpen.value = false })
 
 const expanded = ref<Set<number | string>>(new Set())
 const selected = ref<Set<number | string>>(new Set())
@@ -529,7 +538,7 @@ function onPaymentToggle(p: string) {
         </div>
 
         <!-- Multi-status filter (popover with checkboxes) -->
-        <div class="tb-filter tb-filter--md" style="position: relative;">
+        <div ref="statusPickerRef" class="tb-filter tb-filter--md" style="position: relative;">
           <div
             class="control control--select"
             style="cursor: pointer;"
@@ -592,7 +601,7 @@ function onPaymentToggle(p: string) {
         </div>
 
         <!-- Category multi-select (popover) -->
-        <div class="tb-filter tb-filter--md" style="position: relative;">
+        <div ref="categoryPickerRef" class="tb-filter tb-filter--md" style="position: relative;">
           <div
             class="control control--select"
             style="cursor: pointer;"

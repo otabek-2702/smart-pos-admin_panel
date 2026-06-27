@@ -3298,6 +3298,7 @@
   "Avg quantity": "Avg quantity sold",
   "No menu items": "No menu items to analyze",
   "Try a different date range or COGS fraction.": "Try a different date range or COGS fraction.",
+  "Try a different date range.": "Try a different date range.",
   "currency_uzs": "UZS",
   "id_prefix": "#",
   "negative_amount": "−{amount}",

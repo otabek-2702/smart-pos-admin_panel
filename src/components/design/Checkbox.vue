@@ -26,8 +26,8 @@ const klass = computed(() =>
   ),
 )
 
-function toggle(ev: MouseEvent) {
-  ev.stopPropagation()
+function toggle(ev?: Event) {
+  ev?.stopPropagation()
   if (props.disabled)
     return
   const next = !props.modelValue
@@ -44,6 +44,8 @@ function toggle(ev: MouseEvent) {
     :aria-disabled="disabled"
     tabindex="0"
     @click="toggle"
+    @keydown.space.prevent="toggle"
+    @keydown.enter.prevent="toggle"
   >
     <span
       v-if="indeterminate"

@@ -20,6 +20,8 @@ import ChartTip from './ChartTip.vue'
 import { niceTicks } from './niceTicks'
 import { useWidth } from './useWidth'
 
+const { t } = useI18n({ useScope: 'global' })
+
 interface Series {
   key: string
   label: string
@@ -159,8 +161,8 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
   >
     <StateFill
       icon="chart"
-      title="No data for this range"
-      sub="Try a different date range."
+      :title="t('No data for this range')"
+      :sub="t('Try a different date range.')"
       :style="{ height: `${height}px` }"
     />
   </div>

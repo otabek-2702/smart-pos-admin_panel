@@ -6,6 +6,8 @@ import Skeleton from './Skeleton.vue'
 import StateFill from './StateFill.vue'
 import ChartTip from './ChartTip.vue'
 
+const { t } = useI18n({ useScope: 'global' })
+
 interface Series {
   key: string
   label: string
@@ -141,7 +143,7 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
     v-else-if="!series.length || !categories.length"
     ref="elRef"
   >
-    <StateFill icon="bx-line-chart" title="No data for this range" sub="Try a different date range." />
+    <StateFill icon="bx-line-chart" :title="t('No data for this range')" :sub="t('Try a different date range.')" />
   </div>
   <div
     v-else
@@ -199,7 +201,7 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
           font-size="11"
           font-weight="600"
           fill="rgb(var(--v-theme-chart-target))"
-        >Target {{ yfmt(target) }}</text>
+        >{{ t('Target') }} {{ yfmt(target) }}</text>
       </g>
 
       <!-- series paths -->

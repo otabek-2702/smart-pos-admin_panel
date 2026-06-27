@@ -900,7 +900,11 @@ textarea.control { height: auto; padding: var(--sp-2) var(--sp-3); resize: verti
 .statefill.is-error .statefill__icon { background: var(--error-weak); color: var(--error); }
 
 /* ---------- Modal ---------- */
-.overlay { position: fixed; inset: 0; background: var(--overlay); z-index: 60; display: grid; place-items: center; padding: var(--sp-5); animation: fade .16s ease; }
+/* z-scale: drawer (.sidebar) sits at 80, nav-scrim at 70. Modal overlay paints
+   ABOVE both so a modal opened while the mobile drawer is up isn't covered.
+   Vuetify VOverlay defaults to 2400; keep this below that so a VDialog still
+   paints above the Sneat modal stack if both happen to be open. */
+.overlay { position: fixed; inset: 0; background: var(--overlay); z-index: 100; display: grid; place-items: center; padding: var(--sp-5); animation: fade .16s ease; }
 @keyframes fade { from { opacity: 0; } }
 .modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-xl); box-shadow: var(--shadow-lg); width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; animation: pop .18s cubic-bezier(.2,.9,.3,1.1); }
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.985); } }

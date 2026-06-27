@@ -6,6 +6,8 @@ import Skeleton from './Skeleton.vue'
 import StateFill from './StateFill.vue'
 import ChartTip from './ChartTip.vue'
 
+const { t } = useI18n({ useScope: 'global' })
+
 interface BarPoint {
   label: string
   value: number
@@ -116,7 +118,7 @@ const tipTitle = computed(() => hover.value !== null ? props.data[hover.value].l
     v-else-if="!data.length"
     ref="elRef"
   >
-    <StateFill icon="bx-bar-chart-alt-2" title="No data for this range" />
+    <StateFill icon="bx-bar-chart-alt-2" :title="t('No data for this range')" />
   </div>
   <div
     v-else

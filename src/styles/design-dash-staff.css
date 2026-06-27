@@ -28,6 +28,8 @@
   background: rgb(var(--v-theme-neutral-weak));
   color: rgb(var(--v-theme-text-secondary));
 }
+/* Light-mode rank colors. The hex values fail WCAG AA on dark surfaces,
+   so [data-theme=dark] overrides below lighten them for ~4.5:1 contrast. */
 .lb-rank.is-1 {
   background: rgba(255, 199, 0, 0.18);
   color: #b58100;
@@ -40,6 +42,9 @@
   background: rgba(176, 116, 70, 0.22);
   color: #8a4b1f;
 }
+[data-theme="dark"] .lb-rank.is-1 { color: #FFD27A; background: rgba(255, 199, 0, 0.22); }
+[data-theme="dark"] .lb-rank.is-2 { color: #C9CCD1; background: rgba(165, 168, 173, 0.26); }
+[data-theme="dark"] .lb-rank.is-3 { color: #E0B58A; background: rgba(176, 116, 70, 0.26); }
 
 .lb-bar {
   position: relative;

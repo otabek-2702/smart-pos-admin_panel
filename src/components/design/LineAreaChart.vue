@@ -216,9 +216,10 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
         />
       </g>
 
-      <!-- hover crosshair + dots -->
+      <!-- hover crosshair + dots — wrapped so the geometry-attribute transitions can slide -->
       <line
         v-if="hover !== null"
+        class="chart-crosshair"
         :x1="x(hover)"
         :x2="x(hover)"
         :y1="padT"
@@ -230,6 +231,7 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
         v-for="(s, si) in (hover !== null ? series : [])"
         v-show="hover !== null && Number.isFinite(s.data[hover!])"
         :key="`hc${si}`"
+        class="chart-hover-dot"
         :cx="x(hover!)"
         :cy="y(s.data[hover!] ?? 0)"
         r="4.5"
@@ -272,3 +274,16 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
     />
   </div>
 </template>
+
+<style scoped>
+/* Modern browsers transition SVG geometry attributes via CSS — Chrome 78+ /
+   Firefox 130+. Falls back to the old jumpy behavior on unsupported engines. */
+.chart-crosshair {
+  transition: x1 .14s cubic-bezier(.2, .8, .2, 1),
+              x2 .14s cubic-bezier(.2, .8, .2, 1);
+}
+.chart-hover-dot {
+  transition: cx .14s cubic-bezier(.2, .8, .2, 1),
+              cy .14s cubic-bezier(.2, .8, .2, 1);
+}
+</style>

@@ -119,12 +119,15 @@ interface BulletItem {
 const bullets = computed<BulletItem[]>(() => [])
 
 // ---------- Revenue/Expense chart series ----------
+// BE returns Decimal as string. Coerce before passing to LineAreaChart — maxV's
+// loop does numeric > comparison, but '22720000' > '8085000' is lex (false), so
+// the wrong peak is picked and the area path overshoots above viewBox.
 const chartSeries = computed(() => {
   const D = data.value
   if (!D) return []
   return [
-    { key: 'revenue', label: t('Revenue'), color: 'rgb(var(--v-theme-chart-revenue))', data: D.revenue30 },
-    { key: 'expense', label: t('Expenses'), color: 'rgb(var(--v-theme-chart-expense))', data: D.expense30 },
+    { key: 'revenue', label: t('Revenue'), color: 'rgb(var(--v-theme-chart-revenue))', data: toNumArr(D.revenue30) },
+    { key: 'expense', label: t('Expenses'), color: 'rgb(var(--v-theme-chart-expense))', data: toNumArr(D.expense30) },
   ]
 })
 

@@ -52,11 +52,14 @@ function reset() {
 const yfmt = computed(() => props.yFormat ?? fmtAbbr)
 
 const maxV = computed(() => {
+  // BE often hands money over as Decimal-as-string. Coerce here so callers that
+  // forget to map(Number) don't end up with a lex-compared max that caps too low.
   let m = 0
   for (const s of props.series) {
     for (const v of s.data) {
-      if (v > m)
-        m = v
+      const n = typeof v === 'string' ? Number(v) : v
+      if (Number.isFinite(n) && n > m)
+        m = n
     }
   }
   if (props.target && props.target > m)
@@ -149,8 +152,7 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
     <svg
       :width="w"
       :height="height"
-      overflow="visible"
-      style="display:block; overflow: visible;"
+      style="display:block;"
     >
       <defs>
         <linearGradient :id="id" x1="0" y1="0" x2="0" y2="1">

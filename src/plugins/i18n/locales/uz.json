@@ -474,6 +474,8 @@
   "Failed to load discounts": "Chegirmalarni yuklab bo'lmadi",
   "Method": "Usul",
   "Code": "Kod",
+  "Scan barcode": "Shtrix-kodni skanerlash",
+  "Point at the barcode or QR": "Kameraga shtrix-kod yoki QRni qarating",
   "Min Order Amount": "Min buyurtma summasi",
   "Starts At": "Boshlanish",
   "Ends At": "Tugash",

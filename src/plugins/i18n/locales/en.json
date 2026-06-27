@@ -475,6 +475,8 @@
   "Failed to load discounts": "Failed to load discounts",
   "Method": "Method",
   "Code": "Code",
+  "Scan barcode": "Scan barcode",
+  "Point at the barcode or QR": "Point at the barcode or QR",
   "Min Order Amount": "Min Order Amount",
   "Starts At": "Starts At",
   "Ends At": "Ends At",

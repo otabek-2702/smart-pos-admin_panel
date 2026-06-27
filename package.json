@@ -24,6 +24,8 @@
     "@sentry/vue": "^10.47.0",
     "@vueuse/core": "10.1.2",
     "@vueuse/math": "10.1.2",
+    "@zxing/browser": "^0.2.0",
+    "@zxing/library": "^0.23.0",
     "apexcharts-clevision": "3.28.5",
     "axios": "1.4.0",
     "chart.js": "4.3.0",

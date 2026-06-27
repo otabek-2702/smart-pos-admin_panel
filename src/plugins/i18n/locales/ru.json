@@ -473,6 +473,8 @@
   "Failed to load discounts": "Не удалось загрузить скидки",
   "Method": "Метод",
   "Code": "Код",
+  "Scan barcode": "Сканировать штрих-код",
+  "Point at the barcode or QR": "Наведите камеру на штрих-код или QR",
   "Min Order Amount": "Мин. сумма заказа",
   "Starts At": "Начало",
   "Ends At": "Окончание",

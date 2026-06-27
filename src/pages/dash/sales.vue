@@ -58,32 +58,37 @@ interface HeroKpiData {
   sub?: string
 }
 
+// BE returns Decimal arrays as strings — coerce defensively.
+const toNumArr = (arr: any): number[] => Array.isArray(arr) ? arr.map(v => Number(v) || 0) : []
+
 const heroKpis = computed<HeroKpiData[]>(() => {
   const D = data.value
   if (!D) return []
-  const vsLastMonthDiff = D.monthRevenue - D.lastMonthRev.reduce((a, b) => a + b, 0)
+  const revenue30 = toNumArr(D.revenue30)
+  const expense30 = toNumArr(D.expense30)
+  const lastMonth = toNumArr(D.lastMonthRev)
+  const monthRevenue = Number(D.monthRevenue) || 0
+  const vsLastMonthDiff = monthRevenue - lastMonth.reduce((a, b) => a + b, 0)
   return [
     {
       label: t('This month'),
-      value: D.monthRevenue,
+      value: monthRevenue,
       money: true,
       unit: 'UZS',
-      delta: 12.4,
       icon: 'wallet',
       tone: 'primary',
-      spark: D.revenue30.slice(-14),
+      spark: revenue30.slice(-14),
     },
     {
       label: t('vs last month'),
-      value: `+${fmtAbbr(vsLastMonthDiff)}`,
+      value: `${vsLastMonthDiff >= 0 ? '+' : ''}${fmtAbbr(vsLastMonthDiff)}`,
       unit: 'UZS',
-      delta: 14.1,
       icon: 'trend',
-      tone: 'success',
+      tone: vsLastMonthDiff >= 0 ? 'success' : 'error',
     },
     {
       label: t('Best day'),
-      value: Math.max.apply(null, D.revenue30),
+      value: revenue30.length ? Math.max(...revenue30) : 0,
       money: true,
       unit: 'UZS',
       icon: 'star',
@@ -92,13 +97,12 @@ const heroKpis = computed<HeroKpiData[]>(() => {
     },
     {
       label: t('Expenses (30d)'),
-      value: D.expense30.reduce((a, b) => a + b, 0),
+      value: expense30.reduce((a, b) => a + b, 0),
       money: true,
       unit: 'UZS',
-      delta: -2.3,
       icon: 'receipt',
       tone: 'error',
-      spark: D.expense30.slice(-14),
+      spark: expense30.slice(-14),
     },
   ]
 })
@@ -110,13 +114,9 @@ interface BulletItem {
   target: number
 }
 
-const bullets = computed<BulletItem[]>(() => [
-  { label: t('Pizza'), value: 24_800_000, target: 26_000_000 },
-  { label: t('Lavash'), value: 18_200_000, target: 16_000_000 },
-  { label: t('Kebab'), value: 15_600_000, target: 18_000_000 },
-  { label: t('Hot Dogs'), value: 8_900_000, target: 8_000_000 },
-  { label: t('Drinks'), value: 6_400_000, target: 7_500_000 },
-])
+// Real data only — bullets stay empty until BE returns category targets
+// (BACKEND_TODO item 17: category targets endpoint or extend /dashboard/sales).
+const bullets = computed<BulletItem[]>(() => [])
 
 // ---------- Revenue/Expense chart series ----------
 const chartSeries = computed(() => {
@@ -371,7 +371,7 @@ onMounted(() => {
                 {{ t('Revenue vs expenses · 30 days') }}
               </div>
               <h3 class="card__insight">
-                {{ t('Margin holding at {pct}%', { pct: data?.grossMargin ?? 0 }) }}
+                {{ t('Margin holding at {pct}%', { pct: Math.round((Number(data?.grossMargin) || 0) * 100) }) }}
               </h3>
             </div>
           </div>

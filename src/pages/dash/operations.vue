@@ -11,83 +11,46 @@ import { fmtNum } from '@/components/design/utils/format'
 
 const { t } = useI18n({ useScope: 'global' })
 
-// ---- mock data (TODO: wire to BE) -----------------------------------------
-// TODO(backend): /orders/stats?today + /kitchen/queue -> openOrders, inKitchen,
-// readyToServe; /tables/state -> tableGrid.
+// ---- BE-driven data (no mock) ---------------------------------------------
+// Pending BACKEND_TODO item 17: /dashboard/operations?today returning:
+//   { live_counts: { open_orders, in_kitchen, ready_to_serve, tables_seated },
+//     tables: [{ n, status: 'free'|'seated'|'reserved'|'cleaning', guests, mins }],
+//     funnel: [{ stage, value }],
+//     prep_by_category: [{ label, mins, target, orders }],
+//     orders_by_hour: [{ hour, orders, peak }] }
+// Until shipped, page renders empty arrays → cards show empty state.
 interface TableCell {
   n: number
   status: 'free' | 'seated' | 'reserved' | 'cleaning'
   guests: number
   mins: number
 }
-const tableStatuses: TableCell['status'][] = [
-  'seated', 'seated', 'free', 'seated',
-  'reserved', 'free', 'seated', 'cleaning',
-  'seated', 'free', 'seated', 'seated',
-  'reserved', 'free', 'seated', 'seated',
-]
-const tableGrid = computed<TableCell[]>(() =>
-  tableStatuses.map((status, i) => ({
-    n: i + 1,
-    status,
-    guests: status === 'seated' ? 2 + (i % 4) : 0,
-    mins: status === 'seated' ? 12 + (i * 7) % 70 : 0,
-  })),
-)
-
+const tableGrid = ref<TableCell[]>([])
 const seatedCount = computed(() => tableGrid.value.filter(x => x.status === 'seated').length)
 
 interface LiveCount { labelKey: string, value: number, icon: string, tone: 'warning' | 'info' | 'success' | 'primary' }
 const liveCounts = computed<LiveCount[]>(() => [
-  { labelKey: 'Open orders', value: 5, icon: 'receipt', tone: 'warning' },
-  { labelKey: 'In kitchen', value: 3, icon: 'clock', tone: 'info' },
-  { labelKey: 'Ready to serve', value: 2, icon: 'check', tone: 'success' },
+  { labelKey: 'Open orders', value: 0, icon: 'receipt', tone: 'warning' },
+  { labelKey: 'In kitchen', value: 0, icon: 'clock', tone: 'info' },
+  { labelKey: 'Ready to serve', value: 0, icon: 'check', tone: 'success' },
   { labelKey: 'Tables seated', value: seatedCount.value, icon: 'table', tone: 'primary' },
 ])
 
-// TODO(backend): /orders/funnel?today
 interface FunnelRow { label: string, value: number, color: string }
-const funnelData: FunnelRow[] = [
-  { label: 'Orders placed', value: 2555, color: 'rgb(var(--v-theme-c1, 58 91 219))' },
-  { label: 'Accepted by kitchen', value: 2488, color: 'rgb(var(--v-theme-c4, 58 91 219))' },
-  { label: 'Prepared', value: 2471, color: 'var(--primary)' },
-  { label: 'Served', value: 2455, color: 'var(--success)' },
-  { label: 'Paid', value: 2417, color: 'var(--success-strong)' },
-]
+const funnelData = ref<FunnelRow[]>([])
 
-// TODO(backend): /kitchen/prep-by-category?today
 interface PrepRow { label: string, mins: number, target: number, orders: number }
-const prepByCategory: PrepRow[] = [
-  { label: 'Hot Dogs', mins: 5.2, target: 8, orders: 190 },
-  { label: 'Drinks', mins: 1.4, target: 4, orders: 612 },
-  { label: 'Lavash', mins: 7.8, target: 9, orders: 401 },
-  { label: 'Burgers', mins: 9.1, target: 9, orders: 318 },
-  { label: 'Pizza', mins: 13.4, target: 12, orders: 207 },
-  { label: 'Salads', mins: 3.6, target: 5, orders: 144 },
-]
-const prepSorted = computed(() =>
-  prepByCategory.slice().sort((a, b) => b.mins - a.mins),
-)
+const prepByCategory = ref<PrepRow[]>([])
+const prepSorted = computed(() => prepByCategory.value.slice().sort((a, b) => b.mins - a.mins))
 const prepMax = computed(() => {
+  if (!prepSorted.value.length) return 1
   const m = Math.max(...prepSorted.value.map(d => Math.max(d.mins, d.target)))
   return m * 1.1
 })
 
-// TODO(backend): /orders/by-hour?today
 interface HourPoint { hour: number, label: string, orders: number, peak: boolean }
-const hours = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
-const hourCounts = [4, 9, 14, 11, 7, 6, 12, 18, 23, 16, 9, 5]
-const ordersByHour = computed<HourPoint[]>(() =>
-  hours.map((h, i) => ({
-    hour: h,
-    label: `${h < 10 ? `0${h}` : h}:00`,
-    orders: hourCounts[i],
-    peak: h === 19,
-  })),
-)
-const barData = computed(() =>
-  ordersByHour.value.map(h => ({ label: h.label, value: h.orders, peak: h.peak })),
-)
+const ordersByHour = ref<HourPoint[]>([])
+const barData = computed(() => ordersByHour.value.map(h => ({ label: h.label, value: h.orders, peak: h.peak })))
 
 // ---- CountUp (lightweight inline) -----------------------------------------
 function useCountUp(target: () => number, durationMs = 800) {

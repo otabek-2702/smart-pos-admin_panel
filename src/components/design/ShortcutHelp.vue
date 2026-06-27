@@ -47,9 +47,13 @@ function isEditable(el: Element | null): boolean {
 }
 
 function onKey(e: KeyboardEvent) {
-  if (e.key === '?' && !isEditable(document.activeElement)) {
+  // "?" key — depending on layout this comes through as `e.key === '?'` or as
+  // `e.key === '/'` with shiftKey true. Accept both. Guard against opening
+  // while typing inside an input / textarea / contenteditable.
+  const wantsHelp = (e.key === '?' || (e.key === '/' && e.shiftKey))
+  if (wantsHelp && !isEditable(document.activeElement)) {
     e.preventDefault()
-    open.value = true
+    open.value = !open.value
     return
   }
   if (open.value && e.key === 'Escape') {

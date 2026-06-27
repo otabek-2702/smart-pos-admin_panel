@@ -1333,6 +1333,7 @@
   "Enter a shift ID above and press Load": "Yuqorida smena ID kiriting va Yuklashni bosing",
   "Could not load shift report": "Smena hisobotini yuklab bo'lmadi",
   "Retry": "Qayta urinish",
+  "Undo": "Qaytarish",
   "Check your connection and try again.": "Internetni tekshiring va qaytadan urining.",
   "Browse shifts": "Smenalar ro'yxati",
   "in progress": "davom etmoqda",

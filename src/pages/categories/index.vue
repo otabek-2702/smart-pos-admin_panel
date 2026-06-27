@@ -27,9 +27,25 @@ async function bulkDelete() {
   bulkBusy.value = true
   try {
     await axios.post('/categories/bulk-delete', { ids })
-    notify(t('Deleted {n} categories', { n: ids.length }))
     selection.clear()
     await loadCategories()
+    const { toast: sonner } = await import('vue-sonner')
+    sonner.success(t('Deleted {n} categories', { n: ids.length }), {
+      duration: 7000,
+      action: {
+        label: t('Undo'),
+        onClick: async () => {
+          try {
+            await axios.post('/categories/bulk-restore', { ids })
+            notify(t('Restored {n} categories', { n: ids.length }))
+            await loadCategories()
+          }
+          catch (e: any) {
+            notify(e?.response?.data?.message ?? t('Error restoring categories'), 'error')
+          }
+        },
+      },
+    })
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting categories'), 'error')

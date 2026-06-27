@@ -338,9 +338,26 @@ async function bulkDelete() {
   bulkBusy.value = true
   try {
     await axios.post('/products/bulk-delete', { ids })
-    notify(t('Deleted {n} products', { n: ids.length }))
     selection.clear()
     await loadProducts()
+    // Sonner undo toast — one click restores the deleted IDs via bulk-restore.
+    const { toast: sonner } = await import('vue-sonner')
+    sonner.success(t('Deleted {n} products', { n: ids.length }), {
+      duration: 7000,
+      action: {
+        label: t('Undo'),
+        onClick: async () => {
+          try {
+            await axios.post('/products/bulk-restore', { ids })
+            notify(t('Restored {n} products', { n: ids.length }))
+            await loadProducts()
+          }
+          catch (e: any) {
+            notify(e?.response?.data?.message ?? t('Error restoring products'), 'error')
+          }
+        },
+      },
+    })
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting products'), 'error')

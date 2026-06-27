@@ -1333,6 +1333,7 @@
   "Enter a shift ID above and press Load": "Введите ID смены выше и нажмите Загрузить",
   "Could not load shift report": "Не удалось загрузить отчёт по смене",
   "Retry": "Повторить",
+  "Undo": "Отменить",
   "Check your connection and try again.": "Проверьте подключение и попробуйте снова.",
   "Browse shifts": "К списку смен",
   "in progress": "в процессе",

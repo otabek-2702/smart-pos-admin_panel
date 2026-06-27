@@ -307,11 +307,14 @@ async function loadDashboard() {
   try {
     // Page labels read "Performance · last 30 days", so consume the
     // 30-day range endpoint. Category card falls back to /dashboard/today
-    // because /dashboard (range) does not return category stats.
+    // because /dashboard (range) does not return category stats. The chart's
+    // time-series + grossMargin come from /dashboard/sales (item 12), since
+    // /dashboard (range) ships aggregates only.
     const { from, to } = rangeDatesExec(30)
-    const [rangeRes, todayRes] = await Promise.all([
+    const [rangeRes, todayRes, salesRes] = await Promise.all([
       axiosIns.get('/dashboard', { params: { from, to } }),
       axiosIns.get('/dashboard/today').catch(() => null),
+      axiosIns.get('/dashboard/sales', { params: { range: '30d' } }).catch(() => null),
     ])
     const rangePayload = rangeRes.data?.data ?? rangeRes.data ?? {}
     const mapped = mapRangePayload(rangePayload)
@@ -320,6 +323,18 @@ async function loadDashboard() {
       const todayMapped = mapTodayPayload(todayPayload)
       if (todayMapped.categories.length)
         mapped.categories = todayMapped.categories
+    }
+    const salesPayload = salesRes?.data?.data ?? salesRes?.data
+    if (salesPayload) {
+      const rev30 = Array.isArray(salesPayload.revenue30) ? salesPayload.revenue30.map(asNum) : []
+      const last30 = Array.isArray(salesPayload.lastMonthRev) ? salesPayload.lastMonthRev.map(asNum) : []
+      const labels = Array.isArray(salesPayload.dayLabels) ? salesPayload.dayLabels.map((s: any) => String(s)) : []
+      if (rev30.length === 30) mapped.revenue30 = rev30
+      if (last30.length === 30) mapped.lastMonthRev = last30
+      if (labels.length === 30) mapped.dayLabels = labels
+      // grossMargin from BE is 0..1 (float). Render as 0..100.
+      const gm = Number(salesPayload.grossMargin)
+      if (Number.isFinite(gm)) mapped.grossMargin = Math.round(gm * 100)
     }
     data.value = mapped
   }
@@ -558,7 +573,7 @@ void locale
           </div>
         </Card>
 
-        <Card>
+        <Card v-if="data && data.monthTarget > 0">
           <div class="card__head">
             <div class="card__head-text">
               <div class="kpi__label">
@@ -776,6 +791,10 @@ void locale
 
 .exec-main {
   grid-template-columns: 1.7fr 1fr;
+}
+/* Gauge card hides when monthTarget is unknown — let chart card span. */
+.exec-main:has(> .card:only-child) {
+  grid-template-columns: 1fr;
 }
 
 .exec-secondary {

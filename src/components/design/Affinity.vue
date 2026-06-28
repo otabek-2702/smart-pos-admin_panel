@@ -175,7 +175,21 @@ function samePair(p: { a: number; b: number } | null, a: number, b: number): boo
 }
 
 function pickProduct(i: number) {
-  pair.value = null
+  // 1. Already on a pair → tapping any product resets to single-focus on it.
+  if (pair.value) {
+    pair.value = null
+    focus.value = i
+    return
+  }
+  // 2. Already focused on a DIFFERENT product → upgrade to pair-mode (focus + i).
+  if (focus.value != null && focus.value !== i) {
+    const a = Math.min(focus.value, i)
+    const b = Math.max(focus.value, i)
+    focus.value = null
+    pair.value = { a, b }
+    return
+  }
+  // 3. Toggle single-focus (tap same product again to clear).
   focus.value = focus.value === i ? null : i
 }
 function pickPair(pr: { a: number; b: number }) {

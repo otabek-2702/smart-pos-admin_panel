@@ -7,9 +7,43 @@
 import Card from '@/components/design/Card.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import BarChart from '@/components/design/BarChart.vue'
+import StateFill from '@/components/design/StateFill.vue'
 import { fmtNum } from '@/components/design/utils/format'
+import axiosIns from '@/plugins/axios'
 
 const { t } = useI18n({ useScope: 'global' })
+
+// Live counts come from /orders/stats (today). Tables-seated stays 0 until BE
+// item 17 (/dashboard/operations) ships the table grid. Best-effort: a failed
+// fetch just leaves the counts at 0 instead of breaking the page.
+interface OrdersStats {
+  total_orders?: number
+  preparing_orders?: number
+  ready_orders?: number
+  completed_orders?: number
+  paid_orders?: number
+  unpaid_orders?: number
+}
+const ordersStats = ref<OrdersStats>({})
+
+async function loadOrderStats(): Promise<void> {
+  try {
+    const res = await axiosIns.get('/orders/stats')
+    ordersStats.value = res?.data?.data ?? {}
+  }
+  catch { /* leave zeros */ }
+}
+
+onMounted(() => { void loadOrderStats() })
+
+// Open orders = paid but not completed yet (in-flight) + unpaid. A "live"
+// number the manager actually cares about during service.
+const openOrdersCount = computed(() => {
+  const s = ordersStats.value
+  const inflight = (s.preparing_orders ?? 0) + (s.ready_orders ?? 0)
+  const unpaid = s.unpaid_orders ?? 0
+  return inflight + unpaid
+})
 
 // ---- BE-driven data (no mock) ---------------------------------------------
 // Pending BACKEND_TODO item 17: /dashboard/operations?today returning:
@@ -30,9 +64,9 @@ const seatedCount = computed(() => tableGrid.value.filter(x => x.status === 'sea
 
 interface LiveCount { labelKey: string, value: number, icon: string, tone: 'warning' | 'info' | 'success' | 'primary' }
 const liveCounts = computed<LiveCount[]>(() => [
-  { labelKey: 'Open orders', value: 0, icon: 'receipt', tone: 'warning' },
-  { labelKey: 'In kitchen', value: 0, icon: 'clock', tone: 'info' },
-  { labelKey: 'Ready to serve', value: 0, icon: 'check', tone: 'success' },
+  { labelKey: 'Open orders', value: openOrdersCount.value, icon: 'receipt', tone: 'warning' },
+  { labelKey: 'In kitchen', value: ordersStats.value.preparing_orders ?? 0, icon: 'clock', tone: 'info' },
+  { labelKey: 'Ready to serve', value: ordersStats.value.ready_orders ?? 0, icon: 'check', tone: 'success' },
   { labelKey: 'Tables seated', value: seatedCount.value, icon: 'table', tone: 'primary' },
 ])
 
@@ -139,7 +173,12 @@ function ringGeom(value: number, max = 100) {
 }
 
 // ---- counter live values --------------------------------------------------
-const liveValues = liveCounts.value.map(c => useCountUp(() => c.value))
+// Index-based count-up bindings — each row's count animates from its previous
+// value to the latest BE number. The original code captured `c.value` at the
+// time of map() (running once at mount) so subsequent ordersStats updates were
+// ignored and every counter stayed at 0. Map by index so the closure rereads
+// liveCounts.value[i].value on every change.
+const liveValues = liveCounts.value.map((_c, i) => useCountUp(() => liveCounts.value[i]?.value ?? 0))
 </script>
 
 <template>
@@ -163,6 +202,18 @@ const liveValues = liveCounts.value.map(c => useCountUp(() => c.value))
         </div>
       </div>
     </div>
+
+    <!-- Empty-state explainer rendered when none of the BE-item-17 datasets have shipped yet.
+         Keeps the page from looking broken behind the live counts strip. -->
+    <Card v-if="!funnelData.length && !ordersByHour.length && !prepByCategory.length && !tableGrid.length">
+      <div class="card__body">
+        <StateFill
+          icon="bx-time-five"
+          :title="t('Live operations data is coming soon')"
+          :sub="t('Detailed funnel, kitchen prep times and table occupancy unlock when the backend operations endpoint ships. Live counts above already update from real orders.')"
+        />
+      </div>
+    </Card>
 
     <!-- funnel + prep gauge + service rings — only when BE item 17 (/dashboard/operations) ships data -->
     <div v-if="funnelData.length || ordersByHour.length" class="grid" style="grid-template-columns: 1.3fr 1fr 1fr;">

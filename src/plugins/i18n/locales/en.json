@@ -3721,6 +3721,8 @@
   "Top categories": "Top categories",
   "Revenue by category": "Revenue by category",
   "Live": "Live",
+  "Live operations data is coming soon": "Live operations data is coming soon",
+  "Detailed funnel, kitchen prep times and table occupancy unlock when the backend operations endpoint ships. Live counts above already update from real orders.": "Detailed funnel, kitchen prep times and table occupancy unlock when the backend operations endpoint ships. Live counts above already update from real orders.",
   "Recent activity": "Recent activity",
   "{n}s ago": "{n}s ago",
   "{n}m ago": "{n}m ago",

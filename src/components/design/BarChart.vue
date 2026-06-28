@@ -19,12 +19,17 @@ interface Props {
   height?: number
   valueLabel?: string
   yFormat?: (n: number) => string
+  /** Format the bar-top label (defaults to yFormat). */
+  labelFormat?: (n: number) => string
+  /** Draw a numeric label above every bar (not just the peak). */
+  showLabels?: boolean
   loading?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   height: 240,
   valueLabel: 'Orders',
+  showLabels: false,
 })
 
 const [elRef, w] = useWidth()
@@ -164,14 +169,14 @@ const tipTitle = computed(() => hover.value !== null ? props.data[hover.value].l
           style="transition: opacity .12s;"
         />
         <text
-          v-if="d.peak"
+          v-if="d.peak || showLabels"
           :x="padL + band * i + band / 2"
           :y="y(d.value) - 7"
           text-anchor="middle"
           font-size="11"
-          font-weight="700"
-          fill="rgb(var(--v-theme-chart-revenue))"
-        >{{ d.value }}</text>
+          :font-weight="d.peak ? 700 : 500"
+          :fill="d.peak ? 'rgb(var(--v-theme-chart-revenue))' : 'rgb(var(--v-theme-text-secondary))'"
+        >{{ (labelFormat || yfmt)(d.value) }}</text>
         <text
           :x="padL + band * i + band / 2"
           :y="height - 9"

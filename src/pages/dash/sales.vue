@@ -7,6 +7,7 @@ import Skeleton from '@/components/design/Skeleton.vue'
 import Delta from '@/components/design/Delta.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import LineAreaChart from '@/components/design/LineAreaChart.vue'
+import BarChart from '@/components/design/BarChart.vue'
 import { fmtAbbr, fmtNum } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
 import type { Tone } from '@/components/design/utils'
@@ -122,6 +123,30 @@ interface BulletItem {
 // Real data only — bullets stay empty until BE returns category targets
 // (BACKEND_TODO item 17: category targets endpoint or extend /dashboard/sales).
 const bullets = computed<BulletItem[]>(() => [])
+
+// ---------- Daily orders + revenue bars (sepettakip-style per-day breakdown) ----------
+// Day count comes from channelDays' hall+delivery+pickup sum, revenue from
+// revenue30. Each bar carries the formatted value as a top-label.
+function shortDay(label: string): string {
+  // BE dayLabels look like "2026-06-09" — surface "09" for compactness.
+  const m = /(\d{2})$/.exec(label || '')
+  return m ? m[1] : (label || '').slice(-5)
+}
+const ordersByDay = computed(() => {
+  const D = data.value
+  if (!D || !D.channelDays?.length) return [] as { label: string; value: number }[]
+  return D.channelDays.map((d: any) => ({
+    label: shortDay(d.day || d.label || ''),
+    value: (d.values?.hall ?? 0) + (d.values?.delivery ?? 0) + (d.values?.pickup ?? 0),
+  }))
+})
+const revenueByDay = computed(() => {
+  const D = data.value
+  if (!D) return [] as { label: string; value: number }[]
+  const rev = toNumArr(D.revenue30)
+  const labels = Array.isArray(D.dayLabels) ? D.dayLabels : []
+  return rev.map((v, i) => ({ label: shortDay(labels[i] || `D${i + 1}`), value: v }))
+})
 
 // ---------- Revenue/Expense chart series ----------
 // BE returns Decimal as string. Coerce before passing to LineAreaChart — maxV's
@@ -663,6 +688,58 @@ onMounted(() => {
                 </span>
               </div>
             </div>
+          </div>
+        </Card>
+      </div>
+
+      <!-- Row 4: daily order count + daily revenue bars, labels above each bar. -->
+      <div
+        v-if="ordersByDay.length || revenueByDay.length"
+        class="grid"
+        :style="{ gridTemplateColumns: '1fr' }"
+      >
+        <Card v-if="ordersByDay.length">
+          <div class="card__head">
+            <div class="card__head-text">
+              <div class="kpi__label">
+                {{ t('Last 30 days · order count') }}
+              </div>
+              <h3 class="card__title">
+                {{ t('Daily orders') }}
+              </h3>
+            </div>
+          </div>
+          <div class="card__body">
+            <BarChart
+              :data="ordersByDay"
+              :height="240"
+              :show-labels="true"
+              :value-label="t('Orders')"
+              :y-format="(v: number) => String(Math.round(v))"
+              :label-format="(v: number) => String(Math.round(v))"
+            />
+          </div>
+        </Card>
+        <Card v-if="revenueByDay.length">
+          <div class="card__head">
+            <div class="card__head-text">
+              <div class="kpi__label">
+                {{ t('Last 30 days · revenue') }}
+              </div>
+              <h3 class="card__title">
+                {{ t('Daily revenue') }}
+              </h3>
+            </div>
+          </div>
+          <div class="card__body">
+            <BarChart
+              :data="revenueByDay"
+              :height="240"
+              :show-labels="true"
+              :value-label="t('Revenue')"
+              :y-format="fmtAbbr"
+              :label-format="fmtAbbr"
+            />
           </div>
         </Card>
       </div>

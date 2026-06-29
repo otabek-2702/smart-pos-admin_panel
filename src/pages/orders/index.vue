@@ -277,9 +277,45 @@ async function bulkCancel() {
   }
 }
 
+// Client-side CSV export of the currently SELECTED orders from in-memory rows.
+// Previously this just toasted "Exporting N orders…" without doing anything —
+// the BE export endpoint hasn't shipped, so the toast was a lie. Until BE ships
+// a /orders/export endpoint that can stream all matching rows, this gives users
+// a real (if scoped to the current page selection) CSV.
 function onBulkExport() {
-  notify(t('Exporting {n} orders…', { n: selected.value.size }), 'info')
-  // BE endpoint pending — no actual export call
+  const ids = Array.from(selected.value)
+  const rows = orders.value.filter((o: any) => ids.includes(o.id))
+  if (!rows.length) {
+    notify(t('Nothing to export yet'), 'warning')
+    return
+  }
+  const cols: Array<[string, (o: any) => any]> = [
+    ['ID', o => o.order_number ?? o.display_id ?? o.id],
+    ['Created', o => o.created_at],
+    ['Status', o => o.status],
+    ['Type', o => o.order_type],
+    ['Cashier', o => o.cashier?.name ?? ''],
+    ['Total', o => o.total_amount],
+    ['Paid', o => o.is_paid ? '1' : '0'],
+    ['Payment', o => o.payment_method ?? ''],
+    ['Items', o => o.items_count ?? (o.items?.length ?? '')],
+  ]
+  const head = cols.map(c => `"${c[0]}"`).join(',')
+  const body = rows.map(o =>
+    cols.map(c => `"${String(c[1](o) ?? '').replace(/"/g, '""')}"`).join(','),
+  ).join('\n')
+  const csv = `﻿${head}\n${body}\n`
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const stamp = new Date().toISOString().slice(0, 10)
+  a.href = url
+  a.download = `orders-${stamp}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  notify(t('Exported {n} orders', { n: rows.length }), 'success')
 }
 
 function toggleRow(id: number | string) {

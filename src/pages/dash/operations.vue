@@ -375,7 +375,9 @@ const liveValues = liveCounts.value.map((_c, i) => useCountUp(() => liveCounts.v
         </div>
       </Card>
 
-      <Card>
+      <!-- Fulfilment rings disabled — values hardcoded 94/86/2.8%. Enable when BE
+           ships on_time / paid / cancelled fields on /dashboard/operations. -->
+      <Card v-if="false">
         <div class="card__head">
           <div class="card__head-text">
             <div class="kpi__label">{{ t('Service rings') }}</div>

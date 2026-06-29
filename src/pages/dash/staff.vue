@@ -186,13 +186,15 @@ const leaderInsight = computed(() => {
 })
 
 /* ---------- Radar series (Top vs steady performer) ----------
-   Only axes backed by real BE signal: Accuracy (100 - cancel_rate_pct), Attendance
-   (shifts_worked), Volume (revenue share). Speed and Upsell were hardcoded to 80 / 60
-   for every cashier with no BE field to source from, so they painted identical radar
-   shapes regardless of actual performance — dropped until BE ships those metrics. */
+   Only axes backed by real BE signal: Accuracy (100 - cancel_rate_pct), Shift
+   activity (shifts_worked normalised), Volume (revenue share). Speed and Upsell
+   were hardcoded to 80 / 60 for every cashier with no BE field to source from, so
+   they painted identical radar shapes — dropped until BE ships those metrics.
+   The middle axis was renamed from "Attendance" to "Shift activity" because the
+   value (75 + min(25, shifts*6)) measures shift count only, not punctuality. */
 const radarAxes = computed(() => [
   t('Accuracy'),
-  t('Attendance'),
+  t('Shift activity'),
   t('Volume'),
 ])
 
@@ -235,20 +237,19 @@ const scatterData = computed(() => ranked.value.map((s, i) => ({
   color: palette[i % palette.length],
 })))
 
-/* ---------- StackedBar (hours & punctuality per cashier) ---------- */
+/* ---------- StackedBar (hours per cashier) ----------
+   BE only provides hours_worked. Overtime (hours * 0.08) and Late ((100 -
+   attendance) * 1.2) used to be stacked here as if they were measured timeclock
+   signals — neither has a BE source, so they painted derived noise next to real
+   hours. Dropped both stacks; the chart now shows a single bar per cashier with
+   real worked hours. Add overtime / late back when BE ships a timeclock model. */
 const punctualityData = computed(() => ranked.value.map(s => ({
   label: s.initials,
-  values: {
-    worked: s.hours,
-    overtime: Math.round(s.hours * 0.08),
-    late: Math.round((100 - s.attendance) * 1.2),
-  },
+  values: { worked: s.hours },
 })))
 
 const punctualitySeries = computed(() => [
-  { key: 'worked', label: t('Worked'), color: 'var(--c1)' },
-  { key: 'overtime', label: t('Overtime'), color: 'var(--c3)' },
-  { key: 'late', label: t('Late (min)'), color: 'var(--c5)' },
+  { key: 'worked', label: t('Hours worked'), color: 'var(--c1)' },
 ])
 
 /* ---------- Helpers ---------- */

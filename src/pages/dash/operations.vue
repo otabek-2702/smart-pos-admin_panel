@@ -34,7 +34,73 @@ async function loadOrderStats(): Promise<void> {
   catch { /* leave zeros */ }
 }
 
-onMounted(() => { void loadOrderStats() })
+// Status → funnel color/label mapping. BE returns { status, count } per stage.
+const FUNNEL_TONE: Record<string, string> = {
+  OPEN: 'rgb(var(--v-theme-warning))',
+  PAID: 'rgb(var(--v-theme-info))',
+  PREPARING: 'rgb(var(--v-theme-info))',
+  READY: 'rgb(var(--v-theme-success))',
+  COMPLETED: 'rgb(var(--v-theme-success-strong))',
+  CANCELED: 'rgb(var(--v-theme-error))',
+}
+
+async function loadOperations(): Promise<void> {
+  try {
+    const res = await axiosIns.get('/dashboard/operations')
+    const d = res?.data?.data ?? {}
+    // Funnel: BE { status, count } → FE { label, value, color }
+    if (Array.isArray(d.funnel)) {
+      funnelData.value = d.funnel.map((r: any) => ({
+        label: t(`order_status_${r.status}`) || r.status,
+        value: Number(r.count) || 0,
+        color: FUNNEL_TONE[r.status] || 'rgb(var(--v-theme-text-secondary))',
+      })).filter((r: any) => r.value > 0)
+    }
+    // Orders by hour: BE { hour: "09", orders } → FE { hour: 9, label, orders, peak }.
+    // Skip the chart entirely if BE returned all zeros (today before noon, e.g.) so we
+    // don't paint 14 empty bars; let the empty-state card explain.
+    if (Array.isArray(d.ordersByHour)) {
+      const max = Math.max(0, ...d.ordersByHour.map((h: any) => Number(h.orders) || 0))
+      if (max > 0) {
+        ordersByHour.value = d.ordersByHour.map((h: any) => {
+          const orders = Number(h.orders) || 0
+          return {
+            hour: Number(h.hour) || 0,
+            label: String(h.hour ?? '').padStart(2, '0'),
+            orders,
+            peak: orders === max,
+          }
+        })
+      }
+    }
+    // Prep-by-category: shape from BE matches FE (label, mins, target, orders).
+    if (Array.isArray(d.prepByCategory)) {
+      prepByCategory.value = d.prepByCategory.map((r: any) => ({
+        label: String(r.label ?? ''),
+        mins: Number(r.mins) || 0,
+        target: Number(r.target) || 0,
+        orders: Number(r.orders) || 0,
+      }))
+    }
+    // Table grid: BE { n, status, guests, mins } → FE same. Filter to valid status enum.
+    if (Array.isArray(d.tableGrid)) {
+      tableGrid.value = d.tableGrid
+        .filter((c: any) => ['free', 'seated', 'reserved', 'cleaning'].includes(c.status))
+        .map((c: any) => ({
+          n: Number(c.n) || 0,
+          status: c.status,
+          guests: Number(c.guests) || 0,
+          mins: Number(c.mins) || 0,
+        }))
+    }
+  }
+  catch { /* leave empty arrays; empty-state card renders */ }
+}
+
+onMounted(() => {
+  void loadOrderStats()
+  void loadOperations()
+})
 
 // Open orders = paid but not completed yet (in-flight) + unpaid. A "live"
 // number the manager actually cares about during service.

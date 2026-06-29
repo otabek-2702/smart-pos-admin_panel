@@ -8,6 +8,7 @@
    and are lazy-loaded via defineAsyncComponent.
    ============================================================ */
 import { defineAsyncComponent } from 'vue'
+import AIBriefingCard from '@/components/design/AIBriefingCard.vue'
 import Button from '@/components/design/Button.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import DateRangePicker, { type DateRangeValue } from '@/components/design/DateRangePicker.vue'
@@ -231,6 +232,9 @@ void sharedDash
         </Button>
       </div>
     </div>
+
+    <!-- Morning briefing — LLM-generated daily digest. Hides itself when dismissed/empty. -->
+    <AIBriefingCard style="margin-bottom: var(--sp-3);" />
 
     <div
       class="dashtabs"

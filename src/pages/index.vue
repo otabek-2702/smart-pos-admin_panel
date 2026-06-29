@@ -9,6 +9,7 @@
    ============================================================ */
 import { defineAsyncComponent } from 'vue'
 import AIBriefingCard from '@/components/design/AIBriefingCard.vue'
+import { useAIPageContext } from '@/composables/useAIPageContext'
 import Button from '@/components/design/Button.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import DateRangePicker, { type DateRangeValue } from '@/components/design/DateRangePicker.vue'
@@ -119,6 +120,35 @@ watch(
 )
 
 onMounted(() => { void loadShared() })
+
+// Push the current dashboard context to the AI assistant so /ai/query knows
+// which sub-dashboard + date range the user is looking at when they ask
+// "Why did Wednesday dip?". Re-pushes on view / range change.
+const aiCtx = useAIPageContext()
+watch(
+  () => [view.value, dateRange.value?.from, dateRange.value?.to],
+  () => {
+    const v = current.value
+    aiCtx.set({
+      route: '/dashboard',
+      route_label: `${t(v.labelKey)} dashboard`,
+      range_from: dateRange.value?.from || undefined,
+      range_to: dateRange.value?.to || undefined,
+      filters: { tab: v.id },
+      visible_data_keys: v.id === 'sales'
+        ? ['monthRevenue', 'grossMargin', 'revenue30', 'expense30', 'heatMatrix', 'channelDays']
+        : v.id === 'products'
+          ? ['menuItems', 'bestSellerName', 'units30d', 'menuRevenue', 'top_products', 'affinity']
+          : v.id === 'staff'
+            ? ['active_count', 'top_performer', 'leaderboard', 'accuracy']
+            : v.id === 'ops'
+              ? ['live_counts', 'funnel', 'ordersByHour']
+              : ['revenue', 'orders', 'paid_orders', 'units_sold'],
+    })
+  },
+  { immediate: true },
+)
+onUnmounted(() => { aiCtx.clear() })
 
 // ---------- Actions ----------
 function selectView(id: ViewId) {

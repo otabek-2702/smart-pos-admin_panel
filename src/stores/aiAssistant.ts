@@ -579,9 +579,12 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
     try {
       const locale = localStorage.getItem('appLocale') || 'uz'
       const user = getUserPayload()
+      // Page-context — set by individual dash pages via useAIPageContext().set().
+      // BE folds it into the prompt as "CURRENT VIEW:" preamble (core caa6845).
+      const pageCtx = (await import('@/composables/useAIPageContext')).useAIPageContext().snapshot()
       const payload: Record<string, any> = {
         query: text,
-        context: null,
+        context: pageCtx,
         locale,
         user,
       }

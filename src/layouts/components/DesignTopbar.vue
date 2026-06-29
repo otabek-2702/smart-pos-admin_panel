@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useTheme } from 'vuetify'
 import { storeToRefs } from 'pinia'
+import AnomalyBell from '@/components/design/AnomalyBell.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import SettingsMenu from '@/components/design/SettingsMenu.vue'
 import { useAIAssistantStore } from '@/stores/aiAssistant'
@@ -143,6 +144,9 @@ void props
 
     <!-- DateRange would render here when showDate === true (currently hard-locked off) -->
     <template v-if="showDate" />
+
+    <!-- Anomaly bell — polls /ai/anomalies, opens dropdown w/ ack buttons. -->
+    <AnomalyBell />
 
     <!-- Settings menu (gear popover) — decision #5 v3 -->
     <SettingsMenu />

@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import DesignIcon from '@/components/design/DesignIcon.vue'
+import SidebarLiveWidget from '@/components/design/SidebarLiveWidget.vue'
+import { useNavCountsStore } from '@/stores/navCounts'
 
 /* ============================================================
    Alpha POS — Design Sidebar
@@ -25,17 +28,30 @@ const { t } = useI18n({ useScope: 'global' })
 const router = useRouter()
 const route = useRoute()
 
+const navStore = useNavCountsStore()
+const { counts } = storeToRefs(navStore)
+onMounted(() => navStore.start())
+onBeforeUnmount(() => navStore.stop())
+
+function badgeFor(id: string): string | undefined {
+  if (id === 'shifts' && counts.value.shifts !== null && counts.value.shifts > 0)
+    return String(counts.value.shifts)
+  if (id === 'orders' && counts.value.orders !== null && counts.value.orders > 0)
+    return String(counts.value.orders)
+  return undefined
+}
+
 /* NAV array — mirrors source App.shell.jsx NAV verbatim.
    Source ids are mapped to existing Vue routes via `to`. */
 const NAV: NavEntry[] = [
-  { type: 'item', id: 'dashboard', label: 'Dashboard', icon: 'dashboard', to: '/dashboard' },
+  { type: 'item', id: 'dashboard', label: 'Dashboard', icon: 'dashboard', to: '/' },
   { type: 'item', id: 'ai', label: 'AI Assistant', icon: 'ai', to: '/ai-assistant' },
-  { type: 'item', id: 'shifts', label: 'Shifts', icon: 'clock', to: '/shifts-analytics', badge: '2' },
+  { type: 'item', id: 'shifts', label: 'Shifts', icon: 'clock', to: '/shifts-analytics' },
   { type: 'section', label: 'Management' },
   { type: 'item', id: 'users', label: 'Users', icon: 'users', to: '/users' },
   { type: 'item', id: 'categories', label: 'Categories', icon: 'grid', to: '/categories' },
-  { type: 'item', id: 'products', label: 'Products', icon: 'box', to: '/products', badge: '316' },
-  { type: 'item', id: 'orders', label: 'Orders', icon: 'receipt', to: '/orders', badge: '5' },
+  { type: 'item', id: 'products', label: 'Products', icon: 'box', to: '/products' },
+  { type: 'item', id: 'orders', label: 'Orders', icon: 'receipt', to: '/orders' },
   { type: 'item', id: 'places', label: 'Places & Tables', icon: 'table', to: '/places' },
   { type: 'item', id: 'discounts', label: 'Discounts', icon: 'tag', to: '/discounts' },
   { type: 'item', id: 'cash', label: 'Cash Register', icon: 'register', to: '/cashbox/categories' },
@@ -82,6 +98,22 @@ function go(item: NavItem) {
     router.push(item.to)
   emit('nav-go')
 }
+
+function onNavClick(e: MouseEvent, item: NavItem) {
+  // Honor modifier / middle clicks — let the browser open in new tab/window via the anchor's href.
+  if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button === 1)
+    return
+  e.preventDefault()
+  if (!isActive(item))
+    router.push(item.to)
+  emit('nav-go')
+}
+
+function onWidgetGo() {
+  if (route.path !== '/dashboard')
+    router.push('/dashboard')
+  emit('nav-go')
+}
 </script>
 
 <template>
@@ -111,21 +143,25 @@ function go(item: NavItem) {
           <div v-else class="hr" style="margin: 10px 8px;" />
         </template>
         <template v-else-if="isItem(n)">
-          <div
+          <a
+            :href="n.to"
             class="nav-item"
             :class="{ 'is-active': isActive(n) }"
             :title="collapsed ? t(n.label) : ''"
-            @click="go(n)"
+            @click="onNavClick($event, n)"
           >
             <span class="nav-item__icon">
               <DesignIcon :name="n.icon" :size="20" />
             </span>
             <span v-if="!collapsed" style="flex:1;">{{ t(n.label) }}</span>
-            <span v-if="!collapsed && n.badge" class="nav-item__badge">{{ n.badge }}</span>
-          </div>
+            <span v-if="!collapsed && (n.badge || badgeFor(n.id))" class="nav-item__badge">{{ badgeFor(n.id) ?? n.badge }}</span>
+          </a>
         </template>
       </template>
     </nav>
+
+    <!-- v3 #6 SidebarLiveWidget hidden per Jason: not needed in sidebar foot. -->
+    <!-- <SidebarLiveWidget :collapsed="collapsed" @nav-go="onWidgetGo" /> -->
   </aside>
 </template>
 

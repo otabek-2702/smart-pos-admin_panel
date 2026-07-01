@@ -20,6 +20,9 @@ import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
+import DateRangePicker from '@/components/design/DateRangePicker.vue'
+import OrdersInsights from '@/components/design/OrdersInsights.vue'
+import PaymentBreakdown from '@/components/design/PaymentBreakdown.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { notify } = useNotify()
@@ -36,8 +39,9 @@ const itemsPerPage = ref(10)
 const statusFilter = ref<string[]>([])
 const paymentFilter = ref<string | undefined>(undefined)
 const search = ref('')
-const dateFrom = ref('')
-const dateTo = ref('')
+const dateRange = ref<{ from: string, to: string, preset?: string }>({ from: '', to: '', preset: 'all' })
+const dateFrom = computed({ get: () => dateRange.value.from, set: v => dateRange.value = { ...dateRange.value, from: v } })
+const dateTo = computed({ get: () => dateRange.value.to, set: v => dateRange.value = { ...dateRange.value, to: v } })
 // New filters mirroring BE /orders query params
 const orderTypeFilter = ref<string | undefined>(undefined)
 const cashierFilter = ref<string | undefined>(undefined)
@@ -47,6 +51,15 @@ const cashierOptions = ref<{ value: string, label: string }[]>([])
 const categoryOptions = ref<{ value: string, label: string }[]>([])
 const statusPickerOpen = ref(false)
 const categoryPickerOpen = ref(false)
+const statusPickerRef = ref<HTMLElement | null>(null)
+const categoryPickerRef = ref<HTMLElement | null>(null)
+
+// Close popovers when clicking outside their root + close one when opening
+// the other (so they don't stack overlapping content).
+onClickOutside(statusPickerRef, () => { statusPickerOpen.value = false })
+onClickOutside(categoryPickerRef, () => { categoryPickerOpen.value = false })
+watch(statusPickerOpen, (v) => { if (v) categoryPickerOpen.value = false })
+watch(categoryPickerOpen, (v) => { if (v) statusPickerOpen.value = false })
 
 const expanded = ref<Set<number | string>>(new Set())
 const selected = ref<Set<number | string>>(new Set())
@@ -127,7 +140,11 @@ async function loadOrders() {
 
 async function loadStats() {
   try {
-    const res = await axios.get('/orders/stats')
+    const params: any = {}
+    if (dateFrom.value) params.date_from = dateFrom.value
+    if (dateTo.value) params.date_to = dateTo.value
+    if (cashierFilter.value) params.cashier_id = cashierFilter.value
+    const res = await axios.get('/orders/stats', { params })
 
     stats.value = res.data?.data ?? res.data
   }
@@ -168,9 +185,10 @@ onMounted(() => {
 })
 
 watch([page, itemsPerPage], loadOrders)
-watch([statusFilter, paymentFilter, dateFrom, dateTo, orderTypeFilter, cashierFilter, categoryFilter], () => {
+watch([statusFilter, paymentFilter, dateRange, orderTypeFilter, cashierFilter, categoryFilter], () => {
   page.value = 1
   loadOrders()
+  loadStats()
 })
 watch(search, () => debouncedSearch())
 
@@ -259,6 +277,47 @@ async function bulkCancel() {
   }
 }
 
+// Client-side CSV export of the currently SELECTED orders from in-memory rows.
+// Previously this just toasted "Exporting N orders…" without doing anything —
+// the BE export endpoint hasn't shipped, so the toast was a lie. Until BE ships
+// a /orders/export endpoint that can stream all matching rows, this gives users
+// a real (if scoped to the current page selection) CSV.
+function onBulkExport() {
+  const ids = Array.from(selected.value)
+  const rows = orders.value.filter((o: any) => ids.includes(o.id))
+  if (!rows.length) {
+    notify(t('Nothing to export yet'), 'warning')
+    return
+  }
+  const cols: Array<[string, (o: any) => any]> = [
+    ['ID', o => o.order_number ?? o.display_id ?? o.id],
+    ['Created', o => o.created_at],
+    ['Status', o => o.status],
+    ['Type', o => o.order_type],
+    ['Cashier', o => o.cashier?.name ?? ''],
+    ['Total', o => o.total_amount],
+    ['Paid', o => o.is_paid ? '1' : '0'],
+    ['Payment', o => o.payment_method ?? ''],
+    ['Items', o => o.items_count ?? (o.items?.length ?? '')],
+  ]
+  const head = cols.map(c => `"${c[0]}"`).join(',')
+  const body = rows.map(o =>
+    cols.map(c => `"${String(c[1](o) ?? '').replace(/"/g, '""')}"`).join(','),
+  ).join('\n')
+  const csv = `﻿${head}\n${body}\n`
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const stamp = new Date().toISOString().slice(0, 10)
+  a.href = url
+  a.download = `orders-${stamp}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  notify(t('Exported {n} orders', { n: rows.length }), 'success')
+}
+
 function toggleRow(id: number | string) {
   if (expanded.value.has(id)) expanded.value.delete(id)
   else expanded.value.add(id)
@@ -288,7 +347,7 @@ const sortedOrders = computed(() => {
   const dir = sortDir.value === 'asc' ? 1 : -1
   arr.sort((a: any, b: any) => {
     let av: any, bv: any
-    if (k === 'id') { av = a.id; bv = b.id }
+    if (k === 'id') { av = a.order_number ?? a.display_id ?? 0; bv = b.order_number ?? b.display_id ?? 0 }
     else if (k === 'total') { av = Number(a.total_amount) || 0; bv = Number(b.total_amount) || 0 }
     else if (k === 'at') { av = new Date(a.created_at).getTime(); bv = new Date(b.created_at).getTime() }
     else if (k === 'status') { av = a.status; bv = b.status }
@@ -331,8 +390,7 @@ function clearAll() {
   search.value = ''
   statusFilter.value = []
   paymentFilter.value = undefined
-  dateFrom.value = ''
-  dateTo.value = ''
+  dateRange.value = { from: '', to: '', preset: 'all' }
   orderTypeFilter.value = undefined
   cashierFilter.value = undefined
   categoryFilter.value = []
@@ -400,6 +458,36 @@ const dtPagination = computed(() => ({
 
 const noResultsMsg = computed(() => t('No orders match your filters'))
 const noResultsSub = computed(() => t('Adjust the search, status or date range to see results.'))
+
+// ---- Stats-level payment breakdown ----
+// BE shape (per /orders/stats): payment_breakdown: { CASH: '<dec>', CARD: '<dec>', DIGITAL: '<dec>' }
+// Adapt flat object to PaymentBreakdown's Array<{ type, amount }> shape.
+const statsPaymentMethods = computed(() => {
+  const pb = stats.value?.payment_breakdown
+  if (!pb || typeof pb !== 'object') return []
+  const out: Array<{ type: string, amount: number }> = []
+  for (const [k, v] of Object.entries(pb)) {
+    const amount = Number(v) || 0
+    if (amount > 0) out.push({ type: k, amount })
+  }
+  return out
+})
+const statsPaymentTotal = computed(() =>
+  statsPaymentMethods.value.reduce((a, m) => a + m.amount, 0),
+)
+
+// ---- OrdersInsights bridge ----
+// Click a status segment/legend: toggle membership in the multi-status array.
+function onStatusToggle(s: string) {
+  if (statusFilter.value.includes(s))
+    statusFilter.value = statusFilter.value.filter(x => x !== s)
+  else
+    statusFilter.value = [...statusFilter.value, s]
+}
+// Click a payment legend: set, or clear if already that value.
+function onPaymentToggle(p: string) {
+  paymentFilter.value = paymentFilter.value === p ? undefined : p
+}
 </script>
 
 <template>
@@ -448,6 +536,30 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
       />
     </div>
 
+    <!-- Insights strip (additive port from v3) -->
+    <OrdersInsights
+      v-if="!loading && orders.length"
+      :orders="orders"
+      :status="statusFilter"
+      :payment="paymentFilter"
+      @status="onStatusToggle"
+      @payment="onPaymentToggle"
+    />
+
+    <!-- Stats-level payment breakdown (from /orders/stats payment_breakdown) -->
+    <div
+      v-if="statsPaymentMethods.length"
+      class="card stats-paybreak-card"
+    >
+      <div class="stats-paybreak-head">
+        <span class="kpi__label">{{ t('Payment breakdown') }}</span>
+      </div>
+      <PaymentBreakdown
+        :methods="statsPaymentMethods"
+        :total="statsPaymentTotal"
+      />
+    </div>
+
     <!-- Main table card -->
     <div class="card">
       <!-- Toolbar -->
@@ -462,7 +574,7 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
         </div>
 
         <!-- Multi-status filter (popover with checkboxes) -->
-        <div class="tb-filter tb-filter--md" style="position: relative;">
+        <div ref="statusPickerRef" class="tb-filter tb-filter--md" style="position: relative;">
           <div
             class="control control--select"
             style="cursor: pointer;"
@@ -503,14 +615,6 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
           </div>
         </div>
 
-        <div class="tb-filter tb-filter--sm">
-          <Select
-            :model-value="paymentFilter ?? ''"
-            :placeholder="t('Payment Status')"
-            :options="paymentStatuses.map(p => ({ value: p, label: t(`payment_status_${p}`) }))"
-            @update:model-value="(v: string) => paymentFilter = v ? v : undefined"
-          />
-        </div>
 
         <!-- Order type (HALL / DELIVERY / PICKUP) -->
         <div class="tb-filter tb-filter--xs">
@@ -533,7 +637,7 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
         </div>
 
         <!-- Category multi-select (popover) -->
-        <div class="tb-filter tb-filter--md" style="position: relative;">
+        <div ref="categoryPickerRef" class="tb-filter tb-filter--md" style="position: relative;">
           <div
             class="control control--select"
             style="cursor: pointer;"
@@ -573,13 +677,40 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
           </div>
         </div>
 
-        <div class="row tb-daterange" style="gap: 8px;">
-          <div class="control control--sm tb-date">
-            <input v-model="dateFrom" type="date" :aria-label="t('Date from')">
-          </div>
-          <span class="tertiary" aria-hidden="true">→</span>
-          <div class="control control--sm tb-date">
-            <input v-model="dateTo" type="date" :aria-label="t('Date to')">
+      </div>
+
+      <!-- Compact filter strip: single date range popover + payment segmented control -->
+      <div class="filterstrip">
+        <div class="filterstrip__group">
+          <span class="filterstrip__lbl">{{ t('Period') }}</span>
+          <DateRangePicker
+            v-model="dateRange"
+            align="left"
+            :placeholder="t('All time')"
+          />
+        </div>
+
+        <div class="filterstrip__group">
+          <span class="filterstrip__lbl">{{ t('Payment') }}</span>
+          <div class="segctl">
+            <button
+              type="button"
+              class="segctl__btn"
+              :class="{ 'is-active': !paymentFilter }"
+              @click="paymentFilter = undefined"
+            >
+              {{ t('All') }}
+            </button>
+            <button
+              v-for="p in paymentStatuses"
+              :key="p"
+              type="button"
+              class="segctl__btn"
+              :class="{ 'is-active': paymentFilter === p }"
+              @click="paymentFilter = p"
+            >
+              {{ t(`payment_status_${p}`) }}
+            </button>
           </div>
         </div>
       </div>
@@ -671,8 +802,7 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
       >
         <!-- Order # -->
         <template #cell.id="{ row: o }">
-          <span class="cell-strong mono">#{{ o.id }}</span>
-          <span v-if="o.display_id" class="cell-muted mono" style="margin-left: 4px; font-size: 11px;">· {{ o.display_id }}</span>
+          <span class="cell-strong mono">#{{ o.order_number ?? o.display_id ?? '—' }}</span>
         </template>
 
         <!-- Type -->
@@ -753,6 +883,14 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
           >
             {{ t('Cancel') }}
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="download"
+            @click="onBulkExport"
+          >
+            {{ t('Export') }}
+          </Button>
         </template>
 
         <!-- Inline row actions -->
@@ -823,6 +961,17 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
               </tbody>
             </table>
           </div>
+
+          <!-- Per-method payment breakdown (additive port from v3) -->
+          <div
+            v-if="o.is_paid && o.payments?.length"
+            class="orders-paybreak-wrap"
+          >
+            <PaymentBreakdown
+              :methods="o.payments"
+              :total="Number(o.total_amount) || 0"
+            />
+          </div>
         </template>
 
         <!-- Empty state -->
@@ -866,7 +1015,7 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
         </div>
         <div>
           <p v-if="confirmDialog.order" style="margin:0;font-weight:600;">
-            #{{ confirmDialog.order.id }}
+            #{{ confirmDialog.order.order_number ?? confirmDialog.order.display_id ?? '—' }}
             · {{ formatCurrency(confirmDialog.order.total_amount ?? 0) }}
           </p>
           <p v-else style="margin:0;font-weight:600;">
@@ -934,6 +1083,67 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
 .row {
   display: flex;
   align-items: center;
+}
+
+/* Compact filter strip — segmented controls for date + payment */
+.filterstrip {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.filterstrip--date {
+  padding-top: 10px;
+  padding-bottom: 14px;
+}
+.filterstrip__group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.filterstrip__lbl {
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.segctl {
+  display: inline-flex;
+  background: var(--surface-inset);
+  border-radius: var(--r-sm);
+  padding: 3px;
+  gap: 2px;
+}
+.segctl__btn {
+  border: none;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background .12s, color .12s;
+  white-space: nowrap;
+}
+.segctl__btn:hover:not(.is-active) {
+  color: var(--text);
+}
+.segctl__btn.is-active {
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: var(--shadow-xs);
+  font-weight: var(--fw-semibold);
+}
+@media (max-width: 768px) {
+  .filterstrip { gap: 12px; padding: 10px 14px; }
+  .filterstrip__group { flex: 1 1 100%; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .segctl { overflow-x: auto; max-width: 100%; }
+  .segctl__btn { padding: 6px 10px; }
 }
 
 /* --- Responsive toolbar --- */
@@ -1034,6 +1244,27 @@ const noResultsSub = computed(() => t('Adjust the search, status or date range t
 :deep(.confirm-modal .modal__panel),
 :deep(.confirm-modal .modal) {
   max-width: calc(100vw - 24px);
+}
+
+/* --- Expanded row: payment breakdown wrapper --- */
+.orders-paybreak-wrap {
+  margin-block-start: var(--sp-4);
+  max-width: 480px;
+}
+@media (max-width: 768px) {
+  .orders-paybreak-wrap { max-width: 100%; }
+}
+
+/* --- Stats-level payment breakdown card --- */
+.stats-paybreak-card {
+  padding: var(--sp-4);
+  margin-block-end: var(--sp-5);
+}
+.stats-paybreak-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: var(--sp-2);
 }
 </style>
 

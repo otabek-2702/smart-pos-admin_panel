@@ -1,0 +1,596 @@
+- generic [ref=e6]:
+  - complementary [ref=e7]:
+    - generic [ref=e8]:
+      - img [ref=e10]
+      - generic [ref=e12]: Alpha POS
+    - navigation [ref=e13]:
+      - link "Boshqaruv paneli" [ref=e14] [cursor=pointer]:
+        - /url: /
+        - img [ref=e16]
+        - generic [ref=e18]: Boshqaruv paneli
+      - link "AI yordamchi" [ref=e19] [cursor=pointer]:
+        - /url: /ai-assistant
+        - img [ref=e21]
+        - generic [ref=e25]: AI yordamchi
+      - link "Smenalar 8" [ref=e26] [cursor=pointer]:
+        - /url: /shifts-analytics
+        - img [ref=e28]
+        - generic [ref=e31]: Smenalar
+        - generic [ref=e32]: "8"
+      - generic [ref=e33]: Boshqaruv
+      - link "Foydalanuvchilar" [ref=e34] [cursor=pointer]:
+        - /url: /users
+        - img [ref=e36]
+        - generic [ref=e39]: Foydalanuvchilar
+      - link "Kategoriyalar" [ref=e40] [cursor=pointer]:
+        - /url: /categories
+        - img [ref=e42]
+        - generic [ref=e47]: Kategoriyalar
+      - link "Mahsulotlar" [ref=e48] [cursor=pointer]:
+        - /url: /products
+        - img [ref=e50]
+        - generic [ref=e53]: Mahsulotlar
+      - link "Buyurtmalar 308" [ref=e54] [cursor=pointer]:
+        - /url: /orders
+        - img [ref=e56]
+        - generic [ref=e59]: Buyurtmalar
+        - generic [ref=e60]: "308"
+      - link "Zallar va stollar" [ref=e61] [cursor=pointer]:
+        - /url: /places
+        - img [ref=e63]
+        - generic [ref=e66]: Zallar va stollar
+      - link "Chegirmalar" [ref=e67] [cursor=pointer]:
+        - /url: /discounts
+        - img [ref=e69]
+        - generic [ref=e72]: Chegirmalar
+      - link "Kassa" [ref=e73] [cursor=pointer]:
+        - /url: /cashbox/categories
+        - img [ref=e75]
+        - generic [ref=e78]: Kassa
+      - link "Xazina" [ref=e79] [cursor=pointer]:
+        - /url: /treasury
+        - img [ref=e81]
+        - generic [ref=e83]: Xazina
+      - link "Sodiqlik" [ref=e84] [cursor=pointer]:
+        - /url: /loyalty
+        - img [ref=e86]
+        - generic [ref=e89]: Sodiqlik
+      - link "Sessiyalar" [ref=e90] [cursor=pointer]:
+        - /url: /sessions
+        - img [ref=e92]
+        - generic [ref=e95]: Sessiyalar
+      - generic [ref=e96]: Kadrlar
+      - link "Xodimlar" [ref=e97] [cursor=pointer]:
+        - /url: /hr-employees
+        - img [ref=e99]
+        - generic [ref=e102]: Xodimlar
+      - link "Bo'limlar" [ref=e103] [cursor=pointer]:
+        - /url: /hr-departments
+        - img [ref=e105]
+        - generic [ref=e109]: Bo'limlar
+      - link "Maoshlar" [ref=e110] [cursor=pointer]:
+        - /url: /hr-salaries
+        - img [ref=e112]
+        - generic [ref=e115]: Maoshlar
+      - link "HR kassa" [ref=e116] [cursor=pointer]:
+        - /url: /hr-cash
+        - img [ref=e118]
+        - generic [ref=e122]: HR kassa
+      - link "HR hujjatlar" [ref=e123] [cursor=pointer]:
+        - /url: /hr-documents
+        - img [ref=e125]
+        - generic [ref=e128]: HR hujjatlar
+      - link "Tadbirlar" [ref=e129] [cursor=pointer]:
+        - /url: /hr-events
+        - img [ref=e131]
+        - generic [ref=e133]: Tadbirlar
+      - link "Xarajat kategoriyalari" [ref=e134] [cursor=pointer]:
+        - /url: /hr-expense-categories
+        - img [ref=e136]
+        - generic [ref=e141]: Xarajat kategoriyalari
+      - link "Maqsadlar" [ref=e142] [cursor=pointer]:
+        - /url: /hr-goals
+        - img [ref=e144]
+        - generic [ref=e148]: Maqsadlar
+      - link "Ta'til qoldiqlari" [ref=e149] [cursor=pointer]:
+        - /url: /hr-leave-balances
+        - img [ref=e151]
+        - generic [ref=e154]: Ta'til qoldiqlari
+      - link "Ta'til turlari" [ref=e155] [cursor=pointer]:
+        - /url: /hr-leave-types
+        - img [ref=e157]
+        - generic [ref=e160]: Ta'til turlari
+      - link "Sharhlar" [ref=e161] [cursor=pointer]:
+        - /url: /hr-reviews
+        - img [ref=e163]
+        - generic [ref=e165]: Sharhlar
+      - link "Smena shablonlari" [ref=e166] [cursor=pointer]:
+        - /url: /shift-templates
+        - img [ref=e168]
+        - generic [ref=e171]: Smena shablonlari
+      - generic [ref=e172]: Ombor
+      - link "Ombor ogohlantirishlari" [ref=e173] [cursor=pointer]:
+        - /url: /stock/alerts
+        - img [ref=e175]
+        - generic [ref=e178]: Ombor ogohlantirishlari
+      - link "Qabul qilish" [ref=e179] [cursor=pointer]:
+        - /url: /stock/receiving
+        - img [ref=e181]
+        - generic [ref=e184]: Qabul qilish
+      - link "Tuzatishlar" [ref=e185] [cursor=pointer]:
+        - /url: /stock/adjustments
+        - img [ref=e187]
+        - generic [ref=e191]: Tuzatishlar
+      - link "Zaxiralar" [ref=e192] [cursor=pointer]:
+        - /url: /stock/reservations
+        - img [ref=e194]
+        - generic [ref=e197]: Zaxiralar
+      - generic [ref=e198]: Sozlamalar
+      - link "QR kodlar" [ref=e199] [cursor=pointer]:
+        - /url: /qr-codes
+        - img [ref=e201]
+        - generic [ref=e206]: QR kodlar
+      - generic [ref=e207]: Bildirishnomalar
+      - link "Bildirishnoma navbati" [ref=e208] [cursor=pointer]:
+        - /url: /notification-queue
+        - img [ref=e210]
+        - generic [ref=e213]: Bildirishnoma navbati
+      - link "Bildirishnoma sozlamalari" [ref=e214] [cursor=pointer]:
+        - /url: /notification-settings
+        - img [ref=e216]
+        - generic [ref=e220]: Bildirishnoma sozlamalari
+      - link "Bildirishnoma shablonlari" [ref=e221] [cursor=pointer]:
+        - /url: /notification-templates
+        - img [ref=e223]
+        - generic [ref=e226]: Bildirishnoma shablonlari
+      - link "Bildirishnoma turlari" [ref=e227] [cursor=pointer]:
+        - /url: /notification-types
+        - img [ref=e229]
+        - generic [ref=e232]: Bildirishnoma turlari
+  - generic [ref=e233]:
+    - banner [ref=e234]:
+      - button "Yon panelni almashtirish" [ref=e235] [cursor=pointer]:
+        - img [ref=e236]
+      - generic [ref=e239]:
+        - generic [ref=e240]: Alpha POS
+        - img [ref=e241]
+      - button "Sozlamalar" [ref=e244] [cursor=pointer]:
+        - img [ref=e245]
+      - button "Mavzuni almashtirish" [ref=e248] [cursor=pointer]:
+        - img [ref=e249]
+      - generic [ref=e251]: AU
+    - main [ref=e252]:
+      - generic [ref=e253]:
+        - generic [ref=e254]:
+          - generic [ref=e255]:
+            - heading "Boshqaruv paneli" [level=1] [ref=e256]
+            - generic [ref=e257]: Daromad, marja va sotuvlar manbalari
+          - generic [ref=e258]:
+            - button "Oxirgi 30 kun" [ref=e260] [cursor=pointer]:
+              - img [ref=e261]
+              - generic [ref=e264]: Oxirgi 30 kun
+              - img [ref=e265]
+            - button "Yangilash" [ref=e267] [cursor=pointer]:
+              - img [ref=e268]
+              - text: Yangilash
+            - button "Eksport" [ref=e271] [cursor=pointer]:
+              - img [ref=e272]
+              - text: Eksport
+        - generic [ref=e274]:
+          - button "Bosh sahifa" [ref=e275] [cursor=pointer]:
+            - img [ref=e276]
+            - generic [ref=e278]: Bosh sahifa
+          - button "Sotuvlar va daromad" [ref=e279] [cursor=pointer]:
+            - img [ref=e280]
+            - generic [ref=e283]: Sotuvlar va daromad
+          - button "Operatsiyalar" [ref=e284] [cursor=pointer]:
+            - img [ref=e285]
+            - generic [ref=e288]: Operatsiyalar
+          - button "Mahsulotlar" [ref=e289] [cursor=pointer]:
+            - img [ref=e290]
+            - generic [ref=e293]: Mahsulotlar
+          - button "Xodimlar va smenalar" [ref=e294] [cursor=pointer]:
+            - img [ref=e295]
+            - generic [ref=e298]: Xodimlar va smenalar
+        - generic [ref=e300]:
+          - generic [ref=e301]:
+            - generic [ref=e302]:
+              - generic [ref=e303]:
+                - generic [ref=e304]: Shu oy
+                - img [ref=e306]
+              - generic [ref=e310]: 211842200UZS
+              - generic [ref=e311]:
+                - generic [ref=e312]:
+                  - img [ref=e313]
+                  - text: +12.4%
+                - img [ref=e317]
+            - generic [ref=e319]:
+              - generic [ref=e320]:
+                - generic [ref=e321]: o'tgan oyga nisbatan
+                - img [ref=e323]
+              - generic [ref=e326]: +211.84MUZS
+              - generic [ref=e328]:
+                - img [ref=e329]
+                - text: +14.1%
+            - generic [ref=e332]:
+              - generic [ref=e333]:
+                - generic [ref=e334]: Eng yaxshi kun
+                - img [ref=e336]
+              - generic [ref=e338]: 25 790 000UZS
+              - generic [ref=e340]: bir kunlik rekord
+            - generic [ref=e341]:
+              - generic [ref=e342]:
+                - generic [ref=e343]: Xarajatlar (30 kun)
+                - img [ref=e345]
+              - generic [ref=e348]: 0000000000000000000000000000000UZS
+              - generic [ref=e349]:
+                - generic [ref=e350]:
+                  - img [ref=e351]
+                  - text: −2.3%
+                - img [ref=e355]
+          - generic [ref=e356]:
+            - generic [ref=e357]:
+              - generic [ref=e359]:
+                - generic [ref=e360]: Daromad va xarajat · 30 kun
+                - heading "Marja 0.65% darajasida" [level=3] [ref=e361]
+              - generic [ref=e362]:
+                - img [ref=e364]:
+                  - generic [ref=e366]: "0"
+                  - generic [ref=e368]: 10M
+                  - generic [ref=e370]: 20M
+                  - generic [ref=e372]: 30M
+                  - generic [ref=e376]: 2026-05-29
+                  - generic [ref=e377]: 2026-06-03
+                  - generic [ref=e378]: 2026-06-08
+                  - generic [ref=e379]: 2026-06-13
+                  - generic [ref=e380]: 2026-06-18
+                  - generic [ref=e381]: 2026-06-23
+                  - generic [ref=e382]: 2026-06-27
+                - generic [ref=e413]:
+                  - generic [ref=e414]: Daromad
+                  - generic [ref=e416]: Xarajatlar
+            - generic [ref=e418]:
+              - generic [ref=e420]:
+                - generic [ref=e421]: Kategoriya maqsadlari
+                - heading "Haqiqiy va maqsad" [level=3] [ref=e422]
+              - generic [ref=e424]:
+                - generic [ref=e425]:
+                  - generic [ref=e426]:
+                    - generic [ref=e427]: Pitsa
+                    - generic [ref=e428]:
+                      - generic [ref=e429]: 24.8M
+                      - generic [ref=e430]: / 26M
+                      - generic [ref=e431]: 95%
+                  - generic "Haqiqiy va maqsad" [ref=e434]
+                - generic [ref=e435]:
+                  - generic [ref=e436]:
+                    - generic [ref=e437]: Lavash
+                    - generic [ref=e438]:
+                      - generic [ref=e439]: 18.2M
+                      - generic [ref=e440]: / 16M
+                      - generic [ref=e441]: 114%
+                  - generic "Haqiqiy va maqsad" [ref=e444]
+                - generic [ref=e445]:
+                  - generic [ref=e446]:
+                    - generic [ref=e447]: Kabob
+                    - generic [ref=e448]:
+                      - generic [ref=e449]: 15.6M
+                      - generic [ref=e450]: / 18M
+                      - generic [ref=e451]: 87%
+                  - generic "Haqiqiy va maqsad" [ref=e454]
+                - generic [ref=e455]:
+                  - generic [ref=e456]:
+                    - generic [ref=e457]: Hot-dog
+                    - generic [ref=e458]:
+                      - generic [ref=e459]: 8.9M
+                      - generic [ref=e460]: / 8M
+                      - generic [ref=e461]: 111%
+                  - generic "Haqiqiy va maqsad" [ref=e464]
+                - generic [ref=e465]:
+                  - generic [ref=e466]:
+                    - generic [ref=e467]: Ichimliklar
+                    - generic [ref=e468]:
+                      - generic [ref=e469]: 6.4M
+                      - generic [ref=e470]: / 7.5M
+                      - generic [ref=e471]: 85%
+                  - generic "Haqiqiy va maqsad" [ref=e474]
+          - generic [ref=e475]:
+            - generic [ref=e476]:
+              - generic [ref=e478]:
+                - generic [ref=e479]: Sotuvlar qachon bo'ladi
+                - heading "Ju va Sh kechki ovqatlari hajmni oshiradi" [level=3] [ref=e480]
+              - generic [ref=e482]:
+                - generic [ref=e483]:
+                  - generic [ref=e484]: "09"
+                  - generic [ref=e485]: "10"
+                  - generic [ref=e486]: "11"
+                  - generic [ref=e487]: "12"
+                  - generic [ref=e488]: "13"
+                  - generic [ref=e489]: "14"
+                  - generic [ref=e490]: "15"
+                  - generic [ref=e491]: "16"
+                  - generic [ref=e492]: "17"
+                  - generic [ref=e493]: "18"
+                  - generic [ref=e494]: "19"
+                  - generic [ref=e495]: "20"
+                  - generic [ref=e496]: "21"
+                  - generic [ref=e497]: "22"
+                - generic [ref=e498]:
+                  - generic [ref=e499]: Mon
+                  - generic "Mon · 09 — 30 buyurtma" [ref=e500]
+                  - generic "Mon · 10 — 40 buyurtma" [ref=e501]
+                  - generic "Mon · 11 — 41 buyurtma" [ref=e502]
+                  - generic "Mon · 12 — 65 buyurtma" [ref=e503]
+                  - generic "Mon · 13 — 49 buyurtma" [ref=e504]
+                  - generic "Mon · 14 — 29 buyurtma" [ref=e505]
+                  - generic "Mon · 15 — 33 buyurtma" [ref=e506]
+                  - generic "Mon · 16 — 20 buyurtma" [ref=e507]
+                  - generic "Mon · 17 — 32 buyurtma" [ref=e508]
+                  - generic "Mon · 18 — 21 buyurtma" [ref=e509]
+                  - generic "Mon · 19 — 20 buyurtma" [ref=e510]
+                  - generic "Mon · 20 — 33 buyurtma" [ref=e511]
+                  - generic "Mon · 21 — 37 buyurtma" [ref=e512]
+                  - generic "Mon · 22 — 20 buyurtma" [ref=e513]
+                - generic [ref=e514]:
+                  - generic [ref=e515]: Tue
+                  - generic "Tue · 09 — 18 buyurtma" [ref=e516]
+                  - generic "Tue · 10 — 30 buyurtma" [ref=e517]
+                  - generic "Tue · 11 — 45 buyurtma" [ref=e518]
+                  - generic "Tue · 12 — 35 buyurtma" [ref=e519]
+                  - generic "Tue · 13 — 38 buyurtma" [ref=e520]
+                  - generic "Tue · 14 — 40 buyurtma" [ref=e521]
+                  - generic "Tue · 15 — 28 buyurtma" [ref=e522]
+                  - generic "Tue · 16 — 38 buyurtma" [ref=e523]
+                  - generic "Tue · 17 — 32 buyurtma" [ref=e524]
+                  - generic "Tue · 18 — 30 buyurtma" [ref=e525]
+                  - generic "Tue · 19 — 23 buyurtma" [ref=e526]
+                  - generic "Tue · 20 — 23 buyurtma" [ref=e527]
+                  - generic "Tue · 21 — 39 buyurtma" [ref=e528]
+                  - generic "Tue · 22 — 36 buyurtma" [ref=e529]
+                - generic [ref=e530]:
+                  - generic [ref=e531]: Wed
+                  - generic "Wed · 09 — 19 buyurtma" [ref=e532]
+                  - generic "Wed · 10 — 43 buyurtma" [ref=e533]
+                  - generic "Wed · 11 — 49 buyurtma" [ref=e534]
+                  - generic "Wed · 12 — 53 buyurtma" [ref=e535]
+                  - generic "Wed · 13 — 35 buyurtma" [ref=e536]
+                  - generic "Wed · 14 — 26 buyurtma" [ref=e537]
+                  - generic "Wed · 15 — 34 buyurtma" [ref=e538]
+                  - generic "Wed · 16 — 21 buyurtma" [ref=e539]
+                  - generic "Wed · 17 — 22 buyurtma" [ref=e540]
+                  - generic "Wed · 18 — 20 buyurtma" [ref=e541]
+                  - generic "Wed · 19 — 6 buyurtma" [ref=e542]
+                  - generic "Wed · 20 — 0 buyurtma" [ref=e543]
+                  - generic "Wed · 21 — 0 buyurtma" [ref=e544]
+                  - generic "Wed · 22 — 0 buyurtma" [ref=e545]
+                - generic [ref=e546]:
+                  - generic [ref=e547]: Thu
+                  - generic "Thu · 09 — 38 buyurtma" [ref=e548]
+                  - generic "Thu · 10 — 59 buyurtma" [ref=e549]
+                  - generic "Thu · 11 — 103 buyurtma" [ref=e550]
+                  - generic "Thu · 12 — 110 buyurtma" [ref=e551]
+                  - generic "Thu · 13 — 67 buyurtma" [ref=e552]
+                  - generic "Thu · 14 — 49 buyurtma" [ref=e553]
+                  - generic "Thu · 15 — 55 buyurtma" [ref=e554]
+                  - generic "Thu · 16 — 62 buyurtma" [ref=e555]
+                  - generic "Thu · 17 — 52 buyurtma" [ref=e556]
+                  - generic "Thu · 18 — 54 buyurtma" [ref=e557]
+                  - generic "Thu · 19 — 63 buyurtma" [ref=e558]
+                  - generic "Thu · 20 — 68 buyurtma" [ref=e559]
+                  - generic "Thu · 21 — 80 buyurtma" [ref=e560]
+                  - generic "Thu · 22 — 66 buyurtma" [ref=e561]
+                - generic [ref=e562]:
+                  - generic [ref=e563]: Fri
+                  - generic "Fri · 09 — 54 buyurtma" [ref=e564]
+                  - generic "Fri · 10 — 65 buyurtma" [ref=e565]
+                  - generic "Fri · 11 — 106 buyurtma" [ref=e566]
+                  - generic "Fri · 12 — 73 buyurtma" [ref=e567]
+                  - generic "Fri · 13 — 43 buyurtma" [ref=e568]
+                  - generic "Fri · 14 — 62 buyurtma" [ref=e569]
+                  - generic "Fri · 15 — 61 buyurtma" [ref=e570]
+                  - generic "Fri · 16 — 44 buyurtma" [ref=e571]
+                  - generic "Fri · 17 — 58 buyurtma" [ref=e572]
+                  - generic "Fri · 18 — 39 buyurtma" [ref=e573]
+                  - generic "Fri · 19 — 38 buyurtma" [ref=e574]
+                  - generic "Fri · 20 — 72 buyurtma" [ref=e575]
+                  - generic "Fri · 21 — 61 buyurtma" [ref=e576]
+                  - generic "Fri · 22 — 17 buyurtma" [ref=e577]
+                - generic [ref=e578]:
+                  - generic [ref=e579]: Sat
+                  - generic "Sat · 09 — 123 buyurtma" [ref=e580]
+                  - generic "Sat · 10 — 76 buyurtma" [ref=e581]
+                  - generic "Sat · 11 — 76 buyurtma" [ref=e582]
+                  - generic "Sat · 12 — 116 buyurtma" [ref=e583]
+                  - generic "Sat · 13 — 66 buyurtma" [ref=e584]
+                  - generic "Sat · 14 — 56 buyurtma" [ref=e585]
+                  - generic "Sat · 15 — 50 buyurtma" [ref=e586]
+                  - generic "Sat · 16 — 15 buyurtma" [ref=e587]
+                  - generic "Sat · 17 — 18 buyurtma" [ref=e588]
+                  - generic "Sat · 18 — 22 buyurtma" [ref=e589]
+                  - generic "Sat · 19 — 33 buyurtma" [ref=e590]
+                  - generic "Sat · 20 — 37 buyurtma" [ref=e591]
+                  - generic "Sat · 21 — 40 buyurtma" [ref=e592]
+                  - generic "Sat · 22 — 32 buyurtma" [ref=e593]
+                - generic [ref=e594]:
+                  - generic [ref=e595]: Sun
+                  - generic "Sun · 09 — 8 buyurtma" [ref=e596]
+                  - generic "Sun · 10 — 18 buyurtma" [ref=e597]
+                  - generic "Sun · 11 — 45 buyurtma" [ref=e598]
+                  - generic "Sun · 12 — 24 buyurtma" [ref=e599]
+                  - generic "Sun · 13 — 21 buyurtma" [ref=e600]
+                  - generic "Sun · 14 — 20 buyurtma" [ref=e601]
+                  - generic "Sun · 15 — 13 buyurtma" [ref=e602]
+                  - generic "Sun · 16 — 16 buyurtma" [ref=e603]
+                  - generic "Sun · 17 — 13 buyurtma" [ref=e604]
+                  - generic "Sun · 18 — 26 buyurtma" [ref=e605]
+                  - generic "Sun · 19 — 14 buyurtma" [ref=e606]
+                  - generic "Sun · 20 — 43 buyurtma" [ref=e607]
+                  - generic "Sun · 21 — 45 buyurtma" [ref=e608]
+                  - generic "Sun · 22 — 31 buyurtma" [ref=e609]
+                - generic [ref=e610]:
+                  - generic [ref=e611]: Kam
+                  - generic [ref=e617]: Yana
+            - generic [ref=e618]:
+              - generic [ref=e620]:
+                - generic [ref=e621]: Kanal bo'yicha · 7 kun
+                - heading "Zal, yetkazib berish va olib ketish" [level=3] [ref=e622]
+              - generic [ref=e624]:
+                - img [ref=e625]:
+                  - generic [ref=e627]: "0"
+                  - generic [ref=e629]: "200"
+                  - generic [ref=e631]: "400"
+                  - generic [ref=e633]: "600"
+                  - generic [ref=e634]:
+                    - generic "05-29 · Zal — 0"
+                    - generic "05-29 · Yetkazib berish — 0"
+                    - generic "05-29 · Olib ketish — 0"
+                    - generic [ref=e635]: 05-29
+                  - generic [ref=e636]:
+                    - generic "05-30 · Zal — 0"
+                    - generic "05-30 · Yetkazib berish — 0"
+                    - generic "05-30 · Olib ketish — 0"
+                    - generic [ref=e637]: 05-30
+                  - generic [ref=e638]:
+                    - generic "05-31 · Zal — 0"
+                    - generic "05-31 · Yetkazib berish — 0"
+                    - generic "05-31 · Olib ketish — 0"
+                    - generic [ref=e639]: 05-31
+                  - generic [ref=e640]:
+                    - generic "06-01 · Zal — 0"
+                    - generic "06-01 · Yetkazib berish — 0"
+                    - generic "06-01 · Olib ketish — 0"
+                    - generic [ref=e641]: 06-01
+                  - generic [ref=e642]:
+                    - generic "06-02 · Zal — 0"
+                    - generic "06-02 · Yetkazib berish — 0"
+                    - generic "06-02 · Olib ketish — 0"
+                    - generic [ref=e643]: 06-02
+                  - generic [ref=e644]:
+                    - generic "06-03 · Zal — 0"
+                    - generic "06-03 · Yetkazib berish — 0"
+                    - generic "06-03 · Olib ketish — 0"
+                    - generic [ref=e645]: 06-03
+                  - generic [ref=e646]:
+                    - generic "06-04 · Zal — 0"
+                    - generic "06-04 · Yetkazib berish — 0"
+                    - generic "06-04 · Olib ketish — 0"
+                    - generic [ref=e647]: 06-04
+                  - generic [ref=e648]:
+                    - generic "06-05 · Zal — 0"
+                    - generic "06-05 · Yetkazib berish — 0"
+                    - generic "06-05 · Olib ketish — 0"
+                    - generic [ref=e649]: 06-05
+                  - generic [ref=e650]:
+                    - generic "06-06 · Zal — 0"
+                    - generic "06-06 · Yetkazib berish — 0"
+                    - generic "06-06 · Olib ketish — 0"
+                    - generic [ref=e651]: 06-06
+                  - generic [ref=e652]:
+                    - generic "06-07 · Zal — 0"
+                    - generic "06-07 · Yetkazib berish — 0"
+                    - generic "06-07 · Olib ketish — 0"
+                    - generic [ref=e653]: 06-07
+                  - generic [ref=e654]:
+                    - generic "06-08 · Zal — 0"
+                    - generic "06-08 · Yetkazib berish — 0"
+                    - generic "06-08 · Olib ketish — 0"
+                    - generic [ref=e655]: 06-08
+                  - generic [ref=e656]:
+                    - generic "06-09 · Zal — 0"
+                    - generic "06-09 · Yetkazib berish — 0"
+                    - generic "06-09 · Olib ketish — 0"
+                    - generic [ref=e657]: 06-09
+                  - generic [ref=e658]:
+                    - generic "06-10 · Zal — 0"
+                    - generic "06-10 · Yetkazib berish — 0"
+                    - generic "06-10 · Olib ketish — 0"
+                    - generic [ref=e659]: 06-10
+                  - generic [ref=e660]:
+                    - generic "06-11 · Zal — 0"
+                    - generic "06-11 · Yetkazib berish — 0"
+                    - generic "06-11 · Olib ketish — 0"
+                    - generic [ref=e661]: 06-11
+                  - generic [ref=e662]:
+                    - generic "06-12 · Zal — 0"
+                    - generic "06-12 · Yetkazib berish — 0"
+                    - generic "06-12 · Olib ketish — 0"
+                    - generic [ref=e663]: 06-12
+                  - generic [ref=e664]:
+                    - generic "06-13 · Zal — 0"
+                    - generic "06-13 · Yetkazib berish — 0"
+                    - generic "06-13 · Olib ketish — 0"
+                    - generic [ref=e665]: 06-13
+                  - generic [ref=e666]:
+                    - generic "06-14 · Zal — 0"
+                    - generic "06-14 · Yetkazib berish — 0"
+                    - generic "06-14 · Olib ketish — 0"
+                    - generic [ref=e667]: 06-14
+                  - generic [ref=e668]:
+                    - generic "06-15 · Zal — 0"
+                    - generic "06-15 · Yetkazib berish — 0"
+                    - generic "06-15 · Olib ketish — 0"
+                    - generic [ref=e669]: 06-15
+                  - generic [ref=e670]:
+                    - generic "06-16 · Zal — 0"
+                    - generic "06-16 · Yetkazib berish — 0"
+                    - generic "06-16 · Olib ketish — 0"
+                    - generic [ref=e671]: 06-16
+                  - generic [ref=e672]:
+                    - generic "06-17 · Zal — 0"
+                    - generic "06-17 · Yetkazib berish — 0"
+                    - generic "06-17 · Olib ketish — 0"
+                    - generic [ref=e673]: 06-17
+                  - generic [ref=e674]:
+                    - generic "06-18 · Zal — 372" [ref=e675]
+                    - generic "06-18 · Yetkazib berish — 64" [ref=e676]
+                    - generic "06-18 · Olib ketish — 66" [ref=e677]
+                    - generic [ref=e678]: 06-18
+                  - generic [ref=e679]:
+                    - generic "06-19 · Zal — 361" [ref=e680]
+                    - generic "06-19 · Yetkazib berish — 78" [ref=e681]
+                    - generic "06-19 · Olib ketish — 70" [ref=e682]
+                    - generic [ref=e683]: 06-19
+                  - generic [ref=e684]:
+                    - generic "06-20 · Zal — 328" [ref=e685]
+                    - generic "06-20 · Yetkazib berish — 75" [ref=e686]
+                    - generic "06-20 · Olib ketish — 94" [ref=e687]
+                    - generic [ref=e688]: 06-20
+                  - generic [ref=e689]:
+                    - generic "06-21 · Zal — 248" [ref=e690]
+                    - generic "06-21 · Yetkazib berish — 76" [ref=e691]
+                    - generic "06-21 · Olib ketish — 52" [ref=e692]
+                    - generic [ref=e693]: 06-21
+                  - generic [ref=e694]:
+                    - generic "06-22 · Zal — 372" [ref=e695]
+                    - generic "06-22 · Yetkazib berish — 65" [ref=e696]
+                    - generic "06-22 · Olib ketish — 73" [ref=e697]
+                    - generic [ref=e698]: 06-22
+                  - generic [ref=e699]:
+                    - generic "06-23 · Zal — 382" [ref=e700]
+                    - generic "06-23 · Yetkazib berish — 57" [ref=e701]
+                    - generic "06-23 · Olib ketish — 72" [ref=e702]
+                    - generic [ref=e703]: 06-23
+                  - generic [ref=e704]:
+                    - generic "06-24 · Zal — 264" [ref=e705]
+                    - generic "06-24 · Yetkazib berish — 27" [ref=e706]
+                    - generic "06-24 · Olib ketish — 37" [ref=e707]
+                    - generic [ref=e708]: 06-24
+                  - generic [ref=e709]:
+                    - generic "06-25 · Zal — 359" [ref=e710]
+                    - generic "06-25 · Yetkazib berish — 55" [ref=e711]
+                    - generic "06-25 · Olib ketish — 70" [ref=e712]
+                    - generic [ref=e713]: 06-25
+                  - generic [ref=e714]:
+                    - generic "06-26 · Zal — 239" [ref=e715]
+                    - generic "06-26 · Yetkazib berish — 43" [ref=e716]
+                    - generic "06-26 · Olib ketish — 68" [ref=e717]
+                    - generic [ref=e718]: 06-26
+                  - generic [ref=e719]:
+                    - generic "06-27 · Zal — 233" [ref=e720]
+                    - generic "06-27 · Yetkazib berish — 32" [ref=e721]
+                    - generic "06-27 · Olib ketish — 43" [ref=e722]
+                    - generic [ref=e723]: 06-27
+                - generic [ref=e724]:
+                  - generic [ref=e725]: Zal
+                  - generic [ref=e727]: Yetkazib berish
+                  - generic [ref=e729]: Olib ketish

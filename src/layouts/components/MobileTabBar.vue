@@ -37,11 +37,14 @@ function isActive(tab: Tab): boolean {
   return route.path === tab.to || route.path.startsWith(`${tab.to}/`)
 }
 
-function onTap(tab: Tab) {
+function onTap(e: MouseEvent, tab: Tab) {
   if (tab.id === '__more') {
     emit('more')
     return
   }
+  if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button === 1)
+    return // honor modifier / middle clicks (router-link anchor opens new tab)
+  e.preventDefault()
   if (tab.to && !isActive(tab))
     router.push(tab.to)
 }
@@ -49,18 +52,30 @@ function onTap(tab: Tab) {
 
 <template>
   <nav class="mobile-tabbar">
-    <button
+    <template
       v-for="tab in TAB_ITEMS"
       :key="tab.id"
-      type="button"
-      class="mtab"
-      :class="{ 'is-active': isActive(tab) }"
-      @click="onTap(tab)"
     >
-      <span class="mtab__icon">
-        <DesignIcon :name="tab.icon" :size="22" />
-      </span>
-      <span class="mtab__label">{{ t(tab.label) }}</span>
-    </button>
+      <button
+        v-if="tab.id === '__more'"
+        type="button"
+        class="mtab"
+        :class="{ 'is-active': isActive(tab) }"
+        @click="onTap($event, tab)"
+      >
+        <span class="mtab__icon"><DesignIcon :name="tab.icon" :size="22" /></span>
+        <span class="mtab__label">{{ t(tab.label) }}</span>
+      </button>
+      <a
+        v-else-if="tab.to"
+        :href="tab.to"
+        class="mtab"
+        :class="{ 'is-active': isActive(tab) }"
+        @click="onTap($event, tab)"
+      >
+        <span class="mtab__icon"><DesignIcon :name="tab.icon" :size="22" /></span>
+        <span class="mtab__label">{{ t(tab.label) }}</span>
+      </a>
+    </template>
   </nav>
 </template>

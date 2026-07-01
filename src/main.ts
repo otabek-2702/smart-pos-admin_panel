@@ -10,6 +10,9 @@ import router from '@/router'
 import { abilitiesPlugin } from '@casl/vue'
 import '@core/scss/template/index.scss'
 import '@styles/styles.scss'
+// vue-virtual-scroller — purely-structural CSS (no colors). Imported once
+// globally so DynamicScroller / RecycleScroller in the AI thread render right.
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
 import { createPinia } from 'pinia'
 import { createApp } from 'vue'
 import * as Sentry from '@sentry/vue'

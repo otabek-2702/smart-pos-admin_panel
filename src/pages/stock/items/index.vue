@@ -8,6 +8,7 @@
 import ItemFormDialog from './ItemFormDialog.vue'
 import { stockApi as axios } from '@/plugins/axios'
 import Badge from '@/components/design/Badge.vue'
+import BarcodeScanner from '@/components/design/BarcodeScanner.vue'
 import Button from '@/components/design/Button.vue'
 import DataTable, { type DataTableColumn } from '@/components/design/DataTable.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
@@ -28,6 +29,13 @@ const itemsPerPage = ref(10)
 const search = ref('')
 const barcodeQuery = ref('')
 const barcodeLoading = ref(false)
+const scanOpen = ref(false)
+
+function onScanned(code: string) {
+  barcodeQuery.value = code
+  // Defer lookup one tick so the v-model reflects the new value before lookup runs.
+  nextTick(() => { lookupBarcode() })
+}
 const typeFilter = ref<string | undefined>(undefined)
 const categoryFilter = ref<number | undefined>(undefined)
 const lowStockOnly = ref(false)
@@ -230,15 +238,27 @@ const dtPagination = computed(() => ({
           />
         </div>
 
-        <div class="tb-filter tb-filter--md">
+        <div class="tb-filter tb-filter--md" style="display: flex; gap: 6px; align-items: stretch;">
           <Input
             v-model="barcodeQuery"
             icon="barcode"
             :placeholder="t('items_ext_barcode_placeholder')"
             :aria-label="t('items_ext_barcode_tab')"
             :disabled="barcodeLoading"
+            style="flex: 1;"
             @keydown.enter.prevent="lookupBarcode"
           />
+          <!-- Open camera-based barcode scanner. Only meaningful on devices with a camera. -->
+          <button
+            type="button"
+            class="scan-trigger"
+            :title="t('Scan barcode')"
+            :aria-label="t('Scan barcode')"
+            :disabled="barcodeLoading"
+            @click="scanOpen = true"
+          >
+            <DesignIcon name="camera" :size="18" />
+          </button>
         </div>
 
         <div class="tb-filter tb-filter--sm">
@@ -405,10 +425,34 @@ const dtPagination = computed(() => ({
     >
       {{ snackbarMsg }}
     </VSnackbar>
+
+    <!-- Camera-based EAN/UPC/QR scanner. Lazy-loads ~150kB ZXing on first open. -->
+    <BarcodeScanner v-model:open="scanOpen" @decoded="onScanned" />
   </div>
 </template>
 
 <style scoped>
+/* Camera-scan trigger button */
+.scan-trigger {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.scan-trigger:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.scan-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* --- Responsive toolbar --- */
 .items-toolbar {
   flex-wrap: wrap;

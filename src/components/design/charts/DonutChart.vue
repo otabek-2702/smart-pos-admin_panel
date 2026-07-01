@@ -19,6 +19,8 @@ import Skeleton from '../Skeleton.vue'
 import StateFill from '../StateFill.vue'
 import ChartTip from './ChartTip.vue'
 
+const { t } = useI18n({ useScope: 'global' })
+
 interface DonutSlice {
   label: string
   value: number
@@ -112,7 +114,7 @@ const tipTitle = computed(() => hover.value !== null ? props.data[hover.value].l
   <StateFill
     v-else-if="!data.length || data.every(d => !d.value)"
     icon="chart"
-    title="No data for this range"
+    :title="t('No data for this range')"
     :style="{ height: `${size}px` }"
   />
   <div

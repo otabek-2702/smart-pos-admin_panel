@@ -1,445 +1,297 @@
 <script setup lang="ts">
-import axios from '@/plugins/axios'
+/* ============================================================
+   ALPHA POS — Dashboards hub (5 switchable dashboard views)
+   1:1 port of .tmp-handoff-v3/.../pages/Dashboard.jsx
+   Replaces the previous "Today's Snapshot" page per Jason's call
+   (locked decision #7 v3). Tabbed shell, shared header, date range,
+   refresh + export. Sub-dashboards live in src/pages/dash/*.vue
+   and are lazy-loaded via defineAsyncComponent.
+   ============================================================ */
+import { defineAsyncComponent } from 'vue'
+import AIBriefingCard from '@/components/design/AIBriefingCard.vue'
+import { useAIPageContext } from '@/composables/useAIPageContext'
+import Button from '@/components/design/Button.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import DateRangePicker, { type DateRangeValue } from '@/components/design/DateRangePicker.vue'
+import { useToast } from '@/components/design/useToast'
+import { fmtDateTime } from '@/components/design/utils/format'
+import { cx } from '@/components/design/utils'
+import { useDashboardData } from '@/composables/useDashboardData'
 
 const { t } = useI18n({ useScope: 'global' })
-const { formatCurrency, formatDate } = useFormatters()
-const router = useRouter()
+const toast = useToast()
+const { shared: sharedDash, loading: sharedLoading, fetchShared } = useDashboardData()
 
-const data = ref<any>(null)
-const loading = ref(true)
+// ---------- View registry ----------
+type ViewId = 'exec' | 'sales' | 'ops' | 'products' | 'staff'
 
-async function load() {
-  loading.value = true
+interface DashView {
+  id: ViewId
+  labelKey: string
+  subtitleKey: string
+  icon: string
+  comp: ReturnType<typeof defineAsyncComponent>
+}
+
+const DASH_VIEWS: DashView[] = [
+  {
+    id: 'exec',
+    labelKey: 'Executive',
+    subtitleKey: 'dash_subtitle_exec',
+    icon: 'dashboard',
+    comp: defineAsyncComponent(() => import('@/pages/dash/executive.vue')),
+  },
+  {
+    id: 'sales',
+    labelKey: 'Sales & Revenue',
+    subtitleKey: 'dash_subtitle_sales',
+    icon: 'trend',
+    comp: defineAsyncComponent(() => import('@/pages/dash/sales.vue')),
+  },
+  {
+    id: 'ops',
+    labelKey: 'Operations',
+    subtitleKey: 'dash_subtitle_ops',
+    icon: 'clock',
+    comp: defineAsyncComponent(() => import('@/pages/dash/operations.vue')),
+  },
+  {
+    id: 'products',
+    labelKey: 'Products',
+    subtitleKey: 'dash_subtitle_products',
+    icon: 'box',
+    comp: defineAsyncComponent(() => import('@/pages/dash/products.vue')),
+  },
+  {
+    id: 'staff',
+    labelKey: 'Staff & Shifts',
+    subtitleKey: 'dash_subtitle_staff',
+    icon: 'users',
+    comp: defineAsyncComponent(() => import('@/pages/dash/staff.vue')),
+  },
+]
+
+// ---------- State ----------
+const LS_KEY = 'alphapos-dashview'
+
+function readStoredView(): ViewId {
   try {
-    const res = await axios.get('/dashboard/today')
+    const v = localStorage.getItem(LS_KEY)
+    if (v && DASH_VIEWS.some(x => x.id === v))
+      return v as ViewId
+  }
+  catch {}
+  return 'exec'
+}
 
-    data.value = res.data?.data ?? res.data
+const view = ref<ViewId>(readStoredView())
+const localLoading = ref(false)
+const dateRange = ref<DateRangeValue>({ from: '', to: '', preset: '30d' })
+
+// Loading flag the page exposes to the UI = either the hub-level shared
+// fetch OR an in-flight manual refresh.
+const loading = computed(() => localLoading.value || sharedLoading.value)
+
+watch(view, (v) => {
+  try { localStorage.setItem(LS_KEY, v) }
+  catch {}
+})
+
+const current = computed(() => DASH_VIEWS.find(v => v.id === view.value) ?? DASH_VIEWS[0])
+
+// ---------- Hub-level shared fetch ----------
+// Hits GET /dashboard?from&to when a range is selected, falls back to
+// /dashboard/today when no range provided. Shape verified against
+// alpha_pos_server/admins/services/dashboard_service.py:get_range() /
+// get_today() — same `{ success, data }` envelope. Stored into the
+// shared composable so any sub-dashboard can opt in via
+// `useDashboardData()` without re-fetching.
+async function loadShared(): Promise<void> {
+  await fetchShared({
+    from: dateRange.value?.from ?? '',
+    to: dateRange.value?.to ?? '',
+    preset: dateRange.value?.preset,
+  })
+}
+
+watch(
+  () => [dateRange.value?.from, dateRange.value?.to],
+  () => { void loadShared() },
+)
+
+onMounted(() => { void loadShared() })
+
+// Push the current dashboard context to the AI assistant so /ai/query knows
+// which sub-dashboard + date range the user is looking at when they ask
+// "Why did Wednesday dip?". Re-pushes on view / range change.
+const aiCtx = useAIPageContext()
+watch(
+  () => [view.value, dateRange.value?.from, dateRange.value?.to],
+  () => {
+    const v = current.value
+    aiCtx.set({
+      route: '/dashboard',
+      route_label: `${t(v.labelKey)} dashboard`,
+      range_from: dateRange.value?.from || undefined,
+      range_to: dateRange.value?.to || undefined,
+      filters: { tab: v.id },
+      visible_data_keys: v.id === 'sales'
+        ? ['monthRevenue', 'grossMargin', 'revenue30', 'expense30', 'heatMatrix', 'channelDays']
+        : v.id === 'products'
+          ? ['menuItems', 'bestSellerName', 'units30d', 'menuRevenue', 'top_products', 'affinity']
+          : v.id === 'staff'
+            ? ['active_count', 'top_performer', 'leaderboard', 'accuracy']
+            : v.id === 'ops'
+              ? ['live_counts', 'funnel', 'ordersByHour']
+              : ['revenue', 'orders', 'paid_orders', 'units_sold'],
+    })
+  },
+  { immediate: true },
+)
+onUnmounted(() => { aiCtx.clear() })
+
+// ---------- Actions ----------
+function selectView(id: ViewId) {
+  if (view.value === id)
+    return
+  view.value = id
+}
+
+async function refresh() {
+  localLoading.value = true
+  try {
+    await loadShared()
+    toast({
+      tone: 'success',
+      title: t('Dashboard refreshed'),
+      msg: t('Updated {datetime}', { datetime: fmtDateTime(new Date()) }),
+    })
+  }
+  catch {
+    // Use vue-sonner directly so the user can retry from the failure toast.
+    // The project's wrapper doesn't carry an action payload yet.
+    const { toast: sonner } = await import('vue-sonner')
+    sonner.error(t('Could not refresh dashboard'), {
+      description: t('Check your connection and try again.'),
+      action: {
+        label: t('Retry'),
+        onClick: () => { void refresh() },
+      },
+    })
   }
   finally {
-    loading.value = false
+    localLoading.value = false
   }
 }
 
-onMounted(load)
+// CSV export of the current dashboard's headline metrics. Writes a UTF-8 BOM so
+// Excel on Russian / Uzbek Windows opens the file with the correct encoding.
+// One row per metric — keeps the file readable when copy-pasted into a chat.
+function exportCsv() {
+  const d = sharedDash.value as any
+  if (!d) {
+    toast({ tone: 'warning', title: t('Nothing to export yet'), msg: t('Wait for the dashboard to load first') })
+    return
+  }
+  const rows: [string, unknown][] = [
+    [t('Generated'), fmtDateTime(new Date())],
+    [t('Range'), d.range ? `${d.range.from ?? ''} → ${d.range.to ?? ''}` : t('Today')],
+    [t('View'), t(current.value.labelKey)],
+    [t('Revenue'), d.revenue ?? d.today?.revenue ?? ''],
+    [t('Orders'), d.orders ?? d.today?.orders ?? ''],
+    [t('Paid orders'), d.paid_orders ?? d.today?.paid_orders ?? ''],
+    [t('Cancelled orders'), d.cancelled ?? d.today?.cancelled ?? ''],
+    [t('Units sold'), d.units_sold ?? d.today?.units_sold ?? ''],
+  ]
+  const breakdown = d.payment_breakdown ?? d.payment_breakdown_today ?? {}
+  for (const [k, v] of Object.entries(breakdown))
+    rows.push([`${t('Payment')} · ${k}`, v as any])
+  const tops = d.top_products ?? d.top_products_today ?? []
+  for (const tp of (tops as any[]).slice(0, 10))
+    rows.push([`${t('Top product')} · ${tp.product_name ?? tp.name ?? ''}`, tp.revenue ?? tp.quantity ?? ''])
+  const csv = `﻿${rows.map(r => `"${String(r[0]).replace(/"/g, '""')}","${String(r[1] ?? '').replace(/"/g, '""')}"`).join('\n')}\n`
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const stamp = new Date().toISOString().slice(0, 10)
+  a.href = url
+  a.download = `dashboard-${stamp}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  toast({ tone: 'success', title: t('Exported'), msg: `dashboard-${stamp}.csv` })
+}
 
-const today = computed(() => data.value?.today ?? null)
-const topProducts = computed(() => data.value?.top_products_today ?? [])
-const lowStock = computed(() => data.value?.low_stock_count ?? null)
-const clockedIn = computed(() => data.value?.clocked_in ?? [])
-
-const paidPercentage = computed(() => {
-  if (!today.value)
-    return 0
-  const total = today.value.orders || 0
-  if (!total)
-    return 0
-  return Math.round((today.value.paid_orders / total) * 100)
-})
-
-const avgOrderValue = computed(() => {
-  if (!today.value)
-    return 0
-  const paid = today.value.paid_orders || 0
-  const revenue = Number(today.value.revenue) || 0
-  if (!paid)
-    return 0
-  return Math.round(revenue / paid)
-})
+// Suppress unused-warning when sub-dashboards opt out of the prop.
+void sharedDash
 </script>
 
 <template>
-  <div>
-    <div class="page-head">
-      <div style="min-width:0;">
-        <h1 class="page-head__title">
-          {{ t("Today's Snapshot") }}
+  <div class="page">
+    <div class="page__head">
+      <div style="min-width: 0;">
+        <h1 class="page__title">
+          {{ t('Dashboards') }}
         </h1>
-        <div class="page-head__subtitle">
-          {{ formatDate(new Date().toISOString()) }}
+        <div class="page__subtitle">
+          {{ t(current.subtitleKey) }}
         </div>
       </div>
-      <div class="page-head__actions">
-        <VBtn
-          variant="tonal"
-          prepend-icon="bx-refresh"
+      <div class="page__head-actions">
+        <DateRangePicker
+          v-model="dateRange"
+          align="right"
+          :placeholder="t('Last 30 days')"
+        />
+        <Button
+          variant="secondary"
+          icon="refresh"
           :loading="loading"
-          @click="load"
+          @click="refresh"
         >
           {{ t('Refresh') }}
-        </VBtn>
+        </Button>
+        <Button
+          variant="primary"
+          icon="download"
+          :disabled="loading"
+          @click="exportCsv"
+        >
+          {{ t('Export') }}
+        </Button>
       </div>
     </div>
 
-    <VRow class="mb-4">
-      <VCol
-        cols="6"
-        sm="6"
-        lg="3"
-      >
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-success">
-              <VIcon icon="bx-money" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t("Today's Revenue") }}
-            </div>
-          </div>
-          <div
-            v-if="today"
-            class="kpi-card__value"
-          >
-            {{ formatCurrency(today.revenue ?? 0) }}<span class="kpi-card__unit">{{ t('currency_short') }}</span>
-          </div>
-          <div
-            v-else
-            class="sk-box"
-            style="width:140px;height:32px;border-radius:4px;"
-          />
-        </div>
-      </VCol>
+    <!-- Morning briefing — LLM-generated daily digest. Hides itself when dismissed/empty. -->
+    <AIBriefingCard style="margin-bottom: var(--sp-3);" />
 
-      <VCol
-        cols="6"
-        sm="6"
-        lg="3"
+    <div
+      class="dashtabs"
+      style="margin-bottom: var(--sp-3);"
+    >
+      <button
+        v-for="v in DASH_VIEWS"
+        :key="v.id"
+        type="button"
+        :class="cx('dashtab', view === v.id && 'is-active')"
+        @click="selectView(v.id)"
       >
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-primary">
-              <VIcon icon="bx-receipt" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Orders Today') }}
-            </div>
-          </div>
-          <div
-            v-if="today"
-            class="kpi-card__value"
-          >
-            {{ today.orders ?? 0 }}
-          </div>
-          <div
-            v-else
-            class="sk-box"
-            style="width:80px;height:32px;border-radius:4px;"
-          />
-        </div>
-      </VCol>
+        <DesignIcon
+          :name="v.icon"
+          :size="17"
+        />
+        <span>{{ t(v.labelKey) }}</span>
+      </button>
+    </div>
 
-      <VCol
-        cols="6"
-        sm="6"
-        lg="3"
-      >
-        <div class="kpi-card">
-          <div class="kpi-card__top">
-            <div class="kpi-card__icon t-info">
-              <VIcon icon="bx-trending-up" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Avg Order Value') }}
-            </div>
-          </div>
-          <div
-            v-if="today"
-            class="kpi-card__value"
-          >
-            {{ formatCurrency(avgOrderValue) }}<span class="kpi-card__unit">{{ t('currency_short') }}</span>
-          </div>
-          <div
-            v-else
-            class="sk-box"
-            style="width:120px;height:32px;border-radius:4px;"
-          />
-        </div>
-      </VCol>
-
-      <VCol
-        cols="6"
-        sm="6"
-        lg="3"
-      >
-        <div
-          class="kpi-card"
-          :class="{ 'cursor-pointer': lowStock && lowStock > 0 }"
-          @click="lowStock && lowStock > 0 && router.push('/stock/items')"
-        >
-          <div class="kpi-card__top">
-            <div
-              class="kpi-card__icon"
-              :class="lowStock && lowStock > 0 ? 't-warning' : 't-success'"
-            >
-              <VIcon icon="bx-package" size="20" />
-            </div>
-            <div class="kpi-card__label">
-              {{ t('Low Stock Items') }}
-            </div>
-          </div>
-          <div
-            v-if="lowStock !== null"
-            class="kpi-card__value"
-          >
-            {{ lowStock }}
-          </div>
-          <div
-            v-else
-            class="sk-box"
-            style="width:60px;height:32px;border-radius:4px;"
-          />
-        </div>
-      </VCol>
-    </VRow>
-
-    <VRow class="mb-4">
-      <VCol
-        cols="6"
-        md="3"
-      >
-        <VCard>
-          <VCardText class="text-center pa-3">
-            <div
-              v-if="today"
-              class="text-h5 font-weight-bold text-primary"
-            >
-              {{ today.open ?? 0 }}
-            </div>
-            <div
-              v-else
-              class="sk-box mx-auto mb-1"
-              style="width:30px;height:20px;border-radius:4px;"
-            />
-            <div class="text-caption text-disabled">
-              {{ t('Open Orders') }}
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-      <VCol
-        cols="6"
-        md="3"
-      >
-        <VCard>
-          <VCardText class="text-center pa-3">
-            <div
-              v-if="today"
-              class="text-h5 font-weight-bold text-error"
-            >
-              {{ today.cancelled ?? 0 }}
-            </div>
-            <div
-              v-else
-              class="sk-box mx-auto mb-1"
-              style="width:30px;height:20px;border-radius:4px;"
-            />
-            <div class="text-caption text-disabled">
-              {{ t('Cancelled') }}
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-      <VCol
-        cols="6"
-        md="3"
-      >
-        <VCard>
-          <VCardText class="text-center pa-3">
-            <div
-              v-if="today"
-              class="text-h5 font-weight-bold text-success"
-            >
-              {{ paidPercentage }}%
-            </div>
-            <div
-              v-else
-              class="sk-box mx-auto mb-1"
-              style="width:40px;height:20px;border-radius:4px;"
-            />
-            <div class="text-caption text-disabled">
-              {{ t('Paid') }} ({{ today?.paid_orders ?? 0 }}/{{ today?.orders ?? 0 }})
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-      <VCol
-        cols="6"
-        md="3"
-      >
-        <VCard>
-          <VCardText class="text-center pa-3">
-            <div class="text-h5 font-weight-bold text-info">
-              {{ clockedIn.length }}
-            </div>
-            <div class="text-caption text-disabled">
-              {{ t('Clocked In') }}
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-    </VRow>
-
-    <VRow>
-      <VCol
-        cols="12"
-        lg="7"
-      >
-        <VCard :title="t('Top Products Today')">
-          <VCardText>
-            <template v-if="topProducts.length">
-              <div
-                v-for="(p, idx) in topProducts"
-                :key="p.product_id"
-                class="d-flex align-center gap-3 py-2 flex-wrap dash-list-row"
-                style="border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);"
-              >
-                <VAvatar
-                  size="32"
-                  color="primary"
-                  variant="tonal"
-                >
-                  <span class="text-caption font-weight-bold">{{ idx + 1 }}</span>
-                </VAvatar>
-                <div class="flex-grow-1">
-                  <div class="text-body-2 font-weight-medium">
-                    {{ p.product_name }}
-                  </div>
-                  <div class="text-caption text-disabled">
-                    {{ p.quantity }} {{ t('sold') }}
-                  </div>
-                </div>
-                <span class="text-body-2 font-weight-medium text-success">
-                  {{ formatCurrency(p.revenue) }}
-                </span>
-              </div>
-            </template>
-            <template v-else-if="loading">
-              <div
-                v-for="n in 5"
-                :key="n"
-                class="d-flex gap-3 py-2"
-              >
-                <div
-                  class="sk-box"
-                  style="width:32px;height:32px;border-radius:50%;"
-                />
-                <div
-                  class="sk-box flex-grow-1"
-                  style="height:14px;border-radius:4px;"
-                />
-                <div
-                  class="sk-box"
-                  style="width:80px;height:14px;border-radius:4px;"
-                />
-              </div>
-            </template>
-            <div
-              v-else
-              class="text-center text-disabled py-4"
-            >
-              {{ t('No sales yet today') }}
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-
-      <VCol
-        cols="12"
-        lg="5"
-      >
-        <VCard :title="t('Clocked In')">
-          <VCardText>
-            <template v-if="clockedIn.length">
-              <div
-                v-for="s in clockedIn"
-                :key="s.shift_id"
-                class="d-flex align-center gap-3 py-2 flex-wrap dash-list-row"
-                style="border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);cursor:pointer;"
-                @click="router.push('/shifts')"
-              >
-                <VAvatar
-                  size="36"
-                  color="success"
-                  variant="tonal"
-                >
-                  <VIcon icon="bx-user" />
-                </VAvatar>
-                <div class="flex-grow-1">
-                  <div class="text-body-2 font-weight-medium">
-                    {{ s.name }}
-                  </div>
-                  <div class="text-caption text-disabled">
-                    {{ t('Since') }} {{ formatDate(s.start_time) }}
-                  </div>
-                </div>
-                <VIcon
-                  icon="bx-chevron-right"
-                  size="18"
-                />
-              </div>
-            </template>
-            <template v-else-if="loading">
-              <div
-                v-for="n in 3"
-                :key="n"
-                class="d-flex gap-3 py-2"
-              >
-                <div
-                  class="sk-box"
-                  style="width:36px;height:36px;border-radius:50%;"
-                />
-                <div class="flex-grow-1">
-                  <div
-                    class="sk-box mb-1"
-                    style="width:120px;height:14px;border-radius:4px;"
-                  />
-                  <div
-                    class="sk-box"
-                    style="width:80px;height:11px;border-radius:4px;"
-                  />
-                </div>
-              </div>
-            </template>
-            <div
-              v-else
-              class="text-center text-disabled py-4"
-            >
-              {{ t('No active shifts') }}
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-    </VRow>
+    <component
+      :is="current.comp"
+      :date-range="dateRange"
+      :loading="loading"
+    />
   </div>
 </template>
-
-<style scoped>
-.dash-list-row {
-  min-width: 0;
-}
-
-.dash-list-row .flex-grow-1 {
-  min-width: 0;
-  word-break: break-word;
-}
-
-@media (max-width: 768px) {
-  .kpi-card__value {
-    font-size: 1.25rem;
-  }
-
-  .dash-list-row > span,
-  .dash-list-row > .text-body-2 {
-    inline-size: 100%;
-    text-align: end;
-  }
-}
-
-@media (max-width: 420px) {
-  .dash-list-row {
-    gap: 8px !important;
-  }
-}
-</style>
 
 <route lang="yaml">
 meta:

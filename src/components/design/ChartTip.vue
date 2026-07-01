@@ -57,6 +57,8 @@ defineProps<Props>()
   box-shadow: var(--shadow-lg);
   transform: translate(-50%, -118%);
   min-width: 92px;
+  /* Smooth glide between hover points instead of teleporting */
+  transition: left .12s cubic-bezier(.2, .8, .2, 1), top .12s cubic-bezier(.2, .8, .2, 1);
 }
 :global([data-theme="dark"]) .charttip,
 :global(.v-theme--dark) .charttip {

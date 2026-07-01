@@ -356,11 +356,14 @@ const ordersByHourInsight = computed(() =>
 )
 
 const topProductsData = computed(() =>
-  topProducts.value.slice(0, 5).map((p: any) => ({
-    name: String(p.product_name ?? ''),
-    value: Number(p.revenue) || 0,
-    units: Number(p.quantity) || 0,
-  })),
+  topProducts.value
+    .map((p: any) => ({
+      name: String(p.product_name ?? ''),
+      value: Number(p.revenue) || 0,
+      units: Number(p.quantity) || 0,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5),
 )
 const topProductInsight = computed(() =>
   topProductsData.value.length
@@ -601,7 +604,7 @@ function initial(s: string | undefined | null): string {
                 </Badge>
               </td>
               <td>
-                <StatusBadge :value="o.status ? t(`status_${String(o.status).toUpperCase()}`) : ''" dot />
+                <StatusBadge :value="o.status ? t(`order_status_${String(o.status).toUpperCase()}`) : ''" dot />
               </td>
               <td>
                 <StatusBadge :value="o.is_paid ? t('payment_status_PAID') : t('payment_status_UNPAID')" />
@@ -732,6 +735,8 @@ function initial(s: string | undefined | null): string {
 <style scoped>
 .split-1-7 { grid-template-columns: 1.7fr 1fr; }
 .split-1-4 { grid-template-columns: 1.4fr 1fr; }
+/* Prevent wide table contents from blowing out grid tracks */
+.split-1-7 > *, .split-1-4 > * { min-width: 0; }
 
 /* Allow PageHeader action buttons (Refresh + Export) to wrap on narrow screens */
 .page :deep(.page__head-actions) {

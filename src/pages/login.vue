@@ -8,6 +8,7 @@ import { themeConfig } from '@themeConfig'
 import axiosIns from '@/plugins/axios'
 import ability from '@/plugins/casl/ability'
 import { useApiError } from '@/composables/useApiError'
+import { setBusinessDayStart } from '@/composables/useBusinessDay'
 
 const { t, locale } = useI18n({ useScope: 'global' })
 const { translate } = useApiError()
@@ -46,6 +47,26 @@ const login = async () => {
 
     localStorage.setItem('accessToken', JSON.stringify(token))
     localStorage.setItem('userData', JSON.stringify(user))
+
+    // Per-restaurant overnight-shift boundary (default 03:00). BE exposes it
+    // on /auth-me (top-level) and /app-settings (under data.settings). The
+    // /auth-login response does NOT carry it, so we fan out to /auth-me after
+    // login. Best-effort: failure here is non-fatal — useBusinessDay falls
+    // back to its 03:00 default.
+    try {
+      const meRes = await axiosIns.get('/auth-me')
+      const me = meRes?.data?.data ?? {}
+      const bds: unknown = me?.business_day_start
+        ?? me?.user?.business_day_start
+        ?? me?.restaurant?.business_day_start
+      if (typeof bds === 'string' && /^\d{1,2}:\d{2}/.test(bds))
+        setBusinessDayStart(bds.slice(0, 5))
+      // Refresh cached userData with the fuller /auth-me payload so other
+      // pages that read userData see the new field too.
+      if (me && typeof me === 'object')
+        localStorage.setItem('userData', JSON.stringify({ ...user, ...me }))
+    }
+    catch { /* noop — keep prior default */ }
 
     // Temporary: grant manage-all to every authenticated user. Backend still
     // enforces per-endpoint via @admin_required / @permission_required, so

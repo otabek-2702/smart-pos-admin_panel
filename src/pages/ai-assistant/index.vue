@@ -12,6 +12,7 @@ import { useAIAssistantStore } from '@/stores/aiAssistant'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import Button from '@/components/design/Button.vue'
 import Input from '@/components/design/Input.vue'
+import MarkdownMessage from '@/components/design/MarkdownMessage.vue'
 import { Fmt } from '@/components/design/utils/format'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -20,6 +21,7 @@ const store = useAIAssistantStore()
 const { chats, activeId, generating, notify, permission } = storeToRefs(store)
 
 const draft = ref('')
+const draftRestoreLock = ref(false)
 const query = ref('')
 const scrollRef = ref<HTMLElement | null>(null)
 const taRef = ref<HTMLTextAreaElement | null>(null)
@@ -55,15 +57,57 @@ onMounted(() => {
   })
 })
 
-watch([() => messages.value.length, () => messages.value[messages.value.length - 1]?.content, activeId], async () => {
+// Track whether user has manually scrolled up — if so, don't fight them by
+// snapping back to bottom on every streamed token. Resume auto-scroll only
+// when they scroll back near the bottom themselves.
+const autoFollow = ref(true)
+function onScroll() {
+  const el = scrollRef.value
+  if (!el) return
+  const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+  autoFollow.value = distFromBottom < 80 // within 80px counts as "at bottom"
+}
+watch(activeId, async () => {
+  // Force-scroll on chat switch.
+  autoFollow.value = true
   await nextTick()
   const el = scrollRef.value
-
-  if (el)
-    el.scrollTop = el.scrollHeight
+  if (el) el.scrollTop = el.scrollHeight
+})
+watch([() => messages.value.length, () => messages.value[messages.value.length - 1]?.content], async () => {
+  await nextTick()
+  if (!autoFollow.value) return
+  const el = scrollRef.value
+  if (el) el.scrollTop = el.scrollHeight
 })
 
-watch(draft, async () => {
+// Themed "thinking" status messages cycled while AI is generating.
+// Picked one per phase so user sees motion that maps to what the bot is doing.
+const THINKING_STATUSES = [
+  'thinking_fetching',     // Maʼlumotlar bazasidan olinmoqda…
+  'thinking_calculating',  // Hisoblanmoqda…
+  'thinking_analyzing',    // Tahlil qilinmoqda…
+  'thinking_composing',    // Javob tayyorlanmoqda…
+]
+const thinkingIdx = ref(0)
+let thinkingTimer: number | null = null
+watch(isGenerating, (g) => {
+  if (g) {
+    thinkingIdx.value = 0
+    if (thinkingTimer) window.clearInterval(thinkingTimer)
+    thinkingTimer = window.setInterval(() => {
+      thinkingIdx.value = (thinkingIdx.value + 1) % THINKING_STATUSES.length
+    }, 1800)
+  }
+  else {
+    if (thinkingTimer) { window.clearInterval(thinkingTimer); thinkingTimer = null }
+  }
+})
+const thinkingLabel = computed(() => t(THINKING_STATUSES[thinkingIdx.value]))
+
+watch(draft, async (v) => {
+  if (!draftRestoreLock.value && activeId.value)
+    store.setDraft(activeId.value, v)
   await nextTick()
   const ta = taRef.value
 
@@ -73,6 +117,13 @@ watch(draft, async () => {
   ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`
 })
 
+watch(activeId, (id) => {
+  draftRestoreLock.value = true
+  const c = chats.value.find(x => x.id === id)
+  draft.value = c?.draft ?? ''
+  nextTick(() => { draftRestoreLock.value = false })
+}, { immediate: true })
+
 function submit() {
   const text = draft.value.trim()
 
@@ -80,6 +131,8 @@ function submit() {
     return
   store.send(text)
   draft.value = ''
+  if (activeId.value)
+    store.setDraft(activeId.value, '')
 }
 
 function onKey(e: KeyboardEvent) {
@@ -299,7 +352,7 @@ function selectChat(id: string) {
               {{ active ? active.title : t('AI Assistant') }}
             </div>
             <div class="tertiary" style="font-size: 12px; white-space: nowrap;">
-              {{ isGenerating ? t('Thinking…') : t('POS analyst · always-on') }}
+              {{ isGenerating ? thinkingLabel : t('POS analyst · always-on') }}
             </div>
           </div>
         </div>
@@ -318,7 +371,7 @@ function selectChat(id: string) {
         </div>
       </div>
 
-      <div ref="scrollRef" class="aithread__scroll">
+      <div ref="scrollRef" class="aithread__scroll" @scroll="onScroll">
         <div class="aithread__inner">
           <!-- ===== Empty state ===== -->
           <div
@@ -376,31 +429,7 @@ function selectChat(id: string) {
                       <span class="typing"><span /><span /><span /></span>
                     </template>
                     <template v-else>
-                      <div class="md">
-                        <template
-                          v-for="(b, bi) in parseMd(m.content)"
-                          :key="bi"
-                        >
-                          <p
-                            v-if="b.t === 'p'"
-                            v-html="mdInline(b.text || '')"
-                          />
-                          <ul v-else-if="b.t === 'ul'">
-                            <li
-                              v-for="(it, j) in b.items || []"
-                              :key="j"
-                              v-html="mdInline(it)"
-                            />
-                          </ul>
-                          <ol v-else>
-                            <li
-                              v-for="(it, j) in b.items || []"
-                              :key="j"
-                              v-html="mdInline(it)"
-                            />
-                          </ol>
-                        </template>
-                      </div>
+                      <MarkdownMessage :content="m.content" :streaming="!!m.streaming" />
                     </template>
                     <span
                       v-if="m.streaming && m.content"

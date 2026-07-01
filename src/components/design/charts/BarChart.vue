@@ -21,6 +21,8 @@ import ChartTip from './ChartTip.vue'
 import { niceTicks } from './niceTicks'
 import { useWidth } from './useWidth'
 
+const { t } = useI18n({ useScope: 'global' })
+
 interface BarPoint {
   label: string
   value: number
@@ -128,7 +130,7 @@ const tipTitle = computed(() => hover.value !== null ? props.data[hover.value].l
   >
     <StateFill
       icon="chart"
-      title="No data for this range"
+      :title="t('No data for this range')"
       :style="{ height: `${height}px` }"
     />
   </div>

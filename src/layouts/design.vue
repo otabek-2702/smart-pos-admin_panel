@@ -56,13 +56,13 @@ onMounted(() => {
 <style>
 main.page-shell {
   flex: 1;
-  padding: var(--sp-5, 20px) var(--sp-6, 24px);
+  padding: var(--sp-4, 16px) 0 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
 main.page-shell > .page {
-  padding: 0;
+  padding: 0 var(--sp-4, 16px);
   width: 100%;
 }
 

@@ -19,6 +19,8 @@ import { Fmt } from '../utils/format'
 import Skeleton from '../Skeleton.vue'
 import StateFill from '../StateFill.vue'
 
+const { t } = useI18n({ useScope: 'global' })
+
 interface HBarPoint {
   name: string
   value: number
@@ -55,7 +57,7 @@ const maxV = computed(() => Math.max(...props.data.map(d => d.value), 0) || 1)
   <StateFill
     v-else-if="!data.length"
     icon="chart"
-    title="No data for this range"
+    :title="t('No data for this range')"
   />
   <div
     v-else

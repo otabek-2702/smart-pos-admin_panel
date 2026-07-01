@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import axios from '@/plugins/axios'
+import { useTableSelection } from '@/composables/useTableSelection'
+import BulkActionBar from '@/components/design/BulkActionBar.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
+import Checkbox from '@/components/design/Checkbox.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -7,6 +11,11 @@ const { t } = useI18n({ useScope: 'global' })
 const products = ref<any[]>([])
 const totalProducts = ref(0)
 const loading = ref(false)
+const bulkBusy = ref(false)
+
+// Bulk selection — uses the current visible product ID list so Shift-click
+// range selection respects sort/filter, not raw data order.
+const selection = useTableSelection<number>(() => products.value.map(p => p.id))
 
 const page = ref(1)
 const itemsPerPage = ref(10)
@@ -166,14 +175,16 @@ onMounted(() => {
   loadCategories()
 })
 
-watch(page, loadProducts)
+watch(page, () => { selection.clear(); loadProducts() })
 watch(itemsPerPage, () => {
   page.value = 1
+  selection.clear()
   loadProducts()
 })
 
 const debouncedSearch = useDebounceFn(() => {
   page.value = 1
+  selection.clear()
   loadProducts()
 }, 400)
 
@@ -181,6 +192,7 @@ watch(search, debouncedSearch)
 
 watch(categoryFilter, () => {
   page.value = 1
+  selection.clear()
   loadProducts()
 })
 
@@ -313,6 +325,64 @@ async function deleteProduct() {
   }
   finally {
     deleteBusy.value = false
+  }
+}
+
+// ---- Bulk actions (BulkActionBar) ----
+async function bulkDelete() {
+  const ids = Array.from(selection.selected.value)
+  if (!ids.length)
+    return
+  if (!confirm(t('Delete {n} products?', { n: ids.length })))
+    return
+  bulkBusy.value = true
+  try {
+    await axios.post('/products/bulk-delete', { ids })
+    selection.clear()
+    await loadProducts()
+    // Sonner undo toast — one click restores the deleted IDs via bulk-restore.
+    const { toast: sonner } = await import('vue-sonner')
+    sonner.success(t('Deleted {n} products', { n: ids.length }), {
+      duration: 7000,
+      action: {
+        label: t('Undo'),
+        onClick: async () => {
+          try {
+            await axios.post('/products/bulk-restore', { ids })
+            notify(t('Restored {n} products', { n: ids.length }))
+            await loadProducts()
+          }
+          catch (e: any) {
+            notify(e?.response?.data?.message ?? t('Error restoring products'), 'error')
+          }
+        },
+      },
+    })
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error deleting products'), 'error')
+  }
+  finally {
+    bulkBusy.value = false
+  }
+}
+
+async function bulkRestore() {
+  const ids = Array.from(selection.selected.value)
+  if (!ids.length)
+    return
+  bulkBusy.value = true
+  try {
+    await axios.post('/products/bulk-restore', { ids })
+    notify(t('Restored {n} products', { n: ids.length }))
+    selection.clear()
+    await loadProducts()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error restoring products'), 'error')
+  }
+  finally {
+    bulkBusy.value = false
   }
 }
 
@@ -728,6 +798,13 @@ function goPage(p: number | '…') {
         <table class="dtable">
           <thead>
             <tr>
+              <th style="width: 28px; text-align: center;">
+                <Checkbox
+                  :model-value="selection.allSelected.value"
+                  :indeterminate="selection.someSelected.value"
+                  @update:model-value="(v: boolean) => (v ? selection.selectAll() : selection.clear())"
+                />
+              </th>
               <th style="width:80px;">
                 {{ t('ID') }}
               </th>
@@ -748,6 +825,9 @@ function goPage(p: number | '…') {
                 v-for="n in itemsPerPage"
                 :key="`sk-${n}`"
               >
+                <td style="text-align: center;">
+                  <div class="skel" style="width:14px;height:14px;border-radius:3px;margin:0 auto;" />
+                </td>
                 <td>
                   <div
                     class="skel"
@@ -814,7 +894,7 @@ function goPage(p: number | '…') {
             <!-- Empty -->
             <tr v-else-if="!loading && products.length === 0">
               <td
-                colspan="7"
+                colspan="8"
                 style="padding:0;"
               >
                 <div class="statefill">
@@ -895,7 +975,14 @@ function goPage(p: number | '…') {
               v-for="p in products"
               v-else
               :key="p.id"
+              :class="{ 'is-selected': selection.isSelected(p.id) }"
             >
+              <td
+                style="text-align: center; cursor: pointer;"
+                @click.stop="selection.toggle(p.id, $event)"
+              >
+                <Checkbox :model-value="selection.isSelected(p.id)" />
+              </td>
               <td>
                 <span class="mono cell-muted">#{{ p.id }}</span>
               </td>
@@ -1516,6 +1603,31 @@ function goPage(p: number | '…') {
     >
       {{ snackbarMsg }}
     </VSnackbar>
+
+    <!-- Floating bulk-action bar — appears when rows are checked. -->
+    <BulkActionBar
+      :count="selection.count.value"
+      @clear="selection.clear()"
+    >
+      <button
+        v-if="includeDeleted"
+        type="button"
+        :disabled="bulkBusy"
+        @click="bulkRestore"
+      >
+        <DesignIcon name="restore" :size="14" />
+        {{ t('Restore') }}
+      </button>
+      <button
+        type="button"
+        class="is-danger"
+        :disabled="bulkBusy"
+        @click="bulkDelete"
+      >
+        <DesignIcon name="trash" :size="14" />
+        {{ t('Delete') }}
+      </button>
+    </BulkActionBar>
   </div>
 </template>
 

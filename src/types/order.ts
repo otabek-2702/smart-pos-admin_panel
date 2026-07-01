@@ -15,6 +15,7 @@ export interface OrderItem {
 export interface Order {
   id: number
   display_id: string
+  order_number: number | null
   order_type: string
   phone_number: string | null
   description: string | null

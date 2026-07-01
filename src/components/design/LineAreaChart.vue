@@ -6,6 +6,8 @@ import Skeleton from './Skeleton.vue'
 import StateFill from './StateFill.vue'
 import ChartTip from './ChartTip.vue'
 
+const { t } = useI18n({ useScope: 'global' })
+
 interface Series {
   key: string
   label: string
@@ -52,11 +54,14 @@ function reset() {
 const yfmt = computed(() => props.yFormat ?? fmtAbbr)
 
 const maxV = computed(() => {
+  // BE often hands money over as Decimal-as-string. Coerce here so callers that
+  // forget to map(Number) don't end up with a lex-compared max that caps too low.
   let m = 0
   for (const s of props.series) {
     for (const v of s.data) {
-      if (v > m)
-        m = v
+      const n = typeof v === 'string' ? Number(v) : v
+      if (Number.isFinite(n) && n > m)
+        m = n
     }
   }
   if (props.target && props.target > m)
@@ -138,7 +143,7 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
     v-else-if="!series.length || !categories.length"
     ref="elRef"
   >
-    <StateFill icon="bx-line-chart" title="No data for this range" sub="Try a different date range." />
+    <StateFill icon="bx-line-chart" :title="t('No data for this range')" :sub="t('Try a different date range.')" />
   </div>
   <div
     v-else
@@ -196,7 +201,7 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
           font-size="11"
           font-weight="600"
           fill="rgb(var(--v-theme-chart-target))"
-        >Target {{ yfmt(target) }}</text>
+        >{{ t('Target') }} {{ yfmt(target) }}</text>
       </g>
 
       <!-- series paths -->
@@ -213,9 +218,10 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
         />
       </g>
 
-      <!-- hover crosshair + dots -->
+      <!-- hover crosshair + dots — wrapped so the geometry-attribute transitions can slide -->
       <line
         v-if="hover !== null"
+        class="chart-crosshair"
         :x1="x(hover)"
         :x2="x(hover)"
         :y1="padT"
@@ -227,6 +233,7 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
         v-for="(s, si) in (hover !== null ? series : [])"
         v-show="hover !== null && Number.isFinite(s.data[hover!])"
         :key="`hc${si}`"
+        class="chart-hover-dot"
         :cx="x(hover!)"
         :cy="y(s.data[hover!] ?? 0)"
         r="4.5"
@@ -269,3 +276,16 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
     />
   </div>
 </template>
+
+<style scoped>
+/* Modern browsers transition SVG geometry attributes via CSS — Chrome 78+ /
+   Firefox 130+. Falls back to the old jumpy behavior on unsupported engines. */
+.chart-crosshair {
+  transition: x1 .14s cubic-bezier(.2, .8, .2, 1),
+              x2 .14s cubic-bezier(.2, .8, .2, 1);
+}
+.chart-hover-dot {
+  transition: cx .14s cubic-bezier(.2, .8, .2, 1),
+              cy .14s cubic-bezier(.2, .8, .2, 1);
+}
+</style>

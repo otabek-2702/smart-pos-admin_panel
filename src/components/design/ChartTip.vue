@@ -63,38 +63,47 @@ const transform = computed(() =>
 </script>
 
 <template>
-  <div
-    v-if="show"
-    ref="tipRef"
-    class="charttip"
-    :style="{ left: `${clampedX}px`, top: `${clampedY}px`, transform }"
-  >
+  <!-- Teleport out of any parent stacking context (chart cards, .card __body,
+       transform-animated ancestors) so the fixed-position tooltip is not
+       clipped or covered by sibling cards no matter where it renders. -->
+  <Teleport to="body">
     <div
-      v-if="title"
-      class="charttip__t"
+      v-if="show"
+      ref="tipRef"
+      class="charttip"
+      :style="{ left: `${clampedX}px`, top: `${clampedY}px`, transform }"
     >
-      {{ title }}
+      <div
+        v-if="title"
+        class="charttip__t"
+      >
+        {{ title }}
+      </div>
+      <div
+        v-for="(r, i) in rows"
+        :key="i"
+        class="charttip__row"
+      >
+        <span
+          v-if="r.color"
+          class="legend-swatch"
+          :style="{ background: r.color }"
+        />
+        <span>{{ r.label }}</span>
+        <span class="charttip__v">{{ r.value }}</span>
+      </div>
     </div>
-    <div
-      v-for="(r, i) in rows"
-      :key="i"
-      class="charttip__row"
-    >
-      <span
-        v-if="r.color"
-        class="legend-swatch"
-        :style="{ background: r.color }"
-      />
-      <span>{{ r.label }}</span>
-      <span class="charttip__v">{{ r.value }}</span>
-    </div>
-  </div>
+  </Teleport>
 </template>
 
-<style scoped>
+<style>
+/* NOT scoped — Teleport moves the element to <body>, outside the SFC's scope. */
 .charttip {
   position: fixed;
-  z-index: 80;
+  /* z above sidebar (80), overlay (100), so the tooltip paints on top of every
+     card and drawer. Kept below Vuetify VOverlay (2400) so a real modal still
+     wins. */
+  z-index: 300;
   pointer-events: none;
   background: rgb(var(--v-theme-on-surface));
   color: rgb(var(--v-theme-surface));
@@ -106,8 +115,8 @@ const transform = computed(() =>
   /* Smooth glide between hover points instead of teleporting */
   transition: left .12s cubic-bezier(.2, .8, .2, 1), top .12s cubic-bezier(.2, .8, .2, 1);
 }
-:global([data-theme="dark"]) .charttip,
-:global(.v-theme--dark) .charttip {
+[data-theme="dark"] .charttip,
+.v-theme--dark .charttip {
   background: rgb(var(--v-theme-surface-2));
   color: rgb(var(--v-theme-on-surface));
   border: 1px solid rgb(var(--v-theme-border-strong));

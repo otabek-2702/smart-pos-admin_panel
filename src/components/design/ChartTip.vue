@@ -13,14 +13,61 @@ interface Props {
   rows: TipRow[]
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
+
+// Measure the tip after render and clamp x/y so the pill never leaves the
+// viewport — near the right edge of a chart the -50% translateX previously
+// pushed half the tooltip past the browser edge and cropped the value.
+const tipRef = ref<HTMLElement | null>(null)
+const tipW = ref(160)
+const tipH = ref(56)
+
+watch([() => props.x, () => props.y, () => props.show, () => props.rows], async () => {
+  if (!props.show) return
+  await nextTick()
+  const el = tipRef.value
+  if (!el) return
+  tipW.value = el.offsetWidth
+  tipH.value = el.offsetHeight
+})
+
+const clampedX = computed(() => {
+  if (typeof window === 'undefined') return props.x
+  const half = tipW.value / 2
+  const margin = 8
+  return Math.max(half + margin, Math.min(props.x, window.innerWidth - half - margin))
+})
+
+const clampedY = computed(() => {
+  if (typeof window === 'undefined') return props.y
+  // Default anchor is above cursor (translateY -118%). If the tip would clip
+  // the top of the viewport, flip below the cursor instead.
+  const gap = 12
+  const wantAbove = props.y - tipH.value - gap
+  if (wantAbove < margin())
+    return Math.min(window.innerHeight - margin() - 4, props.y + gap + tipH.value)
+  return props.y
+})
+
+function margin() { return 8 }
+
+const flipDown = computed(() => {
+  if (typeof window === 'undefined') return false
+  const gap = 12
+  return (props.y - tipH.value - gap) < margin()
+})
+
+const transform = computed(() =>
+  flipDown.value ? 'translate(-50%, 0)' : 'translate(-50%, -118%)',
+)
 </script>
 
 <template>
   <div
     v-if="show"
+    ref="tipRef"
     class="charttip"
-    :style="{ left: `${x}px`, top: `${y}px` }"
+    :style="{ left: `${clampedX}px`, top: `${clampedY}px`, transform }"
   >
     <div
       v-if="title"
@@ -55,7 +102,6 @@ defineProps<Props>()
   padding: 8px 11px;
   font-size: var(--fs-sm);
   box-shadow: var(--shadow-lg);
-  transform: translate(-50%, -118%);
   min-width: 92px;
   /* Smooth glide between hover points instead of teleporting */
   transition: left .12s cubic-bezier(.2, .8, .2, 1), top .12s cubic-bezier(.2, .8, .2, 1);

@@ -24,23 +24,14 @@ Open questions sent back to Abrorbek (msg 35):
 
 ---
 
-## Open — new from full QA pass (2026-07-02, sent msg 63)
+## Done — from full QA pass (items 18-22, shipped by Abrorbek 2026-07-02, deploy 51db311 / core cdb1ada, migration 0035)
+All five verified end-to-end against prod BE with real data, FE wired + merged to main (7bd55aa).
 
-### 18. `/users` list — `created_at` null for every user
-Serializer/model default missing; FE "Yaratilgan" column is dead. Return `created_at` ISO-8601.
-
-### 19. `/categories` list — no `product_count`
-Every category card shows "#0". Add `product_count` (int) annotation per category.
-
-### 20. `/orders/stats` — add global per-status + payment counts
-Only totals today, so the orders status-distribution + payment cards can only reflect the visible page.
-Add `status_counts{OPEN,PREPARING,READY,COMPLETED,CANCELED}` + `payment_counts{PAID,UNPAID}`.
-
-### 21. `/dashboard/operations` — `prepByCategory[].mins` all 0
-Prep time not computed. Compute avg prep minutes per category (+ target) or drop the field. (Also logged under item 17.)
-
-### 22. `/dashboard?from=&to=` (range) — no `category_stats`
-Executive tab silently falls back to today's categories while KPIs show the range. Include `category_stats`, same shape as `/dashboard/today` `category_stats_today`.
+- **18. `/users` created_at** ✅ — was a missing column, added + backfilled all 11 (ISO-8601 +00:00). FE "Yaratilgan" column renders dates.
+- **19. `/categories` product_count** ✅ — live count excludes soft-deleted. FE card shows "{n} ta mahsulot" (was the meaningless sort_order "#0").
+- **20. `/orders/stats` status_counts + payment_counts** ✅ — global/windowed. FE OrdersInsights now uses them (verified Tayyor 6614, paid 6828 — full set, not page). NOTE from BE: PAID/UNPAID reuse paid_orders/unpaid_orders semantics (UNPAID excludes OPEN & CANCELED). Fine for our card; ping BE if a pure is_paid split is ever wanted.
+- **21. `/dashboard/operations` prepByCategory.mins** ✅ — avg prep float minutes + target (15-min placeholder SLA, no config field yet). Was a key-name gap (BE emitted avg_prep_seconds, FE reads mins — both present now). Prep card shows real bars.
+- **22. `/dashboard?from&to` category_stats** ✅ — added to range payload, same shape as category_stats_today. Exec category card now tracks the picker (30d Lavashlar 59.89M).
 
 ### Verified working (no BE action) — 2026-07-02
 - `POST /shifts/{id}/end` exists and works (200). FE was not calling it — fixed on FE (end-shift button now closes the shift, refreshes to awaiting-cash). `POST /shifts/{id}/reconcile` already wired correctly.

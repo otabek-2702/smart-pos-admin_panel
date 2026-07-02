@@ -654,9 +654,9 @@ function clearAllFilters() {
                   {{ t(`category_status_${cat.status}`) }}
                 </Badge>
                 <span
-                  v-if="cat.sort_order !== undefined && cat.sort_order !== null"
+                  v-if="cat.product_count !== undefined && cat.product_count !== null"
                   class="mono category-card__order"
-                >#{{ cat.sort_order }}</span>
+                >{{ t('{n} products', { n: cat.product_count }) }}</span>
               </div>
             </div>
           </div>

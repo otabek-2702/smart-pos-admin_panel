@@ -542,6 +542,8 @@ function onPaymentToggle(p: string) {
       :orders="orders"
       :status="statusFilter"
       :payment="paymentFilter"
+      :status-counts="stats?.status_counts ?? null"
+      :payment-counts="stats?.payment_counts ?? null"
       @status="onStatusToggle"
       @payment="onPaymentToggle"
     />

@@ -18,11 +18,17 @@ interface Props {
   data: TreemapDatum[]
   height?: number
   loading?: boolean
+  // Tooltip label + value formatter. Defaults to 'Revenue' / money format;
+  // pass valueUnit='units' when the treemap shows counts, not currency.
+  valueUnit?: 'money' | 'units'
+  valueLabel?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   height: 300,
   loading: false,
+  valueUnit: 'money',
+  valueLabel: '',
 })
 
 const { t } = useI18n({ useScope: 'global' })
@@ -104,10 +110,14 @@ const tipRows = computed(() => {
   if (!r)
     return []
   const pct = Math.round((r.d.value / total.value) * 100)
+  const label = props.valueLabel || (props.valueUnit === 'units' ? t('Units sold') : t('Revenue'))
+  const val = props.valueUnit === 'units'
+    ? `${fmtAbbr(r.d.value)} (${pct}%)`
+    : `${fmtMoney(r.d.value)} (${pct}%)`
   return [{
     color: colorFor(r, hover.value),
-    label: t('Revenue'),
-    value: `${fmtMoney(r.d.value)} (${pct}%)`,
+    label,
+    value: val,
   }]
 })
 </script>

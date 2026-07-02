@@ -363,10 +363,36 @@ function askEndShift(s: any) {
 function cancelEndShift() {
   endingShift.value = null
 }
-function confirmEndShift() {
+async function confirmEndShift() {
   const s = endingShift.value
-  endingShift.value = null
-  if (s) openReport(s)
+  if (!s || busy.value) return
+  busy.value = true
+  try {
+    // POST /shifts/<id>/end — actually closes the shift (previously this button
+    // only navigated to the report and never ended anything). BE guards: the
+    // shift must be ACTIVE and have no open/preparing/ready orders; a manager
+    // may close any cashier's till. The blind cash count is taken later at
+    // reconcile, so `counted` is omitted here and `notes` is optional.
+    await axios.post(`/shifts/${s.id}/end`, { notes: '' })
+    notify(`${t('Shift ended')} · ${fullName(s.user)}`, 'success')
+    endingShift.value = null
+    // Refresh so the card flips ACTIVE → awaiting-cash and the manager can
+    // reconcile the drawer from it.
+    await loadShifts()
+  }
+  catch (e: any) {
+    const status = e?.response?.status
+    const beMsg = e?.response?.data?.message || ''
+    if (status === 404)
+      notify(t('Shift not found'), 'error')
+    else
+      // Surfaces BE guard messages verbatim, e.g. "Cannot close shift while N
+      // order(s) are still open." so the manager knows what to fix.
+      notify(beMsg || e?.message || t('Failed to end shift'), 'error')
+  }
+  finally {
+    busy.value = false
+  }
 }
 
 // ------------------------------------------------------------
@@ -1278,11 +1304,11 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
           </p>
         </div>
         <div class="modal__foot">
-          <button type="button" class="btn btn--ghost" @click="cancelEndShift">
+          <button type="button" class="btn btn--ghost" :disabled="busy" @click="cancelEndShift">
             {{ t('Cancel') }}
           </button>
-          <button type="button" class="btn btn--primary" @click="confirmEndShift">
-            {{ t('End shift') }}
+          <button type="button" class="btn btn--primary" :disabled="busy" @click="confirmEndShift">
+            {{ busy ? t('Ending…') : t('End shift') }}
           </button>
         </div>
       </div>

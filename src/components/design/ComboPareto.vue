@@ -32,7 +32,7 @@ const [elRef, w] = useWidth()
 const padL = 48
 const padR = 46
 const padT = 16
-const padB = 46
+const padB = 68
 
 const hover = ref<number | null>(null)
 const tip = ref<{ show: boolean; x: number; y: number }>({ show: false, x: 0, y: 0 })
@@ -97,8 +97,19 @@ const tipRows = computed(() => {
 })
 
 function truncate(s: string): string {
-  return s.length > 9 ? `${s.slice(0, 8)}…` : s
+  return s.length > 12 ? `${s.slice(0, 11)}…` : s
 }
+
+// Rotated x-axis labels — every band shows one, rotated -38° from the tick
+// center so long product names never collide with neighbors. When the band is
+// tighter than ~14px we thin by stride so at most ~24 labels paint even for
+// menus with 50+ items.
+const labelStride = computed(() => {
+  const n = sorted.value.length
+  if (n <= 20) return 1
+  if (n <= 40) return 2
+  return Math.ceil(n / 20)
+})
 </script>
 
 <template>
@@ -184,11 +195,13 @@ function truncate(s: string): string {
           style="transition: opacity .12s;"
         />
         <text
+          v-if="i % labelStride === 0"
           :x="padL + band * i + band / 2"
-          :y="height - 26"
-          text-anchor="middle"
+          :y="height - padB + 14"
+          text-anchor="end"
           font-size="10"
           fill="rgb(var(--v-theme-chart-axis))"
+          :transform="`rotate(-38 ${padL + band * i + band / 2} ${height - padB + 14})`"
         >{{ truncate(d.label) }}</text>
         <rect
           :x="padL + band * i"

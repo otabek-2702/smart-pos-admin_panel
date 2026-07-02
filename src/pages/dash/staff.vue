@@ -23,6 +23,7 @@ import StackedBar from '@/components/design/charts/StackedBar.vue'
 
 import { fmtAbbr, fmtNum } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
+import { useDashboardData } from '@/composables/useDashboardData'
 // staffFixture mock dropped — real BE data only (Abrorbek deployed /staff/performance 2026-06-25).
 
 const { t } = useI18n({ useScope: 'global' })
@@ -108,7 +109,11 @@ function mapStaffPerformance(raw: any): StaffRow[] {
 async function loadStaff() {
   loading.value = true
   try {
-    const res = await axiosIns.get('/staff/performance', { params: { range: '30d' } })
+    const sr = sharedRange.value
+    const params: Record<string, string> = (sr?.from && sr?.to)
+      ? { from: sr.from, to: sr.to }
+      : { range: sr?.preset || '30d' }
+    const res = await axiosIns.get('/staff/performance', { params })
     const raw = res.data?.data ?? res.data
     staff.value = mapStaffPerformance(raw)
   }
@@ -121,6 +126,8 @@ async function loadStaff() {
   }
 }
 
+const { range: sharedRange } = useDashboardData()
+watch(sharedRange, () => { void loadStaff() })
 onMounted(loadStaff)
 
 /* Defensive ranks — fixture is pre-sorted by revenue desc, but normalise here

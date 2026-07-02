@@ -13,6 +13,7 @@ import LineAreaChart from '@/components/design/LineAreaChart.vue'
 import BarChart from '@/components/design/BarChart.vue'
 import { fmtAbbr, fmtNum } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
+import { useDashboardData } from '@/composables/useDashboardData'
 import type { Tone } from '@/components/design/utils'
 
 /* ============================================================
@@ -317,11 +318,20 @@ async function loadDashboard() {
     // because /dashboard (range) does not return category stats. The chart's
     // time-series + grossMargin come from /dashboard/sales (item 12), since
     // /dashboard (range) ships aggregates only.
-    const { from, to } = rangeDatesExec(30)
+    // Consume the hub's shared range (falls back to last 30d when hub hasn't
+    // set one yet) so switching the top-right picker re-drives this dashboard.
+    let from = ''
+    let to = ''
+    const sr = sharedRange.value
+    if (sr?.from && sr?.to) { from = sr.from; to = sr.to }
+    else { const d = rangeDatesExec(30); from = d.from; to = d.to }
+    const salesParams: Record<string, string> = (sr?.from && sr?.to)
+      ? { from, to }
+      : { range: sr?.preset || '30d' }
     const [rangeRes, todayRes, salesRes] = await Promise.all([
       axiosIns.get('/dashboard', { params: { from, to } }),
       axiosIns.get('/dashboard/today').catch(() => null),
-      axiosIns.get('/dashboard/sales', { params: { range: '30d' } }).catch(() => null),
+      axiosIns.get('/dashboard/sales', { params: salesParams }).catch(() => null),
     ])
     const rangePayload = rangeRes.data?.data ?? rangeRes.data ?? {}
     const mapped = mapRangePayload(rangePayload)
@@ -385,6 +395,8 @@ function sparkTrend(values: number[]): 'up' | 'down' | 'flat' {
   return 'flat'
 }
 
+const { range: sharedRange } = useDashboardData()
+watch(sharedRange, () => { void loadDashboard() })
 onMounted(() => {
   loadDashboard().then(() => {
     if (data.value?.liveFeed?.length)

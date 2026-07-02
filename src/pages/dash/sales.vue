@@ -10,6 +10,7 @@ import LineAreaChart from '@/components/design/LineAreaChart.vue'
 import BarChart from '@/components/design/BarChart.vue'
 import { fmtAbbr, fmtNum } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
+import { useDashboardData } from '@/composables/useDashboardData'
 import type { Tone } from '@/components/design/utils'
 // MOCK_DASH dropped — real BE data only. /dashboard/sales endpoint pending (BACKEND_TODO item 11).
 export interface ChannelDay { day: string; hall: number; delivery: number; pickup: number }
@@ -281,7 +282,11 @@ function sparkTrend(values: number[]): 'up' | 'down' | 'flat' {
 async function loadDashboard() {
   loading.value = true
   try {
-    const res = await axiosIns.get('/dashboard/sales', { params: { range: '30d' } })
+    const params: Record<string, string> = {}
+    const r = sharedRange.value
+    if (r?.from && r?.to) { params.from = r.from; params.to = r.to }
+    else params.range = r?.preset || '30d'
+    const res = await axiosIns.get('/dashboard/sales', { params })
     const raw = res.data?.data ?? res.data
     // BE channelDays shape: { day, hall, delivery, pickup }. FE stacked-bar
     // template uses { label, values: { hall, delivery, pickup } }. Adapt here
@@ -307,6 +312,9 @@ async function loadDashboard() {
   }
 }
 
+// Re-fetch on hub range change.
+const { range: sharedRange } = useDashboardData()
+watch(sharedRange, () => { void loadDashboard() })
 onMounted(() => {
   loadDashboard()
 })

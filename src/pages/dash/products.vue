@@ -23,6 +23,7 @@ import Sparkline from '@/components/design/Sparkline.vue'
 import Affinity from '@/components/design/Affinity.vue'
 import { fmtAbbr } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
+import { useDashboardData } from '@/composables/useDashboardData'
 
 const { t } = useI18n({ useScope: 'global' })
 const { formatCurrency } = useFormatters()
@@ -218,12 +219,21 @@ function mapTrends(raw: any): TrendRow[] {
 async function loadDashboard() {
   loading.value = true
   try {
-    const { from, to } = rangeDates(30)
+    // Consume hub's shared range; fall back to last 30d when hub hasn't fired.
+    let from = ''
+    let to = ''
+    const sr = sharedRange.value
+    if (sr?.from && sr?.to) { from = sr.from; to = sr.to }
+    else { const d = rangeDates(30); from = d.from; to = d.to }
+    // Previous period of same length for delta computation.
     const prev = (() => {
-      const prevTo = new Date(from)
+      const fromD = new Date(from)
+      const toD = new Date(to)
+      const span = Math.max(0, Math.round((toD.getTime() - fromD.getTime()) / 86400000))
+      const prevTo = new Date(fromD)
       prevTo.setDate(prevTo.getDate() - 1)
       const prevFrom = new Date(prevTo)
-      prevFrom.setDate(prevTo.getDate() - 29)
+      prevFrom.setDate(prevTo.getDate() - span)
       return { from: isoDate(prevFrom), to: isoDate(prevTo) }
     })()
 
@@ -287,6 +297,8 @@ async function loadDashboard() {
   }
 }
 
+const { range: sharedRange } = useDashboardData()
+watch(sharedRange, () => { void loadDashboard() })
 onMounted(() => {
   loadDashboard()
 })

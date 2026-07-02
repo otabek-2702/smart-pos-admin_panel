@@ -147,10 +147,23 @@ const liveCounts = computed<LiveCount[]>(() => [
 
 interface FunnelRow { label: string, value: number, color: string }
 const funnelData = ref<FunnelRow[]>([])
+// These are order *statuses*, not a strict decreasing funnel — a later stage
+// (e.g. Ready) can hold more orders than the first (e.g. Preparing). So the bar
+// width is scaled to the largest stage (widest bar = 100% fill) and the badge
+// shows each stage's share of all orders, never > 100%.
+const funnelMax = computed(() => Math.max(1, ...funnelData.value.map(f => f.value)))
+const funnelTotal = computed(() => funnelData.value.reduce((a, f) => a + f.value, 0) || 1)
 
 interface PrepRow { label: string, mins: number, target: number, orders: number }
 const prepByCategory = ref<PrepRow[]>([])
-const prepSorted = computed(() => prepByCategory.value.slice().sort((a, b) => b.mins - a.mins))
+// Zero-suppress: when BE hasn't computed prep times yet every row is 0.0m / 0m.
+// Rendering a wall of empty bars reads as broken, so treat all-zero as "no data"
+// and let the card hide instead.
+const prepSorted = computed(() => {
+  const rows = prepByCategory.value
+  if (!rows.some(d => d.mins > 0 || d.target > 0)) return []
+  return rows.slice().sort((a, b) => b.mins - a.mins)
+})
 const prepMax = computed(() => {
   if (!prepSorted.value.length) return 1
   const m = Math.max(...prepSorted.value.map(d => Math.max(d.mins, d.target)))
@@ -291,7 +304,7 @@ const liveValues = liveCounts.value.map((_c, i) => useCountUp(() => liveCounts.v
     </Card>
 
     <!-- funnel + prep gauge + service rings — only when BE item 17 (/dashboard/operations) ships data -->
-    <div v-if="funnelData.length || ordersByHour.length" class="grid" style="grid-template-columns: 1.3fr 1fr 1fr;">
+    <div v-if="funnelData.length || ordersByHour.length" class="grid" style="grid-template-columns: 1.3fr 1fr;">
       <Card v-if="funnelData.length">
         <div class="card__head">
           <div class="card__head-text">
@@ -309,13 +322,13 @@ const liveValues = liveCounts.value.map((_c, i) => useCountUp(() => liveCounts.v
                 <span style="font-size: 13px; font-weight: 600;">{{ d.label }}</span>
                 <span class="row" style="gap: 8px;">
                   <span class="mono" style="font-weight: 700; font-size: 14px;">{{ fmtNum(d.value) }}</span>
-                  <span class="badge">{{ i === 0 ? 100 : Math.round(d.value / funnelData[0].value * 100) }}%</span>
+                  <span class="badge">{{ Math.round(d.value / funnelTotal * 100) }}%</span>
                 </span>
               </div>
               <div style="height: 30px; background: var(--chart-track); border-radius: 8px; overflow: hidden;">
                 <div
                   :style="{
-                    width: (d.value / funnelData[0].value * 100) + '%',
+                    width: (d.value / funnelMax * 100) + '%',
                     height: '100%',
                     background: d.color,
                     borderRadius: '8px',
@@ -325,6 +338,25 @@ const liveValues = liveCounts.value.map((_c, i) => useCountUp(() => liveCounts.v
               </div>
             </div>
           </div>
+        </div>
+      </Card>
+
+      <!-- Orders-by-hour sits beside the funnel so the row stays balanced
+           (the kitchen-speed gauge + fulfilment rings below are disabled until
+           BE ships those fields, so they no longer leave empty columns here). -->
+      <Card v-if="ordersByHour.length">
+        <div class="card__head">
+          <div class="card__head-text">
+            <div class="kpi__label">{{ t('Orders by hour · today') }}</div>
+          </div>
+        </div>
+        <div class="card__body">
+          <BarChart
+            :data="barData"
+            :height="250"
+            :value-label="t('Orders')"
+            :y-format="(v: number) => String(Math.round(v))"
+          />
         </div>
       </Card>
 
@@ -441,8 +473,8 @@ const liveValues = liveCounts.value.map((_c, i) => useCountUp(() => liveCounts.v
     </div>
 
     <!-- prep by category + table occupancy — only when their data arrives -->
-    <div v-if="prepByCategory.length || tableGrid.length" class="grid" style="grid-template-columns: 1fr 1fr;">
-      <Card v-if="prepByCategory.length">
+    <div v-if="prepSorted.length || tableGrid.length" class="grid" style="grid-template-columns: 1fr 1fr;">
+      <Card v-if="prepSorted.length">
         <div class="card__head">
           <div class="card__head-text">
             <div class="kpi__label">{{ t('Avg prep time by category') }}</div>
@@ -528,23 +560,6 @@ const liveValues = liveCounts.value.map((_c, i) => useCountUp(() => liveCounts.v
         </div>
       </Card>
     </div>
-
-    <!-- orders by hour full width -->
-    <Card v-if="ordersByHour.length">
-      <div class="card__head">
-        <div class="card__head-text">
-          <div class="kpi__label">{{ t('Orders by hour · today') }}</div>
-        </div>
-      </div>
-      <div class="card__body">
-        <BarChart
-          :data="barData"
-          :height="250"
-          :value-label="t('Orders')"
-          :y-format="(v: number) => String(Math.round(v))"
-        />
-      </div>
-    </Card>
   </div>
 </template>
 

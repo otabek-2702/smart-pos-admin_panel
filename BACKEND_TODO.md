@@ -24,6 +24,29 @@ Open questions sent back to Abrorbek (msg 35):
 
 ---
 
+## Open — new from full QA pass (2026-07-02, sent msg 63)
+
+### 18. `/users` list — `created_at` null for every user
+Serializer/model default missing; FE "Yaratilgan" column is dead. Return `created_at` ISO-8601.
+
+### 19. `/categories` list — no `product_count`
+Every category card shows "#0". Add `product_count` (int) annotation per category.
+
+### 20. `/orders/stats` — add global per-status + payment counts
+Only totals today, so the orders status-distribution + payment cards can only reflect the visible page.
+Add `status_counts{OPEN,PREPARING,READY,COMPLETED,CANCELED}` + `payment_counts{PAID,UNPAID}`.
+
+### 21. `/dashboard/operations` — `prepByCategory[].mins` all 0
+Prep time not computed. Compute avg prep minutes per category (+ target) or drop the field. (Also logged under item 17.)
+
+### 22. `/dashboard?from=&to=` (range) — no `category_stats`
+Executive tab silently falls back to today's categories while KPIs show the range. Include `category_stats`, same shape as `/dashboard/today` `category_stats_today`.
+
+### Verified working (no BE action) — 2026-07-02
+- `POST /shifts/{id}/end` exists and works (200). FE was not calling it — fixed on FE (end-shift button now closes the shift, refreshes to awaiting-cash). `POST /shifts/{id}/reconcile` already wired correctly.
+
+---
+
 ## Open
 
 ### 1. Date-filterable dashboard endpoint
@@ -172,7 +195,8 @@ If any of those endpoints are slated for deprecation, tag here and we'll wire up
 
 Window defaults to today; respects `business_day_start` (item 8).
 
-**Status:** Sent to Abrorbek via dev-bot 2026-06-27 (msg 35).
+**Status:** ✅ Shipped on alpha_pos_server (Abrorbek, commit `ac87544`). `/dashboard/operations` returns 200 on prod; FE `dash/operations.vue` consumes funnel + ordersByHour + prepByCategory + tableGrid. Verified live 2026-07-02.
+**Data-quality follow-ups (open, resent 2026-07-02 msg 63):** `prepByCategory[].mins` is 0 for every category (avg prep not computed) — FE now zero-suppresses the card until real values arrive. Funnel `%` display bug was FE-side (dividing by first stage → 8950%) and is fixed on FE.
 
 ---
 

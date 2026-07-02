@@ -20,6 +20,11 @@ interface Props {
   orders: any[]
   status: string[]
   payment?: string
+  // Global counts from /orders/stats (whole filtered set, not just the page).
+  // When provided the status distribution + payment split use these instead of
+  // deriving from the current page's rows. Fall back to page-derived when absent.
+  statusCounts?: Record<string, number> | null
+  paymentCounts?: Record<string, number> | null
 }
 
 const props = defineProps<Props>()
@@ -47,20 +52,35 @@ const STATUSES = computed<StatusDef[]>(() => [
 const counts = computed<Record<string, number>>(() => {
   const c: Record<string, number> = {}
   STATUSES.value.forEach(s => { c[s.key] = 0 })
+  // Prefer global /orders/stats counts when supplied.
+  if (props.statusCounts) {
+    STATUSES.value.forEach((s) => { c[s.key] = Number(props.statusCounts![s.key] ?? 0) })
+    return c
+  }
   for (const o of (props.orders || [])) {
     if (c[o.status] !== undefined) c[o.status] += 1
   }
   return c
 })
 
+// Denominator for the status distribution bars = sum of all status counts
+// (distinct axis from paid/unpaid, so it can't reuse `totals.total`).
+const statusTotal = computed(() => Object.values(counts.value).reduce((a, b) => a + b, 0) || 1)
+
 const totals = computed(() => {
   let paid = 0
   let unpaid = 0
-  for (const o of (props.orders || [])) {
-    if (o.is_paid) paid += 1
-    else unpaid += 1
+  if (props.paymentCounts) {
+    paid = Number(props.paymentCounts.PAID ?? 0)
+    unpaid = Number(props.paymentCounts.UNPAID ?? 0)
   }
-  const total = (props.orders?.length ?? 0) || 1
+  else {
+    for (const o of (props.orders || [])) {
+      if (o.is_paid) paid += 1
+      else unpaid += 1
+    }
+  }
+  const total = (paid + unpaid) || 1
   const paidPct = Math.round((paid / total) * 100)
   return { paid, unpaid, total, paidPct }
 })
@@ -108,10 +128,10 @@ function togglePayment(p: string) {
       <div class="distbar">
         <template v-for="s in STATUSES" :key="s.key">
           <div
-            v-if="(counts[s.key] / totals.total * 100) > 0"
+            v-if="(counts[s.key] / statusTotal * 100) > 0"
             :class="cx('distbar__seg', anyStatusActive() && !isStatusActive(s.key) && 'is-dim')"
             :style="{
-              width: `${counts[s.key] / totals.total * 100}%`,
+              width: `${counts[s.key] / statusTotal * 100}%`,
               background: s.color,
             }"
             :title="`${s.label}: ${counts[s.key]}`"

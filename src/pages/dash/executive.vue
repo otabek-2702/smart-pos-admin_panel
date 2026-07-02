@@ -272,8 +272,13 @@ function mapRangePayload(p: any): DashData {
     .map(([k, v]) => ({ label: k, value: asNum(v), color: PAY_COLORS[k] ?? 'rgb(var(--v-theme-neutral))' }))
     .filter(s => s.value > 0)
 
-  // /dashboard (range) doesn't return category stats — leave empty.
-  d.categories = []
+  // /dashboard (range) now returns category_stats over the selected window
+  // (same shape as /dashboard/today's category_stats_today). Consume it so the
+  // category card reflects the picked range instead of falling back to today.
+  const cats = Array.isArray(p?.category_stats) ? p.category_stats : []
+  d.categories = cats
+    .map((c: any) => ({ label: String(c?.category ?? '—'), value: asNum(c?.revenue) }))
+    .filter((c: { value: number }) => c.value > 0)
   return d
 }
 
@@ -338,7 +343,9 @@ async function loadDashboard() {
     const todayPayload = todayRes?.data?.data ?? todayRes?.data
     if (todayPayload) {
       const todayMapped = mapTodayPayload(todayPayload)
-      if (todayMapped.categories.length)
+      // Only fall back to today's categories if the range payload had none
+      // (older BE). The range now ships category_stats, so this rarely fires.
+      if (!mapped.categories.length && todayMapped.categories.length)
         mapped.categories = todayMapped.categories
     }
     const salesPayload = salesRes?.data?.data ?? salesRes?.data

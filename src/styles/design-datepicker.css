@@ -31,6 +31,11 @@
   animation: drp-in .15s cubic-bezier(.2, .8, .2, 1);
 }
 .drp-pop--right { left: auto; right: 0; }
+/* When Teleported to <body>, the popover uses fixed positioning w/ inline
+   left/top from getBoundingClientRect. Override z-index so it paints above
+   sibling cards / any parent stacking context. */
+.drp-pop--fixed { position: fixed; top: auto; left: auto; z-index: 320; overflow-y: auto; }
+.drp-pop--fixed.drp-pop--right { left: auto; right: auto; }
 @keyframes drp-in { from { opacity: 0; transform: translateY(-6px); } }
 
 /* unified column layout (mode toggle on top) — fixed footprint so toggling Date/Time never resizes the popover */

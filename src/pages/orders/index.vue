@@ -597,21 +597,20 @@ function onPaymentToggle(p: string) {
             class="card"
             style="position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:50; padding:8px; max-height:260px; overflow:auto;"
           >
-            <label
+            <div
               v-for="s in orderStatuses"
               :key="s"
               class="row"
               style="gap:8px; padding:6px 4px; cursor:pointer;"
+              @click="statusFilter = statusFilter.includes(s)
+                ? statusFilter.filter(x => x !== s)
+                : [...statusFilter, s]"
             >
               <Checkbox
                 :model-value="statusFilter.includes(s)"
-                @update:model-value="(v: boolean) => {
-                  if (v && !statusFilter.includes(s)) statusFilter = [...statusFilter, s]
-                  else if (!v) statusFilter = statusFilter.filter(x => x !== s)
-                }"
               />
               <span>{{ t(`order_status_${s}`) }}</span>
-            </label>
+            </div>
           </div>
         </div>
 
@@ -659,21 +658,20 @@ function onPaymentToggle(p: string) {
             class="card"
             style="position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:50; padding:8px; max-height:260px; overflow:auto;"
           >
-            <label
+            <div
               v-for="c in categoryOptions"
               :key="c.value"
               class="row"
               style="gap:8px; padding:6px 4px; cursor:pointer;"
+              @click="categoryFilter = categoryFilter.includes(c.value)
+                ? categoryFilter.filter(x => x !== c.value)
+                : [...categoryFilter, c.value]"
             >
               <Checkbox
                 :model-value="categoryFilter.includes(c.value)"
-                @update:model-value="(v: boolean) => {
-                  if (v && !categoryFilter.includes(c.value)) categoryFilter = [...categoryFilter, c.value]
-                  else if (!v) categoryFilter = categoryFilter.filter(x => x !== c.value)
-                }"
               />
               <span>{{ c.label }}</span>
-            </label>
+            </div>
           </div>
         </div>
 

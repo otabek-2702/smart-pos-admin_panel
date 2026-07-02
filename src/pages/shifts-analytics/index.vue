@@ -794,13 +794,16 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
 
         <!-- Live only switch -->
         <div class="row live-only-wrap" style="gap:10px;">
-          <span class="row" style="gap:8px;font-size:14px;font-weight:500;">
+          <span
+            class="row"
+            style="gap:8px;font-size:14px;font-weight:500;cursor:pointer;"
+            @click="liveOnly = !liveOnly"
+          >
             <span
               class="switch"
               :class="{ 'is-on': liveOnly }"
               role="switch"
               :aria-checked="liveOnly"
-              @click="liveOnly = !liveOnly"
             />
             {{ t('Live only') }}
           </span>

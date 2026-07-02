@@ -709,31 +709,31 @@ function goPage(p: number | '…') {
           </div>
         </div>
 
-        <label
+        <div
           class="row"
           style="gap:8px;cursor:pointer;align-items:center;"
           :title="t('Show soft-deleted products')"
+          @click="includeDeleted = !includeDeleted"
         >
           <div
             class="switch"
             :class="{ 'is-on': includeDeleted }"
-            @click="includeDeleted = !includeDeleted"
           />
           <span style="font-size:13px;">{{ t('Include deleted') }}</span>
-        </label>
+        </div>
 
-        <label
+        <div
           class="row"
           style="gap:8px;cursor:pointer;align-items:center;"
           :title="t('Order best-sellers first')"
+          @click="popularFirst = !popularFirst"
         >
           <div
             class="switch"
             :class="{ 'is-on': popularFirst }"
-            @click="popularFirst = !popularFirst"
           />
           <span style="font-size:13px;">{{ t('Popular first') }}</span>
-        </label>
+        </div>
       </div>
 
       <!-- Active filter chips -->
@@ -1328,7 +1328,8 @@ function goPage(p: number | '…') {
               <label class="field__label">{{ t('Instant — skip the kitchen / KDS') }}</label>
               <div
                 class="row"
-                style="gap:12px;justify-content:space-between;"
+                style="gap:12px;justify-content:space-between;cursor:pointer;"
+                @click="form.is_instant = !form.is_instant"
               >
                 <span
                   class="field__hint"
@@ -1337,7 +1338,6 @@ function goPage(p: number | '…') {
                 <div
                   class="switch"
                   :class="{ 'is-on': form.is_instant }"
-                  @click="form.is_instant = !form.is_instant"
                 />
               </div>
             </div>

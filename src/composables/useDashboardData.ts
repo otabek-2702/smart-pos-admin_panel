@@ -86,6 +86,10 @@ const shared = ref<DashSharedPayload | null>(null)
 const loading = ref(false)
 const error = ref<unknown>(null)
 const lastFetchedAt = ref<number | null>(null)
+// Latest range the hub picked. Sub-dashboards watch this and re-fetch their
+// own dedicated endpoints (/dashboard/sales, /analytics/products/*, …) when it
+// changes. Kept as a plain object so consumers can watch (r.from, r.to).
+const currentRange = ref<DashRange | null>(null)
 
 function hasRange(range: DashRange | null | undefined): boolean {
   return !!(range && (range.from || range.to))
@@ -94,6 +98,7 @@ function hasRange(range: DashRange | null | undefined): boolean {
 async function fetchShared(range: DashRange | null | undefined): Promise<void> {
   loading.value = true
   error.value = null
+  currentRange.value = range ?? null
   try {
     if (hasRange(range)) {
       // /dashboard?from=&to=
@@ -127,6 +132,7 @@ export function useDashboardData() {
     loading: computed(() => loading.value),
     error: computed(() => error.value),
     lastFetchedAt: computed(() => lastFetchedAt.value),
+    range: computed(() => currentRange.value),
     fetchShared,
     hasRange,
   }

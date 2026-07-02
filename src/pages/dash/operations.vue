@@ -10,6 +10,7 @@ import BarChart from '@/components/design/BarChart.vue'
 import StateFill from '@/components/design/StateFill.vue'
 import { fmtNum } from '@/components/design/utils/format'
 import axiosIns from '@/plugins/axios'
+import { useDashboardData } from '@/composables/useDashboardData'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -98,6 +99,14 @@ async function loadOperations(): Promise<void> {
 }
 
 onMounted(() => {
+  void loadOrderStats()
+  void loadOperations()
+})
+
+// Ops endpoints are today-only (not range-scoped), but re-fetch on hub range
+// change so live counters stay fresh when user flips back to this tab.
+const { range: sharedRange } = useDashboardData()
+watch(sharedRange, () => {
   void loadOrderStats()
   void loadOperations()
 })

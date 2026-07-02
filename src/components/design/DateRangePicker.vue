@@ -151,16 +151,52 @@ watch(open, (v) => {
   }
 })
 
-/* Click-outside: pointerdown-capture (Teleport-safe) — Jason's carve-out */
+/* Click-outside: pointerdown-capture — Teleport-safe because we also check popRef */
+const popRef = ref<HTMLElement | null>(null)
 function onDocPointer(e: PointerEvent) {
   if (!open.value) return
   const tgt = e.target as Node | null
   if (tgt && root.value?.contains(tgt)) return
+  if (tgt && popRef.value?.contains(tgt)) return
   open.value = false
 }
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape') open.value = false
 }
+
+// Anchor position — popover is Teleported to <body> to escape sibling-card
+// stacking contexts, so we compute its (fixed) left/top from the trigger rect.
+const popPos = ref<{ left: number; top: number; maxHeight: number } | null>(null)
+
+function measure() {
+  const el = root.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const gap = 6
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const popW = 360
+  const wantRight = props.align === 'right'
+  const left = wantRight
+    ? Math.max(8, Math.min(rect.right - popW, vw - popW - 8))
+    : Math.max(8, Math.min(rect.left, vw - popW - 8))
+  const top = Math.min(rect.bottom + gap, vh - 12)
+  const maxHeight = Math.max(240, vh - top - 12)
+  popPos.value = { left, top, maxHeight }
+}
+
+watch(open, (v) => {
+  if (v) {
+    nextTick(measure)
+    window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, true)
+  }
+  else {
+    window.removeEventListener('resize', measure)
+    window.removeEventListener('scroll', measure, true)
+  }
+})
+
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointer, true)
   document.addEventListener('keydown', onKey)
@@ -168,6 +204,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onDocPointer, true)
   document.removeEventListener('keydown', onKey)
+  window.removeEventListener('resize', measure)
+  window.removeEventListener('scroll', measure, true)
 })
 
 function pick(d: Date) {
@@ -347,9 +385,12 @@ function setMode(m: 'date' | 'time') {
       <DesignIcon name="chevdown" :size="15" class="drp-trigger__chev" />
     </button>
 
+    <Teleport to="body">
     <div
       v-if="open"
-      :class="cx('drp-pop', 'drp-pop--col', align === 'right' && 'drp-pop--right')"
+      ref="popRef"
+      :class="cx('drp-pop', 'drp-pop--col', 'drp-pop--fixed', align === 'right' && 'drp-pop--right')"
+      :style="popPos ? { left: popPos.left + 'px', top: popPos.top + 'px', maxHeight: popPos.maxHeight + 'px' } : undefined"
     >
       <div v-if="enableTime" class="drp-modebar">
         <div class="seg" style="width: 100%;">
@@ -489,5 +530,6 @@ function setMode(m: 'date' | 'time') {
         </div>
       </div>
     </div>
+    </Teleport>
   </div>
 </template>

@@ -29,7 +29,7 @@ const { t } = useI18n({ useScope: 'global' })
 const { formatCurrency } = useFormatters()
 
 /* ---------- Data shape (mirrors window.DASH in handoff v3) ---------- */
-interface CategoryRow { label: string; value: number; color?: string }
+interface CategoryRow { label: string; value: number; units: number; color?: string }
 interface ParetoRow { label: string; value: number }
 interface TrendRow {
   name: string
@@ -106,11 +106,23 @@ const palette = [
   'rgb(var(--v-theme-primary-hover))',
 ]
 
+// Toggle: revenue vs sold-units for both the treemap and donut. Same categories
+// list, different scalar per slice.
+const catMetric = ref<'revenue' | 'units'>('revenue')
+const catMetrics = computed(() => [
+  { key: 'revenue', label: t('Revenue') },
+  { key: 'units', label: t('Units sold') },
+] as const)
+
+function catValue(c: CategoryRow): number {
+  return catMetric.value === 'units' ? c.units : c.value
+}
+
 const categoryTreemap = computed(() => {
   const cats = data.value?.categories || []
   return cats.slice(0, 6).map((c, i) => ({
     label: c.label,
-    value: c.value,
+    value: catValue(c),
     color: c.color || palette[i % palette.length],
   }))
 })
@@ -118,7 +130,7 @@ const categoryTreemap = computed(() => {
 const categoryDonut = computed(() =>
   (data.value?.categories || []).slice(0, 6).map((c, i) => ({
     label: c.label,
-    value: c.value,
+    value: catValue(c),
     color: c.color || palette[i % palette.length],
   })),
 )
@@ -179,6 +191,7 @@ function mapCategories(raw: any): CategoryRow[] {
   return rows.map((c: any) => ({
     label: c?.category ?? '—',
     value: num(c?.revenue),
+    units: num(c?.units),
   }))
 }
 
@@ -371,17 +384,32 @@ onMounted(() => {
           <div class="card__head">
             <div class="card__head-text">
               <div class="kpi__label">
-                {{ t('Revenue composition') }}
+                {{ catMetric === 'units' ? t('Sold units composition') : t('Revenue composition') }}
               </div>
               <h3 class="card__insight">
                 {{ t('Top categories dominate sales') }}
               </h3>
+            </div>
+            <div
+              class="seg"
+              role="tablist"
+              style="align-self: flex-start;"
+            >
+              <button
+                v-for="m in catMetrics"
+                :key="m.key"
+                type="button"
+                class="seg__btn"
+                :class="{ 'is-active': catMetric === m.key }"
+                @click="catMetric = m.key"
+              >{{ m.label }}</button>
             </div>
           </div>
           <div class="card__body">
             <Treemap
               :data="categoryTreemap"
               :height="320"
+              :value-unit="catMetric === 'units' ? 'units' : 'money'"
             />
           </div>
         </Card>
@@ -393,7 +421,7 @@ onMounted(() => {
                 {{ t('Category mix') }}
               </div>
               <h3 class="card__title">
-                {{ t('Share of revenue') }}
+                {{ catMetric === 'units' ? t('Share of sold units') : t('Share of revenue') }}
               </h3>
             </div>
           </div>

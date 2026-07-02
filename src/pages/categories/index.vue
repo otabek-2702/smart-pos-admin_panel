@@ -173,8 +173,23 @@ const dragOverIndex = ref<number | null>(null)
 const debouncedSearch = useDebounceFn(() => { page.value = 1; loadCategories() }, 400)
 
 // ---- helpers ----
+// Deterministic fallback palette. Most seeded categories have an empty
+// `colors` array from BE, which previously rendered every card as the same dead
+// grey blob. Derive a stable hue from the category name/id so each card gets a
+// consistent, distinct colour until an explicit colour is set.
+const CARD_PALETTE = [
+  '#3b5adb', '#e8590c', '#2f9e44', '#e03131', '#9c36b5',
+  '#1098ad', '#f08c00', '#c2255c', '#5f3dc4', '#66a80f',
+]
 function cardColor(cat: any): string {
-  return cat.colors?.[0] ?? '#9e9e9e'
+  const explicit = cat.colors?.[0]
+  if (explicit)
+    return explicit
+  const key = String(cat.name ?? cat.id ?? '')
+  let hash = 0
+  for (let i = 0; i < key.length; i++)
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0
+  return CARD_PALETTE[hash % CARD_PALETTE.length]
 }
 
 // ---- load ----

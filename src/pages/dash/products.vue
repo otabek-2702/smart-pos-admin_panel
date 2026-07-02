@@ -477,7 +477,7 @@ onMounted(() => {
                 <tr>
                   <th>{{ t('Product') }}</th>
                   <th class="num col-units">
-                    {{ t('Units') }}
+                    {{ t('Units sold') }}
                   </th>
                   <th class="col-spark">
                     {{ t('Trend') }}

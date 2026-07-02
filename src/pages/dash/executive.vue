@@ -318,20 +318,20 @@ async function loadDashboard() {
     // because /dashboard (range) does not return category stats. The chart's
     // time-series + grossMargin come from /dashboard/sales (item 12), since
     // /dashboard (range) ships aggregates only.
-    // Consume the hub's shared range (falls back to last 30d when hub hasn't
-    // set one yet) so switching the top-right picker re-drives this dashboard.
+    // Hero KPIs honor the hub's picker (so "Kecha" / "Yesterday" narrows the
+    // hero band to 1 day). The 30-day chart below stays fixed at range=30d
+    // regardless of picker — its label is literally "so'nggi 30 kun" and the
+    // rev30/lastMonthRev arrays must be exactly 30 long or the chart clamps
+    // to zero. Users see picker-driven hero band + persistent 30d context chart.
     let from = ''
     let to = ''
     const sr = sharedRange.value
     if (sr?.from && sr?.to) { from = sr.from; to = sr.to }
     else { const d = rangeDatesExec(30); from = d.from; to = d.to }
-    const salesParams: Record<string, string> = (sr?.from && sr?.to)
-      ? { from, to }
-      : { range: sr?.preset || '30d' }
     const [rangeRes, todayRes, salesRes] = await Promise.all([
       axiosIns.get('/dashboard', { params: { from, to } }),
       axiosIns.get('/dashboard/today').catch(() => null),
-      axiosIns.get('/dashboard/sales', { params: salesParams }).catch(() => null),
+      axiosIns.get('/dashboard/sales', { params: { range: '30d' } }).catch(() => null),
     ])
     const rangePayload = rangeRes.data?.data ?? rangeRes.data ?? {}
     const mapped = mapRangePayload(rangePayload)

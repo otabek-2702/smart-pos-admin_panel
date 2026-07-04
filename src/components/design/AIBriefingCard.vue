@@ -35,6 +35,41 @@ const payload = ref<BriefingPayload | null>(null)
 const loading = ref(true)
 const dismissed = ref(false)
 
+// The briefing emits its own icon vocabulary (revenue/stock/staff/…) that
+// mostly doesn't match DesignIcon's names, so most bullets rendered blank.
+// Map to real icons; fall back to sparkle for anything unknown.
+const ICON_ALIAS: Record<string, string> = {
+  revenue: 'wallet', sales: 'wallet', money: 'coins',
+  trend: 'trend', growth: 'trend', mover: 'trend',
+  stock: 'box', inventory: 'box', product: 'box', products: 'box',
+  staff: 'users', shift: 'clock', shifts: 'clock',
+  menu: 'menu', category: 'tag', order: 'receipt', orders: 'receipt',
+  alert: 'alert', warning: 'alert',
+}
+const KNOWN_ICONS = new Set(['dashboard', 'ai', 'clock', 'users', 'grid', 'box', 'receipt', 'table', 'tag', 'register', 'gift', 'employee', 'building', 'coins', 'chart', 'wallet', 'trend', 'package', 'menu', 'alert', 'info', 'bell', 'sparkle', 'star', 'flag', 'store'])
+function iconFor(name?: string): string {
+  if (!name) return 'sparkle'
+  const mapped = ICON_ALIAS[name] || name
+  return KNOWN_ICONS.has(mapped) ? mapped : 'sparkle'
+}
+
+// The briefing's deep_link uses semantic paths that aren't real admin-panel
+// routes (/menu, /stock, /staff, /dashboard). Remap the path to the real page
+// so "Open" actually navigates. Query string (product_id, shift_id, …) is kept
+// through in case the target page grows to read it.
+const ROUTE_ALIAS: Record<string, string> = {
+  '/menu': '/products',
+  '/stock': '/stock/alerts',
+  '/staff': '/shifts-analytics',
+  '/dashboard': '/',
+}
+function resolveLink(dl?: string): string | null {
+  if (!dl) return null
+  const [path, query] = dl.split('?')
+  const real = ROUTE_ALIAS[path] ?? path
+  return query ? `${real}?${query}` : real
+}
+
 async function load() {
   loading.value = true
   try {
@@ -54,7 +89,8 @@ async function dismiss() {
 
 function seedThread(bullet: BriefingBullet) {
   if (!bullet.ai_seed_prompt) {
-    if (bullet.deep_link) router.push(bullet.deep_link)
+    const link = resolveLink(bullet.deep_link)
+    if (link) router.push(link)
     return
   }
   // Open AI assistant + pre-fill draft with the bullet's seed prompt.
@@ -102,7 +138,7 @@ const show = computed(() => !dismissed.value && (payload.value?.bullets?.length 
           class="briefing__item"
         >
           <span class="briefing__icon">
-            <DesignIcon :name="b.icon || 'sparkle'" :size="15" />
+            <DesignIcon :name="iconFor(b.icon)" :size="15" />
           </span>
           <div class="briefing__body">
             <div class="briefing__item-title">
@@ -121,8 +157,8 @@ const show = computed(() => !dismissed.value && (payload.value?.bullets?.length 
                 {{ t('Dig deeper') }}
               </button>
               <RouterLink
-                v-if="b.deep_link"
-                :to="b.deep_link"
+                v-if="resolveLink(b.deep_link)"
+                :to="resolveLink(b.deep_link)!"
                 class="briefing__chip"
               >
                 {{ t('Open') }}

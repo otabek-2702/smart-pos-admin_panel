@@ -46,6 +46,9 @@ export interface Chat {
   draft?: string
   /** Set when we know the server has more messages than we've hydrated. */
   needsHydration?: boolean
+  /** Last-message snippet from the BE list summary — sidebar subtitle for chats
+   * whose messages aren't hydrated locally yet. */
+  preview?: string
 }
 
 export interface QuickAction { id: string; label: string; icon: string; query: string }
@@ -101,7 +104,7 @@ function toTs(v: any): number {
   return nowTs()
 }
 
-interface RemoteChatSummary { id: string | number; title?: string; updated_at?: any; message_count?: number }
+interface RemoteChatSummary { id: string | number; title?: string; updated_at?: any; message_count?: number; preview?: string }
 interface RemoteChatDetail { id: string | number; title?: string; messages?: any[] }
 
 function coerceSummary(raw: any): RemoteChatSummary | null {
@@ -114,6 +117,9 @@ function coerceSummary(raw: any): RemoteChatSummary | null {
     message_count: typeof raw.message_count === 'number'
       ? raw.message_count
       : (typeof raw.messages_count === 'number' ? raw.messages_count : 0),
+    // Last-message snippet from the BE list — used as the sidebar row subtitle
+    // so un-opened server chats don't all show "Empty conversation".
+    preview: typeof raw.preview === 'string' ? raw.preview : '',
   }
 }
 
@@ -348,6 +354,7 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
           title: r.title || existing.title,
           updatedAt: toTs(r.updated_at) || existing.updatedAt,
           needsHydration: (r.message_count ?? 0) > existing.messages.length,
+          preview: r.preview || existing.preview,
         })
       }
       else {
@@ -359,6 +366,7 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
           messages: [],
           updatedAt: toTs(r.updated_at),
           needsHydration: (r.message_count ?? 0) > 0,
+          preview: r.preview || '',
         })
       }
     }
@@ -402,7 +410,11 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
   async function createRemote(title?: string): Promise<string | number | null> {
     try {
       const res = await stockApi.post('/ai/chats/', title ? { title } : {})
-      const id = res.data?.id ?? res.data?.data?.id ?? null
+      // BE returns { success, id, chat: { id, ... } }. Read the top-level id but
+      // fall back to the nested chat.id — an earlier BE shipped only chat.id,
+      // which made this return null, so every /ai/query went out WITHOUT a
+      // conversation_id and the BE spawned a fresh chat per message. Read both.
+      const id = res.data?.id ?? res.data?.chat?.id ?? res.data?.data?.id ?? null
 
       return id !== undefined && id !== null ? id : null
     }
@@ -411,10 +423,12 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
     }
   }
 
-  /** PATCH /ai/chats/{id}/ */
+  /** POST /ai/chats/{id}/rename/ — BE exposes rename as a POST action, not a
+   * PATCH on the detail URL (that URL is GET-only). Using PATCH silently 405'd,
+   * so renames never persisted server-side. */
   async function renameRemote(serverId: string | number, title: string): Promise<boolean> {
     try {
-      await stockApi.patch(`/ai/chats/${serverId}/`, { title })
+      await stockApi.post(`/ai/chats/${serverId}/rename/`, { title })
 
       return true
     }
@@ -423,10 +437,12 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
     }
   }
 
-  /** DELETE /ai/chats/{id}/ */
+  /** POST /ai/chats/{id}/delete/ — BE exposes delete as a POST action, not a
+   * DELETE on the detail URL. Using DELETE silently 405'd, so chats were only
+   * removed locally and reappeared from the server on the next list fetch. */
   async function deleteRemote(serverId: string | number): Promise<boolean> {
     try {
-      await stockApi.delete(`/ai/chats/${serverId}/`)
+      await stockApi.post(`/ai/chats/${serverId}/delete/`)
 
       return true
     }

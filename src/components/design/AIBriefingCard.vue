@@ -10,16 +10,26 @@
    ============================================================ */
 import axiosIns from '@/plugins/axios'
 import DesignIcon from './DesignIcon.vue'
+import { localizeNotify, notifyIcon, resolveNotifyLink } from './utils/notify'
 import { useAIAssistantStore } from '@/stores/aiAssistant'
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, locale } = useI18n({ useScope: 'global' })
 const router = useRouter()
 const aiStore = useAIAssistantStore()
 
+const iconFor = notifyIcon
+const resolveLink = resolveNotifyLink
+// title/body may be a string (English today) or { uz, ru, en } once the BE
+// ships translations — resolve to the active locale either way.
+function loc(v: unknown): string { return localizeNotify(v, String(locale.value)) }
+
+// title/body are English strings today; will become { uz, ru, en } objects once
+// the BE ships translations. loc() handles both.
+type LocalizedText = string | Record<string, string>
 interface BriefingBullet {
   icon?: string
-  title: string
-  body: string
+  title: LocalizedText
+  body: LocalizedText
   deep_link?: string
   ai_seed_prompt?: string
 }
@@ -34,41 +44,6 @@ interface BriefingPayload {
 const payload = ref<BriefingPayload | null>(null)
 const loading = ref(true)
 const dismissed = ref(false)
-
-// The briefing emits its own icon vocabulary (revenue/stock/staff/…) that
-// mostly doesn't match DesignIcon's names, so most bullets rendered blank.
-// Map to real icons; fall back to sparkle for anything unknown.
-const ICON_ALIAS: Record<string, string> = {
-  revenue: 'wallet', sales: 'wallet', money: 'coins',
-  trend: 'trend', growth: 'trend', mover: 'trend',
-  stock: 'box', inventory: 'box', product: 'box', products: 'box',
-  staff: 'users', shift: 'clock', shifts: 'clock',
-  menu: 'menu', category: 'tag', order: 'receipt', orders: 'receipt',
-  alert: 'alert', warning: 'alert',
-}
-const KNOWN_ICONS = new Set(['dashboard', 'ai', 'clock', 'users', 'grid', 'box', 'receipt', 'table', 'tag', 'register', 'gift', 'employee', 'building', 'coins', 'chart', 'wallet', 'trend', 'package', 'menu', 'alert', 'info', 'bell', 'sparkle', 'star', 'flag', 'store'])
-function iconFor(name?: string): string {
-  if (!name) return 'sparkle'
-  const mapped = ICON_ALIAS[name] || name
-  return KNOWN_ICONS.has(mapped) ? mapped : 'sparkle'
-}
-
-// The briefing's deep_link uses semantic paths that aren't real admin-panel
-// routes (/menu, /stock, /staff, /dashboard). Remap the path to the real page
-// so "Open" actually navigates. Query string (product_id, shift_id, …) is kept
-// through in case the target page grows to read it.
-const ROUTE_ALIAS: Record<string, string> = {
-  '/menu': '/products',
-  '/stock': '/stock/alerts',
-  '/staff': '/shifts-analytics',
-  '/dashboard': '/',
-}
-function resolveLink(dl?: string): string | null {
-  if (!dl) return null
-  const [path, query] = dl.split('?')
-  const real = ROUTE_ALIAS[path] ?? path
-  return query ? `${real}?${query}` : real
-}
 
 async function load() {
   loading.value = true
@@ -142,10 +117,10 @@ const show = computed(() => !dismissed.value && (payload.value?.bullets?.length 
           </span>
           <div class="briefing__body">
             <div class="briefing__item-title">
-              {{ b.title }}
+              {{ loc(b.title) }}
             </div>
             <div class="briefing__item-text">
-              {{ b.body }}
+              {{ loc(b.body) }}
             </div>
             <div class="briefing__actions">
               <button

@@ -80,8 +80,8 @@ const heroKpis = computed(() => {
   // if BE hasn't shipped sales endpoint yet (we only show it when > 0). Revenue / Orders / AOV stay always
   // since /dashboard (range) is guaranteed to return them.
   const rows: Array<Record<string, unknown>> = [
-    { label: t('Revenue (30d)'), value: D.monthRevenue, money: true, unit: 'UZS', delta: null, icon: 'wallet', tone: 'primary' as Tone, spark: D.revenue30.slice(-14) },
-    { label: t('Orders (30d)'), value: D.monthOrders, money: false, delta: null, icon: 'receipt', tone: 'info' as Tone, spark: D.orders30.slice(-14) },
+    { label: t('Revenue'), value: D.monthRevenue, money: true, unit: 'UZS', delta: null, icon: 'wallet', tone: 'primary' as Tone, spark: D.revenue30.slice(-14) },
+    { label: t('Orders'), value: D.monthOrders, money: false, delta: null, icon: 'receipt', tone: 'info' as Tone, spark: D.orders30.slice(-14) },
     { label: t('Avg Order Value'), value: D.avgAov, money: true, unit: 'UZS', delta: null, icon: 'trend', tone: 'success' as Tone, spark: D.aov30.slice(-14) },
   ]
   if (D.grossMargin > 0)
@@ -90,6 +90,10 @@ const heroKpis = computed(() => {
     rows.push({ label: t('Repeat Rate'), value: `${D.repeatRate}%`, money: false, delta: null, icon: 'users', tone: 'primary' as Tone, sub: t('returning guests') })
   return rows
 })
+
+// Number of days in the currently-loaded range — drives the metrics-chart
+// subtitle so it no longer hard-says "last 30 days" when the picker changed.
+const rangeDays = computed(() => data.value?.dayLabels?.length || 0)
 
 // ---------- SwitchChart-lite state (inline until phase 2) ----------
 type MetricKey = 'rev' | 'ord' | 'aov'
@@ -318,16 +322,13 @@ function rangeDatesExec(days: number): { from: string; to: string } {
 async function loadDashboard() {
   loading.value = true
   try {
-    // Page labels read "Performance · last 30 days", so consume the
-    // 30-day range endpoint. Category card falls back to /dashboard/today
-    // because /dashboard (range) does not return category stats. The chart's
-    // time-series + grossMargin come from /dashboard/sales (item 12), since
-    // /dashboard (range) ships aggregates only.
-    // Hero KPIs honor the hub's picker (so "Kecha" / "Yesterday" narrows the
-    // hero band to 1 day). The 30-day chart below stays fixed at range=30d
-    // regardless of picker — its label is literally "so'nggi 30 kun" and the
-    // rev30/lastMonthRev arrays must be exactly 30 long or the chart clamps
-    // to zero. Users see picker-driven hero band + persistent 30d context chart.
+    // Everything on this tab honors the hub's date picker. Both /dashboard
+    // (aggregates + category_stats) and /dashboard/sales (daily time-series +
+    // grossMargin) are queried with the SAME from/to, so the hero band, the
+    // metrics chart, gross margin and categories all move together when the
+    // picker changes. Falls back to last-30d only when the hub hasn't set a
+    // range yet. /dashboard/sales accepts from&to and returns variable-length
+    // arrays aligned to dayLabels (verified: 30d→30, 7d→7, 1d→1).
     let from = ''
     let to = ''
     const sr = sharedRange.value
@@ -336,7 +337,7 @@ async function loadDashboard() {
     const [rangeRes, todayRes, salesRes] = await Promise.all([
       axiosIns.get('/dashboard', { params: { from, to } }),
       axiosIns.get('/dashboard/today').catch(() => null),
-      axiosIns.get('/dashboard/sales', { params: { range: '30d' } }).catch(() => null),
+      axiosIns.get('/dashboard/sales', { params: { from, to } }).catch(() => null),
     ])
     const rangePayload = rangeRes.data?.data ?? rangeRes.data ?? {}
     const mapped = mapRangePayload(rangePayload)
@@ -353,9 +354,22 @@ async function loadDashboard() {
       const rev30 = Array.isArray(salesPayload.revenue30) ? salesPayload.revenue30.map(asNum) : []
       const last30 = Array.isArray(salesPayload.lastMonthRev) ? salesPayload.lastMonthRev.map(asNum) : []
       const labels = Array.isArray(salesPayload.dayLabels) ? salesPayload.dayLabels.map((s: any) => String(s)) : []
-      if (rev30.length === 30) mapped.revenue30 = rev30
-      if (last30.length === 30) mapped.lastMonthRev = last30
-      if (labels.length === 30) mapped.dayLabels = labels
+      // Accept whatever length the range yields (was gated to exactly 30, which
+      // blanked the chart for any other range).
+      if (rev30.length) mapped.revenue30 = rev30
+      if (last30.length) mapped.lastMonthRev = last30
+      if (labels.length) mapped.dayLabels = labels
+      // The sales endpoint only ships daily REVENUE. Daily order counts come
+      // from channelDays (hall+delivery+pickup per day) and daily AOV is
+      // revenue/orders — derive both so the Orders and Avg-order chart tabs
+      // (and their hero sparklines) show real, range-scoped data instead of a
+      // flat zero line.
+      const chDays = Array.isArray(salesPayload.channelDays) ? salesPayload.channelDays : []
+      if (chDays.length) {
+        const ordersByDay = chDays.map((c: any) => asNum(c?.hall) + asNum(c?.delivery) + asNum(c?.pickup))
+        mapped.orders30 = ordersByDay
+        mapped.aov30 = ordersByDay.map((n: number, i: number) => n > 0 ? Math.round(asNum(rev30[i]) / n) : 0)
+      }
       // grossMargin from BE is 0..1 (float). Render as 0..100.
       const gm = Number(salesPayload.grossMargin)
       if (Number.isFinite(gm)) mapped.grossMargin = Math.round(gm * 100)
@@ -528,7 +542,7 @@ void locale
                 class="kpi__label"
                 style="margin-bottom: 3px;"
               >
-                {{ t('Performance · last 30 days') }}
+                {{ rangeDays ? t('Performance · {n} days', { n: rangeDays }) : t('Performance') }}
               </div>
               <h3 v-if="insightStr" class="card__insight">
                 {{ insightStr }}

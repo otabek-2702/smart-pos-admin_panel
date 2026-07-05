@@ -28,8 +28,11 @@ function loc(v: unknown): string { return localizeNotify(v, String(locale.value)
 type LocalizedText = string | Record<string, string>
 interface BriefingBullet {
   icon?: string
+  // Flat English (backward-compat) + the localized objects the BE now ships.
   title: LocalizedText
   body: LocalizedText
+  title_i18n?: Record<string, string>
+  body_i18n?: Record<string, string>
   deep_link?: string
   ai_seed_prompt?: string
 }
@@ -117,10 +120,10 @@ const show = computed(() => !dismissed.value && (payload.value?.bullets?.length 
           </span>
           <div class="briefing__body">
             <div class="briefing__item-title">
-              {{ loc(b.title) }}
+              {{ loc(b.title_i18n ?? b.title) }}
             </div>
             <div class="briefing__item-text">
-              {{ loc(b.body) }}
+              {{ loc(b.body_i18n ?? b.body) }}
             </div>
             <div class="briefing__actions">
               <button

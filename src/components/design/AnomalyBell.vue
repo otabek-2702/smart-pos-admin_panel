@@ -26,6 +26,8 @@ interface BriefingBullet {
   icon?: string
   title: unknown
   body: unknown
+  title_i18n?: Record<string, string>
+  body_i18n?: Record<string, string>
   deep_link?: string
 }
 
@@ -100,8 +102,9 @@ const notifs = computed<Notif[]>(() => {
     id: `b-${briefingId.value}-${i}`,
     kind: 'briefing',
     icon: notifyIcon(bl.icon),
-    title: loc(bl.title),
-    body: loc(bl.body),
+    // BE ships localized title_i18n/body_i18n {uz,ru,en} alongside flat English.
+    title: loc(bl.title_i18n ?? bl.title),
+    body: loc(bl.body_i18n ?? bl.body),
     link: resolveNotifyLink(bl.deep_link),
   }))
   return [...a, ...b]

@@ -165,8 +165,10 @@ function relTime(ts: number): string {
 function previewOf(c: any): string {
   const last = c.messages[c.messages.length - 1]
 
+  // Server-only chats aren't hydrated yet — fall back to the BE list preview
+  // (last-message snippet) so the row shows real content, not "Empty conversation".
   if (!last)
-    return t('Empty conversation')
+    return c.preview ? c.preview.replace(/[*#\-]/g, '').slice(0, 48) : t('Empty conversation')
 
   return (last.role === 'assistant' ? last.content : last.content)
     .replace(/[*#\-]/g, '')

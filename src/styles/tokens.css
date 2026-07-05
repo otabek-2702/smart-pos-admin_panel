@@ -114,6 +114,13 @@
   --c4: #6E8BFF;   /* light blue */
   --c5: #9AA3B2;   /* neutral (e.g. "Mixed") */
 
+  /* Period-over-period comparison (Compare Periods page) — A is the evaluated
+     period (primary), B the baseline (muted). Deltas colour by direction. */
+  --color-period-a: #3A5BDB;
+  --color-period-b: #9AA3B2;
+  --color-positive: #15935A;
+  --color-negative: #C8372A;
+
   /* Elevation — restrained */
   --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
   --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.07), 0 1px 2px rgba(16, 24, 40, 0.04);
@@ -191,6 +198,12 @@
   --c3: #E89A5C;
   --c4: #9DB0FF;
   --c5: #7E8A9C;
+
+  /* Compare Periods — dark */
+  --color-period-a: #6E8BFF;
+  --color-period-b: #7E8A9C;
+  --color-positive: #36C07E;
+  --color-negative: #EF6A5B;
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);

@@ -10,16 +10,29 @@
    ============================================================ */
 import axiosIns from '@/plugins/axios'
 import DesignIcon from './DesignIcon.vue'
+import { localizeNotify, notifyIcon, resolveNotifyLink } from './utils/notify'
 import { useAIAssistantStore } from '@/stores/aiAssistant'
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, locale } = useI18n({ useScope: 'global' })
 const router = useRouter()
 const aiStore = useAIAssistantStore()
 
+const iconFor = notifyIcon
+const resolveLink = resolveNotifyLink
+// title/body may be a string (English today) or { uz, ru, en } once the BE
+// ships translations — resolve to the active locale either way.
+function loc(v: unknown): string { return localizeNotify(v, String(locale.value)) }
+
+// title/body are English strings today; will become { uz, ru, en } objects once
+// the BE ships translations. loc() handles both.
+type LocalizedText = string | Record<string, string>
 interface BriefingBullet {
   icon?: string
-  title: string
-  body: string
+  // Flat English (backward-compat) + the localized objects the BE now ships.
+  title: LocalizedText
+  body: LocalizedText
+  title_i18n?: Record<string, string>
+  body_i18n?: Record<string, string>
   deep_link?: string
   ai_seed_prompt?: string
 }
@@ -54,7 +67,8 @@ async function dismiss() {
 
 function seedThread(bullet: BriefingBullet) {
   if (!bullet.ai_seed_prompt) {
-    if (bullet.deep_link) router.push(bullet.deep_link)
+    const link = resolveLink(bullet.deep_link)
+    if (link) router.push(link)
     return
   }
   // Open AI assistant + pre-fill draft with the bullet's seed prompt.
@@ -102,14 +116,14 @@ const show = computed(() => !dismissed.value && (payload.value?.bullets?.length 
           class="briefing__item"
         >
           <span class="briefing__icon">
-            <DesignIcon :name="b.icon || 'sparkle'" :size="15" />
+            <DesignIcon :name="iconFor(b.icon)" :size="15" />
           </span>
           <div class="briefing__body">
             <div class="briefing__item-title">
-              {{ b.title }}
+              {{ loc(b.title_i18n ?? b.title) }}
             </div>
             <div class="briefing__item-text">
-              {{ b.body }}
+              {{ loc(b.body_i18n ?? b.body) }}
             </div>
             <div class="briefing__actions">
               <button
@@ -121,8 +135,8 @@ const show = computed(() => !dismissed.value && (payload.value?.bullets?.length 
                 {{ t('Dig deeper') }}
               </button>
               <RouterLink
-                v-if="b.deep_link"
-                :to="b.deep_link"
+                v-if="resolveLink(b.deep_link)"
+                :to="resolveLink(b.deep_link)!"
                 class="briefing__chip"
               >
                 {{ t('Open') }}

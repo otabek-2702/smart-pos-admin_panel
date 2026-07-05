@@ -1,75 +1,170 @@
 <script setup lang="ts">
 /* ============================================================
-   ALPHA POS — AnomalyBell
-   Topbar icon button that polls /ai/anomalies (unacked) and shows
-   a red dot + count badge. Click opens a dropdown listing the
-   anomalies. Each row has Open (deep-link) + Acknowledge buttons.
+   ALPHA POS — Notifications bell (topbar)
+   Unified feed: the AI morning-briefing items + anomaly alerts.
+   Click the bell → dropdown with an unread count, per-item Open +
+   mark-read, and a "mark all read". Anomalies mark-read via the
+   server ack; briefing items track read state locally (the BE only
+   exposes a whole-briefing dismiss, not per-bullet read).
    ============================================================ */
 import axiosIns from '@/plugins/axios'
 import DesignIcon from './DesignIcon.vue'
+import { localizeNotify, notifyIcon, resolveNotifyLink } from './utils/notify'
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, locale } = useI18n({ useScope: 'global' })
 const router = useRouter()
 
 interface Anomaly {
   id: number
-  detector: string
   severity: 'low' | 'medium' | 'high' | 'critical'
-  fired_at: string
-  message: string
+  fired_at?: string
+  message: unknown
   deep_link?: string
-  ai_explanation?: string
+  ai_explanation?: unknown
+}
+interface BriefingBullet {
+  icon?: string
+  title: unknown
+  body: unknown
+  title_i18n?: Record<string, string>
+  body_i18n?: Record<string, string>
+  deep_link?: string
 }
 
-const items = ref<Anomaly[]>([])
+interface Notif {
+  id: string
+  kind: 'anomaly' | 'briefing'
+  icon: string
+  title: string
+  body: string
+  link: string | null
+  severity?: Anomaly['severity']
+  ackId?: number
+}
+
+const anomalies = ref<Anomaly[]>([])
+const bullets = ref<BriefingBullet[]>([])
+const briefingId = ref<number | string>('')
+const briefingDismissed = ref(false)
 const open = ref(false)
 const rootRef = ref<HTMLElement | null>(null)
-
 let pollTimer: number | null = null
 
-async function load() {
-  try {
-    const res = await axiosIns.get('/ai/anomalies', { params: { unacked: 1 } })
-    items.value = (res?.data?.data?.anomalies ?? []) as Anomaly[]
-  }
-  catch { /* keep prior list */ }
+// Briefing items have no server-side per-bullet read flag, so remember which
+// ones the operator has read locally.
+const READ_KEY = 'ai-briefing-read'
+function loadReadSet(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(READ_KEY) || '[]')) }
+  catch { return new Set() }
 }
-
-async function ack(id: number) {
-  try {
-    await axiosIns.post(`/ai/anomalies/${id}/ack`)
-    items.value = items.value.filter(a => a.id !== id)
-  }
+const readSet = ref<Set<string>>(loadReadSet())
+function persistRead() {
+  try { localStorage.setItem(READ_KEY, JSON.stringify([...readSet.value])) }
   catch { /* noop */ }
 }
 
-function goAnomaly(a: Anomaly) {
-  if (a.deep_link) router.push(a.deep_link)
-  open.value = false
+function loc(v: unknown): string { return localizeNotify(v, String(locale.value)) }
+
+async function load() {
+  try {
+    const [aRes, bRes] = await Promise.all([
+      axiosIns.get('/ai/anomalies', { params: { unacked: 1 } }).catch(() => null),
+      axiosIns.get('/ai/briefing').catch(() => null),
+    ])
+    anomalies.value = (aRes?.data?.data?.anomalies ?? []) as Anomaly[]
+    const bp = bRes?.data?.data ?? null
+    briefingDismissed.value = !!bp?.dismissed
+    briefingId.value = bp?.id ?? ''
+    // The `dismissed` flag only collapses the dashboard briefing CARD for the
+    // day — the bell is a persistent notification center, so always surface the
+    // bullets here and rely on per-item local read state instead.
+    bullets.value = (bp?.bullets ?? []) as BriefingBullet[]
+  }
+  catch { /* keep prior */ }
 }
 
-const count = computed(() => items.value.length)
-const hasCritical = computed(() => items.value.some(a => a.severity === 'critical' || a.severity === 'high'))
+// Anomalies first (severity-ordered), then briefing items.
+const notifs = computed<Notif[]>(() => {
+  const sevRank: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 }
+  const a = [...anomalies.value]
+    .sort((x, y) => (sevRank[x.severity] ?? 9) - (sevRank[y.severity] ?? 9))
+    .map<Notif>(an => ({
+      id: `a-${an.id}`,
+      kind: 'anomaly',
+      icon: 'alert',
+      title: loc(an.message),
+      body: loc(an.ai_explanation),
+      link: resolveNotifyLink(an.deep_link),
+      severity: an.severity,
+      ackId: an.id,
+    }))
+  const b = bullets.value.map<Notif>((bl, i) => ({
+    id: `b-${briefingId.value}-${i}`,
+    kind: 'briefing',
+    icon: notifyIcon(bl.icon),
+    // BE ships localized title_i18n/body_i18n {uz,ru,en} alongside flat English.
+    title: loc(bl.title_i18n ?? bl.title),
+    body: loc(bl.body_i18n ?? bl.body),
+    link: resolveNotifyLink(bl.deep_link),
+  }))
+  return [...a, ...b]
+})
 
-function sevTone(s: Anomaly['severity']) {
+// Anomalies are always unread (fetched unacked); briefing items are unread
+// until marked.
+function isUnread(n: Notif): boolean {
+  return n.kind === 'anomaly' || !readSet.value.has(n.id)
+}
+const unreadCount = computed(() => notifs.value.filter(isUnread).length)
+const hasCritical = computed(() =>
+  anomalies.value.some(a => a.severity === 'critical' || a.severity === 'high'))
+
+function sevTone(s?: Anomaly['severity']) {
   if (s === 'critical') return 'error'
   if (s === 'high') return 'warning'
   if (s === 'medium') return 'info'
   return 'neutral'
 }
 
+async function markRead(n: Notif) {
+  if (n.kind === 'anomaly' && n.ackId != null) {
+    try { await axiosIns.post(`/ai/anomalies/${n.ackId}/ack`) }
+    catch { /* noop */ }
+    anomalies.value = anomalies.value.filter(a => a.id !== n.ackId)
+  }
+  else {
+    readSet.value = new Set(readSet.value).add(n.id)
+    persistRead()
+  }
+}
+
+async function markAllRead() {
+  // Ack every anomaly server-side, mark every briefing item read locally.
+  const acks = anomalies.value.map(a =>
+    axiosIns.post(`/ai/anomalies/${a.id}/ack`).catch(() => null))
+  await Promise.all(acks)
+  anomalies.value = []
+  const next = new Set(readSet.value)
+  for (const n of notifs.value) next.add(n.id)
+  readSet.value = next
+  persistRead()
+}
+
+function goOpen(n: Notif) {
+  if (n.link) router.push(n.link)
+  if (!isUnread(n)) { /* already read */ }
+  else void markRead(n)
+  open.value = false
+}
+
 onClickOutside(rootRef, () => { open.value = false })
 
 onMounted(() => {
   void load()
-  pollTimer = window.setInterval(load, 90_000)  // every 90s
+  pollTimer = window.setInterval(load, 90_000)
 })
-
 onBeforeUnmount(() => {
-  if (pollTimer != null) {
-    window.clearInterval(pollTimer)
-    pollTimer = null
-  }
+  if (pollTimer != null) { window.clearInterval(pollTimer); pollTimer = null }
 })
 </script>
 
@@ -78,52 +173,67 @@ onBeforeUnmount(() => {
     <button
       class="iconbtn anom-trigger"
       :class="{ 'has-critical': hasCritical }"
-      :title="count ? t('{n} new alerts', { n: count }) : t('No alerts')"
+      :title="unreadCount ? t('{n} unread notifications', { n: unreadCount }) : t('Notifications')"
       @click="open = !open"
     >
       <DesignIcon name="bell" :size="18" />
-      <span v-if="count" class="anom-badge">{{ count > 99 ? '99+' : count }}</span>
+      <span v-if="unreadCount" class="anom-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
     </button>
     <Transition name="fade">
       <div v-if="open" class="anom-panel">
         <div class="anom-head">
-          <span class="anom-title">{{ t('Alerts') }}</span>
-          <span class="anom-count">{{ count }}</span>
+          <span class="anom-title">{{ t('Notifications') }}</span>
+          <button
+            v-if="unreadCount"
+            class="anom-allread"
+            @click="markAllRead"
+          >
+            {{ t('Mark all read') }}
+          </button>
         </div>
-        <div v-if="!items.length" class="anom-empty">
-          {{ t('Nothing flagged in the last cycle.') }}
+        <div v-if="!notifs.length" class="anom-empty">
+          {{ t('No notifications') }}
         </div>
         <ul v-else class="anom-list">
           <li
-            v-for="a in items"
-            :key="a.id"
+            v-for="n in notifs"
+            :key="n.id"
             class="anom-row"
-            :class="`sev-${sevTone(a.severity)}`"
+            :class="{ 'is-read': !isUnread(n) }"
           >
-            <span :class="['anom-dot', `dot-${sevTone(a.severity)}`]" />
+            <span
+              class="anom-icon"
+              :class="n.kind === 'anomaly' ? `sev-${sevTone(n.severity)}` : 'kind-briefing'"
+            >
+              <DesignIcon :name="n.icon" :size="15" />
+            </span>
             <div class="anom-body">
               <div class="anom-msg">
-                {{ a.message }}
+                {{ n.title }}
               </div>
-              <div v-if="a.ai_explanation" class="anom-explain">
-                {{ a.ai_explanation }}
+              <div v-if="n.body" class="anom-explain">
+                {{ n.body }}
               </div>
               <div class="anom-actions">
                 <button
-                  v-if="a.deep_link"
+                  v-if="n.link"
                   class="anom-chip"
-                  @click="goAnomaly(a)"
+                  @click="goOpen(n)"
                 >
                   {{ t('Open') }}
+                  <DesignIcon name="chevright" :size="11" />
                 </button>
                 <button
+                  v-if="isUnread(n)"
                   class="anom-chip anom-chip--ghost"
-                  @click="ack(a.id)"
+                  @click="markRead(n)"
                 >
-                  {{ t('Acknowledge') }}
+                  <DesignIcon name="check" :size="11" />
+                  {{ t('Mark read') }}
                 </button>
               </div>
             </div>
+            <span v-if="isUnread(n)" class="anom-unread-dot" />
           </li>
         </ul>
       </div>
@@ -147,6 +257,9 @@ onBeforeUnmount(() => {
   font-size: 10px;
   font-weight: 700;
   font-family: var(--font-mono);
+  /* The topbar's inherited 22px line-height was taller than the 16px badge and
+     pushed the digit out of view — pin it to 1 so the count centers. */
+  line-height: 1;
   display: grid;
   place-items: center;
   border: 2px solid var(--surface);
@@ -156,13 +269,13 @@ onBeforeUnmount(() => {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  width: min(360px, 92vw);
+  width: min(380px, 92vw);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: var(--shadow-lg);
   z-index: 120;
-  max-height: 70vh;
+  max-height: 72vh;
   overflow-y: auto;
 }
 .anom-head {
@@ -171,51 +284,66 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
 }
 .anom-title { font-size: 13px; font-weight: 600; color: var(--text); }
-.anom-count {
-  font-family: var(--font-mono);
+.anom-allread {
   font-size: 11px;
-  color: var(--text-tertiary);
-  background: var(--surface-2);
-  padding: 2px 8px;
-  border-radius: 99px;
+  font-weight: 500;
+  color: var(--primary);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
 }
+.anom-allread:hover { background: var(--surface-2); }
 .anom-empty {
-  padding: 22px 16px;
+  padding: 26px 16px;
   text-align: center;
   font-size: 13px;
   color: var(--text-tertiary);
 }
 .anom-list { margin: 0; padding: 6px; list-style: none; display: flex; flex-direction: column; gap: 2px; }
 .anom-row {
+  position: relative;
   display: flex;
   gap: 10px;
-  padding: 10px 10px;
+  padding: 10px;
   border-radius: 8px;
 }
 .anom-row:hover { background: var(--surface-2); }
-.anom-dot {
-  flex: 0 0 8px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-top: 6px;
+.anom-row.is-read { opacity: 0.55; }
+.anom-icon {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: rgba(var(--v-theme-primary), 0.1);
+  color: var(--primary);
 }
-.dot-error { background: rgb(var(--v-theme-error)); }
-.dot-warning { background: rgb(var(--v-theme-warning)); }
-.dot-info { background: rgb(var(--v-theme-info)); }
-.dot-neutral { background: var(--text-tertiary); }
+.anom-icon.kind-briefing { background: rgba(var(--v-theme-primary), 0.1); color: var(--primary); }
+.anom-icon.sev-error { background: rgba(var(--v-theme-error), 0.12); color: rgb(var(--v-theme-error)); }
+.anom-icon.sev-warning { background: rgba(var(--v-theme-warning), 0.14); color: rgb(var(--v-theme-warning)); }
+.anom-icon.sev-info { background: rgba(var(--v-theme-info), 0.12); color: rgb(var(--v-theme-info)); }
+.anom-icon.sev-neutral { background: var(--surface-2); color: var(--text-secondary); }
 .anom-body { flex: 1; min-width: 0; }
-.anom-msg { font-size: 13px; font-weight: 500; color: var(--text); }
+.anom-msg { font-size: 13px; font-weight: 600; color: var(--text); }
 .anom-explain {
   font-size: 12px;
   color: var(--text-secondary);
   margin-top: 2px;
   line-height: 1.4;
 }
-.anom-actions { display: inline-flex; gap: 6px; margin-top: 6px; }
+.anom-actions { display: inline-flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 .anom-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
   padding: 3px 9px;
   border-radius: 99px;
@@ -226,6 +354,15 @@ onBeforeUnmount(() => {
 }
 .anom-chip:hover { background: var(--surface-2); color: var(--text); }
 .anom-chip--ghost { border-color: transparent; }
+.anom-unread-dot {
+  position: absolute;
+  top: 12px;
+  right: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgb(var(--v-theme-primary));
+}
 .fade-enter-active, .fade-leave-active { transition: opacity .14s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

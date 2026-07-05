@@ -257,6 +257,9 @@ onBeforeUnmount(() => {
   font-size: 10px;
   font-weight: 700;
   font-family: var(--font-mono);
+  /* The topbar's inherited 22px line-height was taller than the 16px badge and
+     pushed the digit out of view — pin it to 1 so the count centers. */
+  line-height: 1;
   display: grid;
   place-items: center;
   border: 2px solid var(--surface);

@@ -3,6 +3,13 @@ export default [
     heading: 'Analytics',
   },
   {
+    title: 'Compare Periods',
+    icon: { icon: 'bx-git-compare' },
+    to: 'analytics-compare',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
     title: 'Shift Analytics',
     icon: { icon: 'bx-time-five' },
     to: 'shift-analytics',

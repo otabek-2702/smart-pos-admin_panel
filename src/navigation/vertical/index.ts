@@ -7,6 +7,13 @@ import system from './system'
 import type { VerticalNavItems } from '@/@layouts/types'
 
 export default [
+  {
+    title: 'Compare Periods',
+    icon: { icon: 'bx-git-compare' },
+    to: 'analytics-compare',
+    action: 'manage',
+    subject: 'all',
+  },
   ...dashboard,
   ...management,
   ...hr,

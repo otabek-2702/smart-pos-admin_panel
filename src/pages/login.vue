@@ -8,7 +8,7 @@ import { themeConfig } from '@themeConfig'
 import axiosIns from '@/plugins/axios'
 import ability from '@/plugins/casl/ability'
 import { useApiError } from '@/composables/useApiError'
-import { setBusinessDayStart } from '@/composables/useBusinessDay'
+import { hydrateBusinessSettings, setBusinessDayStart } from '@/composables/useBusinessDay'
 
 const { t, locale } = useI18n({ useScope: 'global' })
 const { translate } = useApiError()
@@ -67,6 +67,10 @@ const login = async () => {
         localStorage.setItem('userData', JSON.stringify({ ...user, ...me }))
     }
     catch { /* noop — keep prior default */ }
+
+    // Pull operating-hours settings (day-start + working open/close) from
+    // /app-settings so the picker's "Working hours" filter is correct.
+    void hydrateBusinessSettings()
 
     // Temporary: grant manage-all to every authenticated user. Backend still
     // enforces per-endpoint via @admin_required / @permission_required, so

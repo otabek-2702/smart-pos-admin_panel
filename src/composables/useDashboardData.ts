@@ -17,11 +17,16 @@
    ============================================================ */
 import { computed, ref } from 'vue'
 import axiosIns from '@/plugins/axios'
+import { buildDateParams } from '@/composables/useBusinessDay'
 
 export interface DashRange {
   from: string
   to: string
   preset?: string
+  // Time-of-day filter (Working hours / custom) + granularity flow through to
+  // every sub-dashboard via buildDateParams. Empty time = whole day.
+  fromTime?: string
+  toTime?: string
 }
 
 // Today payload shape (subset — only the fields FE consumes today).
@@ -101,10 +106,8 @@ async function fetchShared(range: DashRange | null | undefined): Promise<void> {
   currentRange.value = range ?? null
   try {
     if (hasRange(range)) {
-      // /dashboard?from=&to=
-      const params: Record<string, string> = {}
-      if (range?.from) params.from = range.from
-      if (range?.to) params.to = range.to
+      // /dashboard?from=&to=(&tod_from=&tod_to=&granularity=)
+      const params = buildDateParams(range)
       const res = await axiosIns.get('/dashboard', { params })
       const data = res.data?.data ?? res.data ?? {}
       shared.value = { ...data, __source: 'range' }

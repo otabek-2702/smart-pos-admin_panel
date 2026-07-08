@@ -3877,5 +3877,9 @@
   "New — no value in the baseline period": "Новый — не было в базовом периоде",
   "No change": "Без изменений",
   "up": "рост",
-  "down": "падение"
+  "down": "падение",
+  "Working hours": "Рабочие часы",
+  "Whole day": "Весь день",
+  "Operating hours": "Часы работы",
+  "The open window used by the “Working hours” time filter.": "Окно, которое использует фильтр «Рабочие часы»."
 }

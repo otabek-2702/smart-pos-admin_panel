@@ -11,6 +11,7 @@ import BarChart from '@/components/design/BarChart.vue'
 import { fmtAbbr, fmtNum } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
 import { useDashboardData } from '@/composables/useDashboardData'
+import { buildDateParams } from '@/composables/useBusinessDay'
 import type { Tone } from '@/components/design/utils'
 // MOCK_DASH dropped — real BE data only. /dashboard/sales endpoint pending (BACKEND_TODO item 11).
 export interface ChannelDay { day: string; hall: number; delivery: number; pickup: number }
@@ -282,10 +283,10 @@ function sparkTrend(values: number[]): 'up' | 'down' | 'flat' {
 async function loadDashboard() {
   loading.value = true
   try {
-    const params: Record<string, string> = {}
     const r = sharedRange.value
-    if (r?.from && r?.to) { params.from = r.from; params.to = r.to }
-    else params.range = r?.preset || '30d'
+    const params: Record<string, string> = (r?.from && r?.to)
+      ? buildDateParams({ from: r.from, to: r.to, fromTime: r.fromTime, toTime: r.toTime })
+      : { range: r?.preset || '30d' }
     const res = await axiosIns.get('/dashboard/sales', { params })
     const raw = res.data?.data ?? res.data
     // BE channelDays shape: { day, hall, delivery, pickup }. FE stacked-bar

@@ -24,6 +24,7 @@ import StackedBar from '@/components/design/charts/StackedBar.vue'
 import { fmtAbbr, fmtNum } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
 import { useDashboardData } from '@/composables/useDashboardData'
+import { buildDateParams } from '@/composables/useBusinessDay'
 // staffFixture mock dropped — real BE data only (Abrorbek deployed /staff/performance 2026-06-25).
 
 const { t } = useI18n({ useScope: 'global' })
@@ -111,7 +112,7 @@ async function loadStaff() {
   try {
     const sr = sharedRange.value
     const params: Record<string, string> = (sr?.from && sr?.to)
-      ? { from: sr.from, to: sr.to }
+      ? buildDateParams({ from: sr.from, to: sr.to, fromTime: sr.fromTime, toTime: sr.toTime })
       : { range: sr?.preset || '30d' }
     const res = await axiosIns.get('/staff/performance', { params })
     const raw = res.data?.data ?? res.data

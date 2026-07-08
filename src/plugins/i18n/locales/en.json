@@ -3975,5 +3975,9 @@
   "New — no value in the baseline period": "New — no value in the baseline period",
   "No change": "No change",
   "up": "up",
-  "down": "down"
+  "down": "down",
+  "Working hours": "Working hours",
+  "Whole day": "Whole day",
+  "Operating hours": "Operating hours",
+  "The open window used by the “Working hours” time filter.": "The open window used by the “Working hours” time filter."
 }

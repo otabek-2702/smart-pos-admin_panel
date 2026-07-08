@@ -5,7 +5,7 @@ import routes from '~pages'
 import { canNavigate } from '@layouts/plugins/casl'
 import { armMotion, replayMotion } from '@/composables/useAlphaMotion'
 import axiosIns from '@/plugins/axios'
-import { setBusinessDayStart } from '@/composables/useBusinessDay'
+import { hydrateBusinessSettings, setBusinessDayStart } from '@/composables/useBusinessDay'
 import { getStoredUserData } from '@/utils/storage'
 
 // Hydrate business_day_start from /auth-me at app boot for users who logged
@@ -15,6 +15,10 @@ import { getStoredUserData } from '@/utils/storage'
 // Only runs when logged in; one-shot per page load; failures are non-fatal.
 function hydrateBusinessDayStart() {
   if (!isUserLoggedIn()) return
+  // Operating-hours settings (day-start + working open/close) are owned by the
+  // backend at /app-settings; pull all three on every authenticated boot so the
+  // working-hours window reflects the server, not just the cached day-start.
+  void hydrateBusinessSettings()
   // Skip if we already have a cached value to avoid a request on every reload.
   // Login + Settings update keep this localStorage key fresh.
   try {

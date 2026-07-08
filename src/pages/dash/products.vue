@@ -24,6 +24,7 @@ import Affinity from '@/components/design/Affinity.vue'
 import { fmtAbbr } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
 import { useDashboardData } from '@/composables/useDashboardData'
+import { buildDateParams } from '@/composables/useBusinessDay'
 
 const { t } = useI18n({ useScope: 'global' })
 const { formatCurrency } = useFormatters()
@@ -250,14 +251,19 @@ async function loadDashboard() {
       return { from: isoDate(prevFrom), to: isoDate(prevTo) }
     })()
 
+    // Same time-of-day filter (Working hours / custom) on the current window;
+    // apply it to the previous period too so the delta compares like-for-like.
+    const tod = { fromTime: sr?.fromTime, toTime: sr?.toTime }
+    const curParams = buildDateParams({ from, to, ...tod })
+    const prevParams = buildDateParams({ from: prev.from, to: prev.to, ...tod })
     const [ovRes, catRes, parRes, trRes, ovPrevRes] = await Promise.all([
-      axiosIns.get('/analytics/products/overview', { params: { from, to } }),
-      axiosIns.get('/analytics/products/categories', { params: { from, to } }),
-      axiosIns.get('/analytics/products/pareto', { params: { from, to } }),
-      axiosIns.get('/analytics/products/trends', { params: { from, to, top_n: 6 } }),
+      axiosIns.get('/analytics/products/overview', { params: curParams }),
+      axiosIns.get('/analytics/products/categories', { params: curParams }),
+      axiosIns.get('/analytics/products/pareto', { params: curParams }),
+      axiosIns.get('/analytics/products/trends', { params: { ...curParams, top_n: 6 } }),
       // Previous-period overview so we can compute units30dDelta + menuRevenueDelta.
       // Best-effort: if it fails, deltas stay null.
-      axiosIns.get('/analytics/products/overview', { params: { from: prev.from, to: prev.to } }).catch(() => null),
+      axiosIns.get('/analytics/products/overview', { params: prevParams }).catch(() => null),
     ])
 
     const ovRaw = ovRes.data?.data ?? ovRes.data

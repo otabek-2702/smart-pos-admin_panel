@@ -3873,5 +3873,9 @@
   "New — no value in the baseline period": "Yangi — bazaviy davrda qiymat yo‘q",
   "No change": "O‘zgarishsiz",
   "up": "o‘sish",
-  "down": "pasayish"
+  "down": "pasayish",
+  "Working hours": "Ish soatlari",
+  "Whole day": "Kun bo‘yi",
+  "Operating hours": "Ish vaqti",
+  "The open window used by the “Working hours” time filter.": "«Ish soatlari» vaqt filtri uchun ishlatiladigan ochiq oyna."
 }

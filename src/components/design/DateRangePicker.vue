@@ -12,6 +12,7 @@
 import DesignIcon from './DesignIcon.vue'
 import TimeRange from './TimeRange.vue'
 import { cx } from './utils'
+import { businessToday, useBusinessDay } from '@/composables/useBusinessDay'
 
 export interface DateRangeValue {
   from: string
@@ -42,6 +43,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n({ useScope: 'global' })
+const biz = useBusinessDay()
 
 const current = computed<DateRangeValue>(() => props.modelValue ?? props.value ?? { from: '', to: '', preset: 'all' })
 
@@ -98,13 +100,12 @@ const PRESETS: { key: PresetKey, label: string }[] = [
   { key: 'all', label: 'All time' },
 ]
 
-const TIME_PRESETS: { key: string, label: string, from: string, to: string }[] = [
-  { key: 'open', label: 'Open hours', from: '09:00', to: '23:00' },
-  { key: 'lunch', label: 'Lunch', from: '12:00', to: '15:00' },
-  { key: 'dinner', label: 'Dinner', from: '18:00', to: '22:00' },
-  { key: 'late', label: 'Late night', from: '22:00', to: '02:00' },
-  { key: 'allday', label: 'All day', from: '00:00', to: '23:59' },
-]
+// Only two presets: Working hours (from the persisted business_open/close) and
+// Whole day (clears the time-of-day filter). Everything else is Custom.
+const TIME_PRESETS = computed<{ key: string, label: string, from: string, to: string }[]>(() => [
+  { key: 'open', label: 'Working hours', from: biz.open.value, to: biz.close.value },
+  { key: 'allday', label: 'Whole day', from: '', to: '' },
+])
 
 function fmtShort(d: Date): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getFullYear()}`
@@ -120,7 +121,7 @@ function matchPreset(from: Date | null, to: Date | null, today: Date): string | 
   return null
 }
 
-const today = startOfDay(new Date())
+const today = businessToday()
 const open = ref(false)
 const root = ref<HTMLElement | null>(null)
 
@@ -225,39 +226,37 @@ function emitChange(v: DateRangeValue) {
   emit('change', v)
 }
 
+/* Date range and time-of-day always travel together — either Apply button
+   emits the full combined value so a picked date preset keeps the chosen
+   time-of-day filter (and vice-versa). Whole day = empty fromTime/toTime. */
+function emitCombined(dateFrom: Date | null, dateTo: Date | null, preset?: string) {
+  const tval = dateTo || dateFrom
+  emitChange({
+    from: dateFrom ? ymd(dateFrom) : '',
+    to: tval ? ymd(tval) : '',
+    preset: preset ?? matchPreset(dateFrom, tval, today) ?? undefined,
+    fromTime: fromTime.value,
+    toTime: toTime.value,
+  })
+}
+
 function applyPreset(key: PresetKey) {
   const [a, b] = presetRange(key, today)
   from.value = a; to.value = b; hover.value = null
   if (a) view.value = new Date(a.getFullYear(), a.getMonth(), 1)
-  emitChange({ from: a ? ymd(a) : '', to: b ? ymd(b) : '', preset: key })
+  emitCombined(a, b, key)
   open.value = false
 }
 
 function apply() {
-  const f = from.value
-  const tval = to.value || from.value
-  emitChange({
-    from: f ? ymd(f) : '',
-    to: tval ? ymd(tval) : '',
-    preset: matchPreset(f, tval, today) ?? undefined,
-    mode: 'date',
-    fromTime: '',
-    toTime: '',
-  })
+  emitCombined(from.value, to.value || from.value)
   open.value = false
 }
 
 function applyTime() {
-  const vf = parseYmd(current.value.from)
-  const vt = parseYmd(current.value.to)
-  emitChange({
-    from: vf ? ymd(vf) : '',
-    to: vt ? ymd(vt) : '',
-    preset: matchPreset(vf, vt, today) ?? undefined,
-    mode: 'time',
-    fromTime: fromTime.value,
-    toTime: toTime.value,
-  })
+  const vf = parseYmd(current.value.from) || from.value
+  const vt = parseYmd(current.value.to) || to.value
+  emitCombined(vf, vt)
   open.value = false
 }
 
@@ -275,33 +274,38 @@ function clearTime() {
 
 const valFrom = computed(() => parseYmd(current.value.from))
 const valTo = computed(() => parseYmd(current.value.to))
-const valMode = computed<'date' | 'time'>(() => (current.value.mode as any) || 'date')
 const activePreset = computed(() => matchPreset(valFrom.value, valTo.value, today))
 const draftActive = computed(() => matchPreset(from.value, to.value, today))
 
 const triggerLabel = computed(() => {
-  // time-mode display takes priority when active + has values
-  if (valMode.value === 'time' && (current.value.fromTime || current.value.toTime)) {
-    const tp = TIME_PRESETS.find(x => x.from === current.value.fromTime && x.to === current.value.toTime)
-    if (tp) return t(tp.label)
-    return `${current.value.fromTime || '00:00'} – ${current.value.toTime || '23:59'}`
-  }
+  let base: string
   if (activePreset.value && activePreset.value !== 'all') {
     const p = PRESETS.find(x => x.key === activePreset.value)
-    if (p) return t(p.label)
+    base = p ? t(p.label) : t(props.placeholder)
   }
-  if (valFrom.value && valTo.value)
-    return sameDay(valFrom.value, valTo.value)
+  else if (valFrom.value && valTo.value) {
+    base = sameDay(valFrom.value, valTo.value)
       ? fmtShort(valFrom.value)
       : `${fmtShort(valFrom.value)} – ${fmtShort(valTo.value)}`
-  if (valFrom.value) return `${t('From')} ${fmtShort(valFrom.value)}`
-  return t(props.placeholder)
+  }
+  else if (valFrom.value) {
+    base = `${t('From')} ${fmtShort(valFrom.value)}`
+  }
+  else {
+    base = t(props.placeholder)
+  }
+  // Append the time-of-day filter when one is active (Working hours / custom).
+  const tf = current.value.fromTime
+  const tt = current.value.toTime
+  if (tf && tt) {
+    const tp = TIME_PRESETS.value.find(x => x.from === tf && x.to === tt)
+    base += ` · ${tp ? t(tp.label) : `${tf}–${tt}`}`
+  }
+  return base
 })
 
 const hasValue = computed(() => !!(
-  valFrom.value
-  || valTo.value
-  || (valMode.value === 'time' && (current.value.fromTime || current.value.toTime))
+  valFrom.value || valTo.value || (current.value.fromTime && current.value.toTime)
 ))
 
 const draftLabel = computed(() => {
@@ -380,7 +384,7 @@ function setMode(m: 'date' | 'time') {
       :class="cx('drp-trigger', hasValue && 'has-value', open && 'is-open')"
       @click="open = !open"
     >
-      <DesignIcon :name="valMode === 'time' ? 'clock' : 'calendar'" :size="17" />
+      <DesignIcon name="calendar" :size="17" />
       <span class="drp-trigger__label">{{ triggerLabel }}</span>
       <DesignIcon name="chevdown" :size="15" class="drp-trigger__chev" />
     </button>

@@ -8,6 +8,7 @@
    ============================================================ */
 import { ORDER_STATUS_COLOR as statusColor } from '@/constants/statusColors'
 import axios from '@/plugins/axios'
+import { buildDateParams } from '@/composables/useBusinessDay'
 import Badge from '@/components/design/Badge.vue'
 import Button from '@/components/design/Button.vue'
 import Checkbox from '@/components/design/Checkbox.vue'
@@ -39,7 +40,7 @@ const itemsPerPage = ref(10)
 const statusFilter = ref<string[]>([])
 const paymentFilter = ref<string | undefined>(undefined)
 const search = ref('')
-const dateRange = ref<{ from: string, to: string, preset?: string }>({ from: '', to: '', preset: 'all' })
+const dateRange = ref<{ from: string, to: string, preset?: string, fromTime?: string, toTime?: string }>({ from: '', to: '', preset: 'all' })
 const dateFrom = computed({ get: () => dateRange.value.from, set: v => dateRange.value = { ...dateRange.value, from: v } })
 const dateTo = computed({ get: () => dateRange.value.to, set: v => dateRange.value = { ...dateRange.value, to: v } })
 // New filters mirroring BE /orders query params
@@ -114,10 +115,10 @@ async function loadOrders() {
       params.payment_status = paymentFilter.value
     if (search.value.trim())
       params.search = search.value.trim()
-    if (dateFrom.value)
-      params.date_from = dateFrom.value
-    if (dateTo.value)
-      params.date_to = dateTo.value
+    Object.assign(params, buildDateParams({
+      from: dateFrom.value, to: dateTo.value,
+      fromTime: dateRange.value.fromTime, toTime: dateRange.value.toTime,
+    }, { orders: true }))
     if (orderTypeFilter.value)
       params.order_type = orderTypeFilter.value
     if (cashierFilter.value)
@@ -140,9 +141,10 @@ async function loadOrders() {
 
 async function loadStats() {
   try {
-    const params: any = {}
-    if (dateFrom.value) params.date_from = dateFrom.value
-    if (dateTo.value) params.date_to = dateTo.value
+    const params: any = buildDateParams({
+      from: dateFrom.value, to: dateTo.value,
+      fromTime: dateRange.value.fromTime, toTime: dateRange.value.toTime,
+    }, { orders: true })
     if (cashierFilter.value) params.cashier_id = cashierFilter.value
     const res = await axios.get('/orders/stats', { params })
 

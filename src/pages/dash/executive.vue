@@ -14,6 +14,7 @@ import BarChart from '@/components/design/BarChart.vue'
 import { fmtAbbr, fmtNum } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
 import { useDashboardData } from '@/composables/useDashboardData'
+import { buildDateParams } from '@/composables/useBusinessDay'
 import type { Tone } from '@/components/design/utils'
 
 /* ============================================================
@@ -334,10 +335,11 @@ async function loadDashboard() {
     const sr = sharedRange.value
     if (sr?.from && sr?.to) { from = sr.from; to = sr.to }
     else { const d = rangeDatesExec(30); from = d.from; to = d.to }
+    const params = buildDateParams({ from, to, fromTime: sr?.fromTime, toTime: sr?.toTime })
     const [rangeRes, todayRes, salesRes] = await Promise.all([
-      axiosIns.get('/dashboard', { params: { from, to } }),
+      axiosIns.get('/dashboard', { params }),
       axiosIns.get('/dashboard/today').catch(() => null),
-      axiosIns.get('/dashboard/sales', { params: { from, to } }).catch(() => null),
+      axiosIns.get('/dashboard/sales', { params }).catch(() => null),
     ])
     const rangePayload = rangeRes.data?.data ?? rangeRes.data ?? {}
     const mapped = mapRangePayload(rangePayload)

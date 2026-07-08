@@ -111,11 +111,13 @@ async function loadShared(): Promise<void> {
     from: dateRange.value?.from ?? '',
     to: dateRange.value?.to ?? '',
     preset: dateRange.value?.preset,
+    fromTime: dateRange.value?.fromTime,
+    toTime: dateRange.value?.toTime,
   })
 }
 
 watch(
-  () => [dateRange.value?.from, dateRange.value?.to],
+  () => [dateRange.value?.from, dateRange.value?.to, dateRange.value?.fromTime, dateRange.value?.toTime],
   () => { void loadShared() },
 )
 

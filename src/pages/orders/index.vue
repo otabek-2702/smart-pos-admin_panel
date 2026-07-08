@@ -916,52 +916,28 @@ function onPaymentToggle(p: string) {
           <IconAction icon="more" :title="t('More')" />
         </template>
 
-        <!-- Expanded row: order items -->
+        <!-- Expanded row: order items (compact) -->
         <template #expanded="{ row: o }">
-          <div class="kpi__label" style="margin-bottom: 10px;">
-            {{ t('Order Items') }}
-          </div>
-          <div class="tablewrap">
-            <table
-              class="dtable"
-              style="background: var(--surface); border-radius: 10px; border: 1px solid var(--border); overflow: hidden;"
-            >
-              <thead>
-                <tr>
-                  <th>{{ t('Product') }}</th>
-                  <th class="num">
-                    {{ t('Qty') }}
-                  </th>
-                  <th class="num">
-                    {{ t('Price') }}
-                  </th>
-                  <th class="num">
-                    {{ t('Subtotal') }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(li, i) in ((o.items ?? []) as any[])" :key="i">
-                  <td class="cell-strong">
-                    {{ li.product__name ?? '—' }}
-                  </td>
-                  <td class="num mono">
-                    {{ li.quantity ?? '—' }}
-                  </td>
-                  <td class="num mono cell-muted">
-                    {{ formatCurrency(li.price ?? 0) }}
-                  </td>
-                  <td class="num mono cell-strong">
-                    {{ formatCurrency((Number(li.price) || 0) * (li.quantity ?? 1)) }}
-                  </td>
-                </tr>
-                <tr v-if="!(o.items?.length)">
-                  <td colspan="4" class="center cell-muted">
-                    {{ t('No items') }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div class="oitems">
+            <div class="oitems__head">
+              <span class="oitems__title">{{ t('Order Items') }}</span>
+              <span v-if="o.items?.length" class="oitems__count">{{ o.items.length }}</span>
+            </div>
+            <div v-if="o.items?.length" class="oitems__list">
+              <div
+                v-for="(li, i) in ((o.items ?? []) as any[])"
+                :key="i"
+                class="oitems__item"
+              >
+                <span class="oitems__qty">{{ li.quantity ?? 1 }}×</span>
+                <span class="oitems__name" :title="li.product__name ?? ''">{{ li.product__name ?? '—' }}</span>
+                <span class="oitems__unit">{{ formatCurrency(li.price ?? 0) }}</span>
+                <span class="oitems__sub">{{ formatCurrency((Number(li.price) || 0) * (li.quantity ?? 1)) }}</span>
+              </div>
+            </div>
+            <div v-else class="oitems__empty">
+              {{ t('No items') }}
+            </div>
           </div>
 
           <!-- Per-method payment breakdown (additive port from v3) -->
@@ -1234,12 +1210,70 @@ function onPaymentToggle(p: string) {
   }
 }
 
-/* --- Expanded row inner table --- */
-:deep(.tablewrap) {
-  overflow-x: auto;
+/* --- Expanded row: compact order items --- */
+.oitems {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md, 10px);
+  padding: 8px 10px;
 }
-:deep(.tablewrap .dtable) {
-  min-width: 480px;
+.oitems__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-block-end: 6px;
+}
+.oitems__title {
+  font-size: var(--fs-label, 11px);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label, 0.04em);
+  font-weight: 700;
+  color: var(--text-tertiary);
+}
+.oitems__count {
+  font: 600 11px/1 var(--font-mono);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 2px 7px;
+  color: var(--text-secondary);
+}
+.oitems__list { display: flex; flex-direction: column; }
+.oitems__item {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: 12px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  font-size: 13px;
+}
+.oitems__item:nth-child(odd) { background: var(--surface); }
+.oitems__qty { font: 600 12px/1.3 var(--font-mono); color: var(--primary); }
+.oitems__name {
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oitems__unit {
+  font: 12px/1.3 var(--font-mono);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.oitems__sub {
+  font: 600 13px/1.3 var(--font-mono);
+  color: var(--text);
+  text-align: right;
+  min-width: 78px;
+  white-space: nowrap;
+}
+.oitems__empty {
+  padding: 8px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-tertiary);
 }
 
 /* --- Modal mobile safety --- */

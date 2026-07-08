@@ -47,20 +47,27 @@ const dateTo = computed({ get: () => dateRange.value.to, set: v => dateRange.val
 const orderTypeFilter = ref<string | undefined>(undefined)
 const cashierFilter = ref<string | undefined>(undefined)
 const categoryFilter = ref<string[]>([])
-// Lookups for cashier / category selects
+const productFilter = ref<string[]>([])
+// Lookups for cashier / category / product selects
 const cashierOptions = ref<{ value: string, label: string }[]>([])
 const categoryOptions = ref<{ value: string, label: string }[]>([])
+const productOptions = ref<{ value: string, label: string }[]>([])
+const productSearch = ref('')
 const statusPickerOpen = ref(false)
 const categoryPickerOpen = ref(false)
+const productPickerOpen = ref(false)
 const statusPickerRef = ref<HTMLElement | null>(null)
 const categoryPickerRef = ref<HTMLElement | null>(null)
+const productPickerRef = ref<HTMLElement | null>(null)
 
 // Close popovers when clicking outside their root + close one when opening
 // the other (so they don't stack overlapping content).
 onClickOutside(statusPickerRef, () => { statusPickerOpen.value = false })
 onClickOutside(categoryPickerRef, () => { categoryPickerOpen.value = false })
-watch(statusPickerOpen, (v) => { if (v) categoryPickerOpen.value = false })
-watch(categoryPickerOpen, (v) => { if (v) statusPickerOpen.value = false })
+onClickOutside(productPickerRef, () => { productPickerOpen.value = false })
+watch(statusPickerOpen, (v) => { if (v) { categoryPickerOpen.value = false; productPickerOpen.value = false } })
+watch(categoryPickerOpen, (v) => { if (v) { statusPickerOpen.value = false; productPickerOpen.value = false } })
+watch(productPickerOpen, (v) => { if (v) { statusPickerOpen.value = false; categoryPickerOpen.value = false } })
 
 const expanded = ref<Set<number | string>>(new Set())
 const selected = ref<Set<number | string>>(new Set())
@@ -125,6 +132,8 @@ async function loadOrders() {
       params.cashier_id = cashierFilter.value
     if (categoryFilter.value.length)
       params.category_ids = categoryFilter.value.join(',')
+    if (productFilter.value.length)
+      params.product_ids = productFilter.value.join(',')
     const res = await axios.get('/orders', { params })
     const d = res.data?.data
 
@@ -146,6 +155,8 @@ async function loadStats() {
       fromTime: dateRange.value.fromTime, toTime: dateRange.value.toTime,
     }, { orders: true })
     if (cashierFilter.value) params.cashier_id = cashierFilter.value
+    if (categoryFilter.value.length) params.category_ids = categoryFilter.value.join(',')
+    if (productFilter.value.length) params.product_ids = productFilter.value.join(',')
     const res = await axios.get('/orders/stats', { params })
 
     stats.value = res.data?.data ?? res.data
@@ -179,15 +190,35 @@ async function loadCategoriesLookup() {
   catch { /* ignore */ }
 }
 
+async function loadProductsLookup() {
+  try {
+    const res = await axios.get('/products', { params: { per_page: 500 } })
+    const d = res.data?.data ?? res.data
+    const list: any[] = d?.products ?? d?.items ?? []
+    productOptions.value = list.map((p: any) => ({
+      value: String(p.id),
+      label: p.name ?? String(p.id),
+    }))
+  }
+  catch { /* ignore */ }
+}
+// Products can be numerous — filter the picker list by a search box.
+const productOptionsFiltered = computed(() => {
+  const q = productSearch.value.trim().toLowerCase()
+  if (!q) return productOptions.value
+  return productOptions.value.filter(p => p.label.toLowerCase().includes(q))
+})
+
 onMounted(() => {
   loadOrders()
   loadStats()
   loadCashiers()
   loadCategoriesLookup()
+  loadProductsLookup()
 })
 
 watch([page, itemsPerPage], loadOrders)
-watch([statusFilter, paymentFilter, dateRange, orderTypeFilter, cashierFilter, categoryFilter], () => {
+watch([statusFilter, paymentFilter, dateRange, orderTypeFilter, cashierFilter, categoryFilter, productFilter], () => {
   page.value = 1
   loadOrders()
   loadStats()
@@ -386,7 +417,7 @@ const rangeEnd = computed(() => Math.min(page.value * itemsPerPage.value, totalO
 // ---- filter chips ----
 const hasFilters = computed(() =>
   !!(search.value || statusFilter.value.length || paymentFilter.value || dateFrom.value || dateTo.value
-    || orderTypeFilter.value || cashierFilter.value || categoryFilter.value.length),
+    || orderTypeFilter.value || cashierFilter.value || categoryFilter.value.length || productFilter.value.length),
 )
 function clearAll() {
   search.value = ''
@@ -396,6 +427,7 @@ function clearAll() {
   orderTypeFilter.value = undefined
   cashierFilter.value = undefined
   categoryFilter.value = []
+  productFilter.value = []
 }
 function cashierLabel(id: string | undefined) {
   if (!id) return ''
@@ -403,6 +435,9 @@ function cashierLabel(id: string | undefined) {
 }
 function categoryLabel(id: string) {
   return categoryOptions.value.find(o => o.value === id)?.label ?? id
+}
+function productLabel(id: string) {
+  return productOptions.value.find(o => o.value === id)?.label ?? id
 }
 
 // ---- formatters ----
@@ -679,6 +714,57 @@ function onPaymentToggle(p: string) {
           </div>
         </div>
 
+        <!-- Product multi-select (popover, searchable) -->
+        <div ref="productPickerRef" class="tb-filter tb-filter--md" style="position: relative;">
+          <div
+            class="control control--select"
+            style="cursor: pointer;"
+            tabindex="0"
+            @click="productPickerOpen = !productPickerOpen"
+            @keydown.enter.prevent="productPickerOpen = !productPickerOpen"
+          >
+            <span
+              :style="{ color: productFilter.length ? 'var(--text)' : 'var(--text-tertiary)', flex: 1, paddingInline: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }"
+            >
+              {{ productFilter.length
+                ? productFilter.map(id => productLabel(id)).join(', ')
+                : t('All products') }}
+            </span>
+            <DesignIcon name="chevdown" :size="18" class="chev" />
+          </div>
+          <div
+            v-if="productPickerOpen"
+            class="card"
+            style="position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:50; padding:8px; max-height:300px; overflow:auto;"
+          >
+            <Input
+              v-model="productSearch"
+              :placeholder="t('Search products')"
+              size="sm"
+              style="margin-bottom:6px;"
+            />
+            <div
+              v-for="p in productOptionsFiltered"
+              :key="p.value"
+              class="row"
+              style="gap:8px; padding:6px 4px; cursor:pointer;"
+              @click="productFilter = productFilter.includes(p.value)
+                ? productFilter.filter(x => x !== p.value)
+                : [...productFilter, p.value]"
+            >
+              <Checkbox :model-value="productFilter.includes(p.value)" />
+              <span>{{ p.label }}</span>
+            </div>
+            <div
+              v-if="!productOptionsFiltered.length"
+              class="cell-muted"
+              style="padding:8px; text-align:center; font-size:13px;"
+            >
+              {{ t('No matching products') }}
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- Compact filter strip: single date range popover + payment segmented control -->
@@ -760,6 +846,13 @@ function onPaymentToggle(p: string) {
           <span v-for="cid in categoryFilter" :key="`cat-${cid}`" class="chip">
             <span>{{ t('Category') }}: <b>{{ categoryLabel(cid) }}</b></span>
             <span class="chip__x" @click="categoryFilter = categoryFilter.filter(x => x !== cid)">
+              <DesignIcon name="close" :size="13" />
+            </span>
+          </span>
+
+          <span v-for="pid in productFilter" :key="`prod-${pid}`" class="chip">
+            <span>{{ t('Product') }}: <b>{{ productLabel(pid) }}</b></span>
+            <span class="chip__x" @click="productFilter = productFilter.filter(x => x !== pid)">
               <DesignIcon name="close" :size="13" />
             </span>
           </span>

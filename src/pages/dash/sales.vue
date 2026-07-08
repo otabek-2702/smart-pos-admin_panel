@@ -130,9 +130,12 @@ const bullets = computed<BulletItem[]>(() => [])
 // Day count comes from channelDays' hall+delivery+pickup sum, revenue from
 // revenue30. Each bar carries the formatted value as a top-label.
 function shortDay(label: string): string {
+  const s = label || ''
+  // Single-day view returns hourly "HH:00" buckets — show them as-is.
+  if (/^\d{1,2}:\d{2}$/.test(s)) return s
   // BE dayLabels look like "2026-06-09" — surface "09" for compactness.
-  const m = /(\d{2})$/.exec(label || '')
-  return m ? m[1] : (label || '').slice(-5)
+  const m = /(\d{2})$/.exec(s)
+  return m ? m[1] : s.slice(-5)
 }
 const ordersByDay = computed(() => {
   const D = data.value

@@ -95,6 +95,9 @@ const heroKpis = computed(() => {
 // Number of days in the currently-loaded range — drives the metrics-chart
 // subtitle so it no longer hard-says "last 30 days" when the picker changed.
 const rangeDays = computed(() => data.value?.dayLabels?.length || 0)
+// A single business-day comes back as HH:00 hourly buckets — the subtitle must
+// then read "hourly", not "24 days".
+const isHourly = computed(() => /^\d{1,2}:\d{2}$/.test(String(data.value?.dayLabels?.[0] ?? '')))
 
 // ---------- SwitchChart-lite state (inline until phase 2) ----------
 type MetricKey = 'rev' | 'ord' | 'aov'
@@ -544,7 +547,7 @@ void locale
                 class="kpi__label"
                 style="margin-bottom: 3px;"
               >
-                {{ rangeDays ? t('Performance · {n} days', { n: rangeDays }) : t('Performance') }}
+                {{ isHourly ? t('Performance · hourly') : rangeDays ? t('Performance · {n} days', { n: rangeDays }) : t('Performance') }}
               </div>
               <h3 v-if="insightStr" class="card__insight">
                 {{ insightStr }}

@@ -30,11 +30,15 @@ const { formatDate } = useFormatters()
 // ============================================================
 // State
 // ============================================================
+// Full, unpaged dataset. The backend `/employees/` list endpoint ignores
+// search / department / contract / is_active query params (the view only
+// forwards page + per_page), so filtering and search are done client-side
+// here over the complete set. Restaurant headcount is small, so we page
+// through the API once and keep everything in memory.
 const employees = ref<any[]>([])
 const total = ref(0)
 const loading = ref(false)
 const stats = ref<any>(null)
-const page = ref(1)
 const itemsPerPage = ref(20)
 const search = ref('')
 const departmentFilter = ref<string>('')
@@ -90,25 +94,60 @@ function fmtMoney(n: number | string | null | undefined): string {
 }
 
 // ============================================================
+// Client-side filtering (backend list ignores filter params)
+// ============================================================
+const filteredEmployees = computed(() => {
+  let rows = employees.value
+  const q = search.value.trim().toLowerCase()
+  if (q) {
+    rows = rows.filter((e: any) => {
+      const name = `${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}`.toLowerCase()
+      return name.includes(q)
+        || (e.user?.email ?? '').toLowerCase().includes(q)
+        || (e.position ?? '').toLowerCase().includes(q)
+        || (e.phone ?? '').toLowerCase().includes(q)
+        || (e.department?.name ?? '').toLowerCase().includes(q)
+    })
+  }
+  if (departmentFilter.value)
+    rows = rows.filter((e: any) => String(e.department?.id ?? '') === departmentFilter.value)
+  if (contractTypeFilter.value)
+    rows = rows.filter((e: any) => e.contract_type === contractTypeFilter.value)
+  if (activeFilter.value !== '')
+    rows = rows.filter((e: any) => Boolean(e.is_active) === (activeFilter.value === 'true'))
+  return rows
+})
+
+// Payroll math derived from the loaded set (BE stats omits these).
+const activeEmployees = computed(() => employees.value.filter((e: any) => e.is_active))
+const monthlyPayroll = computed(() =>
+  activeEmployees.value.reduce((s: number, e: any) => s + Number(e.base_salary || 0), 0),
+)
+const avgSalary = computed(() =>
+  activeEmployees.value.length ? monthlyPayroll.value / activeEmployees.value.length : null,
+)
+
+// ============================================================
 // API
 // ============================================================
 async function load() {
   loading.value = true
   try {
-    const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value)
-      params.search = search.value
-    if (departmentFilter.value)
-      params.department_id = Number(departmentFilter.value)
-    if (contractTypeFilter.value)
-      params.contract_type = contractTypeFilter.value
-    if (activeFilter.value !== '')
-      params.is_active = activeFilter.value === 'true'
-    const res = await axios.get('/employees/', { params })
-    const d = res.data?.data ?? res.data
-
-    employees.value = d?.employees ?? []
-    total.value = d?.pagination?.total ?? employees.value.length
+    // Page through the API and accumulate every employee. Backend caps
+    // per_page at 100; the loop guard prevents any runaway on bad data.
+    const acc: any[] = []
+    let p = 1
+    for (let i = 0; i < 50; i++) {
+      const res = await axios.get('/employees/', { params: { page: p, per_page: 100 } })
+      const d = res.data?.data ?? res.data
+      const batch: any[] = d?.employees ?? []
+      acc.push(...batch)
+      total.value = d?.pagination?.total ?? acc.length
+      if (!d?.pagination?.has_next || batch.length === 0)
+        break
+      p += 1
+    }
+    employees.value = acc
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Failed to load'), 'error')
@@ -151,10 +190,8 @@ async function loadUsers() {
 }
 
 onMounted(() => { load(); loadStats(); loadDepartments(); loadUsers() })
-watch([page, itemsPerPage], load)
-const debounced = useDebounceFn(() => { page.value = 1; load() }, 400)
-watch(search, debounced)
-watch([departmentFilter, contractTypeFilter, activeFilter], () => { page.value = 1; load() })
+// Search + filters run client-side over the in-memory set (see load()),
+// so they need no refetch — the `filteredEmployees` computed reacts to them.
 
 // ============================================================
 // Form helpers
@@ -316,7 +353,7 @@ const kpiActive = computed(() => ({
   tone: 'success' as const,
 }))
 const kpiDepartments = computed(() => ({
-  label: t('Departments'),
+  label: t('hr_employees_kpi_departments'),
   // BE stats does not return a department count — derive from loaded departments list.
   value: departments.value.length || (stats.value ? 0 : null),
   icon: 'building',
@@ -324,11 +361,14 @@ const kpiDepartments = computed(() => ({
 }))
 const kpiAvgSalary = computed(() => ({
   label: t('hr_employees_kpi_avg_salary'),
-  // BE stats does not return avg_salary; show null (dash) until BE provides it.
-  value: stats.value?.avg_salary != null ? Number(stats.value.avg_salary) : null,
+  // BE stats omits avg_salary; compute it from the loaded active-employee set.
+  value: employees.value.length ? avgSalary.value : null,
   icon: 'wallet',
   tone: 'warning' as const,
   money: true,
+  sub: employees.value.length
+    ? t('hr_employees_payroll_sub', { total: `${fmtMoney(monthlyPayroll.value)} UZS` })
+    : undefined,
 }))
 
 // ============================================================
@@ -346,13 +386,44 @@ const columns: DataTableColumn<any>[] = [
   { key: 'is_active', label: t('Status'), sortable: true, width: 110 },
 ]
 
-const tablePagination = computed(() => ({
-  page: page.value,
-  perPage: itemsPerPage.value,
-  total: total.value,
-  onPage: (n: number) => { page.value = n },
-  onPerPage: (n: number) => { itemsPerPage.value = n; page.value = 1 },
-}))
+// ============================================================
+// CSV export — exports the currently filtered set (client-side, no BE endpoint)
+// ============================================================
+function exportCsv() {
+  const rows = filteredEmployees.value
+  if (!rows.length) {
+    notify(t('hr_employees_export_empty'), 'warning')
+
+    return
+  }
+  const cols: Array<[string, (e: any) => any]> = [
+    [t('Name'), e => `${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}`.trim()],
+    [t('Email'), e => e.user?.email ?? ''],
+    [t('Position'), e => e.position ?? ''],
+    [t('Department'), e => e.department?.name ?? ''],
+    [t('Contract Type'), e => (e.contract_type ? t(`contract_type_${e.contract_type}`) : '')],
+    [t('Phone'), e => e.phone ?? ''],
+    [t('Pay schedule'), e => (e.payment_frequency ? t(`payment_frequency_${e.payment_frequency}`) : '')],
+    [t('Base Salary'), e => e.base_salary ?? ''],
+    [t('Hire Date'), e => e.hire_date ?? ''],
+    [t('Status'), e => (e.is_active ? t('Active') : t('Inactive'))],
+  ]
+  const head = cols.map(c => `"${c[0]}"`).join(',')
+  const body = rows.map(e =>
+    cols.map(c => `"${String(c[1](e) ?? '').replace(/"/g, '""')}"`).join(','),
+  ).join('\n')
+  const csv = `﻿${head}\n${body}\n`
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `employees-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  notify(t('hr_employees_export_done', { n: rows.length }), 'success')
+}
 
 // ============================================================
 // Filter chips
@@ -423,6 +494,14 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
       :subtitle="t('hr_employees_subtitle')"
     >
       <template #actions>
+        <Button
+          variant="secondary"
+          icon="download"
+          :disabled="loading || filteredEmployees.length === 0"
+          @click="exportCsv"
+        >
+          {{ t('hr_employees_export') }}
+        </Button>
         <Button
           variant="primary"
           icon="plus"
@@ -510,6 +589,10 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
           >
             {{ t('Clear all') }}
           </button>
+          <span
+            class="tertiary hr-emp__count"
+            style="font-size:13px;"
+          >{{ t('hr_employees_count_label', { shown: filteredEmployees.length, total: total }) }}</span>
         </div>
       </div>
 
@@ -517,10 +600,11 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 
       <DataTable
         :columns="columns"
-        :rows="employees"
+        :rows="filteredEmployees"
         row-key="id"
         :loading="loading"
-        :pagination="tablePagination"
+        :per-page="itemsPerPage"
+        :per-page-options="[10, 20, 50]"
         :initial-sort="{ key: 'hire_date', dir: 'desc' }"
       >
         <template #cell.name="{ row }">
@@ -879,6 +963,10 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.hr-emp__count {
+  margin-inline-start: auto;
 }
 
 @media (max-width: 900px) {

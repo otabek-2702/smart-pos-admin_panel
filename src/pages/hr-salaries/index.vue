@@ -17,6 +17,7 @@ import Kpi from '@/components/design/Kpi.vue'
 import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
+import StateFill from '@/components/design/StateFill.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -232,7 +233,23 @@ const kpiTotal = computed(() => ({
   icon: 'trending-up',
   tone: 'primary' as const,
   money: true,
+  sub: summary.value?.count != null ? t('{n} employees', { n: summary.value.count }) : undefined,
 }))
+
+// ============================================================
+// Contextual empty state
+// ============================================================
+const hasActiveFilters = computed(() =>
+  !!(statusFilter.value || periodFilter.value || employeeFilter.value),
+)
+
+const emptyTitle = computed(() =>
+  hasActiveFilters.value ? t('No matching salaries') : t('salary_empty_title'),
+)
+
+const emptySub = computed(() =>
+  hasActiveFilters.value ? t('Nothing matches your filters.') : t('salary_empty_sub'),
+)
 
 // ============================================================
 // Columns
@@ -300,6 +317,77 @@ async function approveOne(s: any) {
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
   }
+}
+
+// ============================================================
+// Bulk approve selected pending rows
+// (no bulk endpoint exists — loop the per-row /approve/ route)
+// ============================================================
+const bulkApproving = ref(false)
+
+async function approveSelected(rows: any[], clear: () => void) {
+  const pending = rows.filter((r: any) => r.status === 'PENDING')
+  if (!pending.length) {
+    notify(t('No pending salaries in selection'), 'warning')
+    return
+  }
+  bulkApproving.value = true
+  let ok = 0
+  try {
+    for (const r of pending) {
+      try {
+        await axios.post(`/salaries/${r.id}/approve/`)
+        ok++
+      }
+      catch { /* skip individual failures, keep going */ }
+    }
+    notify(t('{n} salaries approved', { n: ok }), ok ? 'success' : 'error')
+    clear()
+    await Promise.all([load(), loadSummary()])
+  }
+  finally {
+    bulkApproving.value = false
+  }
+}
+
+// ============================================================
+// CSV export of the currently loaded payroll rows
+// (scoped to the current page; no BE export endpoint exists)
+// ============================================================
+function exportCsv() {
+  const rows = items.value
+  if (!rows.length) {
+    notify(t('Nothing to export yet'), 'warning')
+    return
+  }
+  const cols: Array<[string, (s: any) => any]> = [
+    [t('Employee'), s => employeeName(s)],
+    [t('Position'), s => s.employee?.position ?? ''],
+    [t('Period'), s => fmtPeriod(s)],
+    [t('Base'), s => s.base_amount ?? 0],
+    [t('Bonus'), s => s.bonus ?? 0],
+    [t('Deduction'), s => s.deduction ?? 0],
+    [t('Net'), s => s.net_amount ?? 0],
+    [t('Status'), s => t(`salary_status_${s.status}`)],
+    [t('Payment method'), s => (s.payment_method ? t(`payment_method_${s.payment_method}`) : '')],
+    [t('Paid at'), s => s.paid_at ?? ''],
+  ]
+  const head = cols.map(c => `"${c[0]}"`).join(',')
+  const body = rows
+    .map((s: any) => cols.map(c => `"${String(c[1](s) ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+  const csv = `﻿${head}\n${body}\n`
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const stamp = periodFilter.value || new Date().toISOString().slice(0, 7)
+  a.href = url
+  a.download = `payroll-${stamp}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  notify(t('Exported {n} salaries', { n: rows.length }), 'success')
 }
 
 // ============================================================
@@ -531,6 +619,14 @@ function employeeName(row: any): string {
     >
       <template #actions>
         <Button
+          variant="ghost"
+          icon="download"
+          :disabled="!items.length"
+          @click="exportCsv"
+        >
+          {{ t('Export CSV') }}
+        </Button>
+        <Button
           variant="secondary"
           icon="settings"
           @click="openGenerate"
@@ -631,9 +727,48 @@ function employeeName(row: any): string {
         row-key="id"
         :loading="loading"
         :pagination="tablePagination"
+        selectable
       >
+        <template #bulk-actions="{ selected, clear }">
+          <Button
+            variant="primary"
+            icon="check"
+            size="sm"
+            :loading="bulkApproving"
+            :disabled="bulkApproving"
+            @click="approveSelected(selected, clear)"
+          >
+            {{ t('Approve selected') }}
+          </Button>
+        </template>
+
+        <template #empty>
+          <StateFill
+            icon="dollar"
+            :title="emptyTitle"
+            :sub="emptySub"
+          >
+            <template #action>
+              <Button
+                v-if="!hasActiveFilters"
+                variant="primary"
+                icon="settings"
+                @click="openGenerate"
+              >
+                {{ t('Generate') }}
+              </Button>
+            </template>
+          </StateFill>
+        </template>
+
         <template #cell.employee="{ row }">
-          <span class="cell-strong">{{ employeeName(row) }}</span>
+          <div class="sal-emp">
+            <span class="cell-strong">{{ employeeName(row) }}</span>
+            <span
+              v-if="row.employee?.position"
+              class="cell-muted sal-emp__pos"
+            >{{ row.employee.position }}</span>
+          </div>
         </template>
 
         <template #cell.period="{ row }">
@@ -1236,6 +1371,18 @@ meta:
   font-size: var(--fs-label);
   color: rgb(var(--v-theme-text-secondary));
   margin-top: 8px;
+}
+
+.sal-emp {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sal-emp__pos {
+  font-size: var(--fs-label);
+  line-height: 1.2;
 }
 
 .t-success {

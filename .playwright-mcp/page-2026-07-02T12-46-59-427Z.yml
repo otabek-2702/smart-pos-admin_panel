@@ -1,0 +1,2843 @@
+- generic [ref=f79e5]:
+  - generic [ref=f79e6]:
+    - complementary [ref=f79e7]:
+      - generic [ref=f79e8]:
+        - img [ref=f79e10]
+        - generic [ref=f79e12]: Alpha POS
+      - navigation [ref=f79e13]:
+        - link "Boshqaruv paneli" [ref=f79e14] [cursor=pointer]:
+          - /url: /
+          - img [ref=f79e16]
+          - generic [ref=f79e18]: Boshqaruv paneli
+        - link "AI yordamchi" [ref=f79e19] [cursor=pointer]:
+          - /url: /ai-assistant
+          - img [ref=f79e21]
+          - generic [ref=f79e25]: AI yordamchi
+        - link "Smenalar" [ref=f79e26] [cursor=pointer]:
+          - /url: /shifts-analytics
+          - img [ref=f79e28]
+          - generic [ref=f79e31]: Smenalar
+        - generic [ref=f79e32]: Boshqaruv
+        - link "Foydalanuvchilar" [ref=f79e33] [cursor=pointer]:
+          - /url: /users
+          - img [ref=f79e35]
+          - generic [ref=f79e38]: Foydalanuvchilar
+        - link "Kategoriyalar" [ref=f79e39] [cursor=pointer]:
+          - /url: /categories
+          - img [ref=f79e41]
+          - generic [ref=f79e46]: Kategoriyalar
+        - link "Mahsulotlar" [ref=f79e47] [cursor=pointer]:
+          - /url: /products
+          - img [ref=f79e49]
+          - generic [ref=f79e52]: Mahsulotlar
+        - link "Buyurtmalar" [ref=f79e53] [cursor=pointer]:
+          - /url: /orders
+          - img [ref=f79e55]
+          - generic [ref=f79e58]: Buyurtmalar
+        - link "Zallar va stollar" [ref=f79e59] [cursor=pointer]:
+          - /url: /places
+          - img [ref=f79e61]
+          - generic [ref=f79e64]: Zallar va stollar
+        - link "Chegirmalar" [ref=f79e65] [cursor=pointer]:
+          - /url: /discounts
+          - img [ref=f79e67]
+          - generic [ref=f79e70]: Chegirmalar
+        - link "Kassa" [ref=f79e71] [cursor=pointer]:
+          - /url: /cashbox/categories
+          - img [ref=f79e73]
+          - generic [ref=f79e76]: Kassa
+        - link "Xazina" [ref=f79e77] [cursor=pointer]:
+          - /url: /treasury
+          - img [ref=f79e79]
+          - generic [ref=f79e81]: Xazina
+        - link "Sodiqlik" [ref=f79e82] [cursor=pointer]:
+          - /url: /loyalty
+          - img [ref=f79e84]
+          - generic [ref=f79e87]: Sodiqlik
+        - link "Sessiyalar" [ref=f79e88] [cursor=pointer]:
+          - /url: /sessions
+          - img [ref=f79e90]
+          - generic [ref=f79e93]: Sessiyalar
+        - generic [ref=f79e94]: Kadrlar
+        - link "Xodimlar" [ref=f79e95] [cursor=pointer]:
+          - /url: /hr-employees
+          - img [ref=f79e97]
+          - generic [ref=f79e100]: Xodimlar
+        - link "Bo'limlar" [ref=f79e101] [cursor=pointer]:
+          - /url: /hr-departments
+          - img [ref=f79e103]
+          - generic [ref=f79e107]: Bo'limlar
+        - link "Maoshlar" [ref=f79e108] [cursor=pointer]:
+          - /url: /hr-salaries
+          - img [ref=f79e110]
+          - generic [ref=f79e113]: Maoshlar
+        - link "HR kassa" [ref=f79e114] [cursor=pointer]:
+          - /url: /hr-cash
+          - img [ref=f79e116]
+          - generic [ref=f79e120]: HR kassa
+        - link "HR hujjatlar" [ref=f79e121] [cursor=pointer]:
+          - /url: /hr-documents
+          - img [ref=f79e123]
+          - generic [ref=f79e126]: HR hujjatlar
+        - link "Tadbirlar" [ref=f79e127] [cursor=pointer]:
+          - /url: /hr-events
+          - img [ref=f79e129]
+          - generic [ref=f79e131]: Tadbirlar
+        - link "Xarajat kategoriyalari" [ref=f79e132] [cursor=pointer]:
+          - /url: /hr-expense-categories
+          - img [ref=f79e134]
+          - generic [ref=f79e139]: Xarajat kategoriyalari
+        - link "Maqsadlar" [ref=f79e140] [cursor=pointer]:
+          - /url: /hr-goals
+          - img [ref=f79e142]
+          - generic [ref=f79e146]: Maqsadlar
+        - link "Ta'til qoldiqlari" [ref=f79e147] [cursor=pointer]:
+          - /url: /hr-leave-balances
+          - img [ref=f79e149]
+          - generic [ref=f79e152]: Ta'til qoldiqlari
+        - link "Ta'til turlari" [ref=f79e153] [cursor=pointer]:
+          - /url: /hr-leave-types
+          - img [ref=f79e155]
+          - generic [ref=f79e158]: Ta'til turlari
+        - link "Sharhlar" [ref=f79e159] [cursor=pointer]:
+          - /url: /hr-reviews
+          - img [ref=f79e161]
+          - generic [ref=f79e163]: Sharhlar
+        - link "Smena shablonlari" [ref=f79e164] [cursor=pointer]:
+          - /url: /shift-templates
+          - img [ref=f79e166]
+          - generic [ref=f79e169]: Smena shablonlari
+        - generic [ref=f79e170]: Ombor
+        - link "Ombor ogohlantirishlari" [ref=f79e171] [cursor=pointer]:
+          - /url: /stock/alerts
+          - img [ref=f79e173]
+          - generic [ref=f79e176]: Ombor ogohlantirishlari
+        - link "Qabul qilish" [ref=f79e177] [cursor=pointer]:
+          - /url: /stock/receiving
+          - img [ref=f79e179]
+          - generic [ref=f79e182]: Qabul qilish
+        - link "Tuzatishlar" [ref=f79e183] [cursor=pointer]:
+          - /url: /stock/adjustments
+          - img [ref=f79e185]
+          - generic [ref=f79e189]: Tuzatishlar
+        - link "Zaxiralar" [ref=f79e190] [cursor=pointer]:
+          - /url: /stock/reservations
+          - img [ref=f79e192]
+          - generic [ref=f79e195]: Zaxiralar
+        - generic [ref=f79e196]: Sozlamalar
+        - link "QR kodlar" [ref=f79e197] [cursor=pointer]:
+          - /url: /qr-codes
+          - img [ref=f79e199]
+          - generic [ref=f79e204]: QR kodlar
+        - generic [ref=f79e205]: Bildirishnomalar
+        - link "Bildirishnoma navbati" [ref=f79e206] [cursor=pointer]:
+          - /url: /notification-queue
+          - img [ref=f79e208]
+          - generic [ref=f79e211]: Bildirishnoma navbati
+        - link "Bildirishnoma sozlamalari" [ref=f79e212] [cursor=pointer]:
+          - /url: /notification-settings
+          - img [ref=f79e214]
+          - generic [ref=f79e218]: Bildirishnoma sozlamalari
+        - link "Bildirishnoma shablonlari" [ref=f79e219] [cursor=pointer]:
+          - /url: /notification-templates
+          - img [ref=f79e221]
+          - generic [ref=f79e224]: Bildirishnoma shablonlari
+        - link "Bildirishnoma turlari" [ref=f79e225] [cursor=pointer]:
+          - /url: /notification-types
+          - img [ref=f79e227]
+          - generic [ref=f79e230]: Bildirishnoma turlari
+    - generic [ref=f79e231]:
+      - banner [ref=f79e232]:
+        - button "Yon panelni almashtirish" [ref=f79e233] [cursor=pointer]:
+          - img [ref=f79e234]
+        - generic [ref=f79e237]:
+          - generic [ref=f79e238]: Alpha POS
+          - img [ref=f79e239]
+          - generic [ref=f79e241]: Tahlil
+        - button "Ogohlantirishlar yo'q" [ref=f79e243] [cursor=pointer]:
+          - img [ref=f79e244]
+        - button "Sozlamalar" [ref=f79e248] [cursor=pointer]:
+          - img [ref=f79e249]
+        - button "Mavzuni almashtirish" [ref=f79e252] [cursor=pointer]:
+          - img [ref=f79e253]
+        - generic [ref=f79e255]: RL
+      - main [ref=f79e256]:
+        - generic [ref=f79e257]:
+          - generic [ref=f79e258]:
+            - generic [ref=f79e259]:
+              - heading "Smenalar" [level=1] [ref=f79e260]
+              - generic [ref=f79e261]: Kassirlarni yarashtirish va smena oxiridagi naqdni qabul qilish
+            - generic [ref=f79e262]:
+              - button "Yangilash" [ref=f79e263] [cursor=pointer]:
+                - img [ref=f79e264]
+                - text: Yangilash
+              - button "Eksport" [ref=f79e267] [cursor=pointer]:
+                - img [ref=f79e268]
+                - text: Eksport
+          - generic [ref=f79e270]:
+            - generic [ref=f79e271]:
+              - generic [ref=f79e272]:
+                - img [ref=f79e274]
+                - generic [ref=f79e277]: Hozir faol
+              - generic [ref=f79e3483]: "3"
+              - generic [ref=f79e280]: faol smenalar
+            - generic [ref=f79e281]:
+              - generic [ref=f79e282]:
+                - img [ref=f79e284]
+                - generic [ref=f79e288]: Naqd kutilmoqda
+              - generic [ref=f79e3484]: "10"
+              - generic [ref=f79e291]: yarashtirish kerak
+            - generic [ref=f79e292]:
+              - generic [ref=f79e293]:
+                - img [ref=f79e295]
+                - generic [ref=f79e299]: Qabul qilinadigan naqd
+              - generic [ref=f79e3485]: 23.96MUZS
+              - generic [ref=f79e302]: 10 ta smena bo'yicha
+            - generic [ref=f79e303]:
+              - generic [ref=f79e304]:
+                - img [ref=f79e306]
+                - generic [ref=f79e309]: Sof farq
+              - generic [ref=f79e3486]: +1.05M
+              - generic [ref=f79e312]: bugun yarashtirildi
+          - generic [ref=f79e314]:
+            - generic [ref=f79e316] [cursor=pointer]:
+              - img [ref=f79e317]
+              - combobox [ref=f79e320]:
+                - option "Barcha kassirlar" [selected]
+                - option "Dilnoza Saidova"
+                - option "Bek Toshev"
+                - option "Aziz Karimov"
+              - img [ref=f79e321]
+            - generic [ref=f79e324] [cursor=pointer]:
+              - img [ref=f79e325]
+              - combobox [ref=f79e327]:
+                - option "Barcha holatlar" [selected]
+                - option "Faol"
+                - option "Yakunlangan (yakunlash kerak)"
+                - option "Tugagan"
+                - option "Tashlangan"
+              - img [ref=f79e328]
+            - generic [ref=f79e331] [cursor=pointer]:
+              - img [ref=f79e332]
+              - combobox [ref=f79e334]:
+                - option "Barcha shablonlar" [selected]
+                - option "Night"
+                - option "Morning"
+                - option "Evening"
+              - img [ref=f79e335]
+            - generic [ref=f79e337]:
+              - button "Kassir" [ref=f79e338] [cursor=pointer]
+              - button "Menejer" [ref=f79e339] [cursor=pointer]
+              - button "Barcha xodimlar" [ref=f79e340] [cursor=pointer]
+            - generic [ref=f79e341]:
+              - textbox [ref=f79e343]:
+                - /placeholder: Sanadan
+              - generic [ref=f79e344]: →
+              - textbox [ref=f79e346]:
+                - /placeholder: Sanagacha
+            - generic [ref=f79e348] [cursor=pointer]:
+              - switch [ref=f79e349]
+              - text: Faqat faollar
+          - generic [ref=f79e3487]:
+            - generic [ref=f79e3488]:
+              - generic [ref=f79e3489]:
+                - generic [ref=f79e3490]: OW
+                - generic [ref=f79e3491]:
+                  - generic [ref=f79e3492]: Onyx Walker
+                  - generic [ref=f79e3493]: "Smena #91 · Night"
+                - generic [ref=f79e3494]: Naqd topshirilishini kutmoqda
+              - generic [ref=f79e3495]:
+                - generic [ref=f79e3496]:
+                  - generic [ref=f79e3497]: 17.06 14:56
+                  - img [ref=f79e3498]
+                  - generic [ref=f79e3500]: 02.07 17:46
+                - generic [ref=f79e3501]:
+                  - img [ref=f79e3502]
+                  - text: 362h 50m
+              - generic [ref=f79e3505]:
+                - generic [ref=f79e3506]:
+                  - generic [ref=f79e3507]: Buyurtmalar
+                  - generic [ref=f79e3508]: "0"
+                - generic [ref=f79e3509]:
+                  - generic [ref=f79e3510]: Yalpi
+                  - generic [ref=f79e3511]: "0"
+                - generic [ref=f79e3512]:
+                  - generic [ref=f79e3513]: Sof
+                  - generic [ref=f79e3514]: "0"
+              - generic [ref=f79e3516]:
+                - generic [ref=f79e3518]: Qabul qilinadigan naqd
+                - generic [ref=f79e3520]: 0 UZS
+                - generic [ref=f79e3521]:
+                  - generic [ref=f79e3522]:
+                    - img [ref=f79e3523]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e3527]: "0"
+                - generic [ref=f79e3528]:
+                  - generic [ref=f79e3529]:
+                    - img [ref=f79e3530]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e3532]: "0"
+              - generic [ref=f79e3534]:
+                - generic [ref=f79e3535]: O'rtacha chek 0
+                - generic [ref=f79e3536]: Mahsulotlar —
+                - generic [ref=f79e3537]: O'rt. tayyorlash —
+                - generic [ref=f79e3538]: Eng band —
+              - generic [ref=f79e3539]:
+                - button "Naqd qabul qilish" [ref=f79e3540] [cursor=pointer]:
+                  - img [ref=f79e3541]
+                  - text: Naqd qabul qilish
+                - button "Hisobot" [ref=f79e3543] [cursor=pointer]:
+                  - img [ref=f79e3544]
+                  - text: Hisobot
+            - generic [ref=f79e3547]:
+              - generic [ref=f79e3548]:
+                - generic [ref=f79e3549]: NA
+                - generic [ref=f79e3550]:
+                  - generic [ref=f79e3551]: Noah Anderson
+                  - generic [ref=f79e3552]: "Smena #92 · Morning"
+                - generic [ref=f79e3553]: Faol
+              - generic [ref=f79e3554]:
+                - generic [ref=f79e3555]:
+                  - generic [ref=f79e3556]: 17.06 14:56
+                  - img [ref=f79e3557]
+                  - generic [ref=f79e3559]: davom etmoqda
+                - generic [ref=f79e3560]:
+                  - img [ref=f79e3561]
+                  - text: 362h 50m
+              - generic [ref=f79e3564]:
+                - generic [ref=f79e3565]:
+                  - generic [ref=f79e3566]: Buyurtmalar
+                  - generic [ref=f79e3567]: "0"
+                - generic [ref=f79e3568]:
+                  - generic [ref=f79e3569]: Yalpi
+                  - generic [ref=f79e3570]: "0"
+                - generic [ref=f79e3571]:
+                  - generic [ref=f79e3572]: Sof
+                  - generic [ref=f79e3573]: "0"
+              - generic [ref=f79e3575]:
+                - generic [ref=f79e3577]: Qabul qilinadigan naqd
+                - generic [ref=f79e3579]: 0 UZS
+                - generic [ref=f79e3580]:
+                  - generic [ref=f79e3581]:
+                    - img [ref=f79e3582]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e3586]: "0"
+                - generic [ref=f79e3587]:
+                  - generic [ref=f79e3588]:
+                    - img [ref=f79e3589]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e3591]: "0"
+              - generic [ref=f79e3593]:
+                - generic [ref=f79e3594]: O'rtacha chek 0
+                - generic [ref=f79e3595]: Mahsulotlar —
+                - generic [ref=f79e3596]: O'rt. tayyorlash —
+                - generic [ref=f79e3597]: Eng band —
+              - generic [ref=f79e3598]:
+                - button "Jonli hisobot" [ref=f79e3599] [cursor=pointer]:
+                  - img [ref=f79e3600]
+                  - text: Jonli hisobot
+                - button "Smenani yopish" [ref=f79e3603] [cursor=pointer]:
+                  - img [ref=f79e3604]
+                  - text: Smenani yopish
+            - generic [ref=f79e3607]:
+              - generic [ref=f79e3608]:
+                - generic [ref=f79e3609]: OW
+                - generic [ref=f79e3610]:
+                  - generic [ref=f79e3611]: Onyx Walker
+                  - generic [ref=f79e3612]: "Smena #54 · Night"
+                - generic [ref=f79e3613]:
+                  - img [ref=f79e3614]
+                  - text: Tugagan
+              - generic [ref=f79e3617]:
+                - generic [ref=f79e3618]:
+                  - generic [ref=f79e3619]: 16.06 19:10
+                  - img [ref=f79e3620]
+                  - generic [ref=f79e3622]: 17.06 00:59
+                - generic [ref=f79e3623]:
+                  - img [ref=f79e3624]
+                  - text: 5h 49m
+              - generic [ref=f79e3627]:
+                - generic [ref=f79e3628]:
+                  - generic [ref=f79e3629]: Buyurtmalar
+                  - generic [ref=f79e3630]: "34"
+                - generic [ref=f79e3631]:
+                  - generic [ref=f79e3632]: Yalpi
+                  - generic [ref=f79e3633]: 4 999 000
+                - generic [ref=f79e3634]:
+                  - generic [ref=f79e3635]: Sof
+                  - generic [ref=f79e3636]: 4 999 000
+              - generic [ref=f79e3638]:
+                - generic [ref=f79e3639]:
+                  - generic [ref=f79e3640]: Naqd qabul qilindi
+                  - generic [ref=f79e3642]: Aniq
+                - generic [ref=f79e3644]: 1 931 000 UZS
+                - generic [ref=f79e3645]:
+                  - generic [ref=f79e3646]:
+                    - img [ref=f79e3647]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e3651]: 1 931 000
+                - generic [ref=f79e3652]:
+                  - generic [ref=f79e3653]:
+                    - img [ref=f79e3654]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e3656]: 3 068 000
+                - generic [ref=f79e3657]:
+                  - generic [ref=f79e3659]: Sanab chiqilgan 1 931 000 · qabul qildi Onyx Walker
+                  - generic [ref=f79e3660]:
+                    - generic [ref=f79e3661]: Sverka qilingan vaqti
+                    - generic [ref=f79e3662]: 17.06 19:56
+              - generic [ref=f79e3664]:
+                - generic [ref=f79e3665]: O'rtacha chek 147K
+                - generic [ref=f79e3666]: Mahsulotlar —
+                - generic [ref=f79e3667]: O'rt. tayyorlash —
+                - generic [ref=f79e3668]: Eng band —
+              - generic [ref=f79e3669]:
+                - generic [ref=f79e3670]:
+                  - img [ref=f79e3671]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e3674] [cursor=pointer]:
+                  - img [ref=f79e3675]
+                  - text: Hisobot
+            - generic [ref=f79e3678]:
+              - generic [ref=f79e3679]:
+                - generic [ref=f79e3680]: OW
+                - generic [ref=f79e3681]:
+                  - generic [ref=f79e3682]: Onyx Walker
+                  - generic [ref=f79e3683]: "Smena #52 · Morning"
+                - generic [ref=f79e3684]:
+                  - img [ref=f79e3685]
+                  - text: Tugagan
+              - generic [ref=f79e3688]:
+                - generic [ref=f79e3689]:
+                  - generic [ref=f79e3690]: 16.06 15:09
+                  - img [ref=f79e3691]
+                  - generic [ref=f79e3693]: 16.06 22:17
+                - generic [ref=f79e3694]:
+                  - img [ref=f79e3695]
+                  - text: 7h 08m
+              - generic [ref=f79e3698]:
+                - generic [ref=f79e3699]:
+                  - generic [ref=f79e3700]: Buyurtmalar
+                  - generic [ref=f79e3701]: "30"
+                - generic [ref=f79e3702]:
+                  - generic [ref=f79e3703]: Yalpi
+                  - generic [ref=f79e3704]: 3 902 000
+                - generic [ref=f79e3705]:
+                  - generic [ref=f79e3706]: Sof
+                  - generic [ref=f79e3707]: 3 902 000
+              - generic [ref=f79e3709]:
+                - generic [ref=f79e3710]:
+                  - generic [ref=f79e3711]: Naqd qabul qilindi
+                  - generic [ref=f79e3713]: Aniq
+                - generic [ref=f79e3715]: 1 371 000 UZS
+                - generic [ref=f79e3716]:
+                  - generic [ref=f79e3717]:
+                    - img [ref=f79e3718]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e3722]: 1 371 000
+                - generic [ref=f79e3723]:
+                  - generic [ref=f79e3724]:
+                    - img [ref=f79e3725]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e3727]: 2 531 000
+                - generic [ref=f79e3728]:
+                  - generic [ref=f79e3730]: Sanab chiqilgan 1 371 000 · qabul qildi Onyx Walker
+                  - generic [ref=f79e3731]:
+                    - generic [ref=f79e3732]: Sverka qilingan vaqti
+                    - generic [ref=f79e3733]: 17.06 19:56
+              - generic [ref=f79e3735]:
+                - generic [ref=f79e3736]: O'rtacha chek 130.1K
+                - generic [ref=f79e3737]: Mahsulotlar —
+                - generic [ref=f79e3738]: O'rt. tayyorlash —
+                - generic [ref=f79e3739]: Eng band —
+              - generic [ref=f79e3740]:
+                - generic [ref=f79e3741]:
+                  - img [ref=f79e3742]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e3745] [cursor=pointer]:
+                  - img [ref=f79e3746]
+                  - text: Hisobot
+            - generic [ref=f79e3749]:
+              - generic [ref=f79e3750]:
+                - generic [ref=f79e3751]: GT
+                - generic [ref=f79e3752]:
+                  - generic [ref=f79e3753]: Gray Torres
+                  - generic [ref=f79e3754]: "Smena #55 · Morning"
+                - generic [ref=f79e3755]:
+                  - img [ref=f79e3756]
+                  - text: Tugagan
+              - generic [ref=f79e3759]:
+                - generic [ref=f79e3760]:
+                  - generic [ref=f79e3761]: 16.06 15:04
+                  - img [ref=f79e3762]
+                  - generic [ref=f79e3764]: 16.06 23:25
+                - generic [ref=f79e3765]:
+                  - img [ref=f79e3766]
+                  - text: 8h 21m
+              - generic [ref=f79e3769]:
+                - generic [ref=f79e3770]:
+                  - generic [ref=f79e3771]: Buyurtmalar
+                  - generic [ref=f79e3772]: "47"
+                - generic [ref=f79e3773]:
+                  - generic [ref=f79e3774]: Yalpi
+                  - generic [ref=f79e3775]: 6 479 000
+                - generic [ref=f79e3776]:
+                  - generic [ref=f79e3777]: Sof
+                  - generic [ref=f79e3778]: 6 479 000
+              - generic [ref=f79e3780]:
+                - generic [ref=f79e3781]:
+                  - generic [ref=f79e3782]: Naqd qabul qilindi
+                  - generic [ref=f79e3784]: Yetishmovchilik −8 626
+                - generic [ref=f79e3786]: 2 533 374 UZS
+                - generic [ref=f79e3787]:
+                  - generic [ref=f79e3788]:
+                    - img [ref=f79e3789]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e3793]: 2 542 000
+                - generic [ref=f79e3794]:
+                  - generic [ref=f79e3795]:
+                    - img [ref=f79e3796]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e3798]: 3 937 000
+                - generic [ref=f79e3799]:
+                  - generic [ref=f79e3801]: Sanab chiqilgan 2 533 374 · qabul qildi Gray Torres
+                  - generic [ref=f79e3802]:
+                    - generic [ref=f79e3803]: Sverka qilingan vaqti
+                    - generic [ref=f79e3804]: 17.06 19:56
+              - generic [ref=f79e3806]:
+                - generic [ref=f79e3807]: O'rtacha chek 137.9K
+                - generic [ref=f79e3808]: Mahsulotlar —
+                - generic [ref=f79e3809]: O'rt. tayyorlash —
+                - generic [ref=f79e3810]: Eng band —
+              - generic [ref=f79e3811]:
+                - generic [ref=f79e3812]:
+                  - img [ref=f79e3813]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e3816] [cursor=pointer]:
+                  - img [ref=f79e3817]
+                  - text: Hisobot
+            - generic [ref=f79e3820]:
+              - generic [ref=f79e3821]:
+                - generic [ref=f79e3822]: NA
+                - generic [ref=f79e3823]:
+                  - generic [ref=f79e3824]: Noah Anderson
+                  - generic [ref=f79e3825]: "Smena #53 · Night"
+                - generic [ref=f79e3826]:
+                  - img [ref=f79e3827]
+                  - text: Tugagan
+              - generic [ref=f79e3830]:
+                - generic [ref=f79e3831]:
+                  - generic [ref=f79e3832]: 16.06 13:13
+                  - img [ref=f79e3833]
+                  - generic [ref=f79e3835]: 16.06 20:49
+                - generic [ref=f79e3836]:
+                  - img [ref=f79e3837]
+                  - text: 7h 36m
+              - generic [ref=f79e3840]:
+                - generic [ref=f79e3841]:
+                  - generic [ref=f79e3842]: Buyurtmalar
+                  - generic [ref=f79e3843]: "53"
+                - generic [ref=f79e3844]:
+                  - generic [ref=f79e3845]: Yalpi
+                  - generic [ref=f79e3846]: 7 427 000
+                - generic [ref=f79e3847]:
+                  - generic [ref=f79e3848]: Sof
+                  - generic [ref=f79e3849]: 7 427 000
+              - generic [ref=f79e3851]:
+                - generic [ref=f79e3852]:
+                  - generic [ref=f79e3853]: Naqd qabul qilindi
+                  - generic [ref=f79e3855]: Aniq
+                - generic [ref=f79e3857]: 2 826 000 UZS
+                - generic [ref=f79e3858]:
+                  - generic [ref=f79e3859]:
+                    - img [ref=f79e3860]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e3864]: 2 826 000
+                - generic [ref=f79e3865]:
+                  - generic [ref=f79e3866]:
+                    - img [ref=f79e3867]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e3869]: 4 601 000
+                - generic [ref=f79e3870]:
+                  - generic [ref=f79e3872]: Sanab chiqilgan 2 826 000 · qabul qildi Noah Anderson
+                  - generic [ref=f79e3873]:
+                    - generic [ref=f79e3874]: Sverka qilingan vaqti
+                    - generic [ref=f79e3875]: 17.06 19:56
+              - generic [ref=f79e3877]:
+                - generic [ref=f79e3878]: O'rtacha chek 140.1K
+                - generic [ref=f79e3879]: Mahsulotlar —
+                - generic [ref=f79e3880]: O'rt. tayyorlash —
+                - generic [ref=f79e3881]: Eng band —
+              - generic [ref=f79e3882]:
+                - generic [ref=f79e3883]:
+                  - img [ref=f79e3884]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e3887] [cursor=pointer]:
+                  - img [ref=f79e3888]
+                  - text: Hisobot
+            - generic [ref=f79e3891]:
+              - generic [ref=f79e3892]:
+                - generic [ref=f79e3893]: OW
+                - generic [ref=f79e3894]:
+                  - generic [ref=f79e3895]: Onyx Walker
+                  - generic [ref=f79e3896]: "Smena #57 · Morning"
+                - generic [ref=f79e3897]:
+                  - img [ref=f79e3898]
+                  - text: Tugagan
+              - generic [ref=f79e3901]:
+                - generic [ref=f79e3902]:
+                  - generic [ref=f79e3903]: 15.06 15:03
+                  - img [ref=f79e3904]
+                  - generic [ref=f79e3906]: 15.06 21:40
+                - generic [ref=f79e3907]:
+                  - img [ref=f79e3908]
+                  - text: 6h 37m
+              - generic [ref=f79e3911]:
+                - generic [ref=f79e3912]:
+                  - generic [ref=f79e3913]: Buyurtmalar
+                  - generic [ref=f79e3914]: "39"
+                - generic [ref=f79e3915]:
+                  - generic [ref=f79e3916]: Yalpi
+                  - generic [ref=f79e3917]: 5 418 000
+                - generic [ref=f79e3918]:
+                  - generic [ref=f79e3919]: Sof
+                  - generic [ref=f79e3920]: 5 418 000
+              - generic [ref=f79e3922]:
+                - generic [ref=f79e3923]:
+                  - generic [ref=f79e3924]: Naqd qabul qilindi
+                  - generic [ref=f79e3926]: Aniq
+                - generic [ref=f79e3928]: 1 423 000 UZS
+                - generic [ref=f79e3929]:
+                  - generic [ref=f79e3930]:
+                    - img [ref=f79e3931]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e3935]: 1 423 000
+                - generic [ref=f79e3936]:
+                  - generic [ref=f79e3937]:
+                    - img [ref=f79e3938]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e3940]: 3 995 000
+                - generic [ref=f79e3941]:
+                  - generic [ref=f79e3943]: Sanab chiqilgan 1 423 000 · qabul qildi Onyx Walker
+                  - generic [ref=f79e3944]:
+                    - generic [ref=f79e3945]: Sverka qilingan vaqti
+                    - generic [ref=f79e3946]: 17.06 19:56
+              - generic [ref=f79e3948]:
+                - generic [ref=f79e3949]: O'rtacha chek 138.9K
+                - generic [ref=f79e3950]: Mahsulotlar —
+                - generic [ref=f79e3951]: O'rt. tayyorlash —
+                - generic [ref=f79e3952]: Eng band —
+              - generic [ref=f79e3953]:
+                - generic [ref=f79e3954]:
+                  - img [ref=f79e3955]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e3958] [cursor=pointer]:
+                  - img [ref=f79e3959]
+                  - text: Hisobot
+            - generic [ref=f79e3962]:
+              - generic [ref=f79e3963]:
+                - generic [ref=f79e3964]: AT
+                - generic [ref=f79e3965]:
+                  - generic [ref=f79e3966]: Alex Torres
+                  - generic [ref=f79e3967]: "Smena #56 · Night"
+                - generic [ref=f79e3968]:
+                  - img [ref=f79e3969]
+                  - text: Tugagan
+              - generic [ref=f79e3972]:
+                - generic [ref=f79e3973]:
+                  - generic [ref=f79e3974]: 15.06 13:22
+                  - img [ref=f79e3975]
+                  - generic [ref=f79e3977]: 15.06 21:09
+                - generic [ref=f79e3978]:
+                  - img [ref=f79e3979]
+                  - text: 7h 47m
+              - generic [ref=f79e3982]:
+                - generic [ref=f79e3983]:
+                  - generic [ref=f79e3984]: Buyurtmalar
+                  - generic [ref=f79e3985]: "25"
+                - generic [ref=f79e3986]:
+                  - generic [ref=f79e3987]: Yalpi
+                  - generic [ref=f79e3988]: 3 637 000
+                - generic [ref=f79e3989]:
+                  - generic [ref=f79e3990]: Sof
+                  - generic [ref=f79e3991]: 3 637 000
+              - generic [ref=f79e3993]:
+                - generic [ref=f79e3994]:
+                  - generic [ref=f79e3995]: Naqd qabul qilindi
+                  - generic [ref=f79e3997]: Yetishmovchilik −45 648
+                - generic [ref=f79e3999]: 1 070 352 UZS
+                - generic [ref=f79e4000]:
+                  - generic [ref=f79e4001]:
+                    - img [ref=f79e4002]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e4006]: 1 116 000
+                - generic [ref=f79e4007]:
+                  - generic [ref=f79e4008]:
+                    - img [ref=f79e4009]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e4011]: 2 521 000
+                - generic [ref=f79e4012]:
+                  - generic [ref=f79e4014]: Sanab chiqilgan 1 070 352 · qabul qildi Alex Torres
+                  - generic [ref=f79e4015]:
+                    - generic [ref=f79e4016]: Sverka qilingan vaqti
+                    - generic [ref=f79e4017]: 17.06 19:56
+              - generic [ref=f79e4019]:
+                - generic [ref=f79e4020]: O'rtacha chek 145.5K
+                - generic [ref=f79e4021]: Mahsulotlar —
+                - generic [ref=f79e4022]: O'rt. tayyorlash —
+                - generic [ref=f79e4023]: Eng band —
+              - generic [ref=f79e4024]:
+                - generic [ref=f79e4025]:
+                  - img [ref=f79e4026]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e4029] [cursor=pointer]:
+                  - img [ref=f79e4030]
+                  - text: Hisobot
+            - generic [ref=f79e4033]:
+              - generic [ref=f79e4034]:
+                - generic [ref=f79e4035]: OW
+                - generic [ref=f79e4036]:
+                  - generic [ref=f79e4037]: Onyx Walker
+                  - generic [ref=f79e4038]: "Smena #58 · Evening"
+                - generic [ref=f79e4039]: Naqd topshirilishini kutmoqda
+              - generic [ref=f79e4040]:
+                - generic [ref=f79e4041]:
+                  - generic [ref=f79e4042]: 14.06 20:13
+                  - img [ref=f79e4043]
+                  - generic [ref=f79e4045]: 15.06 02:02
+                - generic [ref=f79e4046]:
+                  - img [ref=f79e4047]
+                  - text: 5h 49m
+              - generic [ref=f79e4050]:
+                - generic [ref=f79e4051]:
+                  - generic [ref=f79e4052]: Buyurtmalar
+                  - generic [ref=f79e4053]: "47"
+                - generic [ref=f79e4054]:
+                  - generic [ref=f79e4055]: Yalpi
+                  - generic [ref=f79e4056]: 14 297 000
+                - generic [ref=f79e4057]:
+                  - generic [ref=f79e4058]: Sof
+                  - generic [ref=f79e4059]: 14 297 000
+              - generic [ref=f79e4061]:
+                - generic [ref=f79e4063]: Qabul qilinadigan naqd
+                - generic [ref=f79e4065]: 7 683 000 UZS
+                - generic [ref=f79e4066]:
+                  - generic [ref=f79e4067]:
+                    - img [ref=f79e4068]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e4072]: 7 683 000
+                - generic [ref=f79e4073]:
+                  - generic [ref=f79e4074]:
+                    - img [ref=f79e4075]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e4077]: 6 614 000
+              - generic [ref=f79e4079]:
+                - generic [ref=f79e4080]: O'rtacha chek 304.2K
+                - generic [ref=f79e4081]: Mahsulotlar —
+                - generic [ref=f79e4082]: O'rt. tayyorlash —
+                - generic [ref=f79e4083]: Eng band —
+              - generic [ref=f79e4084]:
+                - button "Naqd qabul qilish" [ref=f79e4085] [cursor=pointer]:
+                  - img [ref=f79e4086]
+                  - text: Naqd qabul qilish
+                - button "Hisobot" [ref=f79e4088] [cursor=pointer]:
+                  - img [ref=f79e4089]
+                  - text: Hisobot
+            - generic [ref=f79e4092]:
+              - generic [ref=f79e4093]:
+                - generic [ref=f79e4094]: OW
+                - generic [ref=f79e4095]:
+                  - generic [ref=f79e4096]: Onyx Walker
+                  - generic [ref=f79e4097]: "Smena #61 · Night"
+                - generic [ref=f79e4098]:
+                  - img [ref=f79e4099]
+                  - text: Tugagan
+              - generic [ref=f79e4102]:
+                - generic [ref=f79e4103]:
+                  - generic [ref=f79e4104]: 14.06 20:06
+                  - img [ref=f79e4105]
+                  - generic [ref=f79e4107]: 15.06 06:00
+                - generic [ref=f79e4108]:
+                  - img [ref=f79e4109]
+                  - text: 9h 54m
+              - generic [ref=f79e4112]:
+                - generic [ref=f79e4113]:
+                  - generic [ref=f79e4114]: Buyurtmalar
+                  - generic [ref=f79e4115]: "59"
+                - generic [ref=f79e4116]:
+                  - generic [ref=f79e4117]: Yalpi
+                  - generic [ref=f79e4118]: 16 473 000
+                - generic [ref=f79e4119]:
+                  - generic [ref=f79e4120]: Sof
+                  - generic [ref=f79e4121]: 16 473 000
+              - generic [ref=f79e4123]:
+                - generic [ref=f79e4124]:
+                  - generic [ref=f79e4125]: Naqd qabul qilindi
+                  - generic [ref=f79e4127]: Aniq
+                - generic [ref=f79e4129]: 9 063 000 UZS
+                - generic [ref=f79e4130]:
+                  - generic [ref=f79e4131]:
+                    - img [ref=f79e4132]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e4136]: 9 063 000
+                - generic [ref=f79e4137]:
+                  - generic [ref=f79e4138]:
+                    - img [ref=f79e4139]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e4141]: 7 410 000
+                - generic [ref=f79e4142]:
+                  - generic [ref=f79e4144]: Sanab chiqilgan 9 063 000 · qabul qildi Onyx Walker
+                  - generic [ref=f79e4145]:
+                    - generic [ref=f79e4146]: Sverka qilingan vaqti
+                    - generic [ref=f79e4147]: 17.06 19:56
+              - generic [ref=f79e4149]:
+                - generic [ref=f79e4150]: O'rtacha chek 279.2K
+                - generic [ref=f79e4151]: Mahsulotlar —
+                - generic [ref=f79e4152]: O'rt. tayyorlash —
+                - generic [ref=f79e4153]: Eng band —
+              - generic [ref=f79e4154]:
+                - generic [ref=f79e4155]:
+                  - img [ref=f79e4156]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e4159] [cursor=pointer]:
+                  - img [ref=f79e4160]
+                  - text: Hisobot
+            - generic [ref=f79e4163]:
+              - generic [ref=f79e4164]:
+                - generic [ref=f79e4165]: AT
+                - generic [ref=f79e4166]:
+                  - generic [ref=f79e4167]: Alex Torres
+                  - generic [ref=f79e4168]: "Smena #60 · Evening"
+                - generic [ref=f79e4169]: Naqd topshirilishini kutmoqda
+              - generic [ref=f79e4170]:
+                - generic [ref=f79e4171]:
+                  - generic [ref=f79e4172]: 14.06 15:18
+                  - img [ref=f79e4173]
+                  - generic [ref=f79e4175]: 15.06 00:13
+                - generic [ref=f79e4176]:
+                  - img [ref=f79e4177]
+                  - text: 8h 55m
+              - generic [ref=f79e4180]:
+                - generic [ref=f79e4181]:
+                  - generic [ref=f79e4182]: Buyurtmalar
+                  - generic [ref=f79e4183]: "45"
+                - generic [ref=f79e4184]:
+                  - generic [ref=f79e4185]: Yalpi
+                  - generic [ref=f79e4186]: 9 997 000
+                - generic [ref=f79e4187]:
+                  - generic [ref=f79e4188]: Sof
+                  - generic [ref=f79e4189]: 9 997 000
+              - generic [ref=f79e4191]:
+                - generic [ref=f79e4193]: Qabul qilinadigan naqd
+                - generic [ref=f79e4195]: 4 781 000 UZS
+                - generic [ref=f79e4196]:
+                  - generic [ref=f79e4197]:
+                    - img [ref=f79e4198]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e4202]: 4 781 000
+                - generic [ref=f79e4203]:
+                  - generic [ref=f79e4204]:
+                    - img [ref=f79e4205]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e4207]: 5 216 000
+              - generic [ref=f79e4209]:
+                - generic [ref=f79e4210]: O'rtacha chek 222.2K
+                - generic [ref=f79e4211]: Mahsulotlar —
+                - generic [ref=f79e4212]: O'rt. tayyorlash —
+                - generic [ref=f79e4213]: Eng band —
+              - generic [ref=f79e4214]:
+                - button "Naqd qabul qilish" [ref=f79e4215] [cursor=pointer]:
+                  - img [ref=f79e4216]
+                  - text: Naqd qabul qilish
+                - button "Hisobot" [ref=f79e4218] [cursor=pointer]:
+                  - img [ref=f79e4219]
+                  - text: Hisobot
+            - generic [ref=f79e4222]:
+              - generic [ref=f79e4223]:
+                - generic [ref=f79e4224]: GT
+                - generic [ref=f79e4225]:
+                  - generic [ref=f79e4226]: Gray Torres
+                  - generic [ref=f79e4227]: "Smena #59 · Night"
+                - generic [ref=f79e4228]:
+                  - img [ref=f79e4229]
+                  - text: Tugagan
+              - generic [ref=f79e4232]:
+                - generic [ref=f79e4233]:
+                  - generic [ref=f79e4234]: 14.06 15:05
+                  - img [ref=f79e4235]
+                  - generic [ref=f79e4237]: 15.06 00:16
+                - generic [ref=f79e4238]:
+                  - img [ref=f79e4239]
+                  - text: 9h 11m
+              - generic [ref=f79e4242]:
+                - generic [ref=f79e4243]:
+                  - generic [ref=f79e4244]: Buyurtmalar
+                  - generic [ref=f79e4245]: "33"
+                - generic [ref=f79e4246]:
+                  - generic [ref=f79e4247]: Yalpi
+                  - generic [ref=f79e4248]: 5 980 000
+                - generic [ref=f79e4249]:
+                  - generic [ref=f79e4250]: Sof
+                  - generic [ref=f79e4251]: 5 980 000
+              - generic [ref=f79e4253]:
+                - generic [ref=f79e4254]:
+                  - generic [ref=f79e4255]: Naqd qabul qilindi
+                  - generic [ref=f79e4257]: Ortiqcha +8 978
+                - generic [ref=f79e4259]: 3 032 978 UZS
+                - generic [ref=f79e4260]:
+                  - generic [ref=f79e4261]:
+                    - img [ref=f79e4262]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e4266]: 3 024 000
+                - generic [ref=f79e4267]:
+                  - generic [ref=f79e4268]:
+                    - img [ref=f79e4269]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e4271]: 2 956 000
+                - generic [ref=f79e4272]:
+                  - generic [ref=f79e4274]: Sanab chiqilgan 3 032 978 · qabul qildi Gray Torres
+                  - generic [ref=f79e4275]:
+                    - generic [ref=f79e4276]: Sverka qilingan vaqti
+                    - generic [ref=f79e4277]: 17.06 19:56
+              - generic [ref=f79e4279]:
+                - generic [ref=f79e4280]: O'rtacha chek 181.2K
+                - generic [ref=f79e4281]: Mahsulotlar —
+                - generic [ref=f79e4282]: O'rt. tayyorlash —
+                - generic [ref=f79e4283]: Eng band —
+              - generic [ref=f79e4284]:
+                - generic [ref=f79e4285]:
+                  - img [ref=f79e4286]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e4289] [cursor=pointer]:
+                  - img [ref=f79e4290]
+                  - text: Hisobot
+            - generic [ref=f79e4293]:
+              - generic [ref=f79e4294]:
+                - generic [ref=f79e4295]: AT
+                - generic [ref=f79e4296]:
+                  - generic [ref=f79e4297]: Alex Torres
+                  - generic [ref=f79e4298]: "Smena #62 · Morning"
+                - generic [ref=f79e4299]:
+                  - img [ref=f79e4300]
+                  - text: Tugagan
+              - generic [ref=f79e4303]:
+                - generic [ref=f79e4304]:
+                  - generic [ref=f79e4305]: 13.06 19:21
+                  - img [ref=f79e4306]
+                  - generic [ref=f79e4308]: 14.06 01:16
+                - generic [ref=f79e4309]:
+                  - img [ref=f79e4310]
+                  - text: 5h 55m
+              - generic [ref=f79e4313]:
+                - generic [ref=f79e4314]:
+                  - generic [ref=f79e4315]: Buyurtmalar
+                  - generic [ref=f79e4316]: "33"
+                - generic [ref=f79e4317]:
+                  - generic [ref=f79e4318]: Yalpi
+                  - generic [ref=f79e4319]: 4 736 000
+                - generic [ref=f79e4320]:
+                  - generic [ref=f79e4321]: Sof
+                  - generic [ref=f79e4322]: 4 736 000
+              - generic [ref=f79e4324]:
+                - generic [ref=f79e4325]:
+                  - generic [ref=f79e4326]: Naqd qabul qilindi
+                  - generic [ref=f79e4328]: Aniq
+                - generic [ref=f79e4330]: 1 904 000 UZS
+                - generic [ref=f79e4331]:
+                  - generic [ref=f79e4332]:
+                    - img [ref=f79e4333]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e4337]: 1 904 000
+                - generic [ref=f79e4338]:
+                  - generic [ref=f79e4339]:
+                    - img [ref=f79e4340]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e4342]: 2 832 000
+                - generic [ref=f79e4343]:
+                  - generic [ref=f79e4345]: Sanab chiqilgan 1 904 000 · qabul qildi Alex Torres
+                  - generic [ref=f79e4346]:
+                    - generic [ref=f79e4347]: Sverka qilingan vaqti
+                    - generic [ref=f79e4348]: 17.06 19:56
+              - generic [ref=f79e4350]:
+                - generic [ref=f79e4351]: O'rtacha chek 143.5K
+                - generic [ref=f79e4352]: Mahsulotlar —
+                - generic [ref=f79e4353]: O'rt. tayyorlash —
+                - generic [ref=f79e4354]: Eng band —
+              - generic [ref=f79e4355]:
+                - generic [ref=f79e4356]:
+                  - img [ref=f79e4357]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e4360] [cursor=pointer]:
+                  - img [ref=f79e4361]
+                  - text: Hisobot
+            - generic [ref=f79e4364]:
+              - generic [ref=f79e4365]:
+                - generic [ref=f79e4366]: JG
+                - generic [ref=f79e4367]:
+                  - generic [ref=f79e4368]: Jules Garcia
+                  - generic [ref=f79e4369]: "Smena #64 · Night"
+                - generic [ref=f79e4370]:
+                  - img [ref=f79e4371]
+                  - text: Tugagan
+              - generic [ref=f79e4374]:
+                - generic [ref=f79e4375]:
+                  - generic [ref=f79e4376]: 13.06 15:04
+                  - img [ref=f79e4377]
+                  - generic [ref=f79e4379]: 13.06 20:10
+                - generic [ref=f79e4380]:
+                  - img [ref=f79e4381]
+                  - text: 5h 06m
+              - generic [ref=f79e4384]:
+                - generic [ref=f79e4385]:
+                  - generic [ref=f79e4386]: Buyurtmalar
+                  - generic [ref=f79e4387]: "60"
+                - generic [ref=f79e4388]:
+                  - generic [ref=f79e4389]: Yalpi
+                  - generic [ref=f79e4390]: 9 567 000
+                - generic [ref=f79e4391]:
+                  - generic [ref=f79e4392]: Sof
+                  - generic [ref=f79e4393]: 9 567 000
+              - generic [ref=f79e4395]:
+                - generic [ref=f79e4396]:
+                  - generic [ref=f79e4397]: Naqd qabul qilindi
+                  - generic [ref=f79e4399]: Aniq
+                - generic [ref=f79e4401]: 2 532 000 UZS
+                - generic [ref=f79e4402]:
+                  - generic [ref=f79e4403]:
+                    - img [ref=f79e4404]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e4408]: 2 532 000
+                - generic [ref=f79e4409]:
+                  - generic [ref=f79e4410]:
+                    - img [ref=f79e4411]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e4413]: 7 035 000
+                - generic [ref=f79e4414]:
+                  - generic [ref=f79e4416]: Sanab chiqilgan 2 532 000 · qabul qildi Jules Garcia
+                  - generic [ref=f79e4417]:
+                    - generic [ref=f79e4418]: Sverka qilingan vaqti
+                    - generic [ref=f79e4419]: 17.06 19:56
+              - generic [ref=f79e4421]:
+                - generic [ref=f79e4422]: O'rtacha chek 159.4K
+                - generic [ref=f79e4423]: Mahsulotlar —
+                - generic [ref=f79e4424]: O'rt. tayyorlash —
+                - generic [ref=f79e4425]: Eng band —
+              - generic [ref=f79e4426]:
+                - generic [ref=f79e4427]:
+                  - img [ref=f79e4428]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e4431] [cursor=pointer]:
+                  - img [ref=f79e4432]
+                  - text: Hisobot
+            - generic [ref=f79e4435]:
+              - generic [ref=f79e4436]:
+                - generic [ref=f79e4437]: RL
+                - generic [ref=f79e4438]:
+                  - generic [ref=f79e4439]: Reese Lewis
+                  - generic [ref=f79e4440]: "Smena #63 · Night"
+                - generic [ref=f79e4441]:
+                  - img [ref=f79e4442]
+                  - text: Tugagan
+              - generic [ref=f79e4445]:
+                - generic [ref=f79e4446]:
+                  - generic [ref=f79e4447]: 13.06 14:03
+                  - img [ref=f79e4448]
+                  - generic [ref=f79e4450]: 13.06 20:36
+                - generic [ref=f79e4451]:
+                  - img [ref=f79e4452]
+                  - text: 6h 33m
+              - generic [ref=f79e4455]:
+                - generic [ref=f79e4456]:
+                  - generic [ref=f79e4457]: Buyurtmalar
+                  - generic [ref=f79e4458]: "43"
+                - generic [ref=f79e4459]:
+                  - generic [ref=f79e4460]: Yalpi
+                  - generic [ref=f79e4461]: 6 177 000
+                - generic [ref=f79e4462]:
+                  - generic [ref=f79e4463]: Sof
+                  - generic [ref=f79e4464]: 6 177 000
+              - generic [ref=f79e4466]:
+                - generic [ref=f79e4467]:
+                  - generic [ref=f79e4468]: Naqd qabul qilindi
+                  - generic [ref=f79e4470]: Ortiqcha +3 071
+                - generic [ref=f79e4472]: 1 827 071 UZS
+                - generic [ref=f79e4473]:
+                  - generic [ref=f79e4474]:
+                    - img [ref=f79e4475]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e4479]: 1 824 000
+                - generic [ref=f79e4480]:
+                  - generic [ref=f79e4481]:
+                    - img [ref=f79e4482]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e4484]: 4 353 000
+                - generic [ref=f79e4485]:
+                  - generic [ref=f79e4487]: Sanab chiqilgan 1 827 071 · qabul qildi Reese Lewis
+                  - generic [ref=f79e4488]:
+                    - generic [ref=f79e4489]: Sverka qilingan vaqti
+                    - generic [ref=f79e4490]: 17.06 19:56
+              - generic [ref=f79e4492]:
+                - generic [ref=f79e4493]: O'rtacha chek 143.7K
+                - generic [ref=f79e4494]: Mahsulotlar —
+                - generic [ref=f79e4495]: O'rt. tayyorlash —
+                - generic [ref=f79e4496]: Eng band —
+              - generic [ref=f79e4497]:
+                - generic [ref=f79e4498]:
+                  - img [ref=f79e4499]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e4502] [cursor=pointer]:
+                  - img [ref=f79e4503]
+                  - text: Hisobot
+            - generic [ref=f79e4506]:
+              - generic [ref=f79e4507]:
+                - generic [ref=f79e4508]: AM
+                - generic [ref=f79e4509]:
+                  - generic [ref=f79e4510]: Avery Miller
+                  - generic [ref=f79e4511]: "Smena #65 · Evening"
+                - generic [ref=f79e4512]: Naqd topshirilishini kutmoqda
+              - generic [ref=f79e4513]:
+                - generic [ref=f79e4514]:
+                  - generic [ref=f79e4515]: 12.06 20:13
+                  - img [ref=f79e4516]
+                  - generic [ref=f79e4518]: 13.06 03:40
+                - generic [ref=f79e4519]:
+                  - img [ref=f79e4520]
+                  - text: 7h 27m
+              - generic [ref=f79e4523]:
+                - generic [ref=f79e4524]:
+                  - generic [ref=f79e4525]: Buyurtmalar
+                  - generic [ref=f79e4526]: "38"
+                - generic [ref=f79e4527]:
+                  - generic [ref=f79e4528]: Yalpi
+                  - generic [ref=f79e4529]: 5 039 000
+                - generic [ref=f79e4530]:
+                  - generic [ref=f79e4531]: Sof
+                  - generic [ref=f79e4532]: 5 039 000
+              - generic [ref=f79e4534]:
+                - generic [ref=f79e4536]: Qabul qilinadigan naqd
+                - generic [ref=f79e4538]: 1 953 000 UZS
+                - generic [ref=f79e4539]:
+                  - generic [ref=f79e4540]:
+                    - img [ref=f79e4541]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e4545]: 1 953 000
+                - generic [ref=f79e4546]:
+                  - generic [ref=f79e4547]:
+                    - img [ref=f79e4548]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e4550]: 3 086 000
+              - generic [ref=f79e4552]:
+                - generic [ref=f79e4553]: O'rtacha chek 132.6K
+                - generic [ref=f79e4554]: Mahsulotlar —
+                - generic [ref=f79e4555]: O'rt. tayyorlash —
+                - generic [ref=f79e4556]: Eng band —
+              - generic [ref=f79e4557]:
+                - button "Naqd qabul qilish" [ref=f79e4558] [cursor=pointer]:
+                  - img [ref=f79e4559]
+                  - text: Naqd qabul qilish
+                - button "Hisobot" [ref=f79e4561] [cursor=pointer]:
+                  - img [ref=f79e4562]
+                  - text: Hisobot
+            - generic [ref=f79e4565]:
+              - generic [ref=f79e4566]:
+                - generic [ref=f79e4567]: TT
+                - generic [ref=f79e4568]:
+                  - generic [ref=f79e4569]: Test TEst
+                  - generic [ref=f79e4570]: "Smena #51 · —"
+                - generic [ref=f79e4571]: Faol
+              - generic [ref=f79e4572]:
+                - generic [ref=f79e4573]:
+                  - generic [ref=f79e4574]: 12.06 19:34
+                  - img [ref=f79e4575]
+                  - generic [ref=f79e4577]: davom etmoqda
+                - generic [ref=f79e4578]:
+                  - img [ref=f79e4579]
+                  - text: 478h 12m
+              - generic [ref=f79e4582]:
+                - generic [ref=f79e4583]:
+                  - generic [ref=f79e4584]: Buyurtmalar
+                  - generic [ref=f79e4585]: "6"
+                - generic [ref=f79e4586]:
+                  - generic [ref=f79e4587]: Yalpi
+                  - generic [ref=f79e4588]: 88 000
+                - generic [ref=f79e4589]:
+                  - generic [ref=f79e4590]: Sof
+                  - generic [ref=f79e4591]: 88 000
+              - generic [ref=f79e4593]:
+                - generic [ref=f79e4595]: Qabul qilinadigan naqd
+                - generic [ref=f79e4597]: 88 000 UZS
+                - generic [ref=f79e4598]:
+                  - generic [ref=f79e4599]:
+                    - img [ref=f79e4600]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e4604]: 88 000
+                - generic [ref=f79e4605]:
+                  - generic [ref=f79e4606]:
+                    - img [ref=f79e4607]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e4609]: "0"
+              - generic [ref=f79e4611]:
+                - generic [ref=f79e4612]: O'rtacha chek 14.7K
+                - generic [ref=f79e4613]: Mahsulotlar —
+                - generic [ref=f79e4614]: O'rt. tayyorlash —
+                - generic [ref=f79e4615]: Eng band —
+              - generic [ref=f79e4616]:
+                - button "Jonli hisobot" [ref=f79e4617] [cursor=pointer]:
+                  - img [ref=f79e4618]
+                  - text: Jonli hisobot
+                - button "Smenani yopish" [ref=f79e4621] [cursor=pointer]:
+                  - img [ref=f79e4622]
+                  - text: Smenani yopish
+            - generic [ref=f79e4625]:
+              - generic [ref=f79e4626]:
+                - generic [ref=f79e4627]: AK
+                - generic [ref=f79e4628]:
+                  - generic [ref=f79e4629]: Aziz Karimov
+                  - generic [ref=f79e4630]: "Smena #50 · —"
+                - generic [ref=f79e4631]: Faol
+              - generic [ref=f79e4632]:
+                - generic [ref=f79e4633]:
+                  - generic [ref=f79e4634]: 12.06 17:19
+                  - img [ref=f79e4635]
+                  - generic [ref=f79e4637]: davom etmoqda
+                - generic [ref=f79e4638]:
+                  - img [ref=f79e4639]
+                  - text: 480h 27m
+              - generic [ref=f79e4642]:
+                - generic [ref=f79e4643]:
+                  - generic [ref=f79e4644]: Buyurtmalar
+                  - generic [ref=f79e4645]: "68"
+                - generic [ref=f79e4646]:
+                  - generic [ref=f79e4647]: Yalpi
+                  - generic [ref=f79e4648]: 17 029 000
+                - generic [ref=f79e4649]:
+                  - generic [ref=f79e4650]: Sof
+                  - generic [ref=f79e4651]: 17 029 000
+              - generic [ref=f79e4653]:
+                - generic [ref=f79e4655]: Qabul qilinadigan naqd
+                - generic [ref=f79e4657]: 6 994 000 UZS
+                - generic [ref=f79e4658]:
+                  - generic [ref=f79e4659]:
+                    - img [ref=f79e4660]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e4664]: 6 994 000
+                - generic [ref=f79e4665]:
+                  - generic [ref=f79e4666]:
+                    - img [ref=f79e4667]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e4669]: 10 035 000
+              - generic [ref=f79e4671]:
+                - generic [ref=f79e4672]: O'rtacha chek 250.4K
+                - generic [ref=f79e4673]: Mahsulotlar —
+                - generic [ref=f79e4674]: O'rt. tayyorlash —
+                - generic [ref=f79e4675]: Eng band —
+              - generic [ref=f79e4676]:
+                - button "Jonli hisobot" [ref=f79e4677] [cursor=pointer]:
+                  - img [ref=f79e4678]
+                  - text: Jonli hisobot
+                - button "Smenani yopish" [ref=f79e4681] [cursor=pointer]:
+                  - img [ref=f79e4682]
+                  - text: Smenani yopish
+            - generic [ref=f79e4685]:
+              - generic [ref=f79e4686]:
+                - generic [ref=f79e4687]: DS
+                - generic [ref=f79e4688]:
+                  - generic [ref=f79e4689]: Dilnoza Saidova
+                  - generic [ref=f79e4690]: "Smena #49 · —"
+                - generic [ref=f79e4691]:
+                  - img [ref=f79e4692]
+                  - text: Tugagan
+              - generic [ref=f79e4695]:
+                - generic [ref=f79e4696]:
+                  - generic [ref=f79e4697]: 12.06 17:03
+                  - img [ref=f79e4698]
+                  - generic [ref=f79e4700]: 12.06 17:03
+                - generic [ref=f79e4701]:
+                  - img [ref=f79e4702]
+                  - text: 0m
+              - generic [ref=f79e4705]:
+                - generic [ref=f79e4706]:
+                  - generic [ref=f79e4707]: Buyurtmalar
+                  - generic [ref=f79e4708]: "9"
+                - generic [ref=f79e4709]:
+                  - generic [ref=f79e4710]: Yalpi
+                  - generic [ref=f79e4711]: 4 888 000
+                - generic [ref=f79e4712]:
+                  - generic [ref=f79e4713]: Sof
+                  - generic [ref=f79e4714]: 4 888 000
+              - generic [ref=f79e4716]:
+                - generic [ref=f79e4717]:
+                  - generic [ref=f79e4718]: Naqd qabul qilindi
+                  - generic [ref=f79e4720]: Ortiqcha +394 000
+                - generic [ref=f79e4722]: 2 711 000 UZS
+                - generic [ref=f79e4723]:
+                  - generic [ref=f79e4724]:
+                    - img [ref=f79e4725]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e4729]: 2 317 000
+                - generic [ref=f79e4730]:
+                  - generic [ref=f79e4731]:
+                    - img [ref=f79e4732]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e4734]: 2 571 000
+                - generic [ref=f79e4735]:
+                  - generic [ref=f79e4737]: Sanab chiqilgan 2 711 000 · qabul qildi Reese Lewis
+                  - generic [ref=f79e4738]:
+                    - generic [ref=f79e4739]: Sverka qilingan vaqti
+                    - generic [ref=f79e4740]: 12.06 17:03
+                  - generic [ref=f79e4741]: Sverka izohi:manager confirmed
+              - generic [ref=f79e4743]:
+                - generic [ref=f79e4744]: O'rtacha chek 543.1K
+                - generic [ref=f79e4745]: Mahsulotlar —
+                - generic [ref=f79e4746]: O'rt. tayyorlash —
+                - generic [ref=f79e4747]: Eng band —
+              - generic [ref=f79e4748]:
+                - generic [ref=f79e4749]:
+                  - img [ref=f79e4750]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e4753] [cursor=pointer]:
+                  - img [ref=f79e4754]
+                  - text: Hisobot
+            - generic [ref=f79e4757]:
+              - generic [ref=f79e4758]:
+                - generic [ref=f79e4759]: BT
+                - generic [ref=f79e4760]:
+                  - generic [ref=f79e4761]: Bek Toshev
+                  - generic [ref=f79e4762]: "Smena #48 · —"
+                - generic [ref=f79e4763]:
+                  - img [ref=f79e4764]
+                  - text: Tugagan
+              - generic [ref=f79e4767]:
+                - generic [ref=f79e4768]:
+                  - generic [ref=f79e4769]: 12.06 17:03
+                  - img [ref=f79e4770]
+                  - generic [ref=f79e4772]: 12.06 17:03
+                - generic [ref=f79e4773]:
+                  - img [ref=f79e4774]
+                  - text: 0m
+              - generic [ref=f79e4777]:
+                - generic [ref=f79e4778]:
+                  - generic [ref=f79e4779]: Buyurtmalar
+                  - generic [ref=f79e4780]: "7"
+                - generic [ref=f79e4781]:
+                  - generic [ref=f79e4782]: Yalpi
+                  - generic [ref=f79e4783]: 2 420 000
+                - generic [ref=f79e4784]:
+                  - generic [ref=f79e4785]: Sof
+                  - generic [ref=f79e4786]: 2 420 000
+              - generic [ref=f79e4788]:
+                - generic [ref=f79e4789]:
+                  - generic [ref=f79e4790]: Naqd qabul qilindi
+                  - generic [ref=f79e4792]: Ortiqcha +76 000
+                - generic [ref=f79e4794]: 1 341 000 UZS
+                - generic [ref=f79e4795]:
+                  - generic [ref=f79e4796]:
+                    - img [ref=f79e4797]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e4801]: 1 265 000
+                - generic [ref=f79e4802]:
+                  - generic [ref=f79e4803]:
+                    - img [ref=f79e4804]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e4806]: 1 155 000
+                - generic [ref=f79e4807]:
+                  - generic [ref=f79e4809]: Sanab chiqilgan 1 341 000 · qabul qildi Reese Lewis
+                  - generic [ref=f79e4810]:
+                    - generic [ref=f79e4811]: Sverka qilingan vaqti
+                    - generic [ref=f79e4812]: 12.06 17:03
+                  - generic [ref=f79e4813]: Sverka izohi:manager confirmed
+              - generic [ref=f79e4815]:
+                - generic [ref=f79e4816]: O'rtacha chek 345.7K
+                - generic [ref=f79e4817]: Mahsulotlar —
+                - generic [ref=f79e4818]: O'rt. tayyorlash —
+                - generic [ref=f79e4819]: Eng band —
+              - generic [ref=f79e4820]:
+                - generic [ref=f79e4821]:
+                  - img [ref=f79e4822]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e4825] [cursor=pointer]:
+                  - img [ref=f79e4826]
+                  - text: Hisobot
+            - generic [ref=f79e4829]:
+              - generic [ref=f79e4830]:
+                - generic [ref=f79e4831]: AK
+                - generic [ref=f79e4832]:
+                  - generic [ref=f79e4833]: Aziz Karimov
+                  - generic [ref=f79e4834]: "Smena #47 · —"
+                - generic [ref=f79e4835]:
+                  - img [ref=f79e4836]
+                  - text: Tugagan
+              - generic [ref=f79e4839]:
+                - generic [ref=f79e4840]:
+                  - generic [ref=f79e4841]: 12.06 17:03
+                  - img [ref=f79e4842]
+                  - generic [ref=f79e4844]: 12.06 17:03
+                - generic [ref=f79e4845]:
+                  - img [ref=f79e4846]
+                  - text: 0m
+              - generic [ref=f79e4849]:
+                - generic [ref=f79e4850]:
+                  - generic [ref=f79e4851]: Buyurtmalar
+                  - generic [ref=f79e4852]: "10"
+                - generic [ref=f79e4853]:
+                  - generic [ref=f79e4854]: Yalpi
+                  - generic [ref=f79e4855]: 3 615 000
+                - generic [ref=f79e4856]:
+                  - generic [ref=f79e4857]: Sof
+                  - generic [ref=f79e4858]: 3 615 000
+              - generic [ref=f79e4860]:
+                - generic [ref=f79e4861]:
+                  - generic [ref=f79e4862]: Naqd qabul qilindi
+                  - generic [ref=f79e4864]: Ortiqcha +587 000
+                - generic [ref=f79e4866]: 1 484 000 UZS
+                - generic [ref=f79e4867]:
+                  - generic [ref=f79e4868]:
+                    - img [ref=f79e4869]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e4873]: 897 000
+                - generic [ref=f79e4874]:
+                  - generic [ref=f79e4875]:
+                    - img [ref=f79e4876]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e4878]: 2 718 000
+                - generic [ref=f79e4879]:
+                  - generic [ref=f79e4881]: Sanab chiqilgan 1 484 000 · qabul qildi Reese Lewis
+                  - generic [ref=f79e4882]:
+                    - generic [ref=f79e4883]: Sverka qilingan vaqti
+                    - generic [ref=f79e4884]: 12.06 17:03
+                  - generic [ref=f79e4885]: Sverka izohi:manager confirmed
+              - generic [ref=f79e4887]:
+                - generic [ref=f79e4888]: O'rtacha chek 361.5K
+                - generic [ref=f79e4889]: Mahsulotlar —
+                - generic [ref=f79e4890]: O'rt. tayyorlash —
+                - generic [ref=f79e4891]: Eng band —
+              - generic [ref=f79e4892]:
+                - generic [ref=f79e4893]:
+                  - img [ref=f79e4894]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e4897] [cursor=pointer]:
+                  - img [ref=f79e4898]
+                  - text: Hisobot
+            - generic [ref=f79e4901]:
+              - generic [ref=f79e4902]:
+                - generic [ref=f79e4903]: FG
+                - generic [ref=f79e4904]:
+                  - generic [ref=f79e4905]: Flynn Garcia
+                  - generic [ref=f79e4906]: "Smena #66 · Evening"
+                - generic [ref=f79e4907]:
+                  - img [ref=f79e4908]
+                  - text: Tugagan
+              - generic [ref=f79e4911]:
+                - generic [ref=f79e4912]:
+                  - generic [ref=f79e4913]: 12.06 13:15
+                  - img [ref=f79e4914]
+                  - generic [ref=f79e4916]: 12.06 21:50
+                - generic [ref=f79e4917]:
+                  - img [ref=f79e4918]
+                  - text: 8h 35m
+              - generic [ref=f79e4921]:
+                - generic [ref=f79e4922]:
+                  - generic [ref=f79e4923]: Buyurtmalar
+                  - generic [ref=f79e4924]: "35"
+                - generic [ref=f79e4925]:
+                  - generic [ref=f79e4926]: Yalpi
+                  - generic [ref=f79e4927]: 13 672 000
+                - generic [ref=f79e4928]:
+                  - generic [ref=f79e4929]: Sof
+                  - generic [ref=f79e4930]: 13 672 000
+              - generic [ref=f79e4932]:
+                - generic [ref=f79e4933]:
+                  - generic [ref=f79e4934]: Naqd qabul qilindi
+                  - generic [ref=f79e4936]: Aniq
+                - generic [ref=f79e4938]: 5 982 000 UZS
+                - generic [ref=f79e4939]:
+                  - generic [ref=f79e4940]:
+                    - img [ref=f79e4941]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e4945]: 5 982 000
+                - generic [ref=f79e4946]:
+                  - generic [ref=f79e4947]:
+                    - img [ref=f79e4948]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e4950]: 7 690 000
+                - generic [ref=f79e4951]:
+                  - generic [ref=f79e4953]: Sanab chiqilgan 5 982 000 · qabul qildi Flynn Garcia
+                  - generic [ref=f79e4954]:
+                    - generic [ref=f79e4955]: Sverka qilingan vaqti
+                    - generic [ref=f79e4956]: 17.06 19:56
+              - generic [ref=f79e4958]:
+                - generic [ref=f79e4959]: O'rtacha chek 390.6K
+                - generic [ref=f79e4960]: Mahsulotlar —
+                - generic [ref=f79e4961]: O'rt. tayyorlash —
+                - generic [ref=f79e4962]: Eng band —
+              - generic [ref=f79e4963]:
+                - generic [ref=f79e4964]:
+                  - img [ref=f79e4965]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e4968] [cursor=pointer]:
+                  - img [ref=f79e4969]
+                  - text: Hisobot
+            - generic [ref=f79e4972]:
+              - generic [ref=f79e4973]:
+                - generic [ref=f79e4974]: NA
+                - generic [ref=f79e4975]:
+                  - generic [ref=f79e4976]: Noah Anderson
+                  - generic [ref=f79e4977]: "Smena #68 · Night"
+                - generic [ref=f79e4978]:
+                  - img [ref=f79e4979]
+                  - text: Tugagan
+              - generic [ref=f79e4982]:
+                - generic [ref=f79e4983]:
+                  - generic [ref=f79e4984]: 11.06 21:21
+                  - img [ref=f79e4985]
+                  - generic [ref=f79e4987]: 12.06 06:55
+                - generic [ref=f79e4988]:
+                  - img [ref=f79e4989]
+                  - text: 9h 34m
+              - generic [ref=f79e4992]:
+                - generic [ref=f79e4993]:
+                  - generic [ref=f79e4994]: Buyurtmalar
+                  - generic [ref=f79e4995]: "41"
+                - generic [ref=f79e4996]:
+                  - generic [ref=f79e4997]: Yalpi
+                  - generic [ref=f79e4998]: 6 375 000
+                - generic [ref=f79e4999]:
+                  - generic [ref=f79e5000]: Sof
+                  - generic [ref=f79e5001]: 6 375 000
+              - generic [ref=f79e5003]:
+                - generic [ref=f79e5004]:
+                  - generic [ref=f79e5005]: Naqd qabul qilindi
+                  - generic [ref=f79e5007]: Ortiqcha +16 880
+                - generic [ref=f79e5009]: 2 026 880 UZS
+                - generic [ref=f79e5010]:
+                  - generic [ref=f79e5011]:
+                    - img [ref=f79e5012]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e5016]: 2 010 000
+                - generic [ref=f79e5017]:
+                  - generic [ref=f79e5018]:
+                    - img [ref=f79e5019]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e5021]: 4 365 000
+                - generic [ref=f79e5022]:
+                  - generic [ref=f79e5024]: Sanab chiqilgan 2 026 880 · qabul qildi Noah Anderson
+                  - generic [ref=f79e5025]:
+                    - generic [ref=f79e5026]: Sverka qilingan vaqti
+                    - generic [ref=f79e5027]: 17.06 19:56
+              - generic [ref=f79e5029]:
+                - generic [ref=f79e5030]: O'rtacha chek 155.5K
+                - generic [ref=f79e5031]: Mahsulotlar —
+                - generic [ref=f79e5032]: O'rt. tayyorlash —
+                - generic [ref=f79e5033]: Eng band —
+              - generic [ref=f79e5034]:
+                - generic [ref=f79e5035]:
+                  - img [ref=f79e5036]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e5039] [cursor=pointer]:
+                  - img [ref=f79e5040]
+                  - text: Hisobot
+            - generic [ref=f79e5043]:
+              - generic [ref=f79e5044]:
+                - generic [ref=f79e5045]: JG
+                - generic [ref=f79e5046]:
+                  - generic [ref=f79e5047]: Jules Garcia
+                  - generic [ref=f79e5048]: "Smena #67 · Morning"
+                - generic [ref=f79e5049]:
+                  - img [ref=f79e5050]
+                  - text: Tugagan
+              - generic [ref=f79e5053]:
+                - generic [ref=f79e5054]:
+                  - generic [ref=f79e5055]: 11.06 21:07
+                  - img [ref=f79e5056]
+                  - generic [ref=f79e5058]: 12.06 04:28
+                - generic [ref=f79e5059]:
+                  - img [ref=f79e5060]
+                  - text: 7h 21m
+              - generic [ref=f79e5063]:
+                - generic [ref=f79e5064]:
+                  - generic [ref=f79e5065]: Buyurtmalar
+                  - generic [ref=f79e5066]: "25"
+                - generic [ref=f79e5067]:
+                  - generic [ref=f79e5068]: Yalpi
+                  - generic [ref=f79e5069]: 3 900 000
+                - generic [ref=f79e5070]:
+                  - generic [ref=f79e5071]: Sof
+                  - generic [ref=f79e5072]: 3 900 000
+              - generic [ref=f79e5074]:
+                - generic [ref=f79e5075]:
+                  - generic [ref=f79e5076]: Naqd qabul qilindi
+                  - generic [ref=f79e5078]: Aniq
+                - generic [ref=f79e5080]: 943 000 UZS
+                - generic [ref=f79e5081]:
+                  - generic [ref=f79e5082]:
+                    - img [ref=f79e5083]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e5087]: 943 000
+                - generic [ref=f79e5088]:
+                  - generic [ref=f79e5089]:
+                    - img [ref=f79e5090]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e5092]: 2 957 000
+                - generic [ref=f79e5093]:
+                  - generic [ref=f79e5095]: Sanab chiqilgan 943 000 · qabul qildi Jules Garcia
+                  - generic [ref=f79e5096]:
+                    - generic [ref=f79e5097]: Sverka qilingan vaqti
+                    - generic [ref=f79e5098]: 17.06 19:56
+              - generic [ref=f79e5100]:
+                - generic [ref=f79e5101]: O'rtacha chek 156K
+                - generic [ref=f79e5102]: Mahsulotlar —
+                - generic [ref=f79e5103]: O'rt. tayyorlash —
+                - generic [ref=f79e5104]: Eng band —
+              - generic [ref=f79e5105]:
+                - generic [ref=f79e5106]:
+                  - img [ref=f79e5107]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e5110] [cursor=pointer]:
+                  - img [ref=f79e5111]
+                  - text: Hisobot
+            - generic [ref=f79e5114]:
+              - generic [ref=f79e5115]:
+                - generic [ref=f79e5116]: JG
+                - generic [ref=f79e5117]:
+                  - generic [ref=f79e5118]: Jules Garcia
+                  - generic [ref=f79e5119]: "Smena #69 · Night"
+                - generic [ref=f79e5120]: Naqd topshirilishini kutmoqda
+              - generic [ref=f79e5121]:
+                - generic [ref=f79e5122]:
+                  - generic [ref=f79e5123]: 10.06 14:01
+                  - img [ref=f79e5124]
+                  - generic [ref=f79e5126]: 10.06 21:03
+                - generic [ref=f79e5127]:
+                  - img [ref=f79e5128]
+                  - text: 7h 02m
+              - generic [ref=f79e5131]:
+                - generic [ref=f79e5132]:
+                  - generic [ref=f79e5133]: Buyurtmalar
+                  - generic [ref=f79e5134]: "31"
+                - generic [ref=f79e5135]:
+                  - generic [ref=f79e5136]: Yalpi
+                  - generic [ref=f79e5137]: 4 538 000
+                - generic [ref=f79e5138]:
+                  - generic [ref=f79e5139]: Sof
+                  - generic [ref=f79e5140]: 4 538 000
+              - generic [ref=f79e5142]:
+                - generic [ref=f79e5144]: Qabul qilinadigan naqd
+                - generic [ref=f79e5146]: 1 789 000 UZS
+                - generic [ref=f79e5147]:
+                  - generic [ref=f79e5148]:
+                    - img [ref=f79e5149]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e5153]: 1 789 000
+                - generic [ref=f79e5154]:
+                  - generic [ref=f79e5155]:
+                    - img [ref=f79e5156]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e5158]: 2 749 000
+              - generic [ref=f79e5160]:
+                - generic [ref=f79e5161]: O'rtacha chek 146.4K
+                - generic [ref=f79e5162]: Mahsulotlar —
+                - generic [ref=f79e5163]: O'rt. tayyorlash —
+                - generic [ref=f79e5164]: Eng band —
+              - generic [ref=f79e5165]:
+                - button "Naqd qabul qilish" [ref=f79e5166] [cursor=pointer]:
+                  - img [ref=f79e5167]
+                  - text: Naqd qabul qilish
+                - button "Hisobot" [ref=f79e5169] [cursor=pointer]:
+                  - img [ref=f79e5170]
+                  - text: Hisobot
+            - generic [ref=f79e5173]:
+              - generic [ref=f79e5174]:
+                - generic [ref=f79e5175]: AM
+                - generic [ref=f79e5176]:
+                  - generic [ref=f79e5177]: Avery Miller
+                  - generic [ref=f79e5178]: "Smena #70 · Morning"
+                - generic [ref=f79e5179]:
+                  - img [ref=f79e5180]
+                  - text: Tugagan
+              - generic [ref=f79e5183]:
+                - generic [ref=f79e5184]:
+                  - generic [ref=f79e5185]: 10.06 13:02
+                  - img [ref=f79e5186]
+                  - generic [ref=f79e5188]: 10.06 19:24
+                - generic [ref=f79e5189]:
+                  - img [ref=f79e5190]
+                  - text: 6h 22m
+              - generic [ref=f79e5193]:
+                - generic [ref=f79e5194]:
+                  - generic [ref=f79e5195]: Buyurtmalar
+                  - generic [ref=f79e5196]: "29"
+                - generic [ref=f79e5197]:
+                  - generic [ref=f79e5198]: Yalpi
+                  - generic [ref=f79e5199]: 4 342 000
+                - generic [ref=f79e5200]:
+                  - generic [ref=f79e5201]: Sof
+                  - generic [ref=f79e5202]: 4 342 000
+              - generic [ref=f79e5204]:
+                - generic [ref=f79e5205]:
+                  - generic [ref=f79e5206]: Naqd qabul qilindi
+                  - generic [ref=f79e5208]: Aniq
+                - generic [ref=f79e5210]: 1 753 000 UZS
+                - generic [ref=f79e5211]:
+                  - generic [ref=f79e5212]:
+                    - img [ref=f79e5213]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e5217]: 1 753 000
+                - generic [ref=f79e5218]:
+                  - generic [ref=f79e5219]:
+                    - img [ref=f79e5220]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e5222]: 2 589 000
+                - generic [ref=f79e5223]:
+                  - generic [ref=f79e5225]: Sanab chiqilgan 1 753 000 · qabul qildi Avery Miller
+                  - generic [ref=f79e5226]:
+                    - generic [ref=f79e5227]: Sverka qilingan vaqti
+                    - generic [ref=f79e5228]: 17.06 19:56
+              - generic [ref=f79e5230]:
+                - generic [ref=f79e5231]: O'rtacha chek 149.7K
+                - generic [ref=f79e5232]: Mahsulotlar —
+                - generic [ref=f79e5233]: O'rt. tayyorlash —
+                - generic [ref=f79e5234]: Eng band —
+              - generic [ref=f79e5235]:
+                - generic [ref=f79e5236]:
+                  - img [ref=f79e5237]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e5240] [cursor=pointer]:
+                  - img [ref=f79e5241]
+                  - text: Hisobot
+            - generic [ref=f79e5244]:
+              - generic [ref=f79e5245]:
+                - generic [ref=f79e5246]: FG
+                - generic [ref=f79e5247]:
+                  - generic [ref=f79e5248]: Flynn Garcia
+                  - generic [ref=f79e5249]: "Smena #72 · Evening"
+                - generic [ref=f79e5250]: Naqd topshirilishini kutmoqda
+              - generic [ref=f79e5251]:
+                - generic [ref=f79e5252]:
+                  - generic [ref=f79e5253]: 09.06 21:21
+                  - img [ref=f79e5254]
+                  - generic [ref=f79e5256]: 10.06 04:56
+                - generic [ref=f79e5257]:
+                  - img [ref=f79e5258]
+                  - text: 7h 35m
+              - generic [ref=f79e5261]:
+                - generic [ref=f79e5262]:
+                  - generic [ref=f79e5263]: Buyurtmalar
+                  - generic [ref=f79e5264]: "26"
+                - generic [ref=f79e5265]:
+                  - generic [ref=f79e5266]: Yalpi
+                  - generic [ref=f79e5267]: 3 749 000
+                - generic [ref=f79e5268]:
+                  - generic [ref=f79e5269]: Sof
+                  - generic [ref=f79e5270]: 3 749 000
+              - generic [ref=f79e5272]:
+                - generic [ref=f79e5274]: Qabul qilinadigan naqd
+                - generic [ref=f79e5276]: 663 000 UZS
+                - generic [ref=f79e5277]:
+                  - generic [ref=f79e5278]:
+                    - img [ref=f79e5279]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e5283]: 663 000
+                - generic [ref=f79e5284]:
+                  - generic [ref=f79e5285]:
+                    - img [ref=f79e5286]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e5288]: 3 086 000
+              - generic [ref=f79e5290]:
+                - generic [ref=f79e5291]: O'rtacha chek 144.2K
+                - generic [ref=f79e5292]: Mahsulotlar —
+                - generic [ref=f79e5293]: O'rt. tayyorlash —
+                - generic [ref=f79e5294]: Eng band —
+              - generic [ref=f79e5295]:
+                - button "Naqd qabul qilish" [ref=f79e5296] [cursor=pointer]:
+                  - img [ref=f79e5297]
+                  - text: Naqd qabul qilish
+                - button "Hisobot" [ref=f79e5299] [cursor=pointer]:
+                  - img [ref=f79e5300]
+                  - text: Hisobot
+            - generic [ref=f79e5303]:
+              - generic [ref=f79e5304]:
+                - generic [ref=f79e5305]: RL
+                - generic [ref=f79e5306]:
+                  - generic [ref=f79e5307]: Reese Lewis
+                  - generic [ref=f79e5308]: "Smena #74 · Morning"
+                - generic [ref=f79e5309]:
+                  - img [ref=f79e5310]
+                  - text: Tugagan
+              - generic [ref=f79e5313]:
+                - generic [ref=f79e5314]:
+                  - generic [ref=f79e5315]: 09.06 15:25
+                  - img [ref=f79e5316]
+                  - generic [ref=f79e5318]: 09.06 23:19
+                - generic [ref=f79e5319]:
+                  - img [ref=f79e5320]
+                  - text: 7h 54m
+              - generic [ref=f79e5323]:
+                - generic [ref=f79e5324]:
+                  - generic [ref=f79e5325]: Buyurtmalar
+                  - generic [ref=f79e5326]: "44"
+                - generic [ref=f79e5327]:
+                  - generic [ref=f79e5328]: Yalpi
+                  - generic [ref=f79e5329]: 6 629 000
+                - generic [ref=f79e5330]:
+                  - generic [ref=f79e5331]: Sof
+                  - generic [ref=f79e5332]: 6 629 000
+              - generic [ref=f79e5334]:
+                - generic [ref=f79e5335]:
+                  - generic [ref=f79e5336]: Naqd qabul qilindi
+                  - generic [ref=f79e5338]: Aniq
+                - generic [ref=f79e5340]: 2 477 000 UZS
+                - generic [ref=f79e5341]:
+                  - generic [ref=f79e5342]:
+                    - img [ref=f79e5343]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e5347]: 2 477 000
+                - generic [ref=f79e5348]:
+                  - generic [ref=f79e5349]:
+                    - img [ref=f79e5350]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e5352]: 4 152 000
+                - generic [ref=f79e5353]:
+                  - generic [ref=f79e5355]: Sanab chiqilgan 2 477 000 · qabul qildi Reese Lewis
+                  - generic [ref=f79e5356]:
+                    - generic [ref=f79e5357]: Sverka qilingan vaqti
+                    - generic [ref=f79e5358]: 17.06 19:56
+              - generic [ref=f79e5360]:
+                - generic [ref=f79e5361]: O'rtacha chek 150.7K
+                - generic [ref=f79e5362]: Mahsulotlar —
+                - generic [ref=f79e5363]: O'rt. tayyorlash —
+                - generic [ref=f79e5364]: Eng band —
+              - generic [ref=f79e5365]:
+                - generic [ref=f79e5366]:
+                  - img [ref=f79e5367]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e5370] [cursor=pointer]:
+                  - img [ref=f79e5371]
+                  - text: Hisobot
+            - generic [ref=f79e5374]:
+              - generic [ref=f79e5375]:
+                - generic [ref=f79e5376]: OW
+                - generic [ref=f79e5377]:
+                  - generic [ref=f79e5378]: Onyx Walker
+                  - generic [ref=f79e5379]: "Smena #71 · Morning"
+                - generic [ref=f79e5380]:
+                  - img [ref=f79e5381]
+                  - text: Tugagan
+              - generic [ref=f79e5384]:
+                - generic [ref=f79e5385]:
+                  - generic [ref=f79e5386]: 09.06 15:03
+                  - img [ref=f79e5387]
+                  - generic [ref=f79e5389]: 09.06 21:11
+                - generic [ref=f79e5390]:
+                  - img [ref=f79e5391]
+                  - text: 6h 08m
+              - generic [ref=f79e5394]:
+                - generic [ref=f79e5395]:
+                  - generic [ref=f79e5396]: Buyurtmalar
+                  - generic [ref=f79e5397]: "30"
+                - generic [ref=f79e5398]:
+                  - generic [ref=f79e5399]: Yalpi
+                  - generic [ref=f79e5400]: 4 751 000
+                - generic [ref=f79e5401]:
+                  - generic [ref=f79e5402]: Sof
+                  - generic [ref=f79e5403]: 4 751 000
+              - generic [ref=f79e5405]:
+                - generic [ref=f79e5406]:
+                  - generic [ref=f79e5407]: Naqd qabul qilindi
+                  - generic [ref=f79e5409]: Ortiqcha +5 094
+                - generic [ref=f79e5411]: 2 039 094 UZS
+                - generic [ref=f79e5412]:
+                  - generic [ref=f79e5413]:
+                    - img [ref=f79e5414]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e5418]: 2 034 000
+                - generic [ref=f79e5419]:
+                  - generic [ref=f79e5420]:
+                    - img [ref=f79e5421]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e5423]: 2 717 000
+                - generic [ref=f79e5424]:
+                  - generic [ref=f79e5426]: Sanab chiqilgan 2 039 094 · qabul qildi Onyx Walker
+                  - generic [ref=f79e5427]:
+                    - generic [ref=f79e5428]: Sverka qilingan vaqti
+                    - generic [ref=f79e5429]: 17.06 19:56
+              - generic [ref=f79e5431]:
+                - generic [ref=f79e5432]: O'rtacha chek 158.4K
+                - generic [ref=f79e5433]: Mahsulotlar —
+                - generic [ref=f79e5434]: O'rt. tayyorlash —
+                - generic [ref=f79e5435]: Eng band —
+              - generic [ref=f79e5436]:
+                - generic [ref=f79e5437]:
+                  - img [ref=f79e5438]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e5441] [cursor=pointer]:
+                  - img [ref=f79e5442]
+                  - text: Hisobot
+            - generic [ref=f79e5445]:
+              - generic [ref=f79e5446]:
+                - generic [ref=f79e5447]: RL
+                - generic [ref=f79e5448]:
+                  - generic [ref=f79e5449]: Reese Lewis
+                  - generic [ref=f79e5450]: "Smena #73 · Morning"
+                - generic [ref=f79e5451]:
+                  - img [ref=f79e5452]
+                  - text: Tugagan
+              - generic [ref=f79e5455]:
+                - generic [ref=f79e5456]:
+                  - generic [ref=f79e5457]: 09.06 13:16
+                  - img [ref=f79e5458]
+                  - generic [ref=f79e5460]: 09.06 21:11
+                - generic [ref=f79e5461]:
+                  - img [ref=f79e5462]
+                  - text: 7h 55m
+              - generic [ref=f79e5465]:
+                - generic [ref=f79e5466]:
+                  - generic [ref=f79e5467]: Buyurtmalar
+                  - generic [ref=f79e5468]: "23"
+                - generic [ref=f79e5469]:
+                  - generic [ref=f79e5470]: Yalpi
+                  - generic [ref=f79e5471]: 3 533 000
+                - generic [ref=f79e5472]:
+                  - generic [ref=f79e5473]: Sof
+                  - generic [ref=f79e5474]: 3 533 000
+              - generic [ref=f79e5476]:
+                - generic [ref=f79e5477]:
+                  - generic [ref=f79e5478]: Naqd qabul qilindi
+                  - generic [ref=f79e5480]: Aniq
+                - generic [ref=f79e5482]: 1 384 000 UZS
+                - generic [ref=f79e5483]:
+                  - generic [ref=f79e5484]:
+                    - img [ref=f79e5485]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e5489]: 1 384 000
+                - generic [ref=f79e5490]:
+                  - generic [ref=f79e5491]:
+                    - img [ref=f79e5492]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e5494]: 2 149 000
+                - generic [ref=f79e5495]:
+                  - generic [ref=f79e5497]: Sanab chiqilgan 1 384 000 · qabul qildi Reese Lewis
+                  - generic [ref=f79e5498]:
+                    - generic [ref=f79e5499]: Sverka qilingan vaqti
+                    - generic [ref=f79e5500]: 17.06 19:56
+              - generic [ref=f79e5502]:
+                - generic [ref=f79e5503]: O'rtacha chek 153.6K
+                - generic [ref=f79e5504]: Mahsulotlar —
+                - generic [ref=f79e5505]: O'rt. tayyorlash —
+                - generic [ref=f79e5506]: Eng band —
+              - generic [ref=f79e5507]:
+                - generic [ref=f79e5508]:
+                  - img [ref=f79e5509]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e5512] [cursor=pointer]:
+                  - img [ref=f79e5513]
+                  - text: Hisobot
+            - generic [ref=f79e5516]:
+              - generic [ref=f79e5517]:
+                - generic [ref=f79e5518]: AT
+                - generic [ref=f79e5519]:
+                  - generic [ref=f79e5520]: Alex Torres
+                  - generic [ref=f79e5521]: "Smena #75 · Morning"
+                - generic [ref=f79e5522]:
+                  - img [ref=f79e5523]
+                  - text: Tugagan
+              - generic [ref=f79e5526]:
+                - generic [ref=f79e5527]:
+                  - generic [ref=f79e5528]: 08.06 21:19
+                  - img [ref=f79e5529]
+                  - generic [ref=f79e5531]: 09.06 02:40
+                - generic [ref=f79e5532]:
+                  - img [ref=f79e5533]
+                  - text: 5h 21m
+              - generic [ref=f79e5536]:
+                - generic [ref=f79e5537]:
+                  - generic [ref=f79e5538]: Buyurtmalar
+                  - generic [ref=f79e5539]: "41"
+                - generic [ref=f79e5540]:
+                  - generic [ref=f79e5541]: Yalpi
+                  - generic [ref=f79e5542]: 6 137 000
+                - generic [ref=f79e5543]:
+                  - generic [ref=f79e5544]: Sof
+                  - generic [ref=f79e5545]: 6 137 000
+              - generic [ref=f79e5547]:
+                - generic [ref=f79e5548]:
+                  - generic [ref=f79e5549]: Naqd qabul qilindi
+                  - generic [ref=f79e5551]: Aniq
+                - generic [ref=f79e5553]: 2 996 000 UZS
+                - generic [ref=f79e5554]:
+                  - generic [ref=f79e5555]:
+                    - img [ref=f79e5556]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e5560]: 2 996 000
+                - generic [ref=f79e5561]:
+                  - generic [ref=f79e5562]:
+                    - img [ref=f79e5563]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e5565]: 3 141 000
+                - generic [ref=f79e5566]:
+                  - generic [ref=f79e5568]: Sanab chiqilgan 2 996 000 · qabul qildi Alex Torres
+                  - generic [ref=f79e5569]:
+                    - generic [ref=f79e5570]: Sverka qilingan vaqti
+                    - generic [ref=f79e5571]: 17.06 19:56
+              - generic [ref=f79e5573]:
+                - generic [ref=f79e5574]: O'rtacha chek 149.7K
+                - generic [ref=f79e5575]: Mahsulotlar —
+                - generic [ref=f79e5576]: O'rt. tayyorlash —
+                - generic [ref=f79e5577]: Eng band —
+              - generic [ref=f79e5578]:
+                - generic [ref=f79e5579]:
+                  - img [ref=f79e5580]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e5583] [cursor=pointer]:
+                  - img [ref=f79e5584]
+                  - text: Hisobot
+            - generic [ref=f79e5587]:
+              - generic [ref=f79e5588]:
+                - generic [ref=f79e5589]: JG
+                - generic [ref=f79e5590]:
+                  - generic [ref=f79e5591]: Jules Garcia
+                  - generic [ref=f79e5592]: "Smena #78 · Night"
+                - generic [ref=f79e5593]:
+                  - img [ref=f79e5594]
+                  - text: Tugagan
+              - generic [ref=f79e5597]:
+                - generic [ref=f79e5598]:
+                  - generic [ref=f79e5599]: 08.06 21:16
+                  - img [ref=f79e5600]
+                  - generic [ref=f79e5602]: 09.06 03:17
+                - generic [ref=f79e5603]:
+                  - img [ref=f79e5604]
+                  - text: 6h 01m
+              - generic [ref=f79e5607]:
+                - generic [ref=f79e5608]:
+                  - generic [ref=f79e5609]: Buyurtmalar
+                  - generic [ref=f79e5610]: "23"
+                - generic [ref=f79e5611]:
+                  - generic [ref=f79e5612]: Yalpi
+                  - generic [ref=f79e5613]: 3 451 000
+                - generic [ref=f79e5614]:
+                  - generic [ref=f79e5615]: Sof
+                  - generic [ref=f79e5616]: 3 451 000
+              - generic [ref=f79e5618]:
+                - generic [ref=f79e5619]:
+                  - generic [ref=f79e5620]: Naqd qabul qilindi
+                  - generic [ref=f79e5622]: Aniq
+                - generic [ref=f79e5624]: 1 782 000 UZS
+                - generic [ref=f79e5625]:
+                  - generic [ref=f79e5626]:
+                    - img [ref=f79e5627]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e5631]: 1 782 000
+                - generic [ref=f79e5632]:
+                  - generic [ref=f79e5633]:
+                    - img [ref=f79e5634]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e5636]: 1 669 000
+                - generic [ref=f79e5637]:
+                  - generic [ref=f79e5639]: Sanab chiqilgan 1 782 000 · qabul qildi Jules Garcia
+                  - generic [ref=f79e5640]:
+                    - generic [ref=f79e5641]: Sverka qilingan vaqti
+                    - generic [ref=f79e5642]: 17.06 19:56
+              - generic [ref=f79e5644]:
+                - generic [ref=f79e5645]: O'rtacha chek 150K
+                - generic [ref=f79e5646]: Mahsulotlar —
+                - generic [ref=f79e5647]: O'rt. tayyorlash —
+                - generic [ref=f79e5648]: Eng band —
+              - generic [ref=f79e5649]:
+                - generic [ref=f79e5650]:
+                  - img [ref=f79e5651]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e5654] [cursor=pointer]:
+                  - img [ref=f79e5655]
+                  - text: Hisobot
+            - generic [ref=f79e5658]:
+              - generic [ref=f79e5659]:
+                - generic [ref=f79e5660]: FG
+                - generic [ref=f79e5661]:
+                  - generic [ref=f79e5662]: Flynn Garcia
+                  - generic [ref=f79e5663]: "Smena #76 · Morning"
+                - generic [ref=f79e5664]:
+                  - img [ref=f79e5665]
+                  - text: Tugagan
+              - generic [ref=f79e5668]:
+                - generic [ref=f79e5669]:
+                  - generic [ref=f79e5670]: 08.06 20:21
+                  - img [ref=f79e5671]
+                  - generic [ref=f79e5673]: 09.06 01:50
+                - generic [ref=f79e5674]:
+                  - img [ref=f79e5675]
+                  - text: 5h 29m
+              - generic [ref=f79e5678]:
+                - generic [ref=f79e5679]:
+                  - generic [ref=f79e5680]: Buyurtmalar
+                  - generic [ref=f79e5681]: "38"
+                - generic [ref=f79e5682]:
+                  - generic [ref=f79e5683]: Yalpi
+                  - generic [ref=f79e5684]: 5 863 000
+                - generic [ref=f79e5685]:
+                  - generic [ref=f79e5686]: Sof
+                  - generic [ref=f79e5687]: 5 863 000
+              - generic [ref=f79e5689]:
+                - generic [ref=f79e5690]:
+                  - generic [ref=f79e5691]: Naqd qabul qilindi
+                  - generic [ref=f79e5693]: Ortiqcha +12 939
+                - generic [ref=f79e5695]: 2 343 939 UZS
+                - generic [ref=f79e5696]:
+                  - generic [ref=f79e5697]:
+                    - img [ref=f79e5698]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e5702]: 2 331 000
+                - generic [ref=f79e5703]:
+                  - generic [ref=f79e5704]:
+                    - img [ref=f79e5705]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e5707]: 3 532 000
+                - generic [ref=f79e5708]:
+                  - generic [ref=f79e5710]: Sanab chiqilgan 2 343 939 · qabul qildi Flynn Garcia
+                  - generic [ref=f79e5711]:
+                    - generic [ref=f79e5712]: Sverka qilingan vaqti
+                    - generic [ref=f79e5713]: 17.06 19:56
+              - generic [ref=f79e5715]:
+                - generic [ref=f79e5716]: O'rtacha chek 154.3K
+                - generic [ref=f79e5717]: Mahsulotlar —
+                - generic [ref=f79e5718]: O'rt. tayyorlash —
+                - generic [ref=f79e5719]: Eng band —
+              - generic [ref=f79e5720]:
+                - generic [ref=f79e5721]:
+                  - img [ref=f79e5722]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e5725] [cursor=pointer]:
+                  - img [ref=f79e5726]
+                  - text: Hisobot
+            - generic [ref=f79e5729]:
+              - generic [ref=f79e5730]:
+                - generic [ref=f79e5731]: FG
+                - generic [ref=f79e5732]:
+                  - generic [ref=f79e5733]: Flynn Garcia
+                  - generic [ref=f79e5734]: "Smena #77 · Evening"
+                - generic [ref=f79e5735]:
+                  - img [ref=f79e5736]
+                  - text: Tugagan
+              - generic [ref=f79e5739]:
+                - generic [ref=f79e5740]:
+                  - generic [ref=f79e5741]: 08.06 15:01
+                  - img [ref=f79e5742]
+                  - generic [ref=f79e5744]: 08.06 22:14
+                - generic [ref=f79e5745]:
+                  - img [ref=f79e5746]
+                  - text: 7h 13m
+              - generic [ref=f79e5749]:
+                - generic [ref=f79e5750]:
+                  - generic [ref=f79e5751]: Buyurtmalar
+                  - generic [ref=f79e5752]: "34"
+                - generic [ref=f79e5753]:
+                  - generic [ref=f79e5754]: Yalpi
+                  - generic [ref=f79e5755]: 4 992 000
+                - generic [ref=f79e5756]:
+                  - generic [ref=f79e5757]: Sof
+                  - generic [ref=f79e5758]: 4 992 000
+              - generic [ref=f79e5760]:
+                - generic [ref=f79e5761]:
+                  - generic [ref=f79e5762]: Naqd qabul qilindi
+                  - generic [ref=f79e5764]: Ortiqcha +18 320
+                - generic [ref=f79e5766]: 1 583 320 UZS
+                - generic [ref=f79e5767]:
+                  - generic [ref=f79e5768]:
+                    - img [ref=f79e5769]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e5773]: 1 565 000
+                - generic [ref=f79e5774]:
+                  - generic [ref=f79e5775]:
+                    - img [ref=f79e5776]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e5778]: 3 427 000
+                - generic [ref=f79e5779]:
+                  - generic [ref=f79e5781]: Sanab chiqilgan 1 583 320 · qabul qildi Flynn Garcia
+                  - generic [ref=f79e5782]:
+                    - generic [ref=f79e5783]: Sverka qilingan vaqti
+                    - generic [ref=f79e5784]: 17.06 19:56
+              - generic [ref=f79e5786]:
+                - generic [ref=f79e5787]: O'rtacha chek 146.8K
+                - generic [ref=f79e5788]: Mahsulotlar —
+                - generic [ref=f79e5789]: O'rt. tayyorlash —
+                - generic [ref=f79e5790]: Eng band —
+              - generic [ref=f79e5791]:
+                - generic [ref=f79e5792]:
+                  - img [ref=f79e5793]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e5796] [cursor=pointer]:
+                  - img [ref=f79e5797]
+                  - text: Hisobot
+            - generic [ref=f79e5800]:
+              - generic [ref=f79e5801]:
+                - generic [ref=f79e5802]: AM
+                - generic [ref=f79e5803]:
+                  - generic [ref=f79e5804]: Avery Miller
+                  - generic [ref=f79e5805]: "Smena #80 · Evening"
+                - generic [ref=f79e5806]:
+                  - img [ref=f79e5807]
+                  - text: Tugagan
+              - generic [ref=f79e5810]:
+                - generic [ref=f79e5811]:
+                  - generic [ref=f79e5812]: 07.06 20:27
+                  - img [ref=f79e5813]
+                  - generic [ref=f79e5815]: 08.06 01:51
+                - generic [ref=f79e5816]:
+                  - img [ref=f79e5817]
+                  - text: 5h 24m
+              - generic [ref=f79e5820]:
+                - generic [ref=f79e5821]:
+                  - generic [ref=f79e5822]: Buyurtmalar
+                  - generic [ref=f79e5823]: "30"
+                - generic [ref=f79e5824]:
+                  - generic [ref=f79e5825]: Yalpi
+                  - generic [ref=f79e5826]: 4 221 000
+                - generic [ref=f79e5827]:
+                  - generic [ref=f79e5828]: Sof
+                  - generic [ref=f79e5829]: 4 221 000
+              - generic [ref=f79e5831]:
+                - generic [ref=f79e5832]:
+                  - generic [ref=f79e5833]: Naqd qabul qilindi
+                  - generic [ref=f79e5835]: Aniq
+                - generic [ref=f79e5837]: 821 000 UZS
+                - generic [ref=f79e5838]:
+                  - generic [ref=f79e5839]:
+                    - img [ref=f79e5840]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e5844]: 821 000
+                - generic [ref=f79e5845]:
+                  - generic [ref=f79e5846]:
+                    - img [ref=f79e5847]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e5849]: 3 400 000
+                - generic [ref=f79e5850]:
+                  - generic [ref=f79e5852]: Sanab chiqilgan 821 000 · qabul qildi Avery Miller
+                  - generic [ref=f79e5853]:
+                    - generic [ref=f79e5854]: Sverka qilingan vaqti
+                    - generic [ref=f79e5855]: 17.06 19:56
+              - generic [ref=f79e5857]:
+                - generic [ref=f79e5858]: O'rtacha chek 140.7K
+                - generic [ref=f79e5859]: Mahsulotlar —
+                - generic [ref=f79e5860]: O'rt. tayyorlash —
+                - generic [ref=f79e5861]: Eng band —
+              - generic [ref=f79e5862]:
+                - generic [ref=f79e5863]:
+                  - img [ref=f79e5864]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e5867] [cursor=pointer]:
+                  - img [ref=f79e5868]
+                  - text: Hisobot
+            - generic [ref=f79e5871]:
+              - generic [ref=f79e5872]:
+                - generic [ref=f79e5873]: FG
+                - generic [ref=f79e5874]:
+                  - generic [ref=f79e5875]: Flynn Garcia
+                  - generic [ref=f79e5876]: "Smena #81 · Evening"
+                - generic [ref=f79e5877]:
+                  - img [ref=f79e5878]
+                  - text: Tugagan
+              - generic [ref=f79e5881]:
+                - generic [ref=f79e5882]:
+                  - generic [ref=f79e5883]: 07.06 20:24
+                  - img [ref=f79e5884]
+                  - generic [ref=f79e5886]: 08.06 03:54
+                - generic [ref=f79e5887]:
+                  - img [ref=f79e5888]
+                  - text: 7h 30m
+              - generic [ref=f79e5891]:
+                - generic [ref=f79e5892]:
+                  - generic [ref=f79e5893]: Buyurtmalar
+                  - generic [ref=f79e5894]: "50"
+                - generic [ref=f79e5895]:
+                  - generic [ref=f79e5896]: Yalpi
+                  - generic [ref=f79e5897]: 7 165 000
+                - generic [ref=f79e5898]:
+                  - generic [ref=f79e5899]: Sof
+                  - generic [ref=f79e5900]: 7 165 000
+              - generic [ref=f79e5902]:
+                - generic [ref=f79e5903]:
+                  - generic [ref=f79e5904]: Naqd qabul qilindi
+                  - generic [ref=f79e5906]: Aniq
+                - generic [ref=f79e5908]: 1 365 000 UZS
+                - generic [ref=f79e5909]:
+                  - generic [ref=f79e5910]:
+                    - img [ref=f79e5911]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e5915]: 1 365 000
+                - generic [ref=f79e5916]:
+                  - generic [ref=f79e5917]:
+                    - img [ref=f79e5918]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e5920]: 5 800 000
+                - generic [ref=f79e5921]:
+                  - generic [ref=f79e5923]: Sanab chiqilgan 1 365 000 · qabul qildi Flynn Garcia
+                  - generic [ref=f79e5924]:
+                    - generic [ref=f79e5925]: Sverka qilingan vaqti
+                    - generic [ref=f79e5926]: 17.06 19:56
+              - generic [ref=f79e5928]:
+                - generic [ref=f79e5929]: O'rtacha chek 143.3K
+                - generic [ref=f79e5930]: Mahsulotlar —
+                - generic [ref=f79e5931]: O'rt. tayyorlash —
+                - generic [ref=f79e5932]: Eng band —
+              - generic [ref=f79e5933]:
+                - generic [ref=f79e5934]:
+                  - img [ref=f79e5935]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e5938] [cursor=pointer]:
+                  - img [ref=f79e5939]
+                  - text: Hisobot
+            - generic [ref=f79e5942]:
+              - generic [ref=f79e5943]:
+                - generic [ref=f79e5944]: OW
+                - generic [ref=f79e5945]:
+                  - generic [ref=f79e5946]: Onyx Walker
+                  - generic [ref=f79e5947]: "Smena #79 · Morning"
+                - generic [ref=f79e5948]: Naqd topshirilishini kutmoqda
+              - generic [ref=f79e5949]:
+                - generic [ref=f79e5950]:
+                  - generic [ref=f79e5951]: 07.06 15:04
+                  - img [ref=f79e5952]
+                  - generic [ref=f79e5954]: 07.06 20:35
+                - generic [ref=f79e5955]:
+                  - img [ref=f79e5956]
+                  - text: 5h 31m
+              - generic [ref=f79e5959]:
+                - generic [ref=f79e5960]:
+                  - generic [ref=f79e5961]: Buyurtmalar
+                  - generic [ref=f79e5962]: "42"
+                - generic [ref=f79e5963]:
+                  - generic [ref=f79e5964]: Yalpi
+                  - generic [ref=f79e5965]: 6 359 000
+                - generic [ref=f79e5966]:
+                  - generic [ref=f79e5967]: Sof
+                  - generic [ref=f79e5968]: 6 359 000
+              - generic [ref=f79e5970]:
+                - generic [ref=f79e5972]: Qabul qilinadigan naqd
+                - generic [ref=f79e5974]: 3 047 000 UZS
+                - generic [ref=f79e5975]:
+                  - generic [ref=f79e5976]:
+                    - img [ref=f79e5977]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e5981]: 3 047 000
+                - generic [ref=f79e5982]:
+                  - generic [ref=f79e5983]:
+                    - img [ref=f79e5984]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e5986]: 3 312 000
+              - generic [ref=f79e5988]:
+                - generic [ref=f79e5989]: O'rtacha chek 151.4K
+                - generic [ref=f79e5990]: Mahsulotlar —
+                - generic [ref=f79e5991]: O'rt. tayyorlash —
+                - generic [ref=f79e5992]: Eng band —
+              - generic [ref=f79e5993]:
+                - button "Naqd qabul qilish" [ref=f79e5994] [cursor=pointer]:
+                  - img [ref=f79e5995]
+                  - text: Naqd qabul qilish
+                - button "Hisobot" [ref=f79e5997] [cursor=pointer]:
+                  - img [ref=f79e5998]
+                  - text: Hisobot
+            - generic [ref=f79e6001]:
+              - generic [ref=f79e6002]:
+                - generic [ref=f79e6003]: JG
+                - generic [ref=f79e6004]:
+                  - generic [ref=f79e6005]: Jules Garcia
+                  - generic [ref=f79e6006]: "Smena #82 · Evening"
+                - generic [ref=f79e6007]:
+                  - img [ref=f79e6008]
+                  - text: Tugagan
+              - generic [ref=f79e6011]:
+                - generic [ref=f79e6012]:
+                  - generic [ref=f79e6013]: 07.06 13:01
+                  - img [ref=f79e6014]
+                  - generic [ref=f79e6016]: 07.06 21:02
+                - generic [ref=f79e6017]:
+                  - img [ref=f79e6018]
+                  - text: 8h 01m
+              - generic [ref=f79e6021]:
+                - generic [ref=f79e6022]:
+                  - generic [ref=f79e6023]: Buyurtmalar
+                  - generic [ref=f79e6024]: "43"
+                - generic [ref=f79e6025]:
+                  - generic [ref=f79e6026]: Yalpi
+                  - generic [ref=f79e6027]: 6 480 000
+                - generic [ref=f79e6028]:
+                  - generic [ref=f79e6029]: Sof
+                  - generic [ref=f79e6030]: 6 480 000
+              - generic [ref=f79e6032]:
+                - generic [ref=f79e6033]:
+                  - generic [ref=f79e6034]: Naqd qabul qilindi
+                  - generic [ref=f79e6036]: Yetishmovchilik −23 337
+                - generic [ref=f79e6038]: 3 023 663 UZS
+                - generic [ref=f79e6039]:
+                  - generic [ref=f79e6040]:
+                    - img [ref=f79e6041]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e6045]: 3 047 000
+                - generic [ref=f79e6046]:
+                  - generic [ref=f79e6047]:
+                    - img [ref=f79e6048]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e6050]: 3 433 000
+                - generic [ref=f79e6051]:
+                  - generic [ref=f79e6053]: Sanab chiqilgan 3 023 663 · qabul qildi Jules Garcia
+                  - generic [ref=f79e6054]:
+                    - generic [ref=f79e6055]: Sverka qilingan vaqti
+                    - generic [ref=f79e6056]: 17.06 19:56
+              - generic [ref=f79e6058]:
+                - generic [ref=f79e6059]: O'rtacha chek 150.7K
+                - generic [ref=f79e6060]: Mahsulotlar —
+                - generic [ref=f79e6061]: O'rt. tayyorlash —
+                - generic [ref=f79e6062]: Eng band —
+              - generic [ref=f79e6063]:
+                - generic [ref=f79e6064]:
+                  - img [ref=f79e6065]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e6068] [cursor=pointer]:
+                  - img [ref=f79e6069]
+                  - text: Hisobot
+            - generic [ref=f79e6072]:
+              - generic [ref=f79e6073]:
+                - generic [ref=f79e6074]: AM
+                - generic [ref=f79e6075]:
+                  - generic [ref=f79e6076]: Avery Miller
+                  - generic [ref=f79e6077]: "Smena #83 · Morning"
+                - generic [ref=f79e6078]: Naqd topshirilishini kutmoqda
+              - generic [ref=f79e6079]:
+                - generic [ref=f79e6080]:
+                  - generic [ref=f79e6081]: 06.06 20:16
+                  - img [ref=f79e6082]
+                  - generic [ref=f79e6084]: 07.06 05:46
+                - generic [ref=f79e6085]:
+                  - img [ref=f79e6086]
+                  - text: 9h 30m
+              - generic [ref=f79e6089]:
+                - generic [ref=f79e6090]:
+                  - generic [ref=f79e6091]: Buyurtmalar
+                  - generic [ref=f79e6092]: "33"
+                - generic [ref=f79e6093]:
+                  - generic [ref=f79e6094]: Yalpi
+                  - generic [ref=f79e6095]: 4 997 000
+                - generic [ref=f79e6096]:
+                  - generic [ref=f79e6097]: Sof
+                  - generic [ref=f79e6098]: 4 997 000
+              - generic [ref=f79e6100]:
+                - generic [ref=f79e6102]: Qabul qilinadigan naqd
+                - generic [ref=f79e6104]: 1 411 000 UZS
+                - generic [ref=f79e6105]:
+                  - generic [ref=f79e6106]:
+                    - img [ref=f79e6107]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e6111]: 1 411 000
+                - generic [ref=f79e6112]:
+                  - generic [ref=f79e6113]:
+                    - img [ref=f79e6114]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e6116]: 3 586 000
+              - generic [ref=f79e6118]:
+                - generic [ref=f79e6119]: O'rtacha chek 151.4K
+                - generic [ref=f79e6120]: Mahsulotlar —
+                - generic [ref=f79e6121]: O'rt. tayyorlash —
+                - generic [ref=f79e6122]: Eng band —
+              - generic [ref=f79e6123]:
+                - button "Naqd qabul qilish" [ref=f79e6124] [cursor=pointer]:
+                  - img [ref=f79e6125]
+                  - text: Naqd qabul qilish
+                - button "Hisobot" [ref=f79e6127] [cursor=pointer]:
+                  - img [ref=f79e6128]
+                  - text: Hisobot
+            - generic [ref=f79e6131]:
+              - generic [ref=f79e6132]:
+                - generic [ref=f79e6133]: AT
+                - generic [ref=f79e6134]:
+                  - generic [ref=f79e6135]: Alex Torres
+                  - generic [ref=f79e6136]: "Smena #84 · Morning"
+                - generic [ref=f79e6137]: Naqd topshirilishini kutmoqda
+              - generic [ref=f79e6138]:
+                - generic [ref=f79e6139]:
+                  - generic [ref=f79e6140]: 06.06 14:15
+                  - img [ref=f79e6141]
+                  - generic [ref=f79e6143]: 06.06 21:40
+                - generic [ref=f79e6144]:
+                  - img [ref=f79e6145]
+                  - text: 7h 25m
+              - generic [ref=f79e6148]:
+                - generic [ref=f79e6149]:
+                  - generic [ref=f79e6150]: Buyurtmalar
+                  - generic [ref=f79e6151]: "35"
+                - generic [ref=f79e6152]:
+                  - generic [ref=f79e6153]: Yalpi
+                  - generic [ref=f79e6154]: 3 695 000
+                - generic [ref=f79e6155]:
+                  - generic [ref=f79e6156]: Sof
+                  - generic [ref=f79e6157]: 3 695 000
+              - generic [ref=f79e6159]:
+                - generic [ref=f79e6161]: Qabul qilinadigan naqd
+                - generic [ref=f79e6163]: 1 183 000 UZS
+                - generic [ref=f79e6164]:
+                  - generic [ref=f79e6165]:
+                    - img [ref=f79e6166]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e6170]: 1 183 000
+                - generic [ref=f79e6171]:
+                  - generic [ref=f79e6172]:
+                    - img [ref=f79e6173]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e6175]: 2 512 000
+              - generic [ref=f79e6177]:
+                - generic [ref=f79e6178]: O'rtacha chek 105.6K
+                - generic [ref=f79e6179]: Mahsulotlar —
+                - generic [ref=f79e6180]: O'rt. tayyorlash —
+                - generic [ref=f79e6181]: Eng band —
+              - generic [ref=f79e6182]:
+                - button "Naqd qabul qilish" [ref=f79e6183] [cursor=pointer]:
+                  - img [ref=f79e6184]
+                  - text: Naqd qabul qilish
+                - button "Hisobot" [ref=f79e6186] [cursor=pointer]:
+                  - img [ref=f79e6187]
+                  - text: Hisobot
+            - generic [ref=f79e6190]:
+              - generic [ref=f79e6191]:
+                - generic [ref=f79e6192]: RL
+                - generic [ref=f79e6193]:
+                  - generic [ref=f79e6194]: Reese Lewis
+                  - generic [ref=f79e6195]: "Smena #87 · Evening"
+                - generic [ref=f79e6196]:
+                  - img [ref=f79e6197]
+                  - text: Tugagan
+              - generic [ref=f79e6200]:
+                - generic [ref=f79e6201]:
+                  - generic [ref=f79e6202]: 05.06 21:04
+                  - img [ref=f79e6203]
+                  - generic [ref=f79e6205]: 06.06 05:56
+                - generic [ref=f79e6206]:
+                  - img [ref=f79e6207]
+                  - text: 8h 52m
+              - generic [ref=f79e6210]:
+                - generic [ref=f79e6211]:
+                  - generic [ref=f79e6212]: Buyurtmalar
+                  - generic [ref=f79e6213]: "27"
+                - generic [ref=f79e6214]:
+                  - generic [ref=f79e6215]: Yalpi
+                  - generic [ref=f79e6216]: 4 109 000
+                - generic [ref=f79e6217]:
+                  - generic [ref=f79e6218]: Sof
+                  - generic [ref=f79e6219]: 4 109 000
+              - generic [ref=f79e6221]:
+                - generic [ref=f79e6222]:
+                  - generic [ref=f79e6223]: Naqd qabul qilindi
+                  - generic [ref=f79e6225]: Aniq
+                - generic [ref=f79e6227]: 1 381 000 UZS
+                - generic [ref=f79e6228]:
+                  - generic [ref=f79e6229]:
+                    - img [ref=f79e6230]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e6234]: 1 381 000
+                - generic [ref=f79e6235]:
+                  - generic [ref=f79e6236]:
+                    - img [ref=f79e6237]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e6239]: 2 728 000
+                - generic [ref=f79e6240]:
+                  - generic [ref=f79e6242]: Sanab chiqilgan 1 381 000 · qabul qildi Reese Lewis
+                  - generic [ref=f79e6243]:
+                    - generic [ref=f79e6244]: Sverka qilingan vaqti
+                    - generic [ref=f79e6245]: 17.06 19:56
+              - generic [ref=f79e6247]:
+                - generic [ref=f79e6248]: O'rtacha chek 152.2K
+                - generic [ref=f79e6249]: Mahsulotlar —
+                - generic [ref=f79e6250]: O'rt. tayyorlash —
+                - generic [ref=f79e6251]: Eng band —
+              - generic [ref=f79e6252]:
+                - generic [ref=f79e6253]:
+                  - img [ref=f79e6254]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e6257] [cursor=pointer]:
+                  - img [ref=f79e6258]
+                  - text: Hisobot
+            - generic [ref=f79e6261]:
+              - generic [ref=f79e6262]:
+                - generic [ref=f79e6263]: AM
+                - generic [ref=f79e6264]:
+                  - generic [ref=f79e6265]: Avery Miller
+                  - generic [ref=f79e6266]: "Smena #86 · Night"
+                - generic [ref=f79e6267]:
+                  - img [ref=f79e6268]
+                  - text: Tugagan
+              - generic [ref=f79e6271]:
+                - generic [ref=f79e6272]:
+                  - generic [ref=f79e6273]: 05.06 15:27
+                  - img [ref=f79e6274]
+                  - generic [ref=f79e6276]: 05.06 21:39
+                - generic [ref=f79e6277]:
+                  - img [ref=f79e6278]
+                  - text: 6h 12m
+              - generic [ref=f79e6281]:
+                - generic [ref=f79e6282]:
+                  - generic [ref=f79e6283]: Buyurtmalar
+                  - generic [ref=f79e6284]: "23"
+                - generic [ref=f79e6285]:
+                  - generic [ref=f79e6286]: Yalpi
+                  - generic [ref=f79e6287]: 3 179 000
+                - generic [ref=f79e6288]:
+                  - generic [ref=f79e6289]: Sof
+                  - generic [ref=f79e6290]: 3 179 000
+              - generic [ref=f79e6292]:
+                - generic [ref=f79e6293]:
+                  - generic [ref=f79e6294]: Naqd qabul qilindi
+                  - generic [ref=f79e6296]: Aniq
+                - generic [ref=f79e6298]: 1 788 000 UZS
+                - generic [ref=f79e6299]:
+                  - generic [ref=f79e6300]:
+                    - img [ref=f79e6301]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e6305]: 1 788 000
+                - generic [ref=f79e6306]:
+                  - generic [ref=f79e6307]:
+                    - img [ref=f79e6308]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e6310]: 1 391 000
+                - generic [ref=f79e6311]:
+                  - generic [ref=f79e6313]: Sanab chiqilgan 1 788 000 · qabul qildi Avery Miller
+                  - generic [ref=f79e6314]:
+                    - generic [ref=f79e6315]: Sverka qilingan vaqti
+                    - generic [ref=f79e6316]: 17.06 19:56
+              - generic [ref=f79e6318]:
+                - generic [ref=f79e6319]: O'rtacha chek 138.2K
+                - generic [ref=f79e6320]: Mahsulotlar —
+                - generic [ref=f79e6321]: O'rt. tayyorlash —
+                - generic [ref=f79e6322]: Eng band —
+              - generic [ref=f79e6323]:
+                - generic [ref=f79e6324]:
+                  - img [ref=f79e6325]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e6328] [cursor=pointer]:
+                  - img [ref=f79e6329]
+                  - text: Hisobot
+            - generic [ref=f79e6332]:
+              - generic [ref=f79e6333]:
+                - generic [ref=f79e6334]: RL
+                - generic [ref=f79e6335]:
+                  - generic [ref=f79e6336]: Reese Lewis
+                  - generic [ref=f79e6337]: "Smena #85 · Night"
+                - generic [ref=f79e6338]:
+                  - img [ref=f79e6339]
+                  - text: Tugagan
+              - generic [ref=f79e6342]:
+                - generic [ref=f79e6343]:
+                  - generic [ref=f79e6344]: 05.06 15:04
+                  - img [ref=f79e6345]
+                  - generic [ref=f79e6347]: 06.06 00:11
+                - generic [ref=f79e6348]:
+                  - img [ref=f79e6349]
+                  - text: 9h 07m
+              - generic [ref=f79e6352]:
+                - generic [ref=f79e6353]:
+                  - generic [ref=f79e6354]: Buyurtmalar
+                  - generic [ref=f79e6355]: "23"
+                - generic [ref=f79e6356]:
+                  - generic [ref=f79e6357]: Yalpi
+                  - generic [ref=f79e6358]: 2 947 000
+                - generic [ref=f79e6359]:
+                  - generic [ref=f79e6360]: Sof
+                  - generic [ref=f79e6361]: 2 947 000
+              - generic [ref=f79e6363]:
+                - generic [ref=f79e6364]:
+                  - generic [ref=f79e6365]: Naqd qabul qilindi
+                  - generic [ref=f79e6367]: Ortiqcha +9 637
+                - generic [ref=f79e6369]: 1 797 637 UZS
+                - generic [ref=f79e6370]:
+                  - generic [ref=f79e6371]:
+                    - img [ref=f79e6372]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e6376]: 1 788 000
+                - generic [ref=f79e6377]:
+                  - generic [ref=f79e6378]:
+                    - img [ref=f79e6379]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e6381]: 1 159 000
+                - generic [ref=f79e6382]:
+                  - generic [ref=f79e6384]: Sanab chiqilgan 1 797 637 · qabul qildi Reese Lewis
+                  - generic [ref=f79e6385]:
+                    - generic [ref=f79e6386]: Sverka qilingan vaqti
+                    - generic [ref=f79e6387]: 17.06 19:56
+              - generic [ref=f79e6389]:
+                - generic [ref=f79e6390]: O'rtacha chek 128.1K
+                - generic [ref=f79e6391]: Mahsulotlar —
+                - generic [ref=f79e6392]: O'rt. tayyorlash —
+                - generic [ref=f79e6393]: Eng band —
+              - generic [ref=f79e6394]:
+                - generic [ref=f79e6395]:
+                  - img [ref=f79e6396]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e6399] [cursor=pointer]:
+                  - img [ref=f79e6400]
+                  - text: Hisobot
+            - generic [ref=f79e6403]:
+              - generic [ref=f79e6404]:
+                - generic [ref=f79e6405]: FG
+                - generic [ref=f79e6406]:
+                  - generic [ref=f79e6407]: Flynn Garcia
+                  - generic [ref=f79e6408]: "Smena #88 · Morning"
+                - generic [ref=f79e6409]:
+                  - img [ref=f79e6410]
+                  - text: Tugagan
+              - generic [ref=f79e6413]:
+                - generic [ref=f79e6414]:
+                  - generic [ref=f79e6415]: 05.06 13:21
+                  - img [ref=f79e6416]
+                  - generic [ref=f79e6418]: 05.06 21:39
+                - generic [ref=f79e6419]:
+                  - img [ref=f79e6420]
+                  - text: 8h 18m
+              - generic [ref=f79e6423]:
+                - generic [ref=f79e6424]:
+                  - generic [ref=f79e6425]: Buyurtmalar
+                  - generic [ref=f79e6426]: "51"
+                - generic [ref=f79e6427]:
+                  - generic [ref=f79e6428]: Yalpi
+                  - generic [ref=f79e6429]: 7 104 000
+                - generic [ref=f79e6430]:
+                  - generic [ref=f79e6431]: Sof
+                  - generic [ref=f79e6432]: 7 104 000
+              - generic [ref=f79e6434]:
+                - generic [ref=f79e6435]:
+                  - generic [ref=f79e6436]: Naqd qabul qilindi
+                  - generic [ref=f79e6438]: Aniq
+                - generic [ref=f79e6440]: 4 015 000 UZS
+                - generic [ref=f79e6441]:
+                  - generic [ref=f79e6442]:
+                    - img [ref=f79e6443]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e6447]: 4 015 000
+                - generic [ref=f79e6448]:
+                  - generic [ref=f79e6449]:
+                    - img [ref=f79e6450]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e6452]: 3 089 000
+                - generic [ref=f79e6453]:
+                  - generic [ref=f79e6455]: Sanab chiqilgan 4 015 000 · qabul qildi Flynn Garcia
+                  - generic [ref=f79e6456]:
+                    - generic [ref=f79e6457]: Sverka qilingan vaqti
+                    - generic [ref=f79e6458]: 17.06 19:56
+              - generic [ref=f79e6460]:
+                - generic [ref=f79e6461]: O'rtacha chek 139.3K
+                - generic [ref=f79e6462]: Mahsulotlar —
+                - generic [ref=f79e6463]: O'rt. tayyorlash —
+                - generic [ref=f79e6464]: Eng band —
+              - generic [ref=f79e6465]:
+                - generic [ref=f79e6466]:
+                  - img [ref=f79e6467]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e6470] [cursor=pointer]:
+                  - img [ref=f79e6471]
+                  - text: Hisobot
+            - generic [ref=f79e6474]:
+              - generic [ref=f79e6475]:
+                - generic [ref=f79e6476]: AM
+                - generic [ref=f79e6477]:
+                  - generic [ref=f79e6478]: Avery Miller
+                  - generic [ref=f79e6479]: "Smena #90 · Evening"
+                - generic [ref=f79e6480]: Naqd topshirilishini kutmoqda
+              - generic [ref=f79e6481]:
+                - generic [ref=f79e6482]:
+                  - generic [ref=f79e6483]: 04.06 20:29
+                  - img [ref=f79e6484]
+                  - generic [ref=f79e6486]: 05.06 02:20
+                - generic [ref=f79e6487]:
+                  - img [ref=f79e6488]
+                  - text: 5h 51m
+              - generic [ref=f79e6491]:
+                - generic [ref=f79e6492]:
+                  - generic [ref=f79e6493]: Buyurtmalar
+                  - generic [ref=f79e6494]: "33"
+                - generic [ref=f79e6495]:
+                  - generic [ref=f79e6496]: Yalpi
+                  - generic [ref=f79e6497]: 4 019 000
+                - generic [ref=f79e6498]:
+                  - generic [ref=f79e6499]: Sof
+                  - generic [ref=f79e6500]: 4 019 000
+              - generic [ref=f79e6502]:
+                - generic [ref=f79e6504]: Qabul qilinadigan naqd
+                - generic [ref=f79e6506]: 1 447 000 UZS
+                - generic [ref=f79e6507]:
+                  - generic [ref=f79e6508]:
+                    - img [ref=f79e6509]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e6513]: 1 447 000
+                - generic [ref=f79e6514]:
+                  - generic [ref=f79e6515]:
+                    - img [ref=f79e6516]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e6518]: 2 572 000
+              - generic [ref=f79e6520]:
+                - generic [ref=f79e6521]: O'rtacha chek 121.8K
+                - generic [ref=f79e6522]: Mahsulotlar —
+                - generic [ref=f79e6523]: O'rt. tayyorlash —
+                - generic [ref=f79e6524]: Eng band —
+              - generic [ref=f79e6525]:
+                - button "Naqd qabul qilish" [ref=f79e6526] [cursor=pointer]:
+                  - img [ref=f79e6527]
+                  - text: Naqd qabul qilish
+                - button "Hisobot" [ref=f79e6529] [cursor=pointer]:
+                  - img [ref=f79e6530]
+                  - text: Hisobot
+            - generic [ref=f79e6533]:
+              - generic [ref=f79e6534]:
+                - generic [ref=f79e6535]: FG
+                - generic [ref=f79e6536]:
+                  - generic [ref=f79e6537]: Flynn Garcia
+                  - generic [ref=f79e6538]: "Smena #89 · Morning"
+                - generic [ref=f79e6539]:
+                  - img [ref=f79e6540]
+                  - text: Tugagan
+              - generic [ref=f79e6543]:
+                - generic [ref=f79e6544]:
+                  - generic [ref=f79e6545]: 04.06 19:14
+                  - img [ref=f79e6546]
+                  - generic [ref=f79e6548]: 05.06 04:21
+                - generic [ref=f79e6549]:
+                  - img [ref=f79e6550]
+                  - text: 9h 07m
+              - generic [ref=f79e6553]:
+                - generic [ref=f79e6554]:
+                  - generic [ref=f79e6555]: Buyurtmalar
+                  - generic [ref=f79e6556]: "21"
+                - generic [ref=f79e6557]:
+                  - generic [ref=f79e6558]: Yalpi
+                  - generic [ref=f79e6559]: 2 996 000
+                - generic [ref=f79e6560]:
+                  - generic [ref=f79e6561]: Sof
+                  - generic [ref=f79e6562]: 2 996 000
+              - generic [ref=f79e6564]:
+                - generic [ref=f79e6565]:
+                  - generic [ref=f79e6566]: Naqd qabul qilindi
+                  - generic [ref=f79e6568]: Aniq
+                - generic [ref=f79e6570]: 1 399 000 UZS
+                - generic [ref=f79e6571]:
+                  - generic [ref=f79e6572]:
+                    - img [ref=f79e6573]
+                    - text: Naqd sotuv
+                  - generic [ref=f79e6577]: 1 399 000
+                - generic [ref=f79e6578]:
+                  - generic [ref=f79e6579]:
+                    - img [ref=f79e6580]
+                    - text: Karta / raqamli
+                  - generic [ref=f79e6582]: 1 597 000
+                - generic [ref=f79e6583]:
+                  - generic [ref=f79e6585]: Sanab chiqilgan 1 399 000 · qabul qildi Flynn Garcia
+                  - generic [ref=f79e6586]:
+                    - generic [ref=f79e6587]: Sverka qilingan vaqti
+                    - generic [ref=f79e6588]: 17.06 19:56
+              - generic [ref=f79e6590]:
+                - generic [ref=f79e6591]: O'rtacha chek 142.7K
+                - generic [ref=f79e6592]: Mahsulotlar —
+                - generic [ref=f79e6593]: O'rt. tayyorlash —
+                - generic [ref=f79e6594]: Eng band —
+              - generic [ref=f79e6595]:
+                - generic [ref=f79e6596]:
+                  - img [ref=f79e6597]
+                  - text: Topshirish tugadi
+                - button "Hisobot" [ref=f79e6600] [cursor=pointer]:
+                  - img [ref=f79e6601]
+                  - text: Hisobot
+  - region "Notifications alt+T":
+    - list

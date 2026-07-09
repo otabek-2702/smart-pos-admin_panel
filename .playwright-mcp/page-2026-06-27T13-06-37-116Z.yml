@@ -1,0 +1,36 @@
+- generic [ref=e1]:
+  - generic [ref=e7]:
+    - img "Kirish illyustratsiyasi" [ref=e11]:
+      - img "Kirish illyustratsiyasi" [ref=e12]
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - button [ref=e17] [cursor=pointer]:
+          - img [ref=e19]
+        - generic [ref=e22]:
+          - button "Tilni almashtirish" [ref=e23] [cursor=pointer]:
+            - generic [ref=e24]: O'zbek
+          - button "Tilni almashtirish" [ref=e25] [cursor=pointer]:
+            - generic [ref=e26]: Русский
+          - button "Tilni almashtirish" [ref=e27] [cursor=pointer]:
+            - generic [ref=e28]: English
+      - generic [ref=e29]:
+        - img [ref=e33]
+        - generic [ref=e38]: pos system
+      - generic [ref=e39]:
+        - heading "pos systemga xush kelibsiz!" [level=6] [ref=e40]
+        - paragraph [ref=e41]: Hisobingizga kiring va boshqaruv paneliga o'ting
+      - generic [ref=e44]:
+        - textbox [ref=e48]:
+          - generic [ref=e49]:
+            - generic: Elektron pochta
+            - textbox "Elektron pochta Elektron pochta" [active] [ref=e50]
+        - generic [ref=e51]:
+          - textbox [ref=e54]:
+            - generic [ref=e55]:
+              - generic: Parol
+              - textbox "Parol Parol" [ref=e56]
+            - button "Parol appended action" [ref=e58] [cursor=pointer]
+          - button "Kirish" [ref=e61] [cursor=pointer]:
+            - generic [ref=e62]: Kirish
+  - generic:
+    - tooltip

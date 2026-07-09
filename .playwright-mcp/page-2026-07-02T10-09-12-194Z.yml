@@ -1,0 +1,639 @@
+- generic [ref=f1e5]:
+  - generic [ref=f1e6]:
+    - complementary [ref=f1e7]:
+      - generic [ref=f1e8]:
+        - img [ref=f1e10]
+        - generic [ref=f1e12]: Alpha POS
+      - navigation [ref=f1e13]:
+        - link "Boshqaruv paneli" [ref=f1e14] [cursor=pointer]:
+          - /url: /
+          - img [ref=f1e16]
+          - generic [ref=f1e18]: Boshqaruv paneli
+        - link "AI yordamchi" [ref=f1e19] [cursor=pointer]:
+          - /url: /ai-assistant
+          - img [ref=f1e21]
+          - generic [ref=f1e25]: AI yordamchi
+        - link "Smenalar 5" [ref=f1e654] [cursor=pointer]:
+          - /url: /shifts-analytics
+          - img [ref=f1e28]
+          - generic [ref=f1e31]: Smenalar
+          - generic [ref=f1e655]: "5"
+        - generic [ref=f1e32]: Boshqaruv
+        - link "Foydalanuvchilar" [ref=f1e33] [cursor=pointer]:
+          - /url: /users
+          - img [ref=f1e35]
+          - generic [ref=f1e38]: Foydalanuvchilar
+        - link "Kategoriyalar" [ref=f1e39] [cursor=pointer]:
+          - /url: /categories
+          - img [ref=f1e41]
+          - generic [ref=f1e46]: Kategoriyalar
+        - link "Mahsulotlar" [ref=f1e47] [cursor=pointer]:
+          - /url: /products
+          - img [ref=f1e49]
+          - generic [ref=f1e52]: Mahsulotlar
+        - link "Buyurtmalar 183" [ref=f1e656] [cursor=pointer]:
+          - /url: /orders
+          - img [ref=f1e55]
+          - generic [ref=f1e58]: Buyurtmalar
+          - generic [ref=f1e657]: "183"
+        - link "Zallar va stollar" [ref=f1e59] [cursor=pointer]:
+          - /url: /places
+          - img [ref=f1e61]
+          - generic [ref=f1e64]: Zallar va stollar
+        - link "Chegirmalar" [ref=f1e65] [cursor=pointer]:
+          - /url: /discounts
+          - img [ref=f1e67]
+          - generic [ref=f1e70]: Chegirmalar
+        - link "Kassa" [ref=f1e71] [cursor=pointer]:
+          - /url: /cashbox/categories
+          - img [ref=f1e73]
+          - generic [ref=f1e76]: Kassa
+        - link "Xazina" [ref=f1e77] [cursor=pointer]:
+          - /url: /treasury
+          - img [ref=f1e79]
+          - generic [ref=f1e81]: Xazina
+        - link "Sodiqlik" [ref=f1e82] [cursor=pointer]:
+          - /url: /loyalty
+          - img [ref=f1e84]
+          - generic [ref=f1e87]: Sodiqlik
+        - link "Sessiyalar" [ref=f1e88] [cursor=pointer]:
+          - /url: /sessions
+          - img [ref=f1e90]
+          - generic [ref=f1e93]: Sessiyalar
+        - generic [ref=f1e94]: Kadrlar
+        - link "Xodimlar" [ref=f1e95] [cursor=pointer]:
+          - /url: /hr-employees
+          - img [ref=f1e97]
+          - generic [ref=f1e100]: Xodimlar
+        - link "Bo'limlar" [ref=f1e101] [cursor=pointer]:
+          - /url: /hr-departments
+          - img [ref=f1e103]
+          - generic [ref=f1e107]: Bo'limlar
+        - link "Maoshlar" [ref=f1e108] [cursor=pointer]:
+          - /url: /hr-salaries
+          - img [ref=f1e110]
+          - generic [ref=f1e113]: Maoshlar
+        - link "HR kassa" [ref=f1e114] [cursor=pointer]:
+          - /url: /hr-cash
+          - img [ref=f1e116]
+          - generic [ref=f1e120]: HR kassa
+        - link "HR hujjatlar" [ref=f1e121] [cursor=pointer]:
+          - /url: /hr-documents
+          - img [ref=f1e123]
+          - generic [ref=f1e126]: HR hujjatlar
+        - link "Tadbirlar" [ref=f1e127] [cursor=pointer]:
+          - /url: /hr-events
+          - img [ref=f1e129]
+          - generic [ref=f1e131]: Tadbirlar
+        - link "Xarajat kategoriyalari" [ref=f1e132] [cursor=pointer]:
+          - /url: /hr-expense-categories
+          - img [ref=f1e134]
+          - generic [ref=f1e139]: Xarajat kategoriyalari
+        - link "Maqsadlar" [ref=f1e140] [cursor=pointer]:
+          - /url: /hr-goals
+          - img [ref=f1e142]
+          - generic [ref=f1e146]: Maqsadlar
+        - link "Ta'til qoldiqlari" [ref=f1e147] [cursor=pointer]:
+          - /url: /hr-leave-balances
+          - img [ref=f1e149]
+          - generic [ref=f1e152]: Ta'til qoldiqlari
+        - link "Ta'til turlari" [ref=f1e153] [cursor=pointer]:
+          - /url: /hr-leave-types
+          - img [ref=f1e155]
+          - generic [ref=f1e158]: Ta'til turlari
+        - link "Sharhlar" [ref=f1e159] [cursor=pointer]:
+          - /url: /hr-reviews
+          - img [ref=f1e161]
+          - generic [ref=f1e163]: Sharhlar
+        - link "Smena shablonlari" [ref=f1e164] [cursor=pointer]:
+          - /url: /shift-templates
+          - img [ref=f1e166]
+          - generic [ref=f1e169]: Smena shablonlari
+        - generic [ref=f1e170]: Ombor
+        - link "Ombor ogohlantirishlari" [ref=f1e171] [cursor=pointer]:
+          - /url: /stock/alerts
+          - img [ref=f1e173]
+          - generic [ref=f1e176]: Ombor ogohlantirishlari
+        - link "Qabul qilish" [ref=f1e177] [cursor=pointer]:
+          - /url: /stock/receiving
+          - img [ref=f1e179]
+          - generic [ref=f1e182]: Qabul qilish
+        - link "Tuzatishlar" [ref=f1e183] [cursor=pointer]:
+          - /url: /stock/adjustments
+          - img [ref=f1e185]
+          - generic [ref=f1e189]: Tuzatishlar
+        - link "Zaxiralar" [ref=f1e190] [cursor=pointer]:
+          - /url: /stock/reservations
+          - img [ref=f1e192]
+          - generic [ref=f1e195]: Zaxiralar
+        - generic [ref=f1e196]: Sozlamalar
+        - link "QR kodlar" [ref=f1e197] [cursor=pointer]:
+          - /url: /qr-codes
+          - img [ref=f1e199]
+          - generic [ref=f1e204]: QR kodlar
+        - generic [ref=f1e205]: Bildirishnomalar
+        - link "Bildirishnoma navbati" [ref=f1e206] [cursor=pointer]:
+          - /url: /notification-queue
+          - img [ref=f1e208]
+          - generic [ref=f1e211]: Bildirishnoma navbati
+        - link "Bildirishnoma sozlamalari" [ref=f1e212] [cursor=pointer]:
+          - /url: /notification-settings
+          - img [ref=f1e214]
+          - generic [ref=f1e218]: Bildirishnoma sozlamalari
+        - link "Bildirishnoma shablonlari" [ref=f1e219] [cursor=pointer]:
+          - /url: /notification-templates
+          - img [ref=f1e221]
+          - generic [ref=f1e224]: Bildirishnoma shablonlari
+        - link "Bildirishnoma turlari" [ref=f1e225] [cursor=pointer]:
+          - /url: /notification-types
+          - img [ref=f1e227]
+          - generic [ref=f1e230]: Bildirishnoma turlari
+    - generic [ref=f1e231]:
+      - banner [ref=f1e232]:
+        - button "Yon panelni almashtirish" [ref=f1e233] [cursor=pointer]:
+          - img [ref=f1e234]
+        - generic [ref=f1e237]:
+          - generic [ref=f1e238]: Alpha POS
+          - img [ref=f1e239]
+          - generic [ref=f1e241]: Buyurtmalar
+        - button "Ogohlantirishlar yo'q" [ref=f1e243] [cursor=pointer]:
+          - img [ref=f1e244]
+        - button "Sozlamalar" [ref=f1e248] [cursor=pointer]:
+          - img [ref=f1e249]
+        - button "Mavzuni almashtirish" [ref=f1e252] [cursor=pointer]:
+          - img [ref=f1e253]
+        - generic [ref=f1e255]: AU
+      - main [ref=f1e256]:
+        - generic [ref=f1e257]:
+          - generic [ref=f1e259]:
+            - heading "Buyurtmalar" [level=1] [ref=f1e260]
+            - generic [ref=f1e261]: Har bir buyurtmani kuzating, to'lang va yarashtiring
+          - generic [ref=f1e262]:
+            - generic [ref=f1e263]:
+              - generic [ref=f1e264]:
+                - img [ref=f1e266]
+                - generic [ref=f1e269]: Jami
+              - generic [ref=f1e270]: 6 602
+            - generic [ref=f1e271]:
+              - generic [ref=f1e272]:
+                - img [ref=f1e274]
+                - generic [ref=f1e277]: Tayyorlanmoqda
+              - generic [ref=f1e278]: "235"
+            - generic [ref=f1e279]:
+              - generic [ref=f1e280]:
+                - img [ref=f1e282]
+                - generic [ref=f1e284]: Tayyor
+              - generic [ref=f1e285]: 6 367
+            - generic [ref=f1e286]:
+              - generic [ref=f1e287]:
+                - img [ref=f1e289]
+                - generic [ref=f1e291]: Daromad
+              - generic [ref=f1e292]: 325 299 300UZS
+          - generic [ref=f1e658]:
+            - generic [ref=f1e659]:
+              - generic [ref=f1e660]:
+                - generic [ref=f1e661]: Statuslar bo'yicha taqsimot
+                - generic [ref=f1e662]: filtrlash uchun bosing
+              - generic [ref=f1e663]:
+                - 'generic "Tayyorlanmoqda: 2" [ref=f1e664] [cursor=pointer]'
+                - 'generic "Tayyor: 8" [ref=f1e665] [cursor=pointer]'
+              - generic [ref=f1e666]:
+                - button "Ochiq 0" [ref=f1e667] [cursor=pointer]:
+                  - generic [ref=f1e669]: Ochiq
+                  - generic [ref=f1e670]: "0"
+                - button "Tayyorlanmoqda 2" [ref=f1e671] [cursor=pointer]:
+                  - generic [ref=f1e673]: Tayyorlanmoqda
+                  - generic [ref=f1e674]: "2"
+                - button "Tayyor 8" [ref=f1e675] [cursor=pointer]:
+                  - generic [ref=f1e677]: Tayyor
+                  - generic [ref=f1e678]: "8"
+                - button "Tugatildi 0" [ref=f1e679] [cursor=pointer]:
+                  - generic [ref=f1e681]: Tugatildi
+                  - generic [ref=f1e682]: "0"
+                - button "Bekor qilindi 0" [ref=f1e683] [cursor=pointer]:
+                  - generic [ref=f1e685]: Bekor qilindi
+                  - generic [ref=f1e686]: "0"
+            - generic [ref=f1e687]:
+              - generic [ref=f1e688]: To'lov holati
+              - generic [ref=f1e689]:
+                - generic [ref=f1e690]:
+                  - img [ref=f1e691]
+                  - generic [ref=f1e694]: 100%
+                - generic [ref=f1e695]:
+                  - button "To'langan 10" [ref=f1e696] [cursor=pointer]:
+                    - generic [ref=f1e698]: To'langan
+                    - generic [ref=f1e699]: "10"
+                  - button "To'lanmagan 0" [ref=f1e700] [cursor=pointer]:
+                    - generic [ref=f1e702]: To'lanmagan
+                    - generic [ref=f1e703]: "0"
+            - generic [ref=f1e704]:
+              - generic [ref=f1e705]:
+                - generic [ref=f1e706]: Soatlar bo'yicha buyurtmalar
+                - generic [ref=f1e707]: 11:00–22:00
+              - generic [ref=f1e708]:
+                - generic "11 · 0" [ref=f1e709]:
+                  - generic [ref=f1e711]: "11"
+                - generic "1 · 0" [ref=f1e712]
+                - generic "13 · 0" [ref=f1e714]:
+                  - generic [ref=f1e716]: "13"
+                - generic "3 · 7" [ref=f1e717]
+                - generic "15 · 3" [ref=f1e719]:
+                  - generic [ref=f1e721]: "15"
+                - generic "5 · 0" [ref=f1e722]
+                - generic "17 · 0" [ref=f1e724]:
+                  - generic [ref=f1e726]: "17"
+                - generic "7 · 0" [ref=f1e727]
+                - generic "19 · 0" [ref=f1e729]:
+                  - generic [ref=f1e731]: "19"
+                - generic "9 · 0" [ref=f1e732]
+                - generic "21 · 0" [ref=f1e734]:
+                  - generic [ref=f1e736]: "21"
+                - generic "11 · 0" [ref=f1e737]
+          - generic [ref=f1e739]:
+            - generic [ref=f1e741]: To'lov bo'yicha taqsimot
+            - generic [ref=f1e742]:
+              - generic [ref=f1e743]:
+                - generic [ref=f1e744]:
+                  - text: To'lov
+                  - generic [ref=f1e745]: Aralash · 3
+                - generic [ref=f1e746]: 325 299 300
+              - generic [ref=f1e747]:
+                - generic "Naqd" [ref=f1e748]
+                - generic "Karta" [ref=f1e749]
+                - generic "DIGITAL" [ref=f1e750]
+              - generic [ref=f1e751]:
+                - generic [ref=f1e752]:
+                  - generic [ref=f1e753]: Naqd
+                  - generic [ref=f1e755]:
+                    - generic [ref=f1e756]: 284 596 200
+                    - generic [ref=f1e757]: 87%
+                - generic [ref=f1e758]:
+                  - generic [ref=f1e759]: Karta
+                  - generic [ref=f1e761]:
+                    - generic [ref=f1e762]: 39 506 700
+                    - generic [ref=f1e763]: 12%
+                - generic [ref=f1e764]:
+                  - generic [ref=f1e765]: DIGITAL
+                  - generic [ref=f1e767]:
+                    - generic [ref=f1e768]: 1 196 400
+                    - generic [ref=f1e769]: 0%
+          - generic [ref=f1e293]:
+            - generic [ref=f1e294]:
+              - generic [ref=f1e296]:
+                - img [ref=f1e297]
+                - textbox "Buyurtmalarni qidirish" [ref=f1e300]:
+                  - /placeholder: Buyurtmalarni qidirish...
+              - generic [ref=f1e301]:
+                - generic [active] [ref=f1e302] [cursor=pointer]:
+                  - img [ref=f1e303]
+                  - generic [ref=f1e305]: Holat bo'yicha saralash
+                  - img [ref=f1e306]
+                - generic [ref=f1e1096]:
+                  - generic [ref=f1e1097] [cursor=pointer]:
+                    - checkbox [ref=f1e1098]
+                    - generic [ref=f1e1099]: Ochiq
+                  - generic [ref=f1e1100] [cursor=pointer]:
+                    - checkbox [ref=f1e1101]
+                    - generic [ref=f1e1102]: Tayyorlanmoqda
+                  - generic [ref=f1e1103] [cursor=pointer]:
+                    - checkbox [ref=f1e1104]
+                    - generic [ref=f1e1105]: Tayyor
+                  - generic [ref=f1e1106] [cursor=pointer]:
+                    - checkbox [ref=f1e1107]
+                    - generic [ref=f1e1108]: Tugatildi
+                  - generic [ref=f1e1109] [cursor=pointer]:
+                    - checkbox [ref=f1e1110]
+                    - generic [ref=f1e1111]: Bekor qilindi
+              - combobox [ref=f1e309] [cursor=pointer]:
+                - generic [ref=f1e310]: Buyurtma turi
+                - img [ref=f1e311]
+              - combobox [ref=f1e314] [cursor=pointer]:
+                - generic [ref=f1e315]: Barcha kassirlar
+                - img [ref=f1e316]
+              - generic [ref=f1e319] [cursor=pointer]:
+                - generic [ref=f1e320]: Barcha kategoriyalar
+                - img [ref=f1e321]
+            - generic [ref=f1e323]:
+              - generic [ref=f1e324]:
+                - generic [ref=f1e325]: Davr
+                - button "Barcha vaqt" [ref=f1e327] [cursor=pointer]:
+                  - img [ref=f1e328]
+                  - generic [ref=f1e331]: Barcha vaqt
+                  - img [ref=f1e332]
+              - generic [ref=f1e334]:
+                - generic [ref=f1e335]: To'lov
+                - generic [ref=f1e336]:
+                  - button "Hammasi" [ref=f1e337] [cursor=pointer]
+                  - button "To'langan" [ref=f1e338] [cursor=pointer]
+                  - button "To'lanmagan" [ref=f1e339] [cursor=pointer]
+            - generic [ref=f1e341]:
+              - table [ref=f1e343]:
+                - rowgroup [ref=f1e344]:
+                  - 'row "Buyurtma # Tur Ma''lumot Mijoz Kassir Holat To''lov Jami Mahsulotlar Sana To''langan vaqt Amallar" [ref=f1e345]':
+                    - columnheader [ref=f1e346]
+                    - columnheader [ref=f1e347]:
+                      - checkbox [ref=f1e348] [cursor=pointer]
+                    - 'columnheader "Buyurtma #" [ref=f1e349] [cursor=pointer]':
+                      - text: "Buyurtma #"
+                      - img [ref=f1e351]
+                    - columnheader "Tur" [ref=f1e353]
+                    - columnheader "Ma'lumot" [ref=f1e354]
+                    - columnheader "Mijoz" [ref=f1e355]
+                    - columnheader "Kassir" [ref=f1e356]
+                    - columnheader "Holat" [ref=f1e357] [cursor=pointer]:
+                      - text: Holat
+                      - img [ref=f1e359]
+                    - columnheader "To'lov" [ref=f1e361]
+                    - columnheader "Jami" [ref=f1e362] [cursor=pointer]:
+                      - text: Jami
+                      - img [ref=f1e364]
+                    - columnheader "Mahsulotlar" [ref=f1e366]
+                    - columnheader "Sana" [ref=f1e367] [cursor=pointer]:
+                      - text: Sana
+                      - img [ref=f1e369]
+                    - columnheader "To'langan vaqt" [ref=f1e371]
+                    - columnheader "Amallar" [ref=f1e372]
+                - rowgroup [ref=f1e770]:
+                  - row "#183 Zal — Nigina Smart Nigina Smart Tayyorlanmoqda To'langan 91 000 3 02.07.2026, 15:07 02.07.2026, 15:07" [ref=f1e771]:
+                    - cell [ref=f1e772]:
+                      - button "Yoyish" [ref=f1e773] [cursor=pointer]:
+                        - img [ref=f1e774]
+                    - cell [ref=f1e776]:
+                      - checkbox [ref=f1e777] [cursor=pointer]
+                    - cell "#183" [ref=f1e778]
+                    - cell "Zal" [ref=f1e779]:
+                      - generic [ref=f1e780]: Zal
+                    - cell "—" [ref=f1e781]
+                    - cell "Nigina Smart" [ref=f1e782]
+                    - cell "Nigina Smart" [ref=f1e783]
+                    - cell "Tayyorlanmoqda" [ref=f1e784]:
+                      - generic [ref=f1e785]: Tayyorlanmoqda
+                    - cell "To'langan" [ref=f1e786]:
+                      - generic [ref=f1e787]: To'langan
+                    - cell "91 000" [ref=f1e788]
+                    - cell "3" [ref=f1e789]
+                    - cell "02.07.2026, 15:07" [ref=f1e790]
+                    - cell "02.07.2026, 15:07" [ref=f1e791]
+                    - cell [ref=f1e792]:
+                      - generic [ref=f1e793]:
+                        - button "Bekor qilish" [ref=f1e794] [cursor=pointer]:
+                          - img [ref=f1e795]
+                        - button "Yana" [ref=f1e797] [cursor=pointer]:
+                          - img [ref=f1e798]
+                  - row "#182 Zal — Nigina Smart Nigina Smart Tayyor To'langan 38 000 2 02.07.2026, 15:04 02.07.2026, 15:04" [ref=f1e802]:
+                    - cell [ref=f1e803]:
+                      - button "Yoyish" [ref=f1e804] [cursor=pointer]:
+                        - img [ref=f1e805]
+                    - cell [ref=f1e807]:
+                      - checkbox [ref=f1e808] [cursor=pointer]
+                    - cell "#182" [ref=f1e809]
+                    - cell "Zal" [ref=f1e810]:
+                      - generic [ref=f1e811]: Zal
+                    - cell "—" [ref=f1e812]
+                    - cell "Nigina Smart" [ref=f1e813]
+                    - cell "Nigina Smart" [ref=f1e814]
+                    - cell "Tayyor" [ref=f1e815]:
+                      - generic [ref=f1e816]: Tayyor
+                    - cell "To'langan" [ref=f1e817]:
+                      - generic [ref=f1e818]: To'langan
+                    - cell "38 000" [ref=f1e819]
+                    - cell "2" [ref=f1e820]
+                    - cell "02.07.2026, 15:04" [ref=f1e821]
+                    - cell "02.07.2026, 15:04" [ref=f1e822]
+                    - cell [ref=f1e823]:
+                      - generic [ref=f1e824]:
+                        - button "Bekor qilish" [ref=f1e825] [cursor=pointer]:
+                          - img [ref=f1e826]
+                        - button "Yana" [ref=f1e828] [cursor=pointer]:
+                          - img [ref=f1e829]
+                  - row "#181 Zal — Nigina Smart Nigina Smart Tayyorlanmoqda To'langan 80 000 2 02.07.2026, 15:02 02.07.2026, 15:02" [ref=f1e833]:
+                    - cell [ref=f1e834]:
+                      - button "Yoyish" [ref=f1e835] [cursor=pointer]:
+                        - img [ref=f1e836]
+                    - cell [ref=f1e838]:
+                      - checkbox [ref=f1e839] [cursor=pointer]
+                    - cell "#181" [ref=f1e840]
+                    - cell "Zal" [ref=f1e841]:
+                      - generic [ref=f1e842]: Zal
+                    - cell "—" [ref=f1e843]
+                    - cell "Nigina Smart" [ref=f1e844]
+                    - cell "Nigina Smart" [ref=f1e845]
+                    - cell "Tayyorlanmoqda" [ref=f1e846]:
+                      - generic [ref=f1e847]: Tayyorlanmoqda
+                    - cell "To'langan" [ref=f1e848]:
+                      - generic [ref=f1e849]: To'langan
+                    - cell "80 000" [ref=f1e850]
+                    - cell "2" [ref=f1e851]
+                    - cell "02.07.2026, 15:02" [ref=f1e852]
+                    - cell "02.07.2026, 15:02" [ref=f1e853]
+                    - cell [ref=f1e854]:
+                      - generic [ref=f1e855]:
+                        - button "Bekor qilish" [ref=f1e856] [cursor=pointer]:
+                          - img [ref=f1e857]
+                        - button "Yana" [ref=f1e859] [cursor=pointer]:
+                          - img [ref=f1e860]
+                  - row "#180 Zal — Umida Smart Umida Smart Tayyor To'langan 126 000 5 02.07.2026, 14:59 02.07.2026, 14:59" [ref=f1e864]:
+                    - cell [ref=f1e865]:
+                      - button "Yoyish" [ref=f1e866] [cursor=pointer]:
+                        - img [ref=f1e867]
+                    - cell [ref=f1e869]:
+                      - checkbox [ref=f1e870] [cursor=pointer]
+                    - cell "#180" [ref=f1e871]
+                    - cell "Zal" [ref=f1e872]:
+                      - generic [ref=f1e873]: Zal
+                    - cell "—" [ref=f1e874]
+                    - cell "Umida Smart" [ref=f1e875]
+                    - cell "Umida Smart" [ref=f1e876]
+                    - cell "Tayyor" [ref=f1e877]:
+                      - generic [ref=f1e878]: Tayyor
+                    - cell "To'langan" [ref=f1e879]:
+                      - generic [ref=f1e880]: To'langan
+                    - cell "126 000" [ref=f1e881]
+                    - cell "5" [ref=f1e882]
+                    - cell "02.07.2026, 14:59" [ref=f1e883]
+                    - cell "02.07.2026, 14:59" [ref=f1e884]
+                    - cell [ref=f1e885]:
+                      - generic [ref=f1e886]:
+                        - button "Bekor qilish" [ref=f1e887] [cursor=pointer]:
+                          - img [ref=f1e888]
+                        - button "Yana" [ref=f1e890] [cursor=pointer]:
+                          - img [ref=f1e891]
+                  - row "#179 Zal — Nigina Smart Nigina Smart Tayyor To'langan 2 000 1 02.07.2026, 14:46 02.07.2026, 14:46" [ref=f1e895]:
+                    - cell [ref=f1e896]:
+                      - button "Yoyish" [ref=f1e897] [cursor=pointer]:
+                        - img [ref=f1e898]
+                    - cell [ref=f1e900]:
+                      - checkbox [ref=f1e901] [cursor=pointer]
+                    - cell "#179" [ref=f1e902]
+                    - cell "Zal" [ref=f1e903]:
+                      - generic [ref=f1e904]: Zal
+                    - cell "—" [ref=f1e905]
+                    - cell "Nigina Smart" [ref=f1e906]
+                    - cell "Nigina Smart" [ref=f1e907]
+                    - cell "Tayyor" [ref=f1e908]:
+                      - generic [ref=f1e909]: Tayyor
+                    - cell "To'langan" [ref=f1e910]:
+                      - generic [ref=f1e911]: To'langan
+                    - cell "2 000" [ref=f1e912]
+                    - cell "1" [ref=f1e913]
+                    - cell "02.07.2026, 14:46" [ref=f1e914]
+                    - cell "02.07.2026, 14:46" [ref=f1e915]
+                    - cell [ref=f1e916]:
+                      - generic [ref=f1e917]:
+                        - button "Bekor qilish" [ref=f1e918] [cursor=pointer]:
+                          - img [ref=f1e919]
+                        - button "Yana" [ref=f1e921] [cursor=pointer]:
+                          - img [ref=f1e922]
+                  - row "#178 Zal — Nigina Smart Nigina Smart Tayyor To'langan 12 000 1 02.07.2026, 14:45 02.07.2026, 14:45" [ref=f1e926]:
+                    - cell [ref=f1e927]:
+                      - button "Yoyish" [ref=f1e928] [cursor=pointer]:
+                        - img [ref=f1e929]
+                    - cell [ref=f1e931]:
+                      - checkbox [ref=f1e932] [cursor=pointer]
+                    - cell "#178" [ref=f1e933]
+                    - cell "Zal" [ref=f1e934]:
+                      - generic [ref=f1e935]: Zal
+                    - cell "—" [ref=f1e936]
+                    - cell "Nigina Smart" [ref=f1e937]
+                    - cell "Nigina Smart" [ref=f1e938]
+                    - cell "Tayyor" [ref=f1e939]:
+                      - generic [ref=f1e940]: Tayyor
+                    - cell "To'langan" [ref=f1e941]:
+                      - generic [ref=f1e942]: To'langan
+                    - cell "12 000" [ref=f1e943]
+                    - cell "1" [ref=f1e944]
+                    - cell "02.07.2026, 14:45" [ref=f1e945]
+                    - cell "02.07.2026, 14:45" [ref=f1e946]
+                    - cell [ref=f1e947]:
+                      - generic [ref=f1e948]:
+                        - button "Bekor qilish" [ref=f1e949] [cursor=pointer]:
+                          - img [ref=f1e950]
+                        - button "Yana" [ref=f1e952] [cursor=pointer]:
+                          - img [ref=f1e953]
+                  - row "#177 Zal — Nigina Smart Nigina Smart Tayyor To'langan 7 000 1 02.07.2026, 14:44 02.07.2026, 14:44" [ref=f1e957]:
+                    - cell [ref=f1e958]:
+                      - button "Yoyish" [ref=f1e959] [cursor=pointer]:
+                        - img [ref=f1e960]
+                    - cell [ref=f1e962]:
+                      - checkbox [ref=f1e963] [cursor=pointer]
+                    - cell "#177" [ref=f1e964]
+                    - cell "Zal" [ref=f1e965]:
+                      - generic [ref=f1e966]: Zal
+                    - cell "—" [ref=f1e967]
+                    - cell "Nigina Smart" [ref=f1e968]
+                    - cell "Nigina Smart" [ref=f1e969]
+                    - cell "Tayyor" [ref=f1e970]:
+                      - generic [ref=f1e971]: Tayyor
+                    - cell "To'langan" [ref=f1e972]:
+                      - generic [ref=f1e973]: To'langan
+                    - cell "7 000" [ref=f1e974]
+                    - cell "1" [ref=f1e975]
+                    - cell "02.07.2026, 14:44" [ref=f1e976]
+                    - cell "02.07.2026, 14:44" [ref=f1e977]
+                    - cell [ref=f1e978]:
+                      - generic [ref=f1e979]:
+                        - button "Bekor qilish" [ref=f1e980] [cursor=pointer]:
+                          - img [ref=f1e981]
+                        - button "Yana" [ref=f1e983] [cursor=pointer]:
+                          - img [ref=f1e984]
+                  - row "#176 Olib ketish — Nigina Smart Nigina Smart Tayyor To'langan 128 000 4 02.07.2026, 14:43 02.07.2026, 14:43" [ref=f1e988]:
+                    - cell [ref=f1e989]:
+                      - button "Yoyish" [ref=f1e990] [cursor=pointer]:
+                        - img [ref=f1e991]
+                    - cell [ref=f1e993]:
+                      - checkbox [ref=f1e994] [cursor=pointer]
+                    - cell "#176" [ref=f1e995]
+                    - cell "Olib ketish" [ref=f1e996]:
+                      - generic [ref=f1e997]: Olib ketish
+                    - cell "—" [ref=f1e998]
+                    - cell "Nigina Smart" [ref=f1e999]
+                    - cell "Nigina Smart" [ref=f1e1000]
+                    - cell "Tayyor" [ref=f1e1001]:
+                      - generic [ref=f1e1002]: Tayyor
+                    - cell "To'langan" [ref=f1e1003]:
+                      - generic [ref=f1e1004]: To'langan
+                    - cell "128 000" [ref=f1e1005]
+                    - cell "4" [ref=f1e1006]
+                    - cell "02.07.2026, 14:43" [ref=f1e1007]
+                    - cell "02.07.2026, 14:43" [ref=f1e1008]
+                    - cell [ref=f1e1009]:
+                      - generic [ref=f1e1010]:
+                        - button "Bekor qilish" [ref=f1e1011] [cursor=pointer]:
+                          - img [ref=f1e1012]
+                        - button "Yana" [ref=f1e1014] [cursor=pointer]:
+                          - img [ref=f1e1015]
+                  - row "#175 Olib ketish — Nigina Smart Nigina Smart Tayyor To'langan 83 000 1 02.07.2026, 14:38 02.07.2026, 14:38" [ref=f1e1019]:
+                    - cell [ref=f1e1020]:
+                      - button "Yoyish" [ref=f1e1021] [cursor=pointer]:
+                        - img [ref=f1e1022]
+                    - cell [ref=f1e1024]:
+                      - checkbox [ref=f1e1025] [cursor=pointer]
+                    - cell "#175" [ref=f1e1026]
+                    - cell "Olib ketish" [ref=f1e1027]:
+                      - generic [ref=f1e1028]: Olib ketish
+                    - cell "—" [ref=f1e1029]
+                    - cell "Nigina Smart" [ref=f1e1030]
+                    - cell "Nigina Smart" [ref=f1e1031]
+                    - cell "Tayyor" [ref=f1e1032]:
+                      - generic [ref=f1e1033]: Tayyor
+                    - cell "To'langan" [ref=f1e1034]:
+                      - generic [ref=f1e1035]: To'langan
+                    - cell "83 000" [ref=f1e1036]
+                    - cell "1" [ref=f1e1037]
+                    - cell "02.07.2026, 14:38" [ref=f1e1038]
+                    - cell "02.07.2026, 14:38" [ref=f1e1039]
+                    - cell [ref=f1e1040]:
+                      - generic [ref=f1e1041]:
+                        - button "Bekor qilish" [ref=f1e1042] [cursor=pointer]:
+                          - img [ref=f1e1043]
+                        - button "Yana" [ref=f1e1045] [cursor=pointer]:
+                          - img [ref=f1e1046]
+                  - row "#174 Zal — Umida Smart Umida Smart Tayyor To'langan 20 000 1 02.07.2026, 14:35 02.07.2026, 14:34" [ref=f1e1050]:
+                    - cell [ref=f1e1051]:
+                      - button "Yoyish" [ref=f1e1052] [cursor=pointer]:
+                        - img [ref=f1e1053]
+                    - cell [ref=f1e1055]:
+                      - checkbox [ref=f1e1056] [cursor=pointer]
+                    - cell "#174" [ref=f1e1057]
+                    - cell "Zal" [ref=f1e1058]:
+                      - generic [ref=f1e1059]: Zal
+                    - cell "—" [ref=f1e1060]
+                    - cell "Umida Smart" [ref=f1e1061]
+                    - cell "Umida Smart" [ref=f1e1062]
+                    - cell "Tayyor" [ref=f1e1063]:
+                      - generic [ref=f1e1064]: Tayyor
+                    - cell "To'langan" [ref=f1e1065]:
+                      - generic [ref=f1e1066]: To'langan
+                    - cell "20 000" [ref=f1e1067]
+                    - cell "1" [ref=f1e1068]
+                    - cell "02.07.2026, 14:35" [ref=f1e1069]
+                    - cell "02.07.2026, 14:34" [ref=f1e1070]
+                    - cell [ref=f1e1071]:
+                      - generic [ref=f1e1072]:
+                        - button "Bekor qilish" [ref=f1e1073] [cursor=pointer]:
+                          - img [ref=f1e1074]
+                        - button "Yana" [ref=f1e1076] [cursor=pointer]:
+                          - img [ref=f1e1077]
+              - generic [ref=f1e1081]:
+                - generic [ref=f1e1082]:
+                  - generic [ref=f1e1083]: "Bir sahifada qatorlar:"
+                  - combobox [ref=f1e1084] [cursor=pointer]:
+                    - option "10" [selected]
+                    - option "25"
+                    - option "50"
+                    - option "100"
+                - generic [ref=f1e1085]: 1–10 dan 6 602
+                - generic [ref=f1e1086]:
+                  - button [disabled]:
+                    - img
+                  - button "1" [ref=f1e1087] [cursor=pointer]
+                  - button "2" [ref=f1e1088] [cursor=pointer]
+                  - button "3" [ref=f1e1089] [cursor=pointer]
+                  - button "4" [ref=f1e1090] [cursor=pointer]
+                  - button "5" [ref=f1e1091] [cursor=pointer]
+                  - generic: …
+                  - button "661" [ref=f1e1092] [cursor=pointer]
+                  - button [ref=f1e1093] [cursor=pointer]:
+                    - img [ref=f1e1094]
+  - region "Notifications alt+T":
+    - list

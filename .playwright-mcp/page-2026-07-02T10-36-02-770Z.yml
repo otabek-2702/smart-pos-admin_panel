@@ -1,0 +1,210 @@
+- generic [ref=f37e5]:
+  - generic [ref=f37e63]:
+    - complementary [ref=f37e64]:
+      - generic [ref=f37e65]:
+        - img [ref=f37e67]
+        - generic [ref=f37e69]: Alpha POS
+      - navigation [ref=f37e70]:
+        - link "Boshqaruv paneli" [ref=f37e71] [cursor=pointer]:
+          - /url: /
+          - img [ref=f37e73]
+          - generic [ref=f37e75]: Boshqaruv paneli
+        - link "AI yordamchi" [ref=f37e76] [cursor=pointer]:
+          - /url: /ai-assistant
+          - img [ref=f37e78]
+          - generic [ref=f37e82]: AI yordamchi
+        - link "Smenalar" [ref=f37e83] [cursor=pointer]:
+          - /url: /shifts-analytics
+          - img [ref=f37e85]
+          - generic [ref=f37e88]: Smenalar
+        - generic [ref=f37e89]: Boshqaruv
+        - link "Foydalanuvchilar" [ref=f37e90] [cursor=pointer]:
+          - /url: /users
+          - img [ref=f37e92]
+          - generic [ref=f37e95]: Foydalanuvchilar
+        - link "Kategoriyalar" [ref=f37e96] [cursor=pointer]:
+          - /url: /categories
+          - img [ref=f37e98]
+          - generic [ref=f37e103]: Kategoriyalar
+        - link "Mahsulotlar" [ref=f37e104] [cursor=pointer]:
+          - /url: /products
+          - img [ref=f37e106]
+          - generic [ref=f37e109]: Mahsulotlar
+        - link "Buyurtmalar" [ref=f37e110] [cursor=pointer]:
+          - /url: /orders
+          - img [ref=f37e112]
+          - generic [ref=f37e115]: Buyurtmalar
+        - link "Zallar va stollar" [ref=f37e116] [cursor=pointer]:
+          - /url: /places
+          - img [ref=f37e118]
+          - generic [ref=f37e121]: Zallar va stollar
+        - link "Chegirmalar" [ref=f37e122] [cursor=pointer]:
+          - /url: /discounts
+          - img [ref=f37e124]
+          - generic [ref=f37e127]: Chegirmalar
+        - link "Kassa" [ref=f37e128] [cursor=pointer]:
+          - /url: /cashbox/categories
+          - img [ref=f37e130]
+          - generic [ref=f37e133]: Kassa
+        - link "Xazina" [ref=f37e134] [cursor=pointer]:
+          - /url: /treasury
+          - img [ref=f37e136]
+          - generic [ref=f37e138]: Xazina
+        - link "Sodiqlik" [ref=f37e139] [cursor=pointer]:
+          - /url: /loyalty
+          - img [ref=f37e141]
+          - generic [ref=f37e144]: Sodiqlik
+        - link "Sessiyalar" [ref=f37e145] [cursor=pointer]:
+          - /url: /sessions
+          - img [ref=f37e147]
+          - generic [ref=f37e150]: Sessiyalar
+        - generic [ref=f37e151]: Kadrlar
+        - link "Xodimlar" [ref=f37e152] [cursor=pointer]:
+          - /url: /hr-employees
+          - img [ref=f37e154]
+          - generic [ref=f37e157]: Xodimlar
+        - link "Bo'limlar" [ref=f37e158] [cursor=pointer]:
+          - /url: /hr-departments
+          - img [ref=f37e160]
+          - generic [ref=f37e164]: Bo'limlar
+        - link "Maoshlar" [ref=f37e165] [cursor=pointer]:
+          - /url: /hr-salaries
+          - img [ref=f37e167]
+          - generic [ref=f37e170]: Maoshlar
+        - link "HR kassa" [ref=f37e171] [cursor=pointer]:
+          - /url: /hr-cash
+          - img [ref=f37e173]
+          - generic [ref=f37e177]: HR kassa
+        - link "HR hujjatlar" [ref=f37e178] [cursor=pointer]:
+          - /url: /hr-documents
+          - img [ref=f37e180]
+          - generic [ref=f37e183]: HR hujjatlar
+        - link "Tadbirlar" [ref=f37e184] [cursor=pointer]:
+          - /url: /hr-events
+          - img [ref=f37e186]
+          - generic [ref=f37e188]: Tadbirlar
+        - link "Xarajat kategoriyalari" [ref=f37e189] [cursor=pointer]:
+          - /url: /hr-expense-categories
+          - img [ref=f37e191]
+          - generic [ref=f37e196]: Xarajat kategoriyalari
+        - link "Maqsadlar" [ref=f37e197] [cursor=pointer]:
+          - /url: /hr-goals
+          - img [ref=f37e199]
+          - generic [ref=f37e203]: Maqsadlar
+        - link "Ta'til qoldiqlari" [ref=f37e204] [cursor=pointer]:
+          - /url: /hr-leave-balances
+          - img [ref=f37e206]
+          - generic [ref=f37e209]: Ta'til qoldiqlari
+        - link "Ta'til turlari" [ref=f37e210] [cursor=pointer]:
+          - /url: /hr-leave-types
+          - img [ref=f37e212]
+          - generic [ref=f37e215]: Ta'til turlari
+        - link "Sharhlar" [ref=f37e216] [cursor=pointer]:
+          - /url: /hr-reviews
+          - img [ref=f37e218]
+          - generic [ref=f37e220]: Sharhlar
+        - link "Smena shablonlari" [ref=f37e221] [cursor=pointer]:
+          - /url: /shift-templates
+          - img [ref=f37e223]
+          - generic [ref=f37e226]: Smena shablonlari
+        - generic [ref=f37e227]: Ombor
+        - link "Ombor ogohlantirishlari" [ref=f37e228] [cursor=pointer]:
+          - /url: /stock/alerts
+          - img [ref=f37e230]
+          - generic [ref=f37e233]: Ombor ogohlantirishlari
+        - link "Qabul qilish" [ref=f37e234] [cursor=pointer]:
+          - /url: /stock/receiving
+          - img [ref=f37e236]
+          - generic [ref=f37e239]: Qabul qilish
+        - link "Tuzatishlar" [ref=f37e240] [cursor=pointer]:
+          - /url: /stock/adjustments
+          - img [ref=f37e242]
+          - generic [ref=f37e246]: Tuzatishlar
+        - link "Zaxiralar" [ref=f37e247] [cursor=pointer]:
+          - /url: /stock/reservations
+          - img [ref=f37e249]
+          - generic [ref=f37e252]: Zaxiralar
+        - generic [ref=f37e253]: Sozlamalar
+        - link "QR kodlar" [ref=f37e254] [cursor=pointer]:
+          - /url: /qr-codes
+          - img [ref=f37e256]
+          - generic [ref=f37e261]: QR kodlar
+        - generic [ref=f37e262]: Bildirishnomalar
+        - link "Bildirishnoma navbati" [ref=f37e263] [cursor=pointer]:
+          - /url: /notification-queue
+          - img [ref=f37e265]
+          - generic [ref=f37e268]: Bildirishnoma navbati
+        - link "Bildirishnoma sozlamalari" [ref=f37e269] [cursor=pointer]:
+          - /url: /notification-settings
+          - img [ref=f37e271]
+          - generic [ref=f37e275]: Bildirishnoma sozlamalari
+        - link "Bildirishnoma shablonlari" [ref=f37e276] [cursor=pointer]:
+          - /url: /notification-templates
+          - img [ref=f37e278]
+          - generic [ref=f37e281]: Bildirishnoma shablonlari
+        - link "Bildirishnoma turlari" [ref=f37e282] [cursor=pointer]:
+          - /url: /notification-types
+          - img [ref=f37e284]
+          - generic [ref=f37e287]: Bildirishnoma turlari
+    - generic [ref=f37e288]:
+      - banner [ref=f37e289]:
+        - button "Yon panelni almashtirish" [ref=f37e290] [cursor=pointer]:
+          - img [ref=f37e291]
+        - generic [ref=f37e294]:
+          - generic [ref=f37e295]: Alpha POS
+          - img [ref=f37e296]
+        - button "Ogohlantirishlar yo'q" [ref=f37e299] [cursor=pointer]:
+          - img [ref=f37e300]
+        - button "Sozlamalar" [ref=f37e304] [cursor=pointer]:
+          - img [ref=f37e305]
+        - button "Mavzuni almashtirish" [ref=f37e308] [cursor=pointer]:
+          - img [ref=f37e309]
+        - generic [ref=f37e311]: RL
+      - main [ref=f37e312]:
+        - generic [ref=f37e313]:
+          - generic [ref=f37e314]:
+            - generic [ref=f37e315]:
+              - heading "Boshqaruv paneli" [level=1] [ref=f37e316]
+              - generic [ref=f37e317]: Daromad, marja va sotuvlar manbalari
+            - generic [ref=f37e318]:
+              - button "Oxirgi 30 kun" [ref=f37e320] [cursor=pointer]:
+                - img [ref=f37e321]
+                - generic [ref=f37e324]: Oxirgi 30 kun
+                - img [ref=f37e325]
+              - button "Yangilash" [ref=f37e327] [cursor=pointer]:
+                - img [ref=f37e328]
+                - text: Yangilash
+              - button "Eksport" [ref=f37e331] [cursor=pointer]:
+                - img [ref=f37e332]
+                - text: Eksport
+          - generic [ref=f37e334]:
+            - button "Bosh sahifa" [ref=f37e335] [cursor=pointer]:
+              - img [ref=f37e336]
+              - generic [ref=f37e338]: Bosh sahifa
+            - button "Sotuvlar va daromad" [ref=f37e339] [cursor=pointer]:
+              - img [ref=f37e340]
+              - generic [ref=f37e343]: Sotuvlar va daromad
+            - button "Operatsiyalar" [ref=f37e344] [cursor=pointer]:
+              - img [ref=f37e345]
+              - generic [ref=f37e348]: Operatsiyalar
+            - button "Mahsulotlar" [ref=f37e349] [cursor=pointer]:
+              - img [ref=f37e350]
+              - generic [ref=f37e353]: Mahsulotlar
+            - button "Xodimlar va smenalar" [ref=f37e354] [cursor=pointer]:
+              - img [ref=f37e355]
+              - generic [ref=f37e358]: Xodimlar va smenalar
+          - generic [ref=f37e360]:
+            - generic [ref=f37e362]:
+              - generic [ref=f37e364]:
+                - generic [ref=f37e365]: Daromad va xarajat · 30 kun
+                - heading "Marja 0% darajasida" [level=3] [ref=f37e366]
+              - generic [ref=f37e368]:
+                - generic [ref=f37e369]: Daromad
+                - generic [ref=f37e371]: Xarajatlar
+            - generic [ref=f37e373]:
+              - generic [ref=f37e377]: Sotuvlar qachon bo'ladi
+              - generic [ref=f37e381]:
+                - generic [ref=f37e382]: Kanal bo'yicha · 7 kun
+                - heading "Zal, yetkazib berish va olib ketish" [level=3] [ref=f37e383]
+  - region "Notifications alt+T":
+    - list

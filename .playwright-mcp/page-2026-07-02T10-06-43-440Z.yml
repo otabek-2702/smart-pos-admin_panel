@@ -1,0 +1,365 @@
+- generic [ref=e5]:
+  - generic [ref=e93]:
+    - complementary [ref=e94]:
+      - generic [ref=e95]:
+        - img [ref=e97]
+        - generic [ref=e99]: Alpha POS
+      - navigation [ref=e100]:
+        - link "Boshqaruv paneli" [ref=e101] [cursor=pointer]:
+          - /url: /
+          - img [ref=e103]
+          - generic [ref=e105]: Boshqaruv paneli
+        - link "AI yordamchi" [ref=e106] [cursor=pointer]:
+          - /url: /ai-assistant
+          - img [ref=e108]
+          - generic [ref=e112]: AI yordamchi
+        - link "Smenalar 5" [ref=e382] [cursor=pointer]:
+          - /url: /shifts-analytics
+          - img [ref=e115]
+          - generic [ref=e118]: Smenalar
+          - generic [ref=e383]: "5"
+        - generic [ref=e119]: Boshqaruv
+        - link "Foydalanuvchilar" [ref=e120] [cursor=pointer]:
+          - /url: /users
+          - img [ref=e122]
+          - generic [ref=e125]: Foydalanuvchilar
+        - link "Kategoriyalar" [ref=e126] [cursor=pointer]:
+          - /url: /categories
+          - img [ref=e128]
+          - generic [ref=e133]: Kategoriyalar
+        - link "Mahsulotlar" [ref=e134] [cursor=pointer]:
+          - /url: /products
+          - img [ref=e136]
+          - generic [ref=e139]: Mahsulotlar
+        - link "Buyurtmalar 181" [ref=e1207] [cursor=pointer]:
+          - /url: /orders
+          - img [ref=e142]
+          - generic [ref=e145]: Buyurtmalar
+          - generic [ref=e385]: "181"
+        - link "Zallar va stollar" [ref=e146] [cursor=pointer]:
+          - /url: /places
+          - img [ref=e148]
+          - generic [ref=e151]: Zallar va stollar
+        - link "Chegirmalar" [ref=e152] [cursor=pointer]:
+          - /url: /discounts
+          - img [ref=e154]
+          - generic [ref=e157]: Chegirmalar
+        - link "Kassa" [ref=e158] [cursor=pointer]:
+          - /url: /cashbox/categories
+          - img [ref=e160]
+          - generic [ref=e163]: Kassa
+        - link "Xazina" [ref=e164] [cursor=pointer]:
+          - /url: /treasury
+          - img [ref=e166]
+          - generic [ref=e168]: Xazina
+        - link "Sodiqlik" [ref=e169] [cursor=pointer]:
+          - /url: /loyalty
+          - img [ref=e171]
+          - generic [ref=e174]: Sodiqlik
+        - link "Sessiyalar" [ref=e175] [cursor=pointer]:
+          - /url: /sessions
+          - img [ref=e177]
+          - generic [ref=e180]: Sessiyalar
+        - generic [ref=e181]: Kadrlar
+        - link "Xodimlar" [ref=e182] [cursor=pointer]:
+          - /url: /hr-employees
+          - img [ref=e184]
+          - generic [ref=e187]: Xodimlar
+        - link "Bo'limlar" [ref=e188] [cursor=pointer]:
+          - /url: /hr-departments
+          - img [ref=e190]
+          - generic [ref=e194]: Bo'limlar
+        - link "Maoshlar" [ref=e195] [cursor=pointer]:
+          - /url: /hr-salaries
+          - img [ref=e197]
+          - generic [ref=e200]: Maoshlar
+        - link "HR kassa" [ref=e201] [cursor=pointer]:
+          - /url: /hr-cash
+          - img [ref=e203]
+          - generic [ref=e207]: HR kassa
+        - link "HR hujjatlar" [ref=e208] [cursor=pointer]:
+          - /url: /hr-documents
+          - img [ref=e210]
+          - generic [ref=e213]: HR hujjatlar
+        - link "Tadbirlar" [ref=e214] [cursor=pointer]:
+          - /url: /hr-events
+          - img [ref=e216]
+          - generic [ref=e218]: Tadbirlar
+        - link "Xarajat kategoriyalari" [ref=e219] [cursor=pointer]:
+          - /url: /hr-expense-categories
+          - img [ref=e221]
+          - generic [ref=e226]: Xarajat kategoriyalari
+        - link "Maqsadlar" [ref=e227] [cursor=pointer]:
+          - /url: /hr-goals
+          - img [ref=e229]
+          - generic [ref=e233]: Maqsadlar
+        - link "Ta'til qoldiqlari" [ref=e234] [cursor=pointer]:
+          - /url: /hr-leave-balances
+          - img [ref=e236]
+          - generic [ref=e239]: Ta'til qoldiqlari
+        - link "Ta'til turlari" [ref=e240] [cursor=pointer]:
+          - /url: /hr-leave-types
+          - img [ref=e242]
+          - generic [ref=e245]: Ta'til turlari
+        - link "Sharhlar" [ref=e246] [cursor=pointer]:
+          - /url: /hr-reviews
+          - img [ref=e248]
+          - generic [ref=e250]: Sharhlar
+        - link "Smena shablonlari" [ref=e251] [cursor=pointer]:
+          - /url: /shift-templates
+          - img [ref=e253]
+          - generic [ref=e256]: Smena shablonlari
+        - generic [ref=e257]: Ombor
+        - link "Ombor ogohlantirishlari" [ref=e258] [cursor=pointer]:
+          - /url: /stock/alerts
+          - img [ref=e260]
+          - generic [ref=e263]: Ombor ogohlantirishlari
+        - link "Qabul qilish" [ref=e264] [cursor=pointer]:
+          - /url: /stock/receiving
+          - img [ref=e266]
+          - generic [ref=e269]: Qabul qilish
+        - link "Tuzatishlar" [ref=e270] [cursor=pointer]:
+          - /url: /stock/adjustments
+          - img [ref=e272]
+          - generic [ref=e276]: Tuzatishlar
+        - link "Zaxiralar" [ref=e277] [cursor=pointer]:
+          - /url: /stock/reservations
+          - img [ref=e279]
+          - generic [ref=e282]: Zaxiralar
+        - generic [ref=e283]: Sozlamalar
+        - link "QR kodlar" [ref=e284] [cursor=pointer]:
+          - /url: /qr-codes
+          - img [ref=e286]
+          - generic [ref=e291]: QR kodlar
+        - generic [ref=e292]: Bildirishnomalar
+        - link "Bildirishnoma navbati" [ref=e293] [cursor=pointer]:
+          - /url: /notification-queue
+          - img [ref=e295]
+          - generic [ref=e298]: Bildirishnoma navbati
+        - link "Bildirishnoma sozlamalari" [ref=e299] [cursor=pointer]:
+          - /url: /notification-settings
+          - img [ref=e301]
+          - generic [ref=e305]: Bildirishnoma sozlamalari
+        - link "Bildirishnoma shablonlari" [ref=e306] [cursor=pointer]:
+          - /url: /notification-templates
+          - img [ref=e308]
+          - generic [ref=e311]: Bildirishnoma shablonlari
+        - link "Bildirishnoma turlari" [ref=e312] [cursor=pointer]:
+          - /url: /notification-types
+          - img [ref=e314]
+          - generic [ref=e317]: Bildirishnoma turlari
+    - generic [ref=e318]:
+      - banner [ref=e319]:
+        - button "Yon panelni almashtirish" [ref=e320] [cursor=pointer]:
+          - img [ref=e321]
+        - generic [ref=e324]:
+          - generic [ref=e325]: Alpha POS
+          - img [ref=e326]
+        - button "Ogohlantirishlar yo'q" [ref=e329] [cursor=pointer]:
+          - img [ref=e330]
+        - button "Sozlamalar" [ref=e334] [cursor=pointer]:
+          - img [ref=e335]
+        - button "Mavzuni almashtirish" [ref=e338] [cursor=pointer]:
+          - img [ref=e339]
+        - generic [ref=e341]: AU
+      - main [ref=e342]:
+        - generic [ref=e343]:
+          - generic [ref=e344]:
+            - generic [ref=e345]:
+              - heading "Boshqaruv paneli" [level=1] [ref=e346]
+              - generic [ref=e347]: Jamoa samaradorligi · kassirlar va smenalar
+            - generic [ref=e348]:
+              - button "Oxirgi 30 kun" [ref=e1322] [cursor=pointer]:
+                - img [ref=e351]
+                - generic [ref=e354]: Oxirgi 30 kun
+                - img [ref=e355]
+              - button "Yangilash" [ref=e386] [cursor=pointer]:
+                - img [ref=e387]
+                - text: Yangilash
+              - button "Eksport" [ref=e390] [cursor=pointer]:
+                - img [ref=e391]
+                - text: Eksport
+          - generic [ref=e357]:
+            - button "Bosh sahifa" [ref=e358] [cursor=pointer]:
+              - img [ref=e359]
+              - generic [ref=e361]: Bosh sahifa
+            - button "Sotuvlar va daromad" [ref=e362] [cursor=pointer]:
+              - img [ref=e363]
+              - generic [ref=e366]: Sotuvlar va daromad
+            - button "Operatsiyalar" [ref=e367] [cursor=pointer]:
+              - img [ref=e368]
+              - generic [ref=e371]: Operatsiyalar
+            - button "Mahsulotlar" [ref=e372] [cursor=pointer]:
+              - img [ref=e373]
+              - generic [ref=e376]: Mahsulotlar
+            - button "Xodimlar va smenalar" [active] [ref=e377] [cursor=pointer]:
+              - img [ref=e378]
+              - generic [ref=e381]: Xodimlar va smenalar
+          - generic [ref=e3674]:
+            - generic [ref=e3675]:
+              - generic [ref=e3676]:
+                - generic [ref=e3677]:
+                  - generic [ref=e3678]: Faol xodimlar
+                  - img [ref=e3680]
+                - generic [ref=e3683]: "8"
+                - generic [ref=e3685]: soʻnggi 30 kunda
+              - generic [ref=e3686]:
+                - generic [ref=e3687]:
+                  - generic [ref=e3688]: Eng yaxshi xodim
+                  - img [ref=e3690]
+                - generic [ref=e3692]: Nigina Smart
+                - generic [ref=e3694]: 143.85M · 30d
+              - generic [ref=e3695]:
+                - generic [ref=e3696]:
+                  - generic [ref=e3697]: Oʻrtacha aniqlik
+                  - img [ref=e3699]
+                - generic [ref=e3701]: 100%
+              - generic [ref=e3703]:
+                - generic [ref=e3704]:
+                  - generic [ref=e3705]: Jami soat (30k)
+                  - img [ref=e3707]
+                - generic [ref=e3710]: 2 397
+                - generic [ref=e3712]: butun jamoada
+            - generic [ref=e3713]:
+              - generic [ref=e3714]:
+                - generic [ref=e3716]:
+                  - generic [ref=e3717]: Kassirlar reytingi · daromad
+                  - heading "Nigina Smart 4% bilan yetakchi" [level=3] [ref=e3718]
+                - generic [ref=e3719]:
+                  - generic [ref=e3720]:
+                    - generic [ref=e3721]: "1"
+                    - generic [ref=e3722]: NS
+                    - generic [ref=e3723]:
+                      - generic [ref=e3724]:
+                        - generic [ref=e3725]: Nigina Smart
+                        - generic [ref=e3726]: 143 845 200
+                      - generic [ref=e3729]:
+                        - generic [ref=e3730]: 2 430 buyurtma
+                        - generic [ref=e3731]: O‘rt. chek 59.3K
+                        - generic [ref=e3732]: 342soat
+                  - generic [ref=e3733]:
+                    - generic [ref=e3734]: "2"
+                    - generic [ref=e3735]: RS
+                    - generic [ref=e3736]:
+                      - generic [ref=e3737]:
+                        - generic [ref=e3738]: Ruxsora Smart
+                        - generic [ref=e3739]: 137 929 400
+                      - generic [ref=e3742]:
+                        - generic [ref=e3743]: 2 342 buyurtma
+                        - generic [ref=e3744]: O‘rt. chek 59.1K
+                        - generic [ref=e3745]: 333soat
+                  - generic [ref=e3746]:
+                    - generic [ref=e3747]: "3"
+                    - generic [ref=e3748]: US
+                    - generic [ref=e3749]:
+                      - generic [ref=e3750]:
+                        - generic [ref=e3751]: Umida Smart
+                        - generic [ref=e3752]: 18 910 000
+                      - generic [ref=e3755]:
+                        - generic [ref=e3756]: 947 buyurtma
+                        - generic [ref=e3757]: O‘rt. chek 20.2K
+                        - generic [ref=e3758]: 331soat
+                  - generic [ref=e3759]:
+                    - generic [ref=e3760]: "4"
+                    - generic [ref=e3761]: KS
+                    - generic [ref=e3762]:
+                      - generic [ref=e3763]:
+                        - generic [ref=e3764]: Kechki Smena
+                        - generic [ref=e3765]: 8 469 700
+                      - generic [ref=e3768]:
+                        - generic [ref=e3769]: 180 buyurtma
+                        - generic [ref=e3770]: O‘rt. chek 47.1K
+                        - generic [ref=e3771]: 326soat
+                  - generic [ref=e3772]:
+                    - generic [ref=e3773]: "5"
+                    - generic [ref=e3774]: M1
+                    - generic [ref=e3775]:
+                      - generic [ref=e3776]:
+                        - generic [ref=e3777]: Muzqaymoq 1-smena
+                        - generic [ref=e3778]: 8 233 000
+                      - generic [ref=e3781]:
+                        - generic [ref=e3782]: 381 buyurtma
+                        - generic [ref=e3783]: O‘rt. chek 21.6K
+                        - generic [ref=e3784]: 168soat
+                  - generic [ref=e3785]:
+                    - generic [ref=e3786]: "6"
+                    - generic [ref=e3787]: BT
+                    - generic [ref=e3788]:
+                      - generic [ref=e3789]:
+                        - generic [ref=e3790]: BOSMANG TENGMAN
+                        - generic [ref=e3791]: 2 867 000
+                      - generic [ref=e3794]:
+                        - generic [ref=e3795]: 102 buyurtma
+                        - generic [ref=e3796]: O‘rt. chek 28.1K
+                        - generic [ref=e3797]: 318soat
+                  - generic [ref=e3798]:
+                    - generic [ref=e3799]: "7"
+                    - generic [ref=e3800]: PS
+                    - generic [ref=e3801]:
+                      - generic [ref=e3802]:
+                        - generic [ref=e3803]: Povr Smart
+                        - generic [ref=e3804]: 2 538 000
+                      - generic [ref=e3807]:
+                        - generic [ref=e3808]: 105 buyurtma
+                        - generic [ref=e3809]: O‘rt. chek 24.4K
+                        - generic [ref=e3810]: 341soat
+                  - generic [ref=e3811]:
+                    - generic [ref=e3812]: "8"
+                    - generic [ref=e3813]: MS
+                    - generic [ref=e3814]:
+                      - generic [ref=e3815]:
+                        - generic [ref=e3816]: Muzqaymoq Smart
+                        - generic [ref=e3817]: 2 416 000
+                      - generic [ref=e3820]:
+                        - generic [ref=e3821]: 114 buyurtma
+                        - generic [ref=e3822]: O‘rt. chek 21.8K
+                        - generic [ref=e3823]: 238soat
+              - generic [ref=e3824]:
+                - generic [ref=e3826]:
+                  - generic [ref=e3827]: Mahorat profili
+                  - heading "Yetakchi va barqaror xodim" [level=3] [ref=e3828]
+                - generic [ref=e3830]:
+                  - img [ref=e3831]:
+                    - generic [ref=e3838]: Aniqlik
+                    - generic [ref=e3839]: Smena faolligi
+                    - generic [ref=e3840]: Hajm
+                  - generic [ref=e3851]:
+                    - generic [ref=e3852]: Nigina Smart
+                    - generic [ref=e3854]: Muzqaymoq 1-smena
+            - generic [ref=e3856]:
+              - generic [ref=e3857]:
+                - generic [ref=e3859]:
+                  - generic [ref=e3860]: Buyurtmalar va daromad
+                  - heading "Doira oʻlchami = oʻrtacha chek" [level=3] [ref=e3861]
+                - img [ref=e3864]:
+                  - generic [ref=e3866]: "0"
+                  - generic [ref=e3868]: 50M
+                  - generic [ref=e3870]: 100M
+                  - generic [ref=e3872]: 150M
+                  - generic [ref=e3873]: "0"
+                  - generic [ref=e3874]: "1000"
+                  - generic [ref=e3875]: "2000"
+                  - generic [ref=e3876]: "3000"
+                  - generic [ref=e3877]: buyurtma
+              - generic [ref=e3886]:
+                - generic [ref=e3888]:
+                  - generic [ref=e3889]: Soatlar va vaqtga rioya
+                  - heading "Ishlangan va qoʻshimcha" [level=3] [ref=e3890]
+                - generic [ref=e3892]:
+                  - img [ref=e3893]:
+                    - generic [ref=e3895]: "0"
+                    - generic [ref=e3897]: "100"
+                    - generic [ref=e3899]: "200"
+                    - generic [ref=e3901]: "300"
+                    - generic [ref=e3903]: "400"
+                    - generic [ref=e3906]: NS
+                    - generic [ref=e3909]: RS
+                    - generic [ref=e3912]: US
+                    - generic [ref=e3915]: KS
+                    - generic [ref=e3918]: M1
+                    - generic [ref=e3921]: BT
+                    - generic [ref=e3924]: PS
+                    - generic [ref=e3927]: MS
+                  - button "Ishlangan soatlar" [ref=e3929] [cursor=pointer]: Ishlangan soatlar
+  - region "Notifications alt+T":
+    - list

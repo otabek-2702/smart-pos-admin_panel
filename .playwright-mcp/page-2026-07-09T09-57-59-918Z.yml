@@ -1,0 +1,427 @@
+- generic [ref=f108e5]:
+  - generic [ref=f108e6]:
+    - complementary [ref=f108e7]:
+      - generic [ref=f108e8]:
+        - img [ref=f108e10]
+        - generic [ref=f108e12]: Alpha POS
+      - navigation [ref=f108e13]:
+        - link "Boshqaruv paneli" [ref=f108e14] [cursor=pointer]:
+          - /url: /
+          - img [ref=f108e16]
+          - generic [ref=f108e18]: Boshqaruv paneli
+        - link "AI yordamchi" [ref=f108e19] [cursor=pointer]:
+          - /url: /ai-assistant
+          - img [ref=f108e21]
+          - generic [ref=f108e25]: AI yordamchi
+        - link "Smenalar 2" [ref=f108e26] [cursor=pointer]:
+          - /url: /shifts-analytics
+          - img [ref=f108e28]
+          - generic [ref=f108e31]: Smenalar
+          - generic [ref=f108e32]: "2"
+        - generic [ref=f108e33]: Boshqaruv
+        - link "Foydalanuvchilar" [ref=f108e34] [cursor=pointer]:
+          - /url: /users
+          - img [ref=f108e36]
+          - generic [ref=f108e39]: Foydalanuvchilar
+        - link "Kategoriyalar" [ref=f108e40] [cursor=pointer]:
+          - /url: /categories
+          - img [ref=f108e42]
+          - generic [ref=f108e47]: Kategoriyalar
+        - link "Mahsulotlar" [ref=f108e48] [cursor=pointer]:
+          - /url: /products
+          - img [ref=f108e50]
+          - generic [ref=f108e53]: Mahsulotlar
+        - link "Buyurtmalar 207" [ref=f108e54] [cursor=pointer]:
+          - /url: /orders
+          - img [ref=f108e56]
+          - generic [ref=f108e59]: Buyurtmalar
+          - generic [ref=f108e60]: "207"
+        - link "Zallar va stollar" [ref=f108e61] [cursor=pointer]:
+          - /url: /places
+          - img [ref=f108e63]
+          - generic [ref=f108e66]: Zallar va stollar
+        - link "Chegirmalar" [ref=f108e67] [cursor=pointer]:
+          - /url: /discounts
+          - img [ref=f108e69]
+          - generic [ref=f108e72]: Chegirmalar
+        - link "Kassa" [ref=f108e73] [cursor=pointer]:
+          - /url: /cashbox/categories
+          - img [ref=f108e75]
+          - generic [ref=f108e78]: Kassa
+        - link "Xazina" [ref=f108e79] [cursor=pointer]:
+          - /url: /treasury
+          - img [ref=f108e81]
+          - generic [ref=f108e83]: Xazina
+        - link "Sodiqlik" [ref=f108e84] [cursor=pointer]:
+          - /url: /loyalty
+          - img [ref=f108e86]
+          - generic [ref=f108e89]: Sodiqlik
+        - link "Sessiyalar" [ref=f108e90] [cursor=pointer]:
+          - /url: /sessions
+          - img [ref=f108e92]
+          - generic [ref=f108e95]: Sessiyalar
+        - generic [ref=f108e96]: Kadrlar
+        - link "Xodimlar" [ref=f108e97] [cursor=pointer]:
+          - /url: /hr-employees
+          - img [ref=f108e99]
+          - generic [ref=f108e102]: Xodimlar
+        - link "Bo'limlar" [ref=f108e103] [cursor=pointer]:
+          - /url: /hr-departments
+          - img [ref=f108e105]
+          - generic [ref=f108e109]: Bo'limlar
+        - link "Maoshlar" [ref=f108e110] [cursor=pointer]:
+          - /url: /hr-salaries
+          - img [ref=f108e112]
+          - generic [ref=f108e115]: Maoshlar
+        - link "HR kassa" [ref=f108e116] [cursor=pointer]:
+          - /url: /hr-cash
+          - img [ref=f108e118]
+          - generic [ref=f108e122]: HR kassa
+        - link "HR hujjatlar" [ref=f108e123] [cursor=pointer]:
+          - /url: /hr-documents
+          - img [ref=f108e125]
+          - generic [ref=f108e128]: HR hujjatlar
+        - link "Tadbirlar" [ref=f108e129] [cursor=pointer]:
+          - /url: /hr-events
+          - img [ref=f108e131]
+          - generic [ref=f108e133]: Tadbirlar
+        - link "Xarajat kategoriyalari" [ref=f108e134] [cursor=pointer]:
+          - /url: /hr-expense-categories
+          - img [ref=f108e136]
+          - generic [ref=f108e141]: Xarajat kategoriyalari
+        - link "Maqsadlar" [ref=f108e142] [cursor=pointer]:
+          - /url: /hr-goals
+          - img [ref=f108e144]
+          - generic [ref=f108e148]: Maqsadlar
+        - link "Ta'til qoldiqlari" [ref=f108e149] [cursor=pointer]:
+          - /url: /hr-leave-balances
+          - img [ref=f108e151]
+          - generic [ref=f108e154]: Ta'til qoldiqlari
+        - link "Ta'til turlari" [ref=f108e155] [cursor=pointer]:
+          - /url: /hr-leave-types
+          - img [ref=f108e157]
+          - generic [ref=f108e160]: Ta'til turlari
+        - link "Sharhlar" [ref=f108e161] [cursor=pointer]:
+          - /url: /hr-reviews
+          - img [ref=f108e163]
+          - generic [ref=f108e165]: Sharhlar
+        - link "Smena shablonlari" [ref=f108e166] [cursor=pointer]:
+          - /url: /shift-templates
+          - img [ref=f108e168]
+          - generic [ref=f108e171]: Smena shablonlari
+        - generic [ref=f108e172]: Ombor
+        - link "Ombor ogohlantirishlari" [ref=f108e173] [cursor=pointer]:
+          - /url: /stock/alerts
+          - img [ref=f108e175]
+          - generic [ref=f108e178]: Ombor ogohlantirishlari
+        - link "Qabul qilish" [ref=f108e179] [cursor=pointer]:
+          - /url: /stock/receiving
+          - img [ref=f108e181]
+          - generic [ref=f108e184]: Qabul qilish
+        - link "Tuzatishlar" [ref=f108e185] [cursor=pointer]:
+          - /url: /stock/adjustments
+          - img [ref=f108e187]
+          - generic [ref=f108e191]: Tuzatishlar
+        - link "Zaxiralar" [ref=f108e192] [cursor=pointer]:
+          - /url: /stock/reservations
+          - img [ref=f108e194]
+          - generic [ref=f108e197]: Zaxiralar
+        - generic [ref=f108e198]: Sozlamalar
+        - link "QR kodlar" [ref=f108e199] [cursor=pointer]:
+          - /url: /qr-codes
+          - img [ref=f108e201]
+          - generic [ref=f108e206]: QR kodlar
+        - generic [ref=f108e207]: Bildirishnomalar
+        - link "Bildirishnoma navbati" [ref=f108e208] [cursor=pointer]:
+          - /url: /notification-queue
+          - img [ref=f108e210]
+          - generic [ref=f108e213]: Bildirishnoma navbati
+        - link "Bildirishnoma sozlamalari" [ref=f108e214] [cursor=pointer]:
+          - /url: /notification-settings
+          - img [ref=f108e216]
+          - generic [ref=f108e220]: Bildirishnoma sozlamalari
+        - link "Bildirishnoma shablonlari" [ref=f108e221] [cursor=pointer]:
+          - /url: /notification-templates
+          - img [ref=f108e223]
+          - generic [ref=f108e226]: Bildirishnoma shablonlari
+        - link "Bildirishnoma turlari" [ref=f108e227] [cursor=pointer]:
+          - /url: /notification-types
+          - img [ref=f108e229]
+          - generic [ref=f108e232]: Bildirishnoma turlari
+    - generic [ref=f108e233]:
+      - banner [ref=f108e234]:
+        - button "Yon panelni almashtirish" [ref=f108e235] [cursor=pointer]:
+          - img [ref=f108e236]
+        - generic [ref=f108e239]:
+          - generic [ref=f108e240]: Alpha POS
+          - img [ref=f108e241]
+        - button "3" [ref=f108e244] [cursor=pointer]:
+          - img [ref=f108e245]
+          - generic [ref=f108e248]: "3"
+        - button "Ish vaqti" [ref=f108e250] [cursor=pointer]:
+          - img [ref=f108e251]
+        - button "Mavzuni almashtirish" [ref=f108e255] [cursor=pointer]:
+          - img [ref=f108e256]
+        - generic [ref=f108e258]: AU
+      - main [ref=f108e259]:
+        - generic [ref=f108e260]:
+          - generic [ref=f108e261]:
+            - generic [ref=f108e262]:
+              - heading "Boshqaruv paneli" [level=1] [ref=f108e263]
+              - generic [ref=f108e264]: Jamoa samaradorligi · kassirlar va smenalar
+            - generic [ref=f108e265]:
+              - button "Oxirgi 30 kun" [ref=f108e267] [cursor=pointer]:
+                - img [ref=f108e268]
+                - generic [ref=f108e271]: Oxirgi 30 kun
+                - img [ref=f108e272]
+              - button "Yangilash" [disabled]:
+                - img
+                - text: Yangilash
+              - button "Eksport" [disabled]:
+                - img
+                - text: Eksport
+          - generic [ref=f108e274]:
+            - generic [ref=f108e275]:
+              - generic [ref=f108e276]:
+                - generic [ref=f108e277]:
+                  - img [ref=f108e278]
+                  - text: Tongdagi bildirgi
+                - heading "Mana, nima o'zgardi" [level=3] [ref=f108e281]
+              - button "Yopish" [ref=f108e282] [cursor=pointer]:
+                - img [ref=f108e283]
+            - list [ref=f108e285]:
+              - listitem [ref=f108e286]:
+                - img [ref=f108e288]
+                - generic [ref=f108e292]:
+                  - generic [ref=f108e293]: Bugungi tushum
+                  - generic [ref=f108e294]: 0 so'm, 0 ta buyurtma.
+                  - generic [ref=f108e295]:
+                    - button "Chuqurroq tahlil" [ref=f108e296] [cursor=pointer]:
+                      - img [ref=f108e297]
+                      - text: Chuqurroq tahlil
+                    - link "Ochish" [ref=f108e300] [cursor=pointer]:
+                      - /url: /?range=today
+                      - text: Ochish
+                      - img [ref=f108e301]
+              - listitem [ref=f108e303]:
+                - img [ref=f108e305]
+                - generic [ref=f108e308]:
+                  - generic [ref=f108e309]: "Eng ko'p sotilgan: Non burger standart"
+                  - generic [ref=f108e310]: Hozircha 43,416,000 so'm.
+                  - generic [ref=f108e311]:
+                    - button "Chuqurroq tahlil" [ref=f108e312] [cursor=pointer]:
+                      - img [ref=f108e313]
+                      - text: Chuqurroq tahlil
+                    - link "Ochish" [ref=f108e316] [cursor=pointer]:
+                      - /url: /dashboard/products
+                      - text: Ochish
+                      - img [ref=f108e317]
+              - listitem [ref=f108e319]:
+                - img [ref=f108e321]
+                - generic [ref=f108e323]:
+                  - generic [ref=f108e324]: "Menyu: \"Autsayderlar\"ni ko'rib chiqing"
+                  - generic [ref=f108e325]: 2 ta kam ommabop, kam foydali mahsulotni qayta ko'rib chiqing.
+                  - generic [ref=f108e326]:
+                    - button "Chuqurroq tahlil" [ref=f108e327] [cursor=pointer]:
+                      - img [ref=f108e328]
+                      - text: Chuqurroq tahlil
+                    - link "Ochish" [ref=f108e331] [cursor=pointer]:
+                      - /url: /dashboard/products
+                      - text: Ochish
+                      - img [ref=f108e332]
+          - generic [ref=f108e334]:
+            - button "Bosh sahifa" [ref=f108e335] [cursor=pointer]:
+              - img [ref=f108e336]
+              - generic [ref=f108e338]: Bosh sahifa
+            - button "Sotuvlar va daromad" [ref=f108e339] [cursor=pointer]:
+              - img [ref=f108e340]
+              - generic [ref=f108e343]: Sotuvlar va daromad
+            - button "Operatsiyalar" [ref=f108e344] [cursor=pointer]:
+              - img [ref=f108e345]
+              - generic [ref=f108e348]: Operatsiyalar
+            - button "Mahsulotlar" [ref=f108e349] [cursor=pointer]:
+              - img [ref=f108e350]
+              - generic [ref=f108e353]: Mahsulotlar
+            - button "Xodimlar va smenalar" [ref=f108e354] [cursor=pointer]:
+              - img [ref=f108e355]
+              - generic [ref=f108e358]: Xodimlar va smenalar
+          - generic [ref=f108e360]:
+            - generic [ref=f108e361]:
+              - generic [ref=f108e362]:
+                - generic [ref=f108e363]:
+                  - generic [ref=f108e364]: Faol xodimlar
+                  - img [ref=f108e366]
+                - generic [ref=f108e369]: "9"
+                - generic [ref=f108e371]: Oxirgi 30 kun ichida
+              - generic [ref=f108e372]:
+                - generic [ref=f108e373]:
+                  - generic [ref=f108e374]: Eng yaxshi xodim
+                  - img [ref=f108e376]
+                - generic [ref=f108e378]: Ruxsora Smart
+                - generic [ref=f108e380]: 218.78M · Oxirgi 30 kun
+              - generic [ref=f108e381]:
+                - generic [ref=f108e382]:
+                  - generic [ref=f108e383]: Oʻrtacha aniqlik
+                  - img [ref=f108e385]
+                - generic [ref=f108e387]: 100%
+              - generic [ref=f108e389]:
+                - generic [ref=f108e390]:
+                  - generic [ref=f108e391]: Jami soat · Oxirgi 30 kun
+                  - img [ref=f108e393]
+                - generic [ref=f108e396]: 2 895
+                - generic [ref=f108e398]: butun jamoada
+            - generic [ref=f108e399]:
+              - generic [ref=f108e400]:
+                - generic [ref=f108e402]:
+                  - generic [ref=f108e403]: Kassirlar reytingi · daromad
+                  - heading "Ruxsora Smart 7% bilan yetakchi" [level=3] [ref=f108e404]
+                - generic [ref=f108e405]:
+                  - generic [ref=f108e406]:
+                    - generic [ref=f108e407]: "1"
+                    - generic [ref=f108e408]: RS
+                    - generic [ref=f108e409]:
+                      - generic [ref=f108e410]:
+                        - generic [ref=f108e411]: Ruxsora Smart
+                        - generic [ref=f108e412]: 218 779 000
+                      - generic [ref=f108e415]:
+                        - generic [ref=f108e416]: 3 725 buyurtma
+                        - generic [ref=f108e417]: O‘rt. chek 58.9K
+                        - generic [ref=f108e418]: 390soat
+                  - generic [ref=f108e419]:
+                    - generic [ref=f108e420]: "2"
+                    - generic [ref=f108e421]: MS
+                    - generic [ref=f108e422]:
+                      - generic [ref=f108e423]:
+                        - generic [ref=f108e424]: MADINA Smart
+                        - generic [ref=f108e425]: 205 366 300
+                      - generic [ref=f108e428]:
+                        - generic [ref=f108e429]: 3 411 buyurtma
+                        - generic [ref=f108e430]: O‘rt. chek 60.3K
+                        - generic [ref=f108e431]: 388soat
+                  - generic [ref=f108e432]:
+                    - generic [ref=f108e433]: "3"
+                    - generic [ref=f108e434]: US
+                    - generic [ref=f108e435]:
+                      - generic [ref=f108e436]:
+                        - generic [ref=f108e437]: Umida Smart
+                        - generic [ref=f108e438]: 28 238 000
+                      - generic [ref=f108e441]:
+                        - generic [ref=f108e442]: 1 308 buyurtma
+                        - generic [ref=f108e443]: O‘rt. chek 21.8K
+                        - generic [ref=f108e444]: 420soat
+                  - generic [ref=f108e445]:
+                    - generic [ref=f108e446]: "4"
+                    - generic [ref=f108e447]: KS
+                    - generic [ref=f108e448]:
+                      - generic [ref=f108e449]:
+                        - generic [ref=f108e450]: Kechki Smena
+                        - generic [ref=f108e451]: 14 464 700
+                      - generic [ref=f108e454]:
+                        - generic [ref=f108e455]: 272 buyurtma
+                        - generic [ref=f108e456]: O‘rt. chek 53.2K
+                        - generic [ref=f108e457]: 375soat
+                  - generic [ref=f108e458]:
+                    - generic [ref=f108e459]: "5"
+                    - generic [ref=f108e460]: O1
+                    - generic [ref=f108e461]:
+                      - generic [ref=f108e462]:
+                        - generic [ref=f108e463]: OGLOY 1-smena
+                        - generic [ref=f108e464]: 8 233 000
+                      - generic [ref=f108e467]:
+                        - generic [ref=f108e468]: 381 buyurtma
+                        - generic [ref=f108e469]: O‘rt. chek 21.6K
+                        - generic [ref=f108e470]: 168soat
+                  - generic [ref=f108e471]:
+                    - generic [ref=f108e472]: "6"
+                    - generic [ref=f108e473]: Z2
+                    - generic [ref=f108e474]:
+                      - generic [ref=f108e475]:
+                        - generic [ref=f108e476]: ZIKIRULLOH 2-smena
+                        - generic [ref=f108e477]: 7 195 000
+                      - generic [ref=f108e480]:
+                        - generic [ref=f108e481]: 380 buyurtma
+                        - generic [ref=f108e482]: O‘rt. chek 19K
+                        - generic [ref=f108e483]: 86soat
+                  - generic [ref=f108e484]:
+                    - generic [ref=f108e485]: "7"
+                    - generic [ref=f108e486]: PS
+                    - generic [ref=f108e487]:
+                      - generic [ref=f108e488]:
+                        - generic [ref=f108e489]: Povr Smart
+                        - generic [ref=f108e490]: 3 103 000
+                      - generic [ref=f108e493]:
+                        - generic [ref=f108e494]: 116 buyurtma
+                        - generic [ref=f108e495]: O‘rt. chek 27K
+                        - generic [ref=f108e496]: 509soat
+                  - generic [ref=f108e497]:
+                    - generic [ref=f108e498]: "8"
+                    - generic [ref=f108e499]: AT
+                    - generic [ref=f108e500]:
+                      - generic [ref=f108e501]:
+                        - generic [ref=f108e502]: Aulquddus TENGMAN
+                        - generic [ref=f108e503]: 2 867 000
+                      - generic [ref=f108e506]:
+                        - generic [ref=f108e507]: 102 buyurtma
+                        - generic [ref=f108e508]: O‘rt. chek 28.1K
+                        - generic [ref=f108e509]: 318soat
+                  - generic [ref=f108e510]:
+                    - generic [ref=f108e511]: "9"
+                    - generic [ref=f108e512]: MS
+                    - generic [ref=f108e513]:
+                      - generic [ref=f108e514]:
+                        - generic [ref=f108e515]: Muzqaymoq Smart
+                        - generic [ref=f108e516]: 2 416 000
+                      - generic [ref=f108e519]:
+                        - generic [ref=f108e520]: 114 buyurtma
+                        - generic [ref=f108e521]: O‘rt. chek 21.8K
+                        - generic [ref=f108e522]: 241soat
+              - generic [ref=f108e523]:
+                - generic [ref=f108e525]:
+                  - generic [ref=f108e526]: Mahorat profili
+                  - heading "Yetakchi va barqaror xodim" [level=3] [ref=f108e527]
+                - generic [ref=f108e529]:
+                  - img [ref=f108e530]:
+                    - generic [ref=f108e537]: Aniqlik
+                    - generic [ref=f108e538]: Smena faolligi
+                    - generic [ref=f108e539]: Hajm
+                  - generic [ref=f108e548]:
+                    - generic [ref=f108e549]: Ruxsora Smart
+                    - generic [ref=f108e551]: OGLOY 1-smena
+            - generic [ref=f108e553]:
+              - generic [ref=f108e554]:
+                - generic [ref=f108e556]:
+                  - generic [ref=f108e557]: Buyurtmalar va daromad
+                  - heading "Doira oʻlchami = oʻrtacha chek" [level=3] [ref=f108e558]
+                - img [ref=f108e561]:
+                  - generic [ref=f108e563]: "0"
+                  - generic [ref=f108e565]: 100M
+                  - generic [ref=f108e567]: 200M
+                  - generic [ref=f108e569]: 300M
+                  - generic [ref=f108e570]: "0"
+                  - generic [ref=f108e571]: "1000"
+                  - generic [ref=f108e572]: "2000"
+                  - generic [ref=f108e573]: "3000"
+                  - generic [ref=f108e574]: "4000"
+                  - generic [ref=f108e575]: buyurtma
+              - generic [ref=f108e576]:
+                - generic [ref=f108e578]:
+                  - generic [ref=f108e579]: Soatlar va vaqtga rioya
+                  - heading "Ishlangan va qoʻshimcha" [level=3] [ref=f108e580]
+                - generic [ref=f108e582]:
+                  - img [ref=f108e583]:
+                    - generic [ref=f108e585]: "0"
+                    - generic [ref=f108e587]: "200"
+                    - generic [ref=f108e589]: "400"
+                    - generic [ref=f108e591]: "600"
+                    - generic [ref=f108e593]: RS
+                    - generic [ref=f108e595]: MS
+                    - generic [ref=f108e597]: US
+                    - generic [ref=f108e599]: KS
+                    - generic [ref=f108e601]: O1
+                    - generic [ref=f108e603]: Z2
+                    - generic [ref=f108e605]: PS
+                    - generic [ref=f108e607]: AT
+                    - generic [ref=f108e609]: MS
+                  - button "Ishlangan soatlar" [ref=f108e611] [cursor=pointer]: Ishlangan soatlar
+  - region "Notifications alt+T":
+    - list

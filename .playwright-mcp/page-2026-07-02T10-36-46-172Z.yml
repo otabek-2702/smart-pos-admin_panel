@@ -1,0 +1,350 @@
+- generic [ref=f42e1]:
+  - generic [ref=f42e5]:
+    - generic [ref=f42e6]:
+      - complementary [ref=f42e7]:
+        - generic [ref=f42e8]:
+          - img [ref=f42e10]
+          - generic [ref=f42e12]: Alpha POS
+        - navigation [ref=f42e13]:
+          - link "Boshqaruv paneli" [ref=f42e14] [cursor=pointer]:
+            - /url: /
+            - img [ref=f42e16]
+            - generic [ref=f42e18]: Boshqaruv paneli
+          - link "AI yordamchi" [ref=f42e19] [cursor=pointer]:
+            - /url: /ai-assistant
+            - img [ref=f42e21]
+            - generic [ref=f42e25]: AI yordamchi
+          - link "Smenalar" [ref=f42e26] [cursor=pointer]:
+            - /url: /shifts-analytics
+            - img [ref=f42e28]
+            - generic [ref=f42e31]: Smenalar
+          - generic [ref=f42e32]: Boshqaruv
+          - link "Foydalanuvchilar" [ref=f42e33] [cursor=pointer]:
+            - /url: /users
+            - img [ref=f42e35]
+            - generic [ref=f42e38]: Foydalanuvchilar
+          - link "Kategoriyalar" [ref=f42e39] [cursor=pointer]:
+            - /url: /categories
+            - img [ref=f42e41]
+            - generic [ref=f42e46]: Kategoriyalar
+          - link "Mahsulotlar" [ref=f42e47] [cursor=pointer]:
+            - /url: /products
+            - img [ref=f42e49]
+            - generic [ref=f42e52]: Mahsulotlar
+          - link "Buyurtmalar" [ref=f42e53] [cursor=pointer]:
+            - /url: /orders
+            - img [ref=f42e55]
+            - generic [ref=f42e58]: Buyurtmalar
+          - link "Zallar va stollar" [ref=f42e59] [cursor=pointer]:
+            - /url: /places
+            - img [ref=f42e61]
+            - generic [ref=f42e64]: Zallar va stollar
+          - link "Chegirmalar" [ref=f42e65] [cursor=pointer]:
+            - /url: /discounts
+            - img [ref=f42e67]
+            - generic [ref=f42e70]: Chegirmalar
+          - link "Kassa" [ref=f42e71] [cursor=pointer]:
+            - /url: /cashbox/categories
+            - img [ref=f42e73]
+            - generic [ref=f42e76]: Kassa
+          - link "Xazina" [ref=f42e77] [cursor=pointer]:
+            - /url: /treasury
+            - img [ref=f42e79]
+            - generic [ref=f42e81]: Xazina
+          - link "Sodiqlik" [ref=f42e82] [cursor=pointer]:
+            - /url: /loyalty
+            - img [ref=f42e84]
+            - generic [ref=f42e87]: Sodiqlik
+          - link "Sessiyalar" [ref=f42e88] [cursor=pointer]:
+            - /url: /sessions
+            - img [ref=f42e90]
+            - generic [ref=f42e93]: Sessiyalar
+          - generic [ref=f42e94]: Kadrlar
+          - link "Xodimlar" [ref=f42e95] [cursor=pointer]:
+            - /url: /hr-employees
+            - img [ref=f42e97]
+            - generic [ref=f42e100]: Xodimlar
+          - link "Bo'limlar" [ref=f42e101] [cursor=pointer]:
+            - /url: /hr-departments
+            - img [ref=f42e103]
+            - generic [ref=f42e107]: Bo'limlar
+          - link "Maoshlar" [ref=f42e108] [cursor=pointer]:
+            - /url: /hr-salaries
+            - img [ref=f42e110]
+            - generic [ref=f42e113]: Maoshlar
+          - link "HR kassa" [ref=f42e114] [cursor=pointer]:
+            - /url: /hr-cash
+            - img [ref=f42e116]
+            - generic [ref=f42e120]: HR kassa
+          - link "HR hujjatlar" [ref=f42e121] [cursor=pointer]:
+            - /url: /hr-documents
+            - img [ref=f42e123]
+            - generic [ref=f42e126]: HR hujjatlar
+          - link "Tadbirlar" [ref=f42e127] [cursor=pointer]:
+            - /url: /hr-events
+            - img [ref=f42e129]
+            - generic [ref=f42e131]: Tadbirlar
+          - link "Xarajat kategoriyalari" [ref=f42e132] [cursor=pointer]:
+            - /url: /hr-expense-categories
+            - img [ref=f42e134]
+            - generic [ref=f42e139]: Xarajat kategoriyalari
+          - link "Maqsadlar" [ref=f42e140] [cursor=pointer]:
+            - /url: /hr-goals
+            - img [ref=f42e142]
+            - generic [ref=f42e146]: Maqsadlar
+          - link "Ta'til qoldiqlari" [ref=f42e147] [cursor=pointer]:
+            - /url: /hr-leave-balances
+            - img [ref=f42e149]
+            - generic [ref=f42e152]: Ta'til qoldiqlari
+          - link "Ta'til turlari" [ref=f42e153] [cursor=pointer]:
+            - /url: /hr-leave-types
+            - img [ref=f42e155]
+            - generic [ref=f42e158]: Ta'til turlari
+          - link "Sharhlar" [ref=f42e159] [cursor=pointer]:
+            - /url: /hr-reviews
+            - img [ref=f42e161]
+            - generic [ref=f42e163]: Sharhlar
+          - link "Smena shablonlari" [ref=f42e164] [cursor=pointer]:
+            - /url: /shift-templates
+            - img [ref=f42e166]
+            - generic [ref=f42e169]: Smena shablonlari
+          - generic [ref=f42e170]: Ombor
+          - link "Ombor ogohlantirishlari" [ref=f42e171] [cursor=pointer]:
+            - /url: /stock/alerts
+            - img [ref=f42e173]
+            - generic [ref=f42e176]: Ombor ogohlantirishlari
+          - link "Qabul qilish" [ref=f42e177] [cursor=pointer]:
+            - /url: /stock/receiving
+            - img [ref=f42e179]
+            - generic [ref=f42e182]: Qabul qilish
+          - link "Tuzatishlar" [ref=f42e183] [cursor=pointer]:
+            - /url: /stock/adjustments
+            - img [ref=f42e185]
+            - generic [ref=f42e189]: Tuzatishlar
+          - link "Zaxiralar" [ref=f42e190] [cursor=pointer]:
+            - /url: /stock/reservations
+            - img [ref=f42e192]
+            - generic [ref=f42e195]: Zaxiralar
+          - generic [ref=f42e196]: Sozlamalar
+          - link "QR kodlar" [ref=f42e197] [cursor=pointer]:
+            - /url: /qr-codes
+            - img [ref=f42e199]
+            - generic [ref=f42e204]: QR kodlar
+          - generic [ref=f42e205]: Bildirishnomalar
+          - link "Bildirishnoma navbati" [ref=f42e206] [cursor=pointer]:
+            - /url: /notification-queue
+            - img [ref=f42e208]
+            - generic [ref=f42e211]: Bildirishnoma navbati
+          - link "Bildirishnoma sozlamalari" [ref=f42e212] [cursor=pointer]:
+            - /url: /notification-settings
+            - img [ref=f42e214]
+            - generic [ref=f42e218]: Bildirishnoma sozlamalari
+          - link "Bildirishnoma shablonlari" [ref=f42e219] [cursor=pointer]:
+            - /url: /notification-templates
+            - img [ref=f42e221]
+            - generic [ref=f42e224]: Bildirishnoma shablonlari
+          - link "Bildirishnoma turlari" [ref=f42e225] [cursor=pointer]:
+            - /url: /notification-types
+            - img [ref=f42e227]
+            - generic [ref=f42e230]: Bildirishnoma turlari
+      - generic [ref=f42e231]:
+        - banner [ref=f42e232]:
+          - button "Yon panelni almashtirish" [ref=f42e233] [cursor=pointer]:
+            - img [ref=f42e234]
+          - generic [ref=f42e237]:
+            - generic [ref=f42e238]: Alpha POS
+            - img [ref=f42e239]
+            - generic [ref=f42e241]: Kategoriyalar
+          - button "Ogohlantirishlar yo'q" [ref=f42e243] [cursor=pointer]:
+            - img [ref=f42e244]
+          - button "Sozlamalar" [ref=f42e248] [cursor=pointer]:
+            - img [ref=f42e249]
+          - button "Mavzuni almashtirish" [ref=f42e252] [cursor=pointer]:
+            - img [ref=f42e253]
+          - generic [ref=f42e255]: RL
+        - main [ref=f42e256]:
+          - generic [ref=f42e257]:
+            - generic [ref=f42e258]:
+              - generic [ref=f42e259]:
+                - heading "Kategoriyalar" [level=1] [ref=f42e260]
+                - generic [ref=f42e261]: Mahsulotlarni POS toifalariga guruhlash
+              - button "Kategoriya qo'shish" [ref=f42e263] [cursor=pointer]:
+                - img [ref=f42e264]
+                - text: Kategoriya qo'shish
+            - generic [ref=f42e266]:
+              - generic [ref=f42e267]:
+                - generic [ref=f42e268]:
+                  - img [ref=f42e270]
+                  - generic [ref=f42e273]: Jami
+                - generic [ref=f42e274]: "15"
+                - generic [ref=f42e276]: Kategoriyalar
+              - generic [ref=f42e277]:
+                - generic [ref=f42e278]:
+                  - img [ref=f42e280]
+                  - generic [ref=f42e283]: Faol
+                - generic [ref=f42e284]: "15"
+              - generic [ref=f42e285]:
+                - generic [ref=f42e286]:
+                  - img [ref=f42e288]
+                  - generic [ref=f42e291]: Nofaol
+                - generic [ref=f42e292]: "0"
+            - generic [ref=f42e293]:
+              - generic [ref=f42e294]:
+                - generic [ref=f42e296]:
+                  - img [ref=f42e297]
+                  - textbox "Qidirish" [ref=f42e300]
+                - combobox [ref=f42e302] [cursor=pointer]:
+                  - img [ref=f42e303]
+                  - generic [ref=f42e305]: Barcha kategoriya holatlari
+                  - img [ref=f42e306]
+                - generic [ref=f42e308]:
+                  - switch [ref=f42e309] [cursor=pointer]
+                  - generic [ref=f42e310]: O'chirilgan kategoriyalarni ko'rsatish
+              - generic [ref=f42e312]:
+                - generic [ref=f42e313]:
+                  - checkbox [ref=f42e315] [cursor=pointer]
+                  - generic [ref=f42e317]:
+                    - generic [ref=f42e319]:
+                      - generic [ref=f42e320]: ichimliklar
+                      - img [ref=f42e321]
+                    - generic [ref=f42e326]:
+                      - generic [ref=f42e327]: Faol
+                      - generic [ref=f42e328]: "#0"
+                - generic [ref=f42e329]:
+                  - checkbox [ref=f42e331] [cursor=pointer]
+                  - generic [ref=f42e333]:
+                    - generic [ref=f42e335]:
+                      - generic [ref=f42e336]: Hot doglar
+                      - img [ref=f42e337]
+                    - generic [ref=f42e342]:
+                      - generic [ref=f42e343]: Faol
+                      - generic [ref=f42e344]: "#0"
+                - generic [ref=f42e345]:
+                  - checkbox [ref=f42e347] [cursor=pointer]
+                  - generic [ref=f42e349]:
+                    - generic [ref=f42e351]:
+                      - generic [ref=f42e352]: Burgerlar
+                      - img [ref=f42e353]
+                    - generic [ref=f42e358]:
+                      - generic [ref=f42e359]: Faol
+                      - generic [ref=f42e360]: "#0"
+                - generic [ref=f42e361]:
+                  - checkbox [ref=f42e363] [cursor=pointer]
+                  - generic [ref=f42e365]:
+                    - generic [ref=f42e367]:
+                      - generic [ref=f42e368]: Pitsalar
+                      - img [ref=f42e369]
+                    - generic [ref=f42e374]:
+                      - generic [ref=f42e375]: Faol
+                      - generic [ref=f42e376]: "#0"
+                - generic [ref=f42e377]:
+                  - checkbox [ref=f42e379] [cursor=pointer]
+                  - generic [ref=f42e381]:
+                    - generic [ref=f42e383]:
+                      - generic [ref=f42e384]: Non burgerlar
+                      - img [ref=f42e385]
+                    - generic [ref=f42e390]:
+                      - generic [ref=f42e391]: Faol
+                      - generic [ref=f42e392]: "#0"
+                - generic [ref=f42e393]:
+                  - checkbox [ref=f42e395] [cursor=pointer]
+                  - generic [ref=f42e397]:
+                    - generic [ref=f42e399]:
+                      - generic [ref=f42e400]: Lavashlar
+                      - img [ref=f42e401]
+                    - generic [ref=f42e406]:
+                      - generic [ref=f42e407]: Faol
+                      - generic [ref=f42e408]: "#0"
+                - generic [ref=f42e409]:
+                  - checkbox [ref=f42e411] [cursor=pointer]
+                  - generic [ref=f42e413]:
+                    - generic [ref=f42e415]:
+                      - generic [ref=f42e416]: Tovuq
+                      - img [ref=f42e417]
+                    - generic [ref=f42e422]:
+                      - generic [ref=f42e423]: Faol
+                      - generic [ref=f42e424]: "#0"
+                - generic [ref=f42e425]:
+                  - checkbox [ref=f42e427] [cursor=pointer]
+                  - generic [ref=f42e429]:
+                    - generic [ref=f42e431]:
+                      - generic [ref=f42e432]: Souslar
+                      - img [ref=f42e433]
+                    - generic [ref=f42e438]:
+                      - generic [ref=f42e439]: Faol
+                      - generic [ref=f42e440]: "#0"
+                - generic [ref=f42e441]:
+                  - checkbox [ref=f42e443] [cursor=pointer]
+                  - generic [ref=f42e445]:
+                    - generic [ref=f42e447]:
+                      - generic [ref=f42e448]: Boshqalar
+                      - img [ref=f42e449]
+                    - generic [ref=f42e454]:
+                      - generic [ref=f42e455]: Faol
+                      - generic [ref=f42e456]: "#0"
+                - generic [ref=f42e457]:
+                  - checkbox [ref=f42e459] [cursor=pointer]
+                  - generic [ref=f42e461]:
+                    - generic [ref=f42e463]:
+                      - generic [ref=f42e464]: Choylar
+                      - img [ref=f42e465]
+                    - generic [ref=f42e470]:
+                      - generic [ref=f42e471]: Faol
+                      - generic [ref=f42e472]: "#0"
+              - generic [ref=f42e473]:
+                - generic [ref=f42e474]:
+                  - generic [ref=f42e475]: "Bir sahifada qatorlar:"
+                  - generic [ref=f42e476] [cursor=pointer]:
+                    - combobox [ref=f42e477]:
+                      - option "10" [selected]
+                      - option "25"
+                      - option "50"
+                      - option "100"
+                    - img [ref=f42e478]
+                - generic [ref=f42e480]: 1–10 dan 15
+                - generic [ref=f42e481]:
+                  - button [disabled]:
+                    - img
+                  - button "1" [ref=f42e482] [cursor=pointer]
+                  - button "2" [ref=f42e483] [cursor=pointer]
+                  - button [ref=f42e484] [cursor=pointer]:
+                    - img [ref=f42e485]
+    - region "Notifications alt+T":
+      - list
+  - dialog "Kategoriya qo'shish" [ref=f42e488]:
+    - generic [ref=f42e489]:
+      - heading "Kategoriya qo'shish" [level=3] [ref=f42e491]
+      - button "Yopish" [active] [ref=f42e492] [cursor=pointer]:
+        - img [ref=f42e493]
+    - generic [ref=f42e495]:
+      - generic [ref=f42e496]:
+        - generic [ref=f42e497]: POS ko'rinishi
+        - generic [ref=f42e498]:
+          - generic [ref=f42e499]: Ism
+          - generic [ref=f42e500]: Boshqa
+          - generic [ref=f42e501]: Boshqa
+        - generic [ref=f42e502]:
+          - generic [ref=f42e503]:
+            - generic [ref=f42e504]: Mahsulot 1
+            - generic [ref=f42e505]: 25 000 so'm
+          - generic [ref=f42e506]:
+            - generic [ref=f42e507]: Mahsulot 2
+            - generic [ref=f42e508]: 18 000 so'm
+          - generic [ref=f42e509]:
+            - generic [ref=f42e510]: Mahsulot 3
+            - generic [ref=f42e511]: 32 000 so'm
+      - generic [ref=f42e512]:
+        - generic [ref=f42e513]:
+          - generic [ref=f42e514]: Ism
+          - textbox "Ism" [ref=f42e516]
+        - generic [ref=f42e517]:
+          - generic [ref=f42e518]: Tavsif
+          - textbox "Tavsif" [ref=f42e520]
+        - generic [ref=f42e521]:
+          - generic [ref=f42e522]: Rang
+          - generic [ref=f42e525]: Rangsiz
+    - generic [ref=f42e526]:
+      - button "Bekor qilish" [ref=f42e527] [cursor=pointer]
+      - button "Saqlash" [ref=f42e528] [cursor=pointer]:
+        - img [ref=f42e529]
+        - text: Saqlash

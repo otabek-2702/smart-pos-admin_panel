@@ -1,0 +1,331 @@
+- generic [ref=f15e5]:
+  - generic [ref=f15e6]:
+    - complementary [ref=f15e7]:
+      - generic [ref=f15e8]:
+        - img [ref=f15e10]
+        - generic [ref=f15e12]: Alpha POS
+      - navigation [ref=f15e13]:
+        - link "Boshqaruv paneli" [ref=f15e14] [cursor=pointer]:
+          - /url: /
+          - img [ref=f15e16]
+          - generic [ref=f15e18]: Boshqaruv paneli
+        - link "AI yordamchi" [ref=f15e19] [cursor=pointer]:
+          - /url: /ai-assistant
+          - img [ref=f15e21]
+          - generic [ref=f15e25]: AI yordamchi
+        - link "Smenalar" [ref=f15e26] [cursor=pointer]:
+          - /url: /shifts-analytics
+          - img [ref=f15e28]
+          - generic [ref=f15e31]: Smenalar
+        - generic [ref=f15e32]: Boshqaruv
+        - link "Foydalanuvchilar" [ref=f15e33] [cursor=pointer]:
+          - /url: /users
+          - img [ref=f15e35]
+          - generic [ref=f15e38]: Foydalanuvchilar
+        - link "Kategoriyalar" [ref=f15e39] [cursor=pointer]:
+          - /url: /categories
+          - img [ref=f15e41]
+          - generic [ref=f15e46]: Kategoriyalar
+        - link "Mahsulotlar" [ref=f15e47] [cursor=pointer]:
+          - /url: /products
+          - img [ref=f15e49]
+          - generic [ref=f15e52]: Mahsulotlar
+        - link "Buyurtmalar" [ref=f15e53] [cursor=pointer]:
+          - /url: /orders
+          - img [ref=f15e55]
+          - generic [ref=f15e58]: Buyurtmalar
+        - link "Zallar va stollar" [ref=f15e59] [cursor=pointer]:
+          - /url: /places
+          - img [ref=f15e61]
+          - generic [ref=f15e64]: Zallar va stollar
+        - link "Chegirmalar" [ref=f15e65] [cursor=pointer]:
+          - /url: /discounts
+          - img [ref=f15e67]
+          - generic [ref=f15e70]: Chegirmalar
+        - link "Kassa" [ref=f15e71] [cursor=pointer]:
+          - /url: /cashbox/categories
+          - img [ref=f15e73]
+          - generic [ref=f15e76]: Kassa
+        - link "Xazina" [ref=f15e77] [cursor=pointer]:
+          - /url: /treasury
+          - img [ref=f15e79]
+          - generic [ref=f15e81]: Xazina
+        - link "Sodiqlik" [ref=f15e82] [cursor=pointer]:
+          - /url: /loyalty
+          - img [ref=f15e84]
+          - generic [ref=f15e87]: Sodiqlik
+        - link "Sessiyalar" [ref=f15e88] [cursor=pointer]:
+          - /url: /sessions
+          - img [ref=f15e90]
+          - generic [ref=f15e93]: Sessiyalar
+        - generic [ref=f15e94]: Kadrlar
+        - link "Xodimlar" [ref=f15e95] [cursor=pointer]:
+          - /url: /hr-employees
+          - img [ref=f15e97]
+          - generic [ref=f15e100]: Xodimlar
+        - link "Bo'limlar" [ref=f15e101] [cursor=pointer]:
+          - /url: /hr-departments
+          - img [ref=f15e103]
+          - generic [ref=f15e107]: Bo'limlar
+        - link "Maoshlar" [ref=f15e108] [cursor=pointer]:
+          - /url: /hr-salaries
+          - img [ref=f15e110]
+          - generic [ref=f15e113]: Maoshlar
+        - link "HR kassa" [ref=f15e114] [cursor=pointer]:
+          - /url: /hr-cash
+          - img [ref=f15e116]
+          - generic [ref=f15e120]: HR kassa
+        - link "HR hujjatlar" [ref=f15e121] [cursor=pointer]:
+          - /url: /hr-documents
+          - img [ref=f15e123]
+          - generic [ref=f15e126]: HR hujjatlar
+        - link "Tadbirlar" [ref=f15e127] [cursor=pointer]:
+          - /url: /hr-events
+          - img [ref=f15e129]
+          - generic [ref=f15e131]: Tadbirlar
+        - link "Xarajat kategoriyalari" [ref=f15e132] [cursor=pointer]:
+          - /url: /hr-expense-categories
+          - img [ref=f15e134]
+          - generic [ref=f15e139]: Xarajat kategoriyalari
+        - link "Maqsadlar" [ref=f15e140] [cursor=pointer]:
+          - /url: /hr-goals
+          - img [ref=f15e142]
+          - generic [ref=f15e146]: Maqsadlar
+        - link "Ta'til qoldiqlari" [ref=f15e147] [cursor=pointer]:
+          - /url: /hr-leave-balances
+          - img [ref=f15e149]
+          - generic [ref=f15e152]: Ta'til qoldiqlari
+        - link "Ta'til turlari" [ref=f15e153] [cursor=pointer]:
+          - /url: /hr-leave-types
+          - img [ref=f15e155]
+          - generic [ref=f15e158]: Ta'til turlari
+        - link "Sharhlar" [ref=f15e159] [cursor=pointer]:
+          - /url: /hr-reviews
+          - img [ref=f15e161]
+          - generic [ref=f15e163]: Sharhlar
+        - link "Smena shablonlari" [ref=f15e164] [cursor=pointer]:
+          - /url: /shift-templates
+          - img [ref=f15e166]
+          - generic [ref=f15e169]: Smena shablonlari
+        - generic [ref=f15e170]: Ombor
+        - link "Ombor ogohlantirishlari" [ref=f15e171] [cursor=pointer]:
+          - /url: /stock/alerts
+          - img [ref=f15e173]
+          - generic [ref=f15e176]: Ombor ogohlantirishlari
+        - link "Qabul qilish" [ref=f15e177] [cursor=pointer]:
+          - /url: /stock/receiving
+          - img [ref=f15e179]
+          - generic [ref=f15e182]: Qabul qilish
+        - link "Tuzatishlar" [ref=f15e183] [cursor=pointer]:
+          - /url: /stock/adjustments
+          - img [ref=f15e185]
+          - generic [ref=f15e189]: Tuzatishlar
+        - link "Zaxiralar" [ref=f15e190] [cursor=pointer]:
+          - /url: /stock/reservations
+          - img [ref=f15e192]
+          - generic [ref=f15e195]: Zaxiralar
+        - generic [ref=f15e196]: Sozlamalar
+        - link "QR kodlar" [ref=f15e197] [cursor=pointer]:
+          - /url: /qr-codes
+          - img [ref=f15e199]
+          - generic [ref=f15e204]: QR kodlar
+        - generic [ref=f15e205]: Bildirishnomalar
+        - link "Bildirishnoma navbati" [ref=f15e206] [cursor=pointer]:
+          - /url: /notification-queue
+          - img [ref=f15e208]
+          - generic [ref=f15e211]: Bildirishnoma navbati
+        - link "Bildirishnoma sozlamalari" [ref=f15e212] [cursor=pointer]:
+          - /url: /notification-settings
+          - img [ref=f15e214]
+          - generic [ref=f15e218]: Bildirishnoma sozlamalari
+        - link "Bildirishnoma shablonlari" [ref=f15e219] [cursor=pointer]:
+          - /url: /notification-templates
+          - img [ref=f15e221]
+          - generic [ref=f15e224]: Bildirishnoma shablonlari
+        - link "Bildirishnoma turlari" [ref=f15e225] [cursor=pointer]:
+          - /url: /notification-types
+          - img [ref=f15e227]
+          - generic [ref=f15e230]: Bildirishnoma turlari
+    - generic [ref=f15e231]:
+      - banner [ref=f15e232]:
+        - button "Yon panelni almashtirish" [ref=f15e233] [cursor=pointer]:
+          - img [ref=f15e234]
+        - generic [ref=f15e237]:
+          - generic [ref=f15e238]: Alpha POS
+          - img [ref=f15e239]
+        - button "Ogohlantirishlar yo'q" [ref=f15e242] [cursor=pointer]:
+          - img [ref=f15e243]
+        - button "Sozlamalar" [ref=f15e247] [cursor=pointer]:
+          - img [ref=f15e248]
+        - button "Mavzuni almashtirish" [ref=f15e251] [cursor=pointer]:
+          - img [ref=f15e252]
+        - generic [ref=f15e254]: AU
+      - main [ref=f15e255]:
+        - generic [ref=f15e256]:
+          - generic [ref=f15e257]:
+            - generic [ref=f15e258]:
+              - heading "Xodim hujjatlari" [level=1] [ref=f15e259]
+              - generic [ref=f15e260]: Pasport, shartnoma va sertifikatlarni boshqarish
+            - generic [ref=f15e261]:
+              - button "Tez orada tugaydi" [ref=f15e262] [cursor=pointer]:
+                - img [ref=f15e263]
+                - text: Tez orada tugaydi
+              - button "Hujjat yuklash" [ref=f15e266] [cursor=pointer]:
+                - img [ref=f15e267]
+                - text: Hujjat yuklash
+          - generic [ref=f15e269]:
+            - generic [ref=f15e270]:
+              - generic [ref=f15e272]:
+                - img [ref=f15e273]
+                - textbox "Sarlavha yoki izoh boyicha qidirish" [ref=f15e276]
+              - combobox [ref=f15e278] [cursor=pointer]:
+                - img [ref=f15e279]
+                - generic [ref=f15e282]: Xodim
+                - img [ref=f15e283]
+              - combobox [ref=f15e286] [cursor=pointer]:
+                - img [ref=f15e287]
+                - generic [ref=f15e289]: Turi
+                - img [ref=f15e290]
+              - generic [ref=f15e292]:
+                - switch [ref=f15e293] [cursor=pointer]
+                - generic [ref=f15e294]: Tez orada tugaydi
+            - table [ref=f15e298]:
+              - rowgroup [ref=f15e299]:
+                - row "ID Xodim Turi Sarlavha Berilgan sana Amal qilish muddati Tasdiqlangan Kim tasdiqladi Yuklangan Amallar" [ref=f15e300]:
+                  - columnheader "ID" [ref=f15e301] [cursor=pointer]:
+                    - text: ID
+                    - img [ref=f15e303]
+                  - columnheader "Xodim" [ref=f15e305]
+                  - columnheader "Turi" [ref=f15e306] [cursor=pointer]:
+                    - text: Turi
+                    - img [ref=f15e308]
+                  - columnheader "Sarlavha" [ref=f15e310] [cursor=pointer]:
+                    - text: Sarlavha
+                    - img [ref=f15e312]
+                  - columnheader "Berilgan sana" [ref=f15e314] [cursor=pointer]:
+                    - text: Berilgan sana
+                    - img [ref=f15e316]
+                  - columnheader "Amal qilish muddati" [ref=f15e318] [cursor=pointer]:
+                    - text: Amal qilish muddati
+                    - img [ref=f15e320]
+                  - columnheader "Tasdiqlangan" [ref=f15e322] [cursor=pointer]:
+                    - text: Tasdiqlangan
+                    - img [ref=f15e324]
+                  - columnheader "Kim tasdiqladi" [ref=f15e326]
+                  - columnheader "Yuklangan" [ref=f15e327] [cursor=pointer]:
+                    - text: Yuklangan
+                    - img [ref=f15e329]
+                  - columnheader "Amallar" [ref=f15e331]
+              - rowgroup [ref=f15e332]:
+                - row [ref=f15e333]:
+                  - cell [ref=f15e334]
+                  - cell [ref=f15e336]
+                  - cell [ref=f15e338]
+                  - cell [ref=f15e340]
+                  - cell [ref=f15e342]
+                  - cell [ref=f15e344]
+                  - cell [ref=f15e346]
+                  - cell [ref=f15e348]
+                  - cell [ref=f15e350]
+                  - cell [ref=f15e352]
+                - row [ref=f15e354]:
+                  - cell [ref=f15e355]
+                  - cell [ref=f15e357]
+                  - cell [ref=f15e359]
+                  - cell [ref=f15e361]
+                  - cell [ref=f15e363]
+                  - cell [ref=f15e365]
+                  - cell [ref=f15e367]
+                  - cell [ref=f15e369]
+                  - cell [ref=f15e371]
+                  - cell [ref=f15e373]
+                - row [ref=f15e375]:
+                  - cell [ref=f15e376]
+                  - cell [ref=f15e378]
+                  - cell [ref=f15e380]
+                  - cell [ref=f15e382]
+                  - cell [ref=f15e384]
+                  - cell [ref=f15e386]
+                  - cell [ref=f15e388]
+                  - cell [ref=f15e390]
+                  - cell [ref=f15e392]
+                  - cell [ref=f15e394]
+                - row [ref=f15e396]:
+                  - cell [ref=f15e397]
+                  - cell [ref=f15e399]
+                  - cell [ref=f15e401]
+                  - cell [ref=f15e403]
+                  - cell [ref=f15e405]
+                  - cell [ref=f15e407]
+                  - cell [ref=f15e409]
+                  - cell [ref=f15e411]
+                  - cell [ref=f15e413]
+                  - cell [ref=f15e415]
+                - row [ref=f15e417]:
+                  - cell [ref=f15e418]
+                  - cell [ref=f15e420]
+                  - cell [ref=f15e422]
+                  - cell [ref=f15e424]
+                  - cell [ref=f15e426]
+                  - cell [ref=f15e428]
+                  - cell [ref=f15e430]
+                  - cell [ref=f15e432]
+                  - cell [ref=f15e434]
+                  - cell [ref=f15e436]
+                - row [ref=f15e438]:
+                  - cell [ref=f15e439]
+                  - cell [ref=f15e441]
+                  - cell [ref=f15e443]
+                  - cell [ref=f15e445]
+                  - cell [ref=f15e447]
+                  - cell [ref=f15e449]
+                  - cell [ref=f15e451]
+                  - cell [ref=f15e453]
+                  - cell [ref=f15e455]
+                  - cell [ref=f15e457]
+                - row [ref=f15e459]:
+                  - cell [ref=f15e460]
+                  - cell [ref=f15e462]
+                  - cell [ref=f15e464]
+                  - cell [ref=f15e466]
+                  - cell [ref=f15e468]
+                  - cell [ref=f15e470]
+                  - cell [ref=f15e472]
+                  - cell [ref=f15e474]
+                  - cell [ref=f15e476]
+                  - cell [ref=f15e478]
+                - row [ref=f15e480]:
+                  - cell [ref=f15e481]
+                  - cell [ref=f15e483]
+                  - cell [ref=f15e485]
+                  - cell [ref=f15e487]
+                  - cell [ref=f15e489]
+                  - cell [ref=f15e491]
+                  - cell [ref=f15e493]
+                  - cell [ref=f15e495]
+                  - cell [ref=f15e497]
+                  - cell [ref=f15e499]
+                - row [ref=f15e501]:
+                  - cell [ref=f15e502]
+                  - cell [ref=f15e504]
+                  - cell [ref=f15e506]
+                  - cell [ref=f15e508]
+                  - cell [ref=f15e510]
+                  - cell [ref=f15e512]
+                  - cell [ref=f15e514]
+                  - cell [ref=f15e516]
+                  - cell [ref=f15e518]
+                  - cell [ref=f15e520]
+                - row [ref=f15e522]:
+                  - cell [ref=f15e523]
+                  - cell [ref=f15e525]
+                  - cell [ref=f15e527]
+                  - cell [ref=f15e529]
+                  - cell [ref=f15e531]
+                  - cell [ref=f15e533]
+                  - cell [ref=f15e535]
+                  - cell [ref=f15e537]
+                  - cell [ref=f15e539]
+                  - cell [ref=f15e541]
+  - region "Notifications alt+T":
+    - list

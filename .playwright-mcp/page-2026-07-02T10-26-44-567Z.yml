@@ -1,0 +1,305 @@
+- generic [ref=f23e5]:
+  - generic [ref=f23e6]:
+    - complementary [ref=f23e7]:
+      - generic [ref=f23e8]:
+        - img [ref=f23e10]
+        - generic [ref=f23e12]: Alpha POS
+      - navigation [ref=f23e13]:
+        - link "Boshqaruv paneli" [ref=f23e14] [cursor=pointer]:
+          - /url: /
+          - img [ref=f23e16]
+          - generic [ref=f23e18]: Boshqaruv paneli
+        - link "AI yordamchi" [ref=f23e19] [cursor=pointer]:
+          - /url: /ai-assistant
+          - img [ref=f23e21]
+          - generic [ref=f23e25]: AI yordamchi
+        - link "Smenalar" [ref=f23e26] [cursor=pointer]:
+          - /url: /shifts-analytics
+          - img [ref=f23e28]
+          - generic [ref=f23e31]: Smenalar
+        - generic [ref=f23e32]: Boshqaruv
+        - link "Foydalanuvchilar" [ref=f23e33] [cursor=pointer]:
+          - /url: /users
+          - img [ref=f23e35]
+          - generic [ref=f23e38]: Foydalanuvchilar
+        - link "Kategoriyalar" [ref=f23e39] [cursor=pointer]:
+          - /url: /categories
+          - img [ref=f23e41]
+          - generic [ref=f23e46]: Kategoriyalar
+        - link "Mahsulotlar" [ref=f23e47] [cursor=pointer]:
+          - /url: /products
+          - img [ref=f23e49]
+          - generic [ref=f23e52]: Mahsulotlar
+        - link "Buyurtmalar" [ref=f23e53] [cursor=pointer]:
+          - /url: /orders
+          - img [ref=f23e55]
+          - generic [ref=f23e58]: Buyurtmalar
+        - link "Zallar va stollar" [ref=f23e59] [cursor=pointer]:
+          - /url: /places
+          - img [ref=f23e61]
+          - generic [ref=f23e64]: Zallar va stollar
+        - link "Chegirmalar" [ref=f23e65] [cursor=pointer]:
+          - /url: /discounts
+          - img [ref=f23e67]
+          - generic [ref=f23e70]: Chegirmalar
+        - link "Kassa" [ref=f23e71] [cursor=pointer]:
+          - /url: /cashbox/categories
+          - img [ref=f23e73]
+          - generic [ref=f23e76]: Kassa
+        - link "Xazina" [ref=f23e77] [cursor=pointer]:
+          - /url: /treasury
+          - img [ref=f23e79]
+          - generic [ref=f23e81]: Xazina
+        - link "Sodiqlik" [ref=f23e82] [cursor=pointer]:
+          - /url: /loyalty
+          - img [ref=f23e84]
+          - generic [ref=f23e87]: Sodiqlik
+        - link "Sessiyalar" [ref=f23e88] [cursor=pointer]:
+          - /url: /sessions
+          - img [ref=f23e90]
+          - generic [ref=f23e93]: Sessiyalar
+        - generic [ref=f23e94]: Kadrlar
+        - link "Xodimlar" [ref=f23e95] [cursor=pointer]:
+          - /url: /hr-employees
+          - img [ref=f23e97]
+          - generic [ref=f23e100]: Xodimlar
+        - link "Bo'limlar" [ref=f23e101] [cursor=pointer]:
+          - /url: /hr-departments
+          - img [ref=f23e103]
+          - generic [ref=f23e107]: Bo'limlar
+        - link "Maoshlar" [ref=f23e108] [cursor=pointer]:
+          - /url: /hr-salaries
+          - img [ref=f23e110]
+          - generic [ref=f23e113]: Maoshlar
+        - link "HR kassa" [ref=f23e114] [cursor=pointer]:
+          - /url: /hr-cash
+          - img [ref=f23e116]
+          - generic [ref=f23e120]: HR kassa
+        - link "HR hujjatlar" [ref=f23e121] [cursor=pointer]:
+          - /url: /hr-documents
+          - img [ref=f23e123]
+          - generic [ref=f23e126]: HR hujjatlar
+        - link "Tadbirlar" [ref=f23e127] [cursor=pointer]:
+          - /url: /hr-events
+          - img [ref=f23e129]
+          - generic [ref=f23e131]: Tadbirlar
+        - link "Xarajat kategoriyalari" [ref=f23e132] [cursor=pointer]:
+          - /url: /hr-expense-categories
+          - img [ref=f23e134]
+          - generic [ref=f23e139]: Xarajat kategoriyalari
+        - link "Maqsadlar" [ref=f23e140] [cursor=pointer]:
+          - /url: /hr-goals
+          - img [ref=f23e142]
+          - generic [ref=f23e146]: Maqsadlar
+        - link "Ta'til qoldiqlari" [ref=f23e147] [cursor=pointer]:
+          - /url: /hr-leave-balances
+          - img [ref=f23e149]
+          - generic [ref=f23e152]: Ta'til qoldiqlari
+        - link "Ta'til turlari" [ref=f23e153] [cursor=pointer]:
+          - /url: /hr-leave-types
+          - img [ref=f23e155]
+          - generic [ref=f23e158]: Ta'til turlari
+        - link "Sharhlar" [ref=f23e159] [cursor=pointer]:
+          - /url: /hr-reviews
+          - img [ref=f23e161]
+          - generic [ref=f23e163]: Sharhlar
+        - link "Smena shablonlari" [ref=f23e164] [cursor=pointer]:
+          - /url: /shift-templates
+          - img [ref=f23e166]
+          - generic [ref=f23e169]: Smena shablonlari
+        - generic [ref=f23e170]: Ombor
+        - link "Ombor ogohlantirishlari" [ref=f23e171] [cursor=pointer]:
+          - /url: /stock/alerts
+          - img [ref=f23e173]
+          - generic [ref=f23e176]: Ombor ogohlantirishlari
+        - link "Qabul qilish" [ref=f23e177] [cursor=pointer]:
+          - /url: /stock/receiving
+          - img [ref=f23e179]
+          - generic [ref=f23e182]: Qabul qilish
+        - link "Tuzatishlar" [ref=f23e183] [cursor=pointer]:
+          - /url: /stock/adjustments
+          - img [ref=f23e185]
+          - generic [ref=f23e189]: Tuzatishlar
+        - link "Zaxiralar" [ref=f23e190] [cursor=pointer]:
+          - /url: /stock/reservations
+          - img [ref=f23e192]
+          - generic [ref=f23e195]: Zaxiralar
+        - generic [ref=f23e196]: Sozlamalar
+        - link "QR kodlar" [ref=f23e197] [cursor=pointer]:
+          - /url: /qr-codes
+          - img [ref=f23e199]
+          - generic [ref=f23e204]: QR kodlar
+        - generic [ref=f23e205]: Bildirishnomalar
+        - link "Bildirishnoma navbati" [ref=f23e206] [cursor=pointer]:
+          - /url: /notification-queue
+          - img [ref=f23e208]
+          - generic [ref=f23e211]: Bildirishnoma navbati
+        - link "Bildirishnoma sozlamalari" [ref=f23e212] [cursor=pointer]:
+          - /url: /notification-settings
+          - img [ref=f23e214]
+          - generic [ref=f23e218]: Bildirishnoma sozlamalari
+        - link "Bildirishnoma shablonlari" [ref=f23e219] [cursor=pointer]:
+          - /url: /notification-templates
+          - img [ref=f23e221]
+          - generic [ref=f23e224]: Bildirishnoma shablonlari
+        - link "Bildirishnoma turlari" [ref=f23e225] [cursor=pointer]:
+          - /url: /notification-types
+          - img [ref=f23e227]
+          - generic [ref=f23e230]: Bildirishnoma turlari
+    - generic [ref=f23e231]:
+      - banner [ref=f23e232]:
+        - button "Yon panelni almashtirish" [ref=f23e233] [cursor=pointer]:
+          - img [ref=f23e234]
+        - generic [ref=f23e237]:
+          - generic [ref=f23e238]: Alpha POS
+          - img [ref=f23e239]
+        - button "Ogohlantirishlar yo'q" [ref=f23e242] [cursor=pointer]:
+          - img [ref=f23e243]
+        - button "Sozlamalar" [ref=f23e247] [cursor=pointer]:
+          - img [ref=f23e248]
+        - button "Mavzuni almashtirish" [ref=f23e251] [cursor=pointer]:
+          - img [ref=f23e252]
+        - generic [ref=f23e254]: AU
+      - main [ref=f23e255]:
+        - generic [ref=f23e256]:
+          - generic [ref=f23e257]:
+            - generic [ref=f23e258]:
+              - heading "Ombor ogohlantirishlari" [level=1] [ref=f23e259]
+              - generic [ref=f23e260]: Ombor xabarnomalarini sozlash va e'tibor talab qiluvchi mahsulotlarni ko'rish
+            - button "Yangi qoida" [ref=f23e262] [cursor=pointer]:
+              - img [ref=f23e263]
+              - text: Yangi qoida
+          - generic [ref=f23e265]:
+            - generic [ref=f23e266]:
+              - generic [ref=f23e267]:
+                - img [ref=f23e269]
+                - generic [ref=f23e272]: Faol qoidalar
+              - generic [ref=f23e273]: "0"
+            - generic [ref=f23e274]:
+              - generic [ref=f23e275]:
+                - img [ref=f23e277]
+                - generic [ref=f23e281]: Jami qoidalar
+              - generic [ref=f23e282]: "0"
+            - generic [ref=f23e283]:
+              - generic [ref=f23e284]:
+                - img [ref=f23e286]
+                - generic [ref=f23e289]: Chegaradan past mahsulotlar
+              - generic [ref=f23e290]: "0"
+          - tablist [ref=f23e292]:
+            - tab "Ogohlantirish qoidalari" [selected] [ref=f23e293] [cursor=pointer]:
+              - img [ref=f23e294]
+              - text: Ogohlantirish qoidalari
+            - tab "Hozirgi kam zaxira" [ref=f23e297] [cursor=pointer]:
+              - img [ref=f23e298]
+              - text: Hozirgi kam zaxira
+          - generic [ref=f23e301]:
+            - generic [ref=f23e302]:
+              - generic [ref=f23e304]:
+                - img [ref=f23e305]
+                - textbox "Qoidalarni qidirish" [ref=f23e308]
+              - combobox [ref=f23e310] [cursor=pointer]:
+                - img [ref=f23e311]
+                - generic [ref=f23e313]: Turi
+                - img [ref=f23e314]
+              - generic [ref=f23e316]:
+                - switch [ref=f23e317] [cursor=pointer]
+                - generic [ref=f23e318]: Faqat faollar
+            - table [ref=f23e322]:
+              - rowgroup [ref=f23e323]:
+                - row "Ogohlantirish turi Ilovada Email Telegram Chegara Holat Amallar" [ref=f23e324]:
+                  - columnheader "Ogohlantirish turi" [ref=f23e325] [cursor=pointer]:
+                    - text: Ogohlantirish turi
+                    - img [ref=f23e327]
+                  - columnheader "Ilovada" [ref=f23e329]
+                  - columnheader "Email" [ref=f23e330]
+                  - columnheader "Telegram" [ref=f23e331]
+                  - columnheader "Chegara" [ref=f23e332] [cursor=pointer]:
+                    - text: Chegara
+                    - img [ref=f23e334]
+                  - columnheader "Holat" [ref=f23e336] [cursor=pointer]:
+                    - text: Holat
+                    - img [ref=f23e338]
+                  - columnheader "Amallar" [ref=f23e340]
+              - rowgroup [ref=f23e341]:
+                - row [ref=f23e342]:
+                  - cell [ref=f23e343]
+                  - cell [ref=f23e345]
+                  - cell [ref=f23e347]
+                  - cell [ref=f23e349]
+                  - cell [ref=f23e351]
+                  - cell [ref=f23e353]
+                  - cell [ref=f23e355]
+                - row [ref=f23e357]:
+                  - cell [ref=f23e358]
+                  - cell [ref=f23e360]
+                  - cell [ref=f23e362]
+                  - cell [ref=f23e364]
+                  - cell [ref=f23e366]
+                  - cell [ref=f23e368]
+                  - cell [ref=f23e370]
+                - row [ref=f23e372]:
+                  - cell [ref=f23e373]
+                  - cell [ref=f23e375]
+                  - cell [ref=f23e377]
+                  - cell [ref=f23e379]
+                  - cell [ref=f23e381]
+                  - cell [ref=f23e383]
+                  - cell [ref=f23e385]
+                - row [ref=f23e387]:
+                  - cell [ref=f23e388]
+                  - cell [ref=f23e390]
+                  - cell [ref=f23e392]
+                  - cell [ref=f23e394]
+                  - cell [ref=f23e396]
+                  - cell [ref=f23e398]
+                  - cell [ref=f23e400]
+                - row [ref=f23e402]:
+                  - cell [ref=f23e403]
+                  - cell [ref=f23e405]
+                  - cell [ref=f23e407]
+                  - cell [ref=f23e409]
+                  - cell [ref=f23e411]
+                  - cell [ref=f23e413]
+                  - cell [ref=f23e415]
+                - row [ref=f23e417]:
+                  - cell [ref=f23e418]
+                  - cell [ref=f23e420]
+                  - cell [ref=f23e422]
+                  - cell [ref=f23e424]
+                  - cell [ref=f23e426]
+                  - cell [ref=f23e428]
+                  - cell [ref=f23e430]
+                - row [ref=f23e432]:
+                  - cell [ref=f23e433]
+                  - cell [ref=f23e435]
+                  - cell [ref=f23e437]
+                  - cell [ref=f23e439]
+                  - cell [ref=f23e441]
+                  - cell [ref=f23e443]
+                  - cell [ref=f23e445]
+                - row [ref=f23e447]:
+                  - cell [ref=f23e448]
+                  - cell [ref=f23e450]
+                  - cell [ref=f23e452]
+                  - cell [ref=f23e454]
+                  - cell [ref=f23e456]
+                  - cell [ref=f23e458]
+                  - cell [ref=f23e460]
+                - row [ref=f23e462]:
+                  - cell [ref=f23e463]
+                  - cell [ref=f23e465]
+                  - cell [ref=f23e467]
+                  - cell [ref=f23e469]
+                  - cell [ref=f23e471]
+                  - cell [ref=f23e473]
+                  - cell [ref=f23e475]
+                - row [ref=f23e477]:
+                  - cell [ref=f23e478]
+                  - cell [ref=f23e480]
+                  - cell [ref=f23e482]
+                  - cell [ref=f23e484]
+                  - cell [ref=f23e486]
+                  - cell [ref=f23e488]
+                  - cell [ref=f23e490]
+  - region "Notifications alt+T":
+    - list

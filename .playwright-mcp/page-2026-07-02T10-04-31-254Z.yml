@@ -1,0 +1,522 @@
+- generic [ref=e1]:
+  - generic [ref=e5]:
+    - generic [ref=e93]:
+      - complementary [ref=e94]:
+        - generic [ref=e95]:
+          - img [ref=e97]
+          - generic [ref=e99]: Alpha POS
+        - navigation [ref=e100]:
+          - link "Boshqaruv paneli" [ref=e101] [cursor=pointer]:
+            - /url: /
+            - img [ref=e103]
+            - generic [ref=e105]: Boshqaruv paneli
+          - link "AI yordamchi" [ref=e106] [cursor=pointer]:
+            - /url: /ai-assistant
+            - img [ref=e108]
+            - generic [ref=e112]: AI yordamchi
+          - link "Smenalar 5" [ref=e382] [cursor=pointer]:
+            - /url: /shifts-analytics
+            - img [ref=e115]
+            - generic [ref=e118]: Smenalar
+            - generic [ref=e383]: "5"
+          - generic [ref=e119]: Boshqaruv
+          - link "Foydalanuvchilar" [ref=e120] [cursor=pointer]:
+            - /url: /users
+            - img [ref=e122]
+            - generic [ref=e125]: Foydalanuvchilar
+          - link "Kategoriyalar" [ref=e126] [cursor=pointer]:
+            - /url: /categories
+            - img [ref=e128]
+            - generic [ref=e133]: Kategoriyalar
+          - link "Mahsulotlar" [ref=e134] [cursor=pointer]:
+            - /url: /products
+            - img [ref=e136]
+            - generic [ref=e139]: Mahsulotlar
+          - link "Buyurtmalar 181" [ref=e1207] [cursor=pointer]:
+            - /url: /orders
+            - img [ref=e142]
+            - generic [ref=e145]: Buyurtmalar
+            - generic [ref=e385]: "181"
+          - link "Zallar va stollar" [ref=e146] [cursor=pointer]:
+            - /url: /places
+            - img [ref=e148]
+            - generic [ref=e151]: Zallar va stollar
+          - link "Chegirmalar" [ref=e152] [cursor=pointer]:
+            - /url: /discounts
+            - img [ref=e154]
+            - generic [ref=e157]: Chegirmalar
+          - link "Kassa" [ref=e158] [cursor=pointer]:
+            - /url: /cashbox/categories
+            - img [ref=e160]
+            - generic [ref=e163]: Kassa
+          - link "Xazina" [ref=e164] [cursor=pointer]:
+            - /url: /treasury
+            - img [ref=e166]
+            - generic [ref=e168]: Xazina
+          - link "Sodiqlik" [ref=e169] [cursor=pointer]:
+            - /url: /loyalty
+            - img [ref=e171]
+            - generic [ref=e174]: Sodiqlik
+          - link "Sessiyalar" [ref=e175] [cursor=pointer]:
+            - /url: /sessions
+            - img [ref=e177]
+            - generic [ref=e180]: Sessiyalar
+          - generic [ref=e181]: Kadrlar
+          - link "Xodimlar" [ref=e182] [cursor=pointer]:
+            - /url: /hr-employees
+            - img [ref=e184]
+            - generic [ref=e187]: Xodimlar
+          - link "Bo'limlar" [ref=e188] [cursor=pointer]:
+            - /url: /hr-departments
+            - img [ref=e190]
+            - generic [ref=e194]: Bo'limlar
+          - link "Maoshlar" [ref=e195] [cursor=pointer]:
+            - /url: /hr-salaries
+            - img [ref=e197]
+            - generic [ref=e200]: Maoshlar
+          - link "HR kassa" [ref=e201] [cursor=pointer]:
+            - /url: /hr-cash
+            - img [ref=e203]
+            - generic [ref=e207]: HR kassa
+          - link "HR hujjatlar" [ref=e208] [cursor=pointer]:
+            - /url: /hr-documents
+            - img [ref=e210]
+            - generic [ref=e213]: HR hujjatlar
+          - link "Tadbirlar" [ref=e214] [cursor=pointer]:
+            - /url: /hr-events
+            - img [ref=e216]
+            - generic [ref=e218]: Tadbirlar
+          - link "Xarajat kategoriyalari" [ref=e219] [cursor=pointer]:
+            - /url: /hr-expense-categories
+            - img [ref=e221]
+            - generic [ref=e226]: Xarajat kategoriyalari
+          - link "Maqsadlar" [ref=e227] [cursor=pointer]:
+            - /url: /hr-goals
+            - img [ref=e229]
+            - generic [ref=e233]: Maqsadlar
+          - link "Ta'til qoldiqlari" [ref=e234] [cursor=pointer]:
+            - /url: /hr-leave-balances
+            - img [ref=e236]
+            - generic [ref=e239]: Ta'til qoldiqlari
+          - link "Ta'til turlari" [ref=e240] [cursor=pointer]:
+            - /url: /hr-leave-types
+            - img [ref=e242]
+            - generic [ref=e245]: Ta'til turlari
+          - link "Sharhlar" [ref=e246] [cursor=pointer]:
+            - /url: /hr-reviews
+            - img [ref=e248]
+            - generic [ref=e250]: Sharhlar
+          - link "Smena shablonlari" [ref=e251] [cursor=pointer]:
+            - /url: /shift-templates
+            - img [ref=e253]
+            - generic [ref=e256]: Smena shablonlari
+          - generic [ref=e257]: Ombor
+          - link "Ombor ogohlantirishlari" [ref=e258] [cursor=pointer]:
+            - /url: /stock/alerts
+            - img [ref=e260]
+            - generic [ref=e263]: Ombor ogohlantirishlari
+          - link "Qabul qilish" [ref=e264] [cursor=pointer]:
+            - /url: /stock/receiving
+            - img [ref=e266]
+            - generic [ref=e269]: Qabul qilish
+          - link "Tuzatishlar" [ref=e270] [cursor=pointer]:
+            - /url: /stock/adjustments
+            - img [ref=e272]
+            - generic [ref=e276]: Tuzatishlar
+          - link "Zaxiralar" [ref=e277] [cursor=pointer]:
+            - /url: /stock/reservations
+            - img [ref=e279]
+            - generic [ref=e282]: Zaxiralar
+          - generic [ref=e283]: Sozlamalar
+          - link "QR kodlar" [ref=e284] [cursor=pointer]:
+            - /url: /qr-codes
+            - img [ref=e286]
+            - generic [ref=e291]: QR kodlar
+          - generic [ref=e292]: Bildirishnomalar
+          - link "Bildirishnoma navbati" [ref=e293] [cursor=pointer]:
+            - /url: /notification-queue
+            - img [ref=e295]
+            - generic [ref=e298]: Bildirishnoma navbati
+          - link "Bildirishnoma sozlamalari" [ref=e299] [cursor=pointer]:
+            - /url: /notification-settings
+            - img [ref=e301]
+            - generic [ref=e305]: Bildirishnoma sozlamalari
+          - link "Bildirishnoma shablonlari" [ref=e306] [cursor=pointer]:
+            - /url: /notification-templates
+            - img [ref=e308]
+            - generic [ref=e311]: Bildirishnoma shablonlari
+          - link "Bildirishnoma turlari" [ref=e312] [cursor=pointer]:
+            - /url: /notification-types
+            - img [ref=e314]
+            - generic [ref=e317]: Bildirishnoma turlari
+      - generic [ref=e318]:
+        - banner [ref=e319]:
+          - button "Yon panelni almashtirish" [ref=e320] [cursor=pointer]:
+            - img [ref=e321]
+          - generic [ref=e324]:
+            - generic [ref=e325]: Alpha POS
+            - img [ref=e326]
+          - button "Ogohlantirishlar yo'q" [ref=e329] [cursor=pointer]:
+            - img [ref=e330]
+          - button "Sozlamalar" [ref=e334] [cursor=pointer]:
+            - img [ref=e335]
+          - button "Mavzuni almashtirish" [ref=e338] [cursor=pointer]:
+            - img [ref=e339]
+          - generic [ref=e341]: AU
+        - main [ref=e342]:
+          - generic [ref=e343]:
+            - generic [ref=e344]:
+              - generic [ref=e345]:
+                - heading "Boshqaruv paneli" [level=1] [ref=e346]
+                - generic [ref=e347]: Daromad, marja va sotuvlar manbalari
+              - generic [ref=e348]:
+                - button "Kecha" [active] [ref=e719] [cursor=pointer]:
+                  - img [ref=e351]
+                  - generic [ref=e354]: Kecha
+                  - img [ref=e355]
+                - button "Yangilash" [ref=e386] [cursor=pointer]:
+                  - img [ref=e387]
+                  - text: Yangilash
+                - button "Eksport" [ref=e390] [cursor=pointer]:
+                  - img [ref=e391]
+                  - text: Eksport
+            - generic [ref=e357]:
+              - button "Bosh sahifa" [ref=e358] [cursor=pointer]:
+                - img [ref=e359]
+                - generic [ref=e361]: Bosh sahifa
+              - button "Sotuvlar va daromad" [ref=e362] [cursor=pointer]:
+                - img [ref=e363]
+                - generic [ref=e366]: Sotuvlar va daromad
+              - button "Operatsiyalar" [ref=e367] [cursor=pointer]:
+                - img [ref=e368]
+                - generic [ref=e371]: Operatsiyalar
+              - button "Mahsulotlar" [ref=e372] [cursor=pointer]:
+                - img [ref=e373]
+                - generic [ref=e376]: Mahsulotlar
+              - button "Xodimlar va smenalar" [ref=e377] [cursor=pointer]:
+                - img [ref=e378]
+                - generic [ref=e381]: Xodimlar va smenalar
+            - generic [ref=e926]:
+              - generic [ref=e927]:
+                - generic [ref=e928]:
+                  - generic [ref=e929]:
+                    - generic [ref=e930]: Shu oy
+                    - img [ref=e932]
+                  - generic [ref=e936]: 27 142 500UZS
+                  - img [ref=e939]
+                - generic [ref=e940]:
+                  - generic [ref=e941]:
+                    - generic [ref=e942]: o'tgan oyga nisbatan
+                    - img [ref=e944]
+                  - generic [ref=e947]: "-25.06MUZS"
+                - generic [ref=e949]:
+                  - generic [ref=e950]:
+                    - generic [ref=e951]: Eng yaxshi kun
+                    - img [ref=e953]
+                  - generic [ref=e955]: 27 142 500UZS
+                  - generic [ref=e957]: bir kunlik rekord
+                - generic [ref=e958]:
+                  - generic [ref=e959]:
+                    - generic [ref=e960]: Xarajatlar (30 kun)
+                    - img [ref=e962]
+                  - generic [ref=e965]: 0UZS
+                  - img [ref=e968]
+              - generic [ref=e970]:
+                - generic [ref=e972]:
+                  - generic [ref=e973]: Daromad va xarajat · 30 kun
+                  - heading "Marja 65% darajasida" [level=3] [ref=e974]
+                - generic [ref=e975]:
+                  - img [ref=e977]:
+                    - generic [ref=e979]: "0"
+                    - generic [ref=e981]: 10M
+                    - generic [ref=e983]: 20M
+                    - generic [ref=e985]: 30M
+                    - generic [ref=e986]: 2026-07-01
+                  - generic [ref=e988]:
+                    - generic [ref=e989]: Daromad
+                    - generic [ref=e991]: Xarajatlar
+              - generic [ref=e993]:
+                - generic [ref=e994]:
+                  - generic [ref=e996]:
+                    - generic [ref=e997]: Sotuvlar qachon bo'ladi
+                    - heading "Peak Wed at 12" [level=3] [ref=e998]
+                  - generic [ref=e1000]:
+                    - generic [ref=e1001]:
+                      - generic [ref=e1002]: "09"
+                      - generic [ref=e1003]: "10"
+                      - generic [ref=e1004]: "11"
+                      - generic [ref=e1005]: "12"
+                      - generic [ref=e1006]: "13"
+                      - generic [ref=e1007]: "14"
+                      - generic [ref=e1008]: "15"
+                      - generic [ref=e1009]: "16"
+                      - generic [ref=e1010]: "17"
+                      - generic [ref=e1011]: "18"
+                      - generic [ref=e1012]: "19"
+                      - generic [ref=e1013]: "20"
+                      - generic [ref=e1014]: "21"
+                      - generic [ref=e1015]: "22"
+                    - generic [ref=e1016]:
+                      - generic [ref=e1017]: Mon
+                      - generic "Mon · 09 — 0 buyurtma" [ref=e1018]
+                      - generic "Mon · 10 — 0 buyurtma" [ref=e1019]
+                      - generic "Mon · 11 — 0 buyurtma" [ref=e1020]
+                      - generic "Mon · 12 — 0 buyurtma" [ref=e1021]
+                      - generic "Mon · 13 — 0 buyurtma" [ref=e1022]
+                      - generic "Mon · 14 — 0 buyurtma" [ref=e1023]
+                      - generic "Mon · 15 — 0 buyurtma" [ref=e1024]
+                      - generic "Mon · 16 — 0 buyurtma" [ref=e1025]
+                      - generic "Mon · 17 — 0 buyurtma" [ref=e1026]
+                      - generic "Mon · 18 — 0 buyurtma" [ref=e1027]
+                      - generic "Mon · 19 — 0 buyurtma" [ref=e1028]
+                      - generic "Mon · 20 — 0 buyurtma" [ref=e1029]
+                      - generic "Mon · 21 — 0 buyurtma" [ref=e1030]
+                      - generic "Mon · 22 — 0 buyurtma" [ref=e1031]
+                    - generic [ref=e1032]:
+                      - generic [ref=e1033]: Tue
+                      - generic "Tue · 09 — 0 buyurtma" [ref=e1034]
+                      - generic "Tue · 10 — 0 buyurtma" [ref=e1035]
+                      - generic "Tue · 11 — 0 buyurtma" [ref=e1036]
+                      - generic "Tue · 12 — 0 buyurtma" [ref=e1037]
+                      - generic "Tue · 13 — 0 buyurtma" [ref=e1038]
+                      - generic "Tue · 14 — 0 buyurtma" [ref=e1039]
+                      - generic "Tue · 15 — 0 buyurtma" [ref=e1040]
+                      - generic "Tue · 16 — 0 buyurtma" [ref=e1041]
+                      - generic "Tue · 17 — 0 buyurtma" [ref=e1042]
+                      - generic "Tue · 18 — 0 buyurtma" [ref=e1043]
+                      - generic "Tue · 19 — 0 buyurtma" [ref=e1044]
+                      - generic "Tue · 20 — 0 buyurtma" [ref=e1045]
+                      - generic "Tue · 21 — 0 buyurtma" [ref=e1046]
+                      - generic "Tue · 22 — 0 buyurtma" [ref=e1047]
+                    - generic [ref=e1048]:
+                      - generic [ref=e1049]: Wed
+                      - generic "Wed · 09 — 28 buyurtma" [ref=e1050]
+                      - generic "Wed · 10 — 32 buyurtma" [ref=e1051]
+                      - generic "Wed · 11 — 38 buyurtma" [ref=e1052]
+                      - generic "Wed · 12 — 46 buyurtma" [ref=e1053]
+                      - generic "Wed · 13 — 38 buyurtma" [ref=e1054]
+                      - generic "Wed · 14 — 37 buyurtma" [ref=e1055]
+                      - generic "Wed · 15 — 44 buyurtma" [ref=e1056]
+                      - generic "Wed · 16 — 32 buyurtma" [ref=e1057]
+                      - generic "Wed · 17 — 32 buyurtma" [ref=e1058]
+                      - generic "Wed · 18 — 21 buyurtma" [ref=e1059]
+                      - generic "Wed · 19 — 37 buyurtma" [ref=e1060]
+                      - generic "Wed · 20 — 38 buyurtma" [ref=e1061]
+                      - generic "Wed · 21 — 41 buyurtma" [ref=e1062]
+                      - generic "Wed · 22 — 31 buyurtma" [ref=e1063]
+                    - generic [ref=e1064]:
+                      - generic [ref=e1065]: Thu
+                      - generic "Thu · 09 — 0 buyurtma" [ref=e1066]
+                      - generic "Thu · 10 — 0 buyurtma" [ref=e1067]
+                      - generic "Thu · 11 — 0 buyurtma" [ref=e1068]
+                      - generic "Thu · 12 — 0 buyurtma" [ref=e1069]
+                      - generic "Thu · 13 — 0 buyurtma" [ref=e1070]
+                      - generic "Thu · 14 — 0 buyurtma" [ref=e1071]
+                      - generic "Thu · 15 — 0 buyurtma" [ref=e1072]
+                      - generic "Thu · 16 — 0 buyurtma" [ref=e1073]
+                      - generic "Thu · 17 — 0 buyurtma" [ref=e1074]
+                      - generic "Thu · 18 — 0 buyurtma" [ref=e1075]
+                      - generic "Thu · 19 — 0 buyurtma" [ref=e1076]
+                      - generic "Thu · 20 — 0 buyurtma" [ref=e1077]
+                      - generic "Thu · 21 — 0 buyurtma" [ref=e1078]
+                      - generic "Thu · 22 — 0 buyurtma" [ref=e1079]
+                    - generic [ref=e1080]:
+                      - generic [ref=e1081]: Fri
+                      - generic "Fri · 09 — 0 buyurtma" [ref=e1082]
+                      - generic "Fri · 10 — 0 buyurtma" [ref=e1083]
+                      - generic "Fri · 11 — 0 buyurtma" [ref=e1084]
+                      - generic "Fri · 12 — 0 buyurtma" [ref=e1085]
+                      - generic "Fri · 13 — 0 buyurtma" [ref=e1086]
+                      - generic "Fri · 14 — 0 buyurtma" [ref=e1087]
+                      - generic "Fri · 15 — 0 buyurtma" [ref=e1088]
+                      - generic "Fri · 16 — 0 buyurtma" [ref=e1089]
+                      - generic "Fri · 17 — 0 buyurtma" [ref=e1090]
+                      - generic "Fri · 18 — 0 buyurtma" [ref=e1091]
+                      - generic "Fri · 19 — 0 buyurtma" [ref=e1092]
+                      - generic "Fri · 20 — 0 buyurtma" [ref=e1093]
+                      - generic "Fri · 21 — 0 buyurtma" [ref=e1094]
+                      - generic "Fri · 22 — 0 buyurtma" [ref=e1095]
+                    - generic [ref=e1096]:
+                      - generic [ref=e1097]: Sat
+                      - generic "Sat · 09 — 0 buyurtma" [ref=e1098]
+                      - generic "Sat · 10 — 0 buyurtma" [ref=e1099]
+                      - generic "Sat · 11 — 0 buyurtma" [ref=e1100]
+                      - generic "Sat · 12 — 0 buyurtma" [ref=e1101]
+                      - generic "Sat · 13 — 0 buyurtma" [ref=e1102]
+                      - generic "Sat · 14 — 0 buyurtma" [ref=e1103]
+                      - generic "Sat · 15 — 0 buyurtma" [ref=e1104]
+                      - generic "Sat · 16 — 0 buyurtma" [ref=e1105]
+                      - generic "Sat · 17 — 0 buyurtma" [ref=e1106]
+                      - generic "Sat · 18 — 0 buyurtma" [ref=e1107]
+                      - generic "Sat · 19 — 0 buyurtma" [ref=e1108]
+                      - generic "Sat · 20 — 0 buyurtma" [ref=e1109]
+                      - generic "Sat · 21 — 0 buyurtma" [ref=e1110]
+                      - generic "Sat · 22 — 0 buyurtma" [ref=e1111]
+                    - generic [ref=e1112]:
+                      - generic [ref=e1113]: Sun
+                      - generic "Sun · 09 — 0 buyurtma" [ref=e1114]
+                      - generic "Sun · 10 — 0 buyurtma" [ref=e1115]
+                      - generic "Sun · 11 — 0 buyurtma" [ref=e1116]
+                      - generic "Sun · 12 — 0 buyurtma" [ref=e1117]
+                      - generic "Sun · 13 — 0 buyurtma" [ref=e1118]
+                      - generic "Sun · 14 — 0 buyurtma" [ref=e1119]
+                      - generic "Sun · 15 — 0 buyurtma" [ref=e1120]
+                      - generic "Sun · 16 — 0 buyurtma" [ref=e1121]
+                      - generic "Sun · 17 — 0 buyurtma" [ref=e1122]
+                      - generic "Sun · 18 — 0 buyurtma" [ref=e1123]
+                      - generic "Sun · 19 — 0 buyurtma" [ref=e1124]
+                      - generic "Sun · 20 — 0 buyurtma" [ref=e1125]
+                      - generic "Sun · 21 — 0 buyurtma" [ref=e1126]
+                      - generic "Sun · 22 — 0 buyurtma" [ref=e1127]
+                    - generic [ref=e1128]:
+                      - generic [ref=e1129]: Kam
+                      - generic [ref=e1135]: Yana
+                - generic [ref=e1136]:
+                  - generic [ref=e1138]:
+                    - generic [ref=e1139]: Kanal bo'yicha · 7 kun
+                    - heading "Zal, yetkazib berish va olib ketish" [level=3] [ref=e1140]
+                  - generic [ref=e1142]:
+                    - img [ref=e1143]:
+                      - generic [ref=e1145]: "0"
+                      - generic [ref=e1147]: "200"
+                      - generic [ref=e1149]: "400"
+                      - generic [ref=e1151]: "600"
+                      - generic [ref=e1152]:
+                        - generic "07-01 · Zal — 384" [ref=e1153]
+                        - generic "07-01 · Yetkazib berish — 70" [ref=e1154]
+                        - generic "07-01 · Olib ketish — 94" [ref=e1155]
+                        - generic [ref=e1156]: 07-01
+                    - generic [ref=e1157]:
+                      - generic [ref=e1158]: Zal
+                      - generic [ref=e1160]: Yetkazib berish
+                      - generic [ref=e1162]: Olib ketish
+              - generic [ref=e1164]:
+                - generic [ref=e1165]:
+                  - generic [ref=e1167]:
+                    - generic [ref=e1168]: Oxirgi 30 kun · buyurtmalar soni
+                    - heading "Kunlik buyurtmalar" [level=3] [ref=e1169]
+                  - img [ref=e1172]:
+                    - generic [ref=e1174]: "0"
+                    - generic [ref=e1176]: "200"
+                    - generic [ref=e1178]: "400"
+                    - generic [ref=e1180]: "600"
+                    - generic [ref=e1181]:
+                      - generic [ref=e1183]: "548"
+                      - generic [ref=e1184]: "01"
+                - generic [ref=e1186]:
+                  - generic [ref=e1188]:
+                    - generic [ref=e1189]: Oxirgi 30 kun · daromad
+                    - heading "Kunlik daromad" [level=3] [ref=e1190]
+                  - img [ref=e1193]:
+                    - generic [ref=e1195]: "0"
+                    - generic [ref=e1197]: 10M
+                    - generic [ref=e1199]: 20M
+                    - generic [ref=e1201]: 30M
+                    - generic [ref=e1202]:
+                      - generic [ref=e1204]: 27.14M
+                      - generic [ref=e1205]: "01"
+    - region "Notifications alt+T":
+      - list
+  - generic [ref=e1208]:
+    - generic [ref=e1210]:
+      - button "Sana oralig'i" [ref=e1211] [cursor=pointer]:
+        - img [ref=e1212]
+        - text: Sana oralig'i
+      - button "Kun vaqti" [ref=e1215] [cursor=pointer]:
+        - img [ref=e1216]
+        - text: Kun vaqti
+    - generic [ref=e1219]:
+      - generic [ref=e1220]:
+        - button "Bugun" [ref=e1221] [cursor=pointer]
+        - button "Kecha" [ref=e1222] [cursor=pointer]
+        - button "Oxirgi 7 kun" [ref=e1223] [cursor=pointer]
+        - button "Oxirgi 30 kun" [ref=e1224] [cursor=pointer]
+        - button "Shu oy" [ref=e1225] [cursor=pointer]
+        - button "O‘tgan oy" [ref=e1226] [cursor=pointer]
+        - button "Bu yil" [ref=e1227] [cursor=pointer]
+        - button "Barcha vaqt" [ref=e1228] [cursor=pointer]
+      - generic [ref=e1229]:
+        - generic [ref=e1230]:
+          - button "Oldingi oy" [ref=e1231] [cursor=pointer]:
+            - img [ref=e1232]
+          - generic [ref=e1235]: Iyul 2026
+          - button "Keyingi oy" [ref=e1236] [cursor=pointer]:
+            - img [ref=e1237]
+        - generic [ref=e1240]:
+          - generic [ref=e1241]:
+            - generic [ref=e1242]: Du
+            - generic [ref=e1243]: Se
+            - generic [ref=e1244]: Cho
+            - generic [ref=e1245]: Pa
+            - generic [ref=e1246]: Ju
+            - generic [ref=e1247]: Sh
+            - generic [ref=e1248]: Ya
+          - generic [ref=e1249]:
+            - button "1" [ref=e1252] [cursor=pointer]:
+              - generic [ref=e1253]: "1"
+            - button "2" [ref=e1254] [cursor=pointer]:
+              - generic [ref=e1255]: "2"
+            - button "3" [disabled] [ref=e1256]:
+              - generic [ref=e1257]: "3"
+            - button "4" [disabled] [ref=e1258]:
+              - generic [ref=e1259]: "4"
+            - button "5" [disabled] [ref=e1260]:
+              - generic [ref=e1261]: "5"
+            - button "6" [disabled] [ref=e1262]:
+              - generic [ref=e1263]: "6"
+            - button "7" [disabled] [ref=e1264]:
+              - generic [ref=e1265]: "7"
+            - button "8" [disabled] [ref=e1266]:
+              - generic [ref=e1267]: "8"
+            - button "9" [disabled] [ref=e1268]:
+              - generic [ref=e1269]: "9"
+            - button "10" [disabled] [ref=e1270]:
+              - generic [ref=e1271]: "10"
+            - button "11" [disabled] [ref=e1272]:
+              - generic [ref=e1273]: "11"
+            - button "12" [disabled] [ref=e1274]:
+              - generic [ref=e1275]: "12"
+            - button "13" [disabled] [ref=e1276]:
+              - generic [ref=e1277]: "13"
+            - button "14" [disabled] [ref=e1278]:
+              - generic [ref=e1279]: "14"
+            - button "15" [disabled] [ref=e1280]:
+              - generic [ref=e1281]: "15"
+            - button "16" [disabled] [ref=e1282]:
+              - generic [ref=e1283]: "16"
+            - button "17" [disabled] [ref=e1284]:
+              - generic [ref=e1285]: "17"
+            - button "18" [disabled] [ref=e1286]:
+              - generic [ref=e1287]: "18"
+            - button "19" [disabled] [ref=e1288]:
+              - generic [ref=e1289]: "19"
+            - button "20" [disabled] [ref=e1290]:
+              - generic [ref=e1291]: "20"
+            - button "21" [disabled] [ref=e1292]:
+              - generic [ref=e1293]: "21"
+            - button "22" [disabled] [ref=e1294]:
+              - generic [ref=e1295]: "22"
+            - button "23" [disabled] [ref=e1296]:
+              - generic [ref=e1297]: "23"
+            - button "24" [disabled] [ref=e1298]:
+              - generic [ref=e1299]: "24"
+            - button "25" [disabled] [ref=e1300]:
+              - generic [ref=e1301]: "25"
+            - button "26" [disabled] [ref=e1302]:
+              - generic [ref=e1303]: "26"
+            - button "27" [disabled] [ref=e1304]:
+              - generic [ref=e1305]: "27"
+            - button "28" [disabled] [ref=e1306]:
+              - generic [ref=e1307]: "28"
+            - button "29" [disabled] [ref=e1308]:
+              - generic [ref=e1309]: "29"
+            - button "30" [disabled] [ref=e1310]:
+              - generic [ref=e1311]: "30"
+            - button "31" [disabled] [ref=e1312]:
+              - generic [ref=e1313]: "31"
+        - generic [ref=e1316]:
+          - generic [ref=e1317]: 1 Jul 2026
+          - generic [ref=e1318]:
+            - button "Tozalash" [ref=e1319] [cursor=pointer]
+            - button "Bekor qilish" [ref=e1320] [cursor=pointer]
+            - button "Qo‘llash" [ref=e1321] [cursor=pointer]

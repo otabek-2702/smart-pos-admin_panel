@@ -15,12 +15,14 @@ import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
 import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
+import Pagination from '@/components/design/Pagination.vue'
 import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
+const router = useRouter()
 
 // List only returns: id, uuid, code(null), name, city, rating, is_active
 const suppliers = ref<any[]>([])
@@ -55,6 +57,7 @@ const form = ref({
   rating: 3,
   payment_terms_days: 30,
   lead_time_days: 7,
+  notes: '',
 })
 
 async function loadSuppliers() {
@@ -112,8 +115,15 @@ async function openDetail(item: any) {
 
 function openCreate() {
   dialogMode.value = 'create'
-  form.value = { name: '', contact_person: '', email: '', phone: '', city: '', address: '', rating: 3, payment_terms_days: 30, lead_time_days: 7 }
+  form.value = { name: '', contact_person: '', email: '', phone: '', city: '', address: '', rating: 3, payment_terms_days: 30, lead_time_days: 7, notes: '' }
   dialog.value = true
+}
+
+function viewProfile(item: any) {
+  if (!item?.id)
+    return
+  detailDialog.value = false
+  router.push(`/stock/suppliers/${item.id}`)
 }
 
 function openEdit(item: any) {
@@ -135,9 +145,10 @@ function openEdit(item: any) {
       rating: d.rating ?? 3,
       payment_terms_days: d.payment_terms_days ?? 30,
       lead_time_days: d.lead_time_days ?? 7,
+      notes: d.notes ?? '',
     }
   }).catch(() => {
-    form.value = { name: item.name ?? '', contact_person: '', email: '', phone: '', city: item.city ?? '', address: '', rating: item.rating ?? 3, payment_terms_days: 30, lead_time_days: 7 }
+    form.value = { name: item.name ?? '', contact_person: '', email: '', phone: '', city: item.city ?? '', address: '', rating: item.rating ?? 3, payment_terms_days: 30, lead_time_days: 7, notes: '' }
   })
   dialog.value = true
 }
@@ -306,6 +317,74 @@ const sourceOptions = computed(() => [
   { value: 'BANK', label: t('pay_source_BANK') },
   { value: 'SAFE', label: t('pay_source_SAFE') },
 ])
+
+// -------- pay: live preview + helpers --------
+// Commission only applies to BANK transfers (backend zeroes it for SAFE).
+const isBankPay = computed(() => payForm.value.source_account === 'BANK')
+const payAmountNum = computed(() => Math.max(0, Number(payForm.value.amount) || 0))
+const payCommissionNum = computed(() => (isBankPay.value ? Math.max(0, Number(payForm.value.commission) || 0) : 0))
+const payTotalCharge = computed(() => payAmountNum.value + payCommissionNum.value)
+const payOwed = computed(() => Number(paying.value?.current_balance ?? 0))
+const payRemaining = computed(() => payOwed.value - payAmountNum.value)
+
+// Prefill the amount with the full outstanding balance (one-click settle).
+function payFull() {
+  if (payOwed.value > 0)
+    payForm.value.amount = payOwed.value
+}
+
+// -------- balance tone (positive = we owe; negative = credit) --------
+type BalanceTone = 'warning' | 'success' | 'neutral'
+function balanceTone(v: any): BalanceTone {
+  const n = Number(v ?? 0)
+  if (n > 0)
+    return 'warning'
+  if (n < 0)
+    return 'success'
+  return 'neutral'
+}
+function balanceLabel(v: any): string {
+  const n = Number(v ?? 0)
+  if (n > 0)
+    return t('Owed')
+  if (n < 0)
+    return t('supplier_balance_credit')
+  return t('supplier_balance_settled')
+}
+const balanceColorVar: Record<BalanceTone, string> = {
+  warning: 'rgb(var(--v-theme-warning-strong))',
+  success: 'rgb(var(--v-theme-success-strong))',
+  neutral: 'var(--text-tertiary)',
+}
+
+// -------- ledger pagination --------
+const ledgerPages = computed(() => Math.max(1, Math.ceil(ledgerTotal.value / ledgerPerPage.value)))
+function onLedgerPerPage(n: number) {
+  ledgerPerPage.value = n
+  ledgerPage.value = 1
+  loadLedger()
+}
+
+// Ledger reference labels (backend reference_type values).
+const refLabels: Record<string, string> = {
+  PurchaseOrder: 'ref_PurchaseOrder',
+  TreasuryPayment: 'ref_TreasuryPayment',
+  CashboxExpense: 'ref_CashboxExpense',
+}
+function refLabel(type: string): string {
+  const key = refLabels[type]
+  return key ? t(key) : type
+}
+
+const sourceLabels: Record<string, string> = {
+  SAFE: 'supplier_source_SAFE',
+  BANK: 'supplier_source_BANK',
+  DRAWER: 'supplier_source_DRAWER',
+}
+function sourceLabel(src: string): string {
+  const key = sourceLabels[src]
+  return key ? t(key) : (src || '—')
+}
 </script>
 
 <template>
@@ -484,7 +563,17 @@ const sourceOptions = computed(() => [
           <div class="field__label">
             {{ t('Balance') }}
           </div>
-          <div>{{ detailItem.current_balance ?? '—' }}</div>
+          <div
+            class="mono"
+            :style="{ color: balanceColorVar[balanceTone(detailItem.current_balance)], fontWeight: 600 }"
+          >
+            {{ detailItem.current_balance != null ? formatCurrency(Math.abs(Number(detailItem.current_balance))) : '—' }}
+            <span
+              v-if="detailItem.current_balance != null"
+              class="cell-muted"
+              style="font-weight: 400; font-size: 12px;"
+            >· {{ balanceLabel(detailItem.current_balance) }}</span>
+          </div>
         </div>
         <div>
           <div class="field__label">
@@ -497,6 +586,72 @@ const sourceOptions = computed(() => [
               style="color: rgb(var(--v-theme-warning-strong));"
             />
             {{ detailItem.rating ?? '—' }}
+          </div>
+        </div>
+        <div v-if="detailItem.code">
+          <div class="field__label">
+            {{ t('Code') }}
+          </div>
+          <div class="mono">
+            {{ detailItem.code }}
+          </div>
+        </div>
+        <div v-if="detailItem.credit_limit">
+          <div class="field__label">
+            {{ t('supplier_field_credit_limit') }}
+          </div>
+          <div class="mono">
+            {{ formatCurrency(detailItem.credit_limit) }}
+          </div>
+        </div>
+
+        <!-- Purchase summary (from detail stats) -->
+        <div
+          v-if="detailItem.stats"
+          class="detail-grid__full supplier-stats"
+          style="grid-column: span 2;"
+        >
+          <div class="field__label" style="margin-bottom: 8px;">
+            {{ t('supplier_purchase_summary') }}
+          </div>
+          <div class="grid cols-3 supplier-stats__grid" style="gap: var(--sp-3);">
+            <div class="supplier-stat">
+              <div class="supplier-stat__val">
+                {{ detailItem.stats.total_orders ?? 0 }}
+              </div>
+              <div class="supplier-stat__lbl">
+                {{ t('supplier_kpi_total_orders') }}
+              </div>
+            </div>
+            <div class="supplier-stat">
+              <div class="supplier-stat__val mono">
+                {{ formatCurrency(detailItem.stats.total_value ?? 0) }}
+              </div>
+              <div class="supplier-stat__lbl">
+                {{ t('supplier_kpi_total_value') }}
+              </div>
+            </div>
+            <div class="supplier-stat">
+              <div class="supplier-stat__val mono">
+                {{ formatCurrency(detailItem.stats.avg_order_value ?? 0) }}
+              </div>
+              <div class="supplier-stat__lbl">
+                {{ t('supplier_kpi_avg_order') }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="detailItem.notes"
+          class="detail-grid__full"
+          style="grid-column: span 2;"
+        >
+          <div class="field__label">
+            {{ t('Notes') }}
+          </div>
+          <div style="white-space: pre-wrap;">
+            {{ detailItem.notes }}
           </div>
         </div>
         <div v-if="detailItem.items?.length" class="detail-grid__full" style="grid-column: span 2;">
@@ -531,6 +686,14 @@ const sourceOptions = computed(() => [
       <template #footer>
         <Button variant="ghost" @click="detailDialog = false">
           {{ t('Close') }}
+        </Button>
+        <Button
+          v-if="detailItem?.id"
+          variant="primary"
+          icon="chevright"
+          @click="viewProfile(detailItem)"
+        >
+          {{ t('supplier_view_profile') }}
         </Button>
       </template>
     </Modal>
@@ -596,6 +759,12 @@ const sourceOptions = computed(() => [
             min="0"
           />
         </Field>
+
+        <div class="form-grid__full" style="grid-column: span 2;">
+          <Field :label="t('Notes')">
+            <Input v-model="form.notes" />
+          </Field>
+        </div>
       </div>
 
       <template #footer>
@@ -661,12 +830,22 @@ const sourceOptions = computed(() => [
       :close-on-backdrop="false"
       @close="payDialog = false"
     >
-      <div v-if="paying" class="cell-muted" style="margin-bottom: var(--sp-3); font-size: 13px;">
-        <strong style="color: var(--text);">{{ paying.name }}</strong>
-        <span v-if="paying.current_balance">
-          · {{ t('Owed') }}:
-          <strong class="mono" style="color: rgb(var(--v-theme-warning-strong));">{{ formatCurrency(paying.current_balance) }}</strong>
-        </span>
+      <div v-if="paying" class="pay-head">
+        <div>
+          <strong style="color: var(--text);">{{ paying.name }}</strong>
+          <span v-if="payOwed" class="cell-muted" style="font-size: 13px;">
+            · {{ t('Owed') }}:
+            <strong class="mono" style="color: rgb(var(--v-theme-warning-strong));">{{ formatCurrency(payOwed) }}</strong>
+          </span>
+        </div>
+        <Button
+          v-if="payOwed > 0"
+          variant="ghost"
+          size="sm"
+          @click="payFull"
+        >
+          {{ t('pay_full') }}
+        </Button>
       </div>
 
       <div class="grid cols-2 form-grid" style="gap: var(--sp-4);">
@@ -689,12 +868,13 @@ const sourceOptions = computed(() => [
         <div class="form-grid__full" style="grid-column: span 2;">
           <Field
             :label="t('Commission / fee (optional)')"
-            :hint="t('pay_commission_hint')"
+            :hint="isBankPay ? t('pay_commission_hint') : t('pay_commission_bank_note')"
           >
             <Input
               v-model="payForm.commission"
               type="number"
               min="0"
+              :disabled="!isBankPay"
             />
           </Field>
         </div>
@@ -703,6 +883,28 @@ const sourceOptions = computed(() => [
           <Field :label="t('Note')">
             <Input v-model="payForm.note" />
           </Field>
+        </div>
+      </div>
+
+      <!-- Live payment preview -->
+      <div v-if="payAmountNum > 0" class="pay-preview">
+        <div class="pay-preview__row">
+          <span class="cell-muted">{{ t('pay_total_charge') }}</span>
+          <span class="mono" style="font-weight: 600;">{{ formatCurrency(payTotalCharge) }}</span>
+        </div>
+        <div v-if="payCommissionNum > 0" class="pay-preview__row">
+          <span class="cell-muted">{{ t('Fee') }}</span>
+          <span class="mono">{{ formatCurrency(payCommissionNum) }}</span>
+        </div>
+        <div v-if="payOwed" class="pay-preview__row">
+          <span class="cell-muted">{{ t('pay_remaining_after') }}</span>
+          <span
+            class="mono"
+            :style="{ color: balanceColorVar[balanceTone(payRemaining)], fontWeight: 600 }"
+          >
+            {{ formatCurrency(Math.abs(payRemaining)) }}
+            <template v-if="payRemaining < 0">({{ t('supplier_balance_credit') }})</template>
+          </span>
         </div>
       </div>
 
@@ -760,6 +962,7 @@ const sourceOptions = computed(() => [
               <th class="num">
                 {{ t('Balance after') }}
               </th>
+              <th>{{ t('Source') }}</th>
               <th>{{ t('Reference') }}</th>
               <th>{{ t('Note') }}</th>
             </tr>
@@ -784,8 +987,17 @@ const sourceOptions = computed(() => [
                 {{ formatCurrency(r.balance_after ?? 0) }}
               </td>
               <td>
+                <span v-if="r.source_account">{{ sourceLabel(r.source_account) }}</span>
+                <span v-else class="cell-muted">—</span>
+                <span
+                  v-if="Number(r.fee) > 0"
+                  class="cell-muted"
+                  style="font-size: 11px;"
+                >· {{ t('Fee') }} {{ formatCurrency(r.fee) }}</span>
+              </td>
+              <td>
                 <span v-if="r.reference_type" class="cell-muted" style="font-size: 12px;">
-                  {{ t(`ref_${r.reference_type}`) }} #{{ r.reference_id }}
+                  {{ refLabel(r.reference_type) }}<template v-if="r.reference_id"> #{{ r.reference_id }}</template>
                 </span>
                 <span v-else class="cell-muted">—</span>
               </td>
@@ -795,6 +1007,21 @@ const sourceOptions = computed(() => [
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div
+        v-if="ledgerRows.length > 0 && ledgerTotal > ledgerPerPage"
+        style="margin-top: var(--sp-3);"
+      >
+        <Pagination
+          :page="ledgerPage"
+          :per-page="ledgerPerPage"
+          :pages="ledgerPages"
+          :total="ledgerTotal"
+          :per-page-options="[20, 50, 100]"
+          @page="(p: number) => ledgerPage = p"
+          @per-page="onLedgerPerPage"
+        />
       </div>
 
       <template #footer>
@@ -838,6 +1065,58 @@ const sourceOptions = computed(() => [
   margin-bottom: 2px;
 }
 
+/* Pay modal: header row + live preview */
+.pay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: var(--sp-3);
+}
+
+.pay-preview {
+  margin-top: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2, rgba(var(--v-theme-on-surface), 0.03));
+  display: grid;
+  gap: 6px;
+}
+
+.pay-preview__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+/* Detail modal: purchase summary tiles */
+.supplier-stats__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.supplier-stat {
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2, rgba(var(--v-theme-on-surface), 0.03));
+}
+
+.supplier-stat__val {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.supplier-stat__lbl {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
 @media (max-width: 768px) {
   .toolbar__search,
   .toolbar__status {
@@ -853,6 +1132,9 @@ const sourceOptions = computed(() => [
   .form-grid__full,
   .detail-grid__full {
     grid-column: span 1 !important;
+  }
+  .supplier-stats__grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

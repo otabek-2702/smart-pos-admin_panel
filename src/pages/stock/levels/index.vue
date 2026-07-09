@@ -8,6 +8,7 @@ import { stockApi as axios } from '@/plugins/axios'
 import Badge from '@/components/design/Badge.vue'
 import Button from '@/components/design/Button.vue'
 import DataTable, { type DataTableColumn } from '@/components/design/DataTable.vue'
+import DesignIcon from '@/components/design/DesignIcon.vue'
 import Field from '@/components/design/Field.vue'
 import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
@@ -25,6 +26,7 @@ const { formatDateShort } = useFormatters()
 const levels = ref<any[]>([])
 const total = ref(0)
 const loading = ref(false)
+const exporting = ref(false)
 const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
@@ -69,20 +71,26 @@ function qtyTone(qty: number): 'success' | 'warning' | 'error' {
 }
 
 // ---- load ----
+function filterParams() {
+  const params: any = {}
+  if (search.value.trim())
+    params.search = search.value.trim()
+  if (locationFilter.value)
+    params.location_id = locationFilter.value
+  if (categoryFilter.value)
+    params.category_id = categoryFilter.value
+  if (itemTypeFilter.value)
+    params.item_type = itemTypeFilter.value
+  if (lowStockOnly.value)
+    params.low_stock_only = 'true'
+
+  return params
+}
+
 async function loadLevels() {
   loading.value = true
   try {
-    const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value.trim())
-      params.search = search.value.trim()
-    if (locationFilter.value)
-      params.location_id = locationFilter.value
-    if (categoryFilter.value)
-      params.category_id = categoryFilter.value
-    if (itemTypeFilter.value)
-      params.item_type = itemTypeFilter.value
-    if (lowStockOnly.value)
-      params.low_stock_only = 'true'
+    const params: any = { ...filterParams(), page: page.value, per_page: itemsPerPage.value }
 
     const res = await axios.get('/levels/', { params })
     const d = readData<any>(res)
@@ -211,6 +219,35 @@ const projectedReserved = computed(() => {
   return current
 })
 
+// Guardrails: reserve can't exceed available, release can't exceed reserved.
+const actionMax = computed<number | null>(() => {
+  if (!actionLevel.value)
+    return null
+  if (actionMode.value === 'reserve')
+    return Number(actionLevel.value.available_quantity ?? 0)
+  if (actionMode.value === 'release')
+    return Number(actionLevel.value.reserved_quantity ?? 0)
+
+  return null
+})
+
+const actionExceedsMax = computed(() => {
+  if (actionMax.value === null)
+    return false
+  const qty = Math.abs(Number(actionForm.value.quantity || 0))
+
+  return qty > actionMax.value + 1e-9
+})
+
+const actionMaxHint = computed(() => {
+  if (actionMode.value === 'reserve')
+    return t('stock_levels_max_available', { n: formatQty(actionMax.value) })
+  if (actionMode.value === 'release')
+    return t('stock_levels_max_reserved', { n: formatQty(actionMax.value) })
+
+  return ''
+})
+
 function openAction(mode: Mode, level: any) {
   actionMode.value = mode
   actionLevel.value = level
@@ -228,12 +265,22 @@ function closeAction() {
   actionLevel.value = null
 }
 
+function fillMax() {
+  if (actionMax.value !== null && actionMax.value > 0)
+    actionForm.value.quantity = String(actionMax.value)
+}
+
 async function doAction() {
   if (!actionLevel.value)
     return
   const qty = Number(actionForm.value.quantity)
   if (!actionForm.value.quantity || Number.isNaN(qty) || qty === 0) {
     notify(t('stock_levels_qty_nonzero'), 'error')
+
+    return
+  }
+  if (actionExceedsMax.value) {
+    notify(actionMode.value === 'reserve' ? t('stock_levels_exceeds_available') : t('stock_levels_exceeds_reserved'), 'error')
 
     return
   }
@@ -299,6 +346,97 @@ function clearFilters() {
   itemTypeFilter.value = ''
   lowStockOnly.value = false
 }
+
+// ---- active filter chips ----
+interface FilterChip { key: string, label: string, clear: () => void }
+
+const activeFilterChips = computed<FilterChip[]>(() => {
+  const chips: FilterChip[] = []
+  if (search.value.trim()) {
+    chips.push({ key: 'search', label: `“${search.value.trim()}”`, clear: () => { search.value = '' } })
+  }
+  if (locationFilter.value) {
+    const loc = locationsList.value.find(l => String(l.id) === locationFilter.value)
+    chips.push({ key: 'location', label: loc?.name ?? t('Location'), clear: () => { locationFilter.value = '' } })
+  }
+  if (categoryFilter.value) {
+    const cat = categoriesList.value.find(c => String(c.id) === categoryFilter.value)
+    chips.push({ key: 'category', label: cat?.name ?? t('All Categories'), clear: () => { categoryFilter.value = '' } })
+  }
+  if (itemTypeFilter.value) {
+    chips.push({ key: 'itemType', label: t(`item_type_${itemTypeFilter.value}`), clear: () => { itemTypeFilter.value = '' } })
+  }
+  if (lowStockOnly.value) {
+    chips.push({ key: 'lowStock', label: t('Low Stock Only'), clear: () => { lowStockOnly.value = false } })
+  }
+
+  return chips
+})
+
+// ---- CSV export (respects current filters, walks all pages) ----
+function csvCell(v: any): string {
+  return `"${String(v ?? '').replace(/"/g, '""')}"`
+}
+
+async function exportCsv() {
+  if (exporting.value)
+    return
+  exporting.value = true
+  try {
+    const rows: any[] = []
+    const perPage = 100
+    let pageNum = 1
+    // Safety cap: never fetch more than 100 pages (10k rows).
+    for (let guard = 0; guard < 100; guard++) {
+      const res = await axios.get('/levels/', { params: { ...filterParams(), page: pageNum, per_page: perPage } })
+      const d = readData<any>(res)
+      const batch: any[] = d?.levels ?? []
+      rows.push(...batch)
+      if (!d?.pagination?.has_next || batch.length === 0)
+        break
+      pageNum += 1
+    }
+
+    if (rows.length === 0) {
+      notify(t('stock_levels_nothing_export'), 'warning')
+
+      return
+    }
+
+    const cols: Array<[string, (r: any) => any]> = [
+      [t('stock_levels_col_item'), r => r.stock_item?.name],
+      [t('SKU'), r => r.stock_item?.sku],
+      [t('Location'), r => r.location?.name],
+      [t('Quantity'), r => formatQty(r.quantity)],
+      [t('unit'), r => r.stock_item?.unit],
+      [t('Reserved'), r => formatQty(r.reserved_quantity)],
+      [t('Available'), r => formatQty(r.available_quantity)],
+      [t('Pending In'), r => formatQty(r.pending_in_quantity)],
+      [t('stock_levels_pending_out'), r => formatQty(r.pending_out_quantity)],
+      [t('Last Movement'), r => (r.last_movement_at ? formatDateShort(r.last_movement_at) : '')],
+    ]
+    const head = cols.map(c => csvCell(c[0])).join(',')
+    const body = rows.map(r => cols.map(c => csvCell(c[1](r))).join(',')).join('\n')
+    const csv = `﻿${head}\n${body}\n`
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const stamp = new Date().toISOString().slice(0, 10)
+    a.href = url
+    a.download = `stock-levels-${stamp}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    notify(t('stock_levels_exported', { n: rows.length }), 'success')
+  }
+  catch {
+    notify(t('stock_levels_export_failed'), 'error')
+  }
+  finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <template>
@@ -308,6 +446,15 @@ function clearFilters() {
       :subtitle="t('stock_levels_subtitle')"
     >
       <template #actions>
+        <Button
+          variant="secondary"
+          icon="download"
+          :loading="exporting"
+          :disabled="loading || levels.length === 0"
+          @click="exportCsv"
+        >
+          {{ t('stock_levels_export') }}
+        </Button>
         <Button
           variant="secondary"
           icon="refresh"
@@ -361,6 +508,31 @@ function clearFilters() {
           <Switch v-model="lowStockOnly" />
           <span style="font-size:13px;">{{ t('Low Stock Only') }}</span>
         </label>
+      </div>
+
+      <!-- Active filter chips -->
+      <div
+        v-if="activeFilterChips.length"
+        class="lvl-chips"
+      >
+        <button
+          v-for="chip in activeFilterChips"
+          :key="chip.key"
+          type="button"
+          class="lvl-chip"
+          :title="t('stock_levels_clear_filters')"
+          @click="chip.clear()"
+        >
+          <span class="lvl-chip__label">{{ chip.label }}</span>
+          <DesignIcon name="close" :size="13" />
+        </button>
+        <button
+          type="button"
+          class="lvl-chip lvl-chip--clear"
+          @click="clearFilters"
+        >
+          {{ t('stock_levels_clear_filters') }}
+        </button>
       </div>
 
       <div class="card__divider" />
@@ -442,8 +614,8 @@ function clearFilters() {
             :sub="t('stock_levels_empty_sub')"
           >
             <div v-if="hasFilters" style="margin-top: 12px;">
-              <Button variant="secondary" @click="clearFilters">
-                {{ t('Cancel') }}
+              <Button variant="secondary" icon="close" @click="clearFilters">
+                {{ t('stock_levels_clear_filters') }}
               </Button>
             </div>
           </StateFill>
@@ -471,6 +643,9 @@ function clearFilters() {
           {{ t('stock_levels_current') }}: <b>{{ formatQty(actionLevel.quantity) }}</b>
           · {{ t('Reserved') }}: <b>{{ formatQty(actionLevel.reserved_quantity) }}</b>
           · {{ t('Available') }}: <b>{{ formatQty(actionLevel.available_quantity) }}</b>
+          <template v-if="Number(actionLevel.pending_in_quantity) > 0">
+            · {{ t('Pending In') }}: <b>{{ formatQty(actionLevel.pending_in_quantity) }}</b>
+          </template>
         </p>
       </div>
 
@@ -482,6 +657,20 @@ function clearFilters() {
             step="0.0001"
             :placeholder="t('Quantity')"
           />
+          <div v-if="actionMax !== null" class="lvl-max">
+            <span :class="{ 'lvl-max--err': actionExceedsMax }">{{ actionMaxHint }}</span>
+            <button
+              v-if="actionMax > 0"
+              type="button"
+              class="lvl-max__btn"
+              @click="fillMax"
+            >
+              {{ t('stock_levels_use_max') }}
+            </button>
+          </div>
+          <div v-if="actionExceedsMax" class="lvl-err">
+            {{ actionMode === 'reserve' ? t('stock_levels_exceeds_available') : t('stock_levels_exceeds_reserved') }}
+          </div>
         </Field>
 
         <Field
@@ -519,7 +708,7 @@ function clearFilters() {
         <Button
           variant="primary"
           :loading="actionSaving"
-          :disabled="actionSaving"
+          :disabled="actionSaving || actionExceedsMax"
           @click="doAction"
         >
           {{ t('Save') }}
@@ -555,6 +744,87 @@ function clearFilters() {
 
 .tb-toggle {
   margin-left: auto;
+}
+
+.lvl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0 4px;
+}
+
+.lvl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--primary-border, var(--border));
+  background: var(--primary-weak, var(--surface-2));
+  color: var(--primary, var(--text));
+  border-radius: var(--r-pill, 99px);
+  font-size: 12.5px;
+  font-weight: var(--fw-semibold, 600);
+  cursor: pointer;
+  transition: all .13s;
+}
+
+.lvl-chip:hover {
+  filter: brightness(0.97);
+}
+
+.lvl-chip__label {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lvl-chip--clear {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+  padding: 0 8px;
+}
+
+.lvl-chip--clear:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.lvl-max {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.lvl-max--err {
+  color: rgb(var(--v-theme-error-strong));
+  font-weight: var(--fw-semibold, 600);
+}
+
+.lvl-max__btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: var(--fw-semibold, 600);
+  cursor: pointer;
+}
+
+.lvl-max__btn:hover {
+  text-decoration: underline;
+}
+
+.lvl-err {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgb(var(--v-theme-error-strong));
 }
 
 .lvl-context {

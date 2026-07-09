@@ -21,7 +21,13 @@ import { businessPreset } from '@/composables/useBusinessDay'
 
 const { t } = useI18n({ useScope: 'global' })
 const toast = useToast()
-const { shared: sharedDash, loading: sharedLoading, fetchShared } = useDashboardData()
+const {
+  shared: sharedDash,
+  loading: sharedLoading,
+  error: sharedError,
+  lastFetchedAt,
+  fetchShared,
+} = useDashboardData()
 
 // ---------- View registry ----------
 type ViewId = 'exec' | 'sales' | 'ops' | 'products' | 'staff'
@@ -102,6 +108,107 @@ watch(view, (v) => {
   catch {}
 })
 
+// ---------- Data-freshness clock ----------
+// A restaurant floor manager keeps this screen up all shift, so "how old is
+// this number?" matters. `now` ticks every 15s; the label recomputes off it.
+const now = ref(Date.now())
+let tickTimer: ReturnType<typeof setInterval> | undefined
+
+const freshness = computed(() => {
+  const at = lastFetchedAt.value
+  if (!at)
+    return ''
+  const secs = Math.max(0, Math.round((now.value - at) / 1000))
+  if (secs < 60)
+    return t('Updated just now')
+  const mins = Math.floor(secs / 60)
+  if (mins < 60)
+    return t('Updated {n} min ago', { n: mins })
+  const hrs = Math.floor(mins / 60)
+  return t('Updated {n} h ago', { n: hrs })
+})
+
+// ---------- Auto-refresh (live wall-board mode) ----------
+// Opt-in polling so an unattended dashboard stays current without a human
+// hitting Refresh. Paused while the tab is hidden to avoid burning API calls
+// on a backgrounded screen; on return it catches up if the data went stale.
+const AUTO_KEY = 'alphapos-dash-autorefresh'
+const AUTO_INTERVAL_MS = 60_000
+const autoRefresh = ref(readStoredAuto())
+let autoTimer: ReturnType<typeof setInterval> | undefined
+
+function readStoredAuto(): boolean {
+  try { return localStorage.getItem(AUTO_KEY) === '1' }
+  catch { return false }
+}
+
+// Silent (no toast) re-fetch used by the poller — a toast every 60s would nag.
+function silentRefresh(): void {
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden')
+    return
+  void loadShared()
+}
+
+function startAuto(): void {
+  stopAuto()
+  autoTimer = setInterval(silentRefresh, AUTO_INTERVAL_MS)
+}
+
+function stopAuto(): void {
+  if (autoTimer) {
+    clearInterval(autoTimer)
+    autoTimer = undefined
+  }
+}
+
+function toggleAuto(): void {
+  autoRefresh.value = !autoRefresh.value
+}
+
+watch(autoRefresh, (on) => {
+  try { localStorage.setItem(AUTO_KEY, on ? '1' : '0') }
+  catch {}
+  if (on) {
+    startAuto()
+    silentRefresh()
+    toast({ tone: 'info', title: t('Auto-refresh on'), msg: t('Refreshing every {n}s', { n: AUTO_INTERVAL_MS / 1000 }) })
+  }
+  else {
+    stopAuto()
+  }
+})
+
+function onVisibility(): void {
+  if (typeof document === 'undefined')
+    return
+  if (document.visibilityState === 'visible' && autoRefresh.value) {
+    const at = lastFetchedAt.value
+    if (!at || Date.now() - at > AUTO_INTERVAL_MS)
+      silentRefresh()
+  }
+}
+
+// ---------- Error surfacing ----------
+// The shared fetch soft-degrades (keeps stale data) so sub-dashboards never
+// flash empty, but a silent failure hides breakage. Surface it as a dismissible
+// banner with a retry so the operator knows the numbers may be stale.
+const errorDismissed = ref(false)
+watch(() => sharedError.value, (e) => { if (e) errorDismissed.value = false })
+const showError = computed(() => !!sharedError.value && !errorDismissed.value)
+
+// ---------- Keyboard shortcuts (1–5 switch views) ----------
+function onKey(e: KeyboardEvent): void {
+  if (e.ctrlKey || e.metaKey || e.altKey)
+    return
+  const el = e.target as HTMLElement | null
+  const tag = el?.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable)
+    return
+  const idx = Number(e.key) - 1
+  if (Number.isInteger(idx) && idx >= 0 && idx < DASH_VIEWS.length)
+    selectView(DASH_VIEWS[idx].id)
+}
+
 const current = computed(() => DASH_VIEWS.find(v => v.id === view.value) ?? DASH_VIEWS[0])
 
 // ---------- Hub-level shared fetch ----------
@@ -126,7 +233,22 @@ watch(
   () => { void loadShared() },
 )
 
-onMounted(() => { void loadShared() })
+onMounted(() => {
+  void loadShared()
+  tickTimer = setInterval(() => { now.value = Date.now() }, 15_000)
+  if (autoRefresh.value)
+    startAuto()
+  window.addEventListener('keydown', onKey)
+  document.addEventListener('visibilitychange', onVisibility)
+})
+
+onUnmounted(() => {
+  if (tickTimer)
+    clearInterval(tickTimer)
+  stopAuto()
+  window.removeEventListener('keydown', onKey)
+  document.removeEventListener('visibilitychange', onVisibility)
+})
 
 // Push the current dashboard context to the AI assistant so /ai/query knows
 // which sub-dashboard + date range the user is looking at when they ask
@@ -246,10 +368,30 @@ void sharedDash
         </div>
       </div>
       <div class="page__head-actions">
+        <span
+          v-if="freshness"
+          class="dash-fresh"
+          :title="t('Last updated')"
+        >
+          <DesignIcon
+            name="clock"
+            :size="13"
+          />
+          {{ freshness }}
+        </span>
         <DateRangePicker
           v-model="dateRange"
           align="right"
           :placeholder="t('Last 30 days')"
+        />
+        <Button
+          variant="secondary"
+          :class="cx('dash-auto', autoRefresh && 'is-on')"
+          :icon="autoRefresh ? 'pause' : 'play'"
+          :aria-pressed="autoRefresh"
+          :title="autoRefresh ? t('Auto-refresh on') : t('Auto-refresh off')"
+          :aria-label="autoRefresh ? t('Auto-refresh on') : t('Auto-refresh off')"
+          @click="toggleAuto"
         />
         <Button
           variant="secondary"
@@ -273,14 +415,59 @@ void sharedDash
     <!-- Morning briefing — LLM-generated daily digest. Hides itself when dismissed/empty. -->
     <AIBriefingCard style="margin-bottom: var(--sp-3);" />
 
+    <!-- Fetch failed — the shared payload soft-degrades to stale data, so warn the operator. -->
+    <div
+      v-if="showError"
+      class="dash-errbar"
+      role="alert"
+    >
+      <DesignIcon
+        name="alert"
+        :size="18"
+      />
+      <div class="dash-errbar__body">
+        <div class="dash-errbar__title">
+          {{ t('Could not load dashboard') }}
+        </div>
+        <div class="dash-errbar__msg">
+          {{ t('Showing the last values we had. Check your connection and try again.') }}
+        </div>
+      </div>
+      <Button
+        variant="secondary"
+        size="sm"
+        icon="retry"
+        :loading="loading"
+        @click="refresh"
+      >
+        {{ t('Retry') }}
+      </Button>
+      <button
+        type="button"
+        class="dash-errbar__x"
+        :aria-label="t('Dismiss')"
+        @click="errorDismissed = true"
+      >
+        <DesignIcon
+          name="close"
+          :size="16"
+        />
+      </button>
+    </div>
+
     <div
       class="dashtabs"
       style="margin-bottom: var(--sp-3);"
+      role="tablist"
+      :aria-label="t('Dashboards')"
     >
       <button
-        v-for="v in DASH_VIEWS"
+        v-for="(v, i) in DASH_VIEWS"
         :key="v.id"
         type="button"
+        role="tab"
+        :aria-selected="view === v.id"
+        :title="t('Shortcut') + ': ' + (i + 1)"
         :class="cx('dashtab', view === v.id && 'is-active')"
         @click="selectView(v.id)"
       >

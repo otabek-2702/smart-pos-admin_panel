@@ -57,7 +57,11 @@ const deleteDialog = ref(false)
 const deleting = ref<any>(null)
 const deleteBusy = ref(false)
 
-const roles = ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER', 'USER']
+// CHEF is a valid backend role (kitchen staff, used for KDS attribution). It is
+// created without any login credential — the BE stores an unusable password and
+// it never appears in the cashier PIN picker. Exposed here so operators can add
+// kitchen staff without dropping to the Django admin.
+const roles = ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER', 'CHEF', 'USER']
 const statuses = ['ACTIVE', 'SUSPENDED']
 
 const form = ref({
@@ -79,6 +83,10 @@ const statusConfirm = ref<{ user: any; newStatus: string } | null>(null)
 const isAdminRole = computed(() => form.value.role === 'ADMIN')
 const requiresEmail = computed(() => ['ADMIN', 'MANAGER'].includes(form.value.role))
 const isPinRole = computed(() => ['CASHIER', 'WAITER'].includes(form.value.role))
+// CHEF is a non-login kitchen label — no email, no PIN. The credential field is
+// hidden and replaced with an explanatory note; on create the BE forces an empty
+// (unusable) password regardless of what we send.
+const isChef = computed(() => form.value.role === 'CHEF')
 
 function validateField(field: string) {
   // Surfaces inline errors without blocking submission flow.
@@ -104,6 +112,7 @@ const ROLE_TONE: Record<string, 'primary' | 'info' | 'neutral' | 'success' | 'wa
   MANAGER: 'primary',
   CASHIER: 'info',
   WAITER: 'info',
+  CHEF: 'warning',
   USER: 'neutral',
 }
 
@@ -203,6 +212,13 @@ function onRoleChange() {
   // clear any leftover free-form password when switching INTO a PIN role.
   if (isPinRole.value && form.value.password && !/^\d{4}$/.test(form.value.password))
     form.value.password = ''
+  // CHEF has no credential at all — drop any typed value and its inline error.
+  if (isChef.value) {
+    form.value.password = ''
+    const err = { ...errors.value }
+    delete err.password
+    errors.value = err
+  }
 }
 
 function openEdit(user: any) {
@@ -621,7 +637,21 @@ onBeforeUnmount(() => {
         </template>
 
         <template #cell.last_login_at="{ row }">
-          <span class="cell-muted">{{ row.last_login_at ? formatDate(row.last_login_at) : t('Never') }}</span>
+          <span
+            v-if="row.last_login_at"
+            class="cell-muted"
+          >{{ formatDate(row.last_login_at) }}</span>
+          <!-- Dormant accounts (never signed in) are a housekeeping/security
+               signal — flag them so operators can spot unused logins. -->
+          <span
+            v-else
+            :title="t('This account has never signed in')"
+          >
+            <Badge
+              tone="warning"
+              dot
+            >{{ t('Never') }}</Badge>
+          </span>
         </template>
 
         <template #cell.created_at="{ row }">
@@ -772,8 +802,21 @@ onBeforeUnmount(() => {
             />
           </Field>
 
+          <!-- Chef: non-login kitchen label — no credential field -->
+          <div
+            v-if="isChef"
+            class="span-2 chef-note"
+          >
+            <DesignIcon
+              name="info"
+              :size="16"
+            />
+            <span>{{ t('Chef accounts are kitchen labels only — they have no login access or PIN.') }}</span>
+          </div>
+
           <!-- Password -->
           <Field
+            v-if="!isChef"
             :label="editing ? t('New Password (leave blank to keep)') : (isPinRole ? t('4-digit PIN') : t('Password'))"
             class="span-2"
             :error="errors.password"
@@ -945,6 +988,24 @@ onBeforeUnmount(() => {
 .iconaction.is-busy {
   cursor: progress;
   opacity: 0.7;
+}
+
+/* CHEF role note — replaces the credential field for passwordless kitchen staff */
+.chef-note {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--r-sm, 8px);
+  background: rgb(var(--v-theme-warning-weak));
+  border: 1px solid rgb(var(--v-theme-warning-border));
+  color: rgb(var(--v-theme-warning-strong));
+  font-size: 13px;
+  line-height: 1.45;
+}
+.chef-note :deep(svg) {
+  flex: 0 0 auto;
+  margin-top: 1px;
 }
 
 /* Toolbar: search expands, filters are fixed at 180px on desktop */

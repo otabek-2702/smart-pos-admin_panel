@@ -729,6 +729,8 @@
   "No products yet": "Пока нет продуктов",
   "Instant": "Мгновенный",
   "product_is_instant_label": "Без кухни",
+  "products_kpi_active": "В каталоге",
+  "products_kpi_deleted_hint": "Нажмите, чтобы показать/скрыть",
   "product_sort_default": "Сортировка (популярные сверху)",
   "product_sort_name_asc": "Название А→Я",
   "product_sort_name_desc": "Название Я→А",

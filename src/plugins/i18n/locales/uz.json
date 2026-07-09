@@ -725,6 +725,8 @@
   "No products yet": "Hozircha mahsulotlar yo'q",
   "Instant": "Tez tayyor",
   "product_is_instant_label": "Oshxonasiz",
+  "products_kpi_active": "Katalogda",
+  "products_kpi_deleted_hint": "Ko‘rsatish/yashirish uchun bosing",
   "product_sort_default": "Saralash (mashhurlar oldin)",
   "product_sort_name_asc": "Nomi A→Z",
   "product_sort_name_desc": "Nomi Z→A",

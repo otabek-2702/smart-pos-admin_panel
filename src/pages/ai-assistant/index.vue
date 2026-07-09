@@ -18,7 +18,7 @@ import { Fmt } from '@/components/design/utils/format'
 const { t } = useI18n({ useScope: 'global' })
 
 const store = useAIAssistantStore()
-const { chats, activeId, generating, notify, permission } = storeToRefs(store)
+const { chats, activeId, generating, notify, permission, suggestions, loadingMeta } = storeToRefs(store)
 
 const draft = ref('')
 const draftRestoreLock = ref(false)
@@ -46,8 +46,21 @@ const SUGGESTIONS = [
   { icon: 'box', text: 'What is running low on stock?', i18n: 'What is running low on stock?' },
 ]
 
+// Live, data-driven suggestions from the backend (/ai/suggestions/). These carry a
+// human `reason` (e.g. "3 items below reorder level") and a priority the BE computes
+// from real stock/PO state — far more actionable than the static prompt chips, so we
+// surface them above the defaults whenever the server returns any.
+function suggestionIcon(priority: string): string {
+  if (priority === 'high') return 'alert'
+  if (priority === 'medium') return 'clock'
+  return 'trend'
+}
+const liveSuggestions = computed(() => (suggestions.value ?? []).slice(0, 4))
+
 onMounted(() => {
   store.setChatVisible(true)
+  // Fetch dynamic suggestions/quick-actions once; safe to call repeatedly (store guards).
+  store.loadMeta()
   const onVis = () => store.setChatVisible(!document.hidden)
 
   document.addEventListener('visibilitychange', onVis)
@@ -260,6 +273,82 @@ function selectChat(id: string) {
   store.selectChat(id)
   histOpen.value = false
 }
+
+// ---- Inline rename (wires the store's renameChat, which had no UI before) ----
+const renaming = ref(false)
+const renameVal = ref('')
+const renameRef = ref<HTMLInputElement | null>(null)
+function startRename() {
+  if (!active.value)
+    return
+  renameVal.value = active.value.title
+  renaming.value = true
+  nextTick(() => { renameRef.value?.focus(); renameRef.value?.select() })
+}
+function commitRename() {
+  if (!renaming.value)
+    return
+  const v = renameVal.value.trim()
+
+  if (active.value && v && v !== active.value.title)
+    store.renameChat(active.value.id, v)
+  renaming.value = false
+}
+function cancelRename() {
+  renaming.value = false
+}
+
+// ---- Two-step delete confirm (prevents accidental loss of a conversation) ----
+const confirmDelId = ref<string | null>(null)
+let confirmTimer: number | null = null
+function requestDelete(id: string) {
+  if (confirmDelId.value === id) {
+    store.deleteChat(id)
+    confirmDelId.value = null
+    if (confirmTimer) { window.clearTimeout(confirmTimer); confirmTimer = null }
+
+    return
+  }
+  confirmDelId.value = id
+  if (confirmTimer)
+    window.clearTimeout(confirmTimer)
+  confirmTimer = window.setTimeout(() => { confirmDelId.value = null }, 3200)
+}
+
+// ---- Jump to latest (shown when the user has scrolled up off the live tail) ----
+const showJump = computed(() => !autoFollow.value && messages.value.length > 0)
+function scrollToBottom() {
+  autoFollow.value = true
+  const el = scrollRef.value
+
+  if (el)
+    el.scrollTop = el.scrollHeight
+}
+
+// ---- Export the active conversation as a Markdown transcript ----
+function exportChat() {
+  const c = active.value
+
+  if (!c || c.messages.length === 0)
+    return
+  const lines: string[] = [`# ${c.title}`, '']
+
+  for (const m of c.messages) {
+    lines.push(m.role === 'user' ? `**${t('You')}:**` : `**${t('AI Assistant')}:**`)
+    lines.push(m.content, '')
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const safe = (c.title || 'chat').replace(/[^\wЀ-ӿ\s-]/g, '').trim().slice(0, 40) || 'chat'
+
+  a.href = url
+  a.download = `alpha-pos-${safe}.md`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
 </script>
 
 <template>
@@ -326,10 +415,11 @@ function selectChat(id: string) {
           </div>
           <button
             class="histitem__del"
-            :title="t('Delete chat')"
-            @click.stop="store.deleteChat(c.id)"
+            :class="{ 'is-confirm': confirmDelId === c.id }"
+            :title="confirmDelId === c.id ? t('Delete this chat?') : t('Delete chat')"
+            @click.stop="requestDelete(c.id)"
           >
-            <DesignIcon name="trash" :size="15" />
+            <DesignIcon :name="confirmDelId === c.id ? 'check' : 'trash'" :size="15" />
           </button>
         </div>
       </div>
@@ -350,15 +440,47 @@ function selectChat(id: string) {
             <DesignIcon name="sparkle" :size="17" />
           </div>
           <div style="min-width: 0;">
-            <div style="font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              {{ active ? active.title : t('AI Assistant') }}
+            <input
+              v-if="renaming"
+              ref="renameRef"
+              v-model="renameVal"
+              class="aititle-edit"
+              maxlength="80"
+              @keydown.enter.prevent="commitRename"
+              @keydown.esc.prevent="cancelRename"
+              @blur="commitRename"
+            >
+            <div
+              v-else
+              class="aititle"
+              :class="{ 'is-editable': !!active }"
+              :title="active ? t('Rename chat') : ''"
+              @dblclick="startRename"
+            >
+              <span class="aititle__text">{{ active ? active.title : t('AI Assistant') }}</span>
+              <button
+                v-if="active"
+                class="aititle__edit"
+                :title="t('Rename chat')"
+                @click.stop="startRename"
+              >
+                <DesignIcon name="pencil" :size="13" />
+              </button>
             </div>
             <div class="tertiary" style="font-size: 12px; white-space: nowrap;">
               {{ isGenerating ? thinkingLabel : t('POS analyst · always-on') }}
             </div>
           </div>
         </div>
-        <div class="row" style="gap: 10px;">
+        <div class="row" style="gap: 8px;">
+          <button
+            v-if="active && messages.length > 0"
+            class="iconbtn"
+            :title="t('Export chat')"
+            @click="exportChat"
+          >
+            <DesignIcon name="download" :size="16" />
+          </button>
           <button
             class="notifbtn"
             :class="{ 'is-on': notifyOn, 'is-blocked': notifyBlocked }"
@@ -389,6 +511,44 @@ function selectChat(id: string) {
             <p class="aiempty__sub">
               {{ t('Ask about sales, products, payments, shifts or stock. I read from your live data.') }}
             </p>
+            <!-- Live, data-driven suggestions from the backend (real stock / PO signals) -->
+            <div
+              v-if="liveSuggestions.length"
+              class="aiempty__live"
+            >
+              <div class="aiempty__livelabel">
+                {{ t('Suggested for you') }}
+              </div>
+              <div class="aiempty__livegrid">
+                <button
+                  v-for="(s, i) in liveSuggestions"
+                  :key="`live-${i}`"
+                  class="livechip"
+                  :class="`prio-${s.priority}`"
+                  @click="store.send(s.query)"
+                >
+                  <span class="livechip__dot" />
+                  <DesignIcon :name="suggestionIcon(s.priority)" :size="16" class="livechip__ic" />
+                  <span class="livechip__body">
+                    <span class="livechip__q">{{ s.query }}</span>
+                    <span v-if="s.reason" class="livechip__reason">{{ s.reason }}</span>
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div v-else-if="loadingMeta" class="aiempty__live">
+              <div class="aiempty__livegrid">
+                <div v-for="n in 2" :key="`sk-${n}`" class="livechip is-skeleton">
+                  <div class="sk-box" style="width: 16px; height: 16px; border-radius: 50%;" />
+                  <div style="flex: 1;">
+                    <div class="sk-box" style="width: 60%; height: 12px; border-radius: 4px;" />
+                    <div class="sk-box" style="width: 40%; height: 10px; border-radius: 4px; margin-top: 6px;" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="aiempty__chips">
               <button
                 v-for="s in SUGGESTIONS"
@@ -468,6 +628,19 @@ function selectChat(id: string) {
         </div>
       </div>
 
+      <!-- Jump to latest — appears when the user has scrolled up off the live tail -->
+      <Transition name="jumpfade">
+        <button
+          v-if="showJump"
+          class="jumpbtn"
+          :title="t('Jump to latest')"
+          @click="scrollToBottom"
+        >
+          <DesignIcon name="arrowdown" :size="16" />
+          <span>{{ isGenerating ? t('New messages') : t('Jump to latest') }}</span>
+        </button>
+      </Transition>
+
       <!-- ===== Composer ===== -->
       <div class="composer">
         <div class="composer__inner">
@@ -516,6 +689,153 @@ meta:
   flex-wrap: wrap;
   gap: 10px;
 }
+.aithread { position: relative; }
+
+/* editable header title */
+.aititle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 15px;
+  min-width: 0;
+}
+.aititle__text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.aititle__edit {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  border-radius: var(--r-xs);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .14s, color .14s, background .14s;
+}
+.aititle.is-editable:hover .aititle__edit { opacity: 1; }
+.aititle__edit:hover { background: var(--surface-2); color: var(--text); }
+.aititle-edit {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1.5px solid var(--primary);
+  border-radius: var(--r-xs);
+  padding: 3px 8px;
+  outline: none;
+  max-width: 260px;
+  box-shadow: var(--shadow-focus);
+}
+
+/* header icon button (export) */
+.iconbtn {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all .14s;
+}
+.iconbtn:hover { border-color: var(--text-tertiary); color: var(--text); }
+
+/* keep the two-step delete-confirm button visible + error-tinted */
+:deep(.histitem__del.is-confirm) {
+  display: grid !important;
+  opacity: 1 !important;
+  background: var(--error-weak);
+  color: var(--error);
+}
+
+/* live suggestions in empty state */
+.aiempty__live { width: 100%; max-width: 520px; margin-bottom: var(--sp-5); }
+.aiempty__livelabel {
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  text-align: left;
+  margin-bottom: 10px;
+}
+.aiempty__livegrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.livechip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  text-align: left;
+  transition: all .14s;
+  box-shadow: var(--shadow-xs);
+  position: relative;
+}
+.livechip:hover {
+  border-color: var(--primary-border);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+.livechip__dot {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+}
+.livechip.prio-high .livechip__dot { background: var(--error); }
+.livechip.prio-medium .livechip__dot { background: var(--warning, #f59e0b); }
+.livechip.prio-low .livechip__dot { background: var(--primary); }
+.livechip__ic { color: var(--text-tertiary); flex: 0 0 16px; margin-top: 1px; }
+.livechip:hover .livechip__ic { color: var(--primary); }
+.livechip__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-right: 8px; }
+.livechip__q { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text); }
+.livechip__reason { font-size: var(--fs-label); color: var(--text-tertiary); line-height: 1.35; }
+.livechip.is-skeleton { cursor: default; pointer-events: none; }
+.livechip.is-skeleton:hover { transform: none; border-color: var(--border); box-shadow: var(--shadow-xs); }
+.sk-box { background: rgba(var(--v-theme-on-surface), 0.08); animation: sk-pulse 1.5s ease-in-out infinite; }
+@keyframes sk-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* jump-to-latest floating button */
+.jumpbtn {
+  position: absolute;
+  left: 50%;
+  bottom: 104px;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--primary-border);
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: transform .14s, box-shadow .14s;
+}
+.jumpbtn:hover { box-shadow: var(--shadow-lg); }
+.jumpfade-enter-active, .jumpfade-leave-active { transition: opacity .18s, transform .18s; }
+.jumpfade-enter-from, .jumpfade-leave-to { opacity: 0; transform: translate(-50%, 8px); }
 
 /* Always show delete button on touch / phone (no hover affordance) */
 @media (hover: none), (max-width: 768px) {
@@ -531,7 +851,8 @@ meta:
     align-items: flex-start;
   }
 
-  .aiempty__chips {
+  .aiempty__chips,
+  .aiempty__livegrid {
     grid-template-columns: 1fr;
   }
 

@@ -11,6 +11,7 @@ import StateFill from '@/components/design/StateFill.vue'
 import { fmtNum } from '@/components/design/utils/format'
 import axiosIns from '@/plugins/axios'
 import { useDashboardData } from '@/composables/useDashboardData'
+import { businessPreset, buildDateParams } from '@/composables/useBusinessDay'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -29,7 +30,12 @@ const ordersStats = ref<OrdersStats>({})
 
 async function loadOrderStats(): Promise<void> {
   try {
-    const res = await axiosIns.get('/orders/stats')
+    // Scope the "live" counters to TODAY's business day. Without date params the
+    // backend aggregates over ALL TIME, so the "Jonli" badges showed ~9k open
+    // orders. order_stats reads date_from/date_to, hence { orders: true }.
+    const res = await axiosIns.get('/orders/stats', {
+      params: buildDateParams({ ...businessPreset('today') }, { orders: true }),
+    })
     ordersStats.value = res?.data?.data ?? {}
   }
   catch { /* leave zeros */ }

@@ -156,10 +156,15 @@ async function save() {
       delete payload.base_unit_id
     if (!payload.base_unit_id)
       delete payload.base_unit_id
-    if (dialogMode.value === 'create')
+    if (dialogMode.value === 'create') {
+      // Backend create() has no is_active param — sending it throws 500.
+      delete payload.is_active
       await axios.post('/units/', payload)
-    else
-      await axios.patch(`/units/${selectedItem.value.id}/`, payload)
+    }
+    else {
+      // Unit detail route allows GET/PUT/DELETE (not PATCH).
+      await axios.put(`/units/${selectedItem.value.id}/`, payload)
+    }
     notify(dialogMode.value === 'create' ? t('Unit created') : t('Unit updated'))
     dialog.value = false
     await loadUnits()

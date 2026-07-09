@@ -144,7 +144,8 @@ async function save() {
   saving.value = true
   try {
     if (dialogMode.value === 'create') {
-      const payload = { ...form.value }
+      // Backend create() has no is_active param — sending it throws 500.
+      const { is_active: _drop, ...payload } = form.value as any
       await axios.post('/variance-codes/', payload)
       notify(t('variance_created'))
     }

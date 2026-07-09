@@ -457,11 +457,11 @@ const shiftColumns = computed<DataTableColumn<any>[]>(() => [
                 {{ formatCurrency(summary.cash_accuracy.net_variance) }}
               </Badge>
             </div>
-            <div class="cs-row cs-row--sm">
+            <div v-if="summary.cash_accuracy.worst_shortage" class="cs-row cs-row--sm">
               <span class="cs-row__label">{{ t('Worst shortage') }}</span>
               <span class="text-error">{{ summary.cash_accuracy.worst_shortage.user_name }} {{ formatCurrency(summary.cash_accuracy.worst_shortage.difference) }}</span>
             </div>
-            <div class="cs-row cs-row--sm">
+            <div v-if="summary.cash_accuracy.biggest_overage" class="cs-row cs-row--sm">
               <span class="cs-row__label">{{ t('Biggest overage') }}</span>
               <span class="text-warning">{{ summary.cash_accuracy.biggest_overage.user_name }} +{{ formatCurrency(summary.cash_accuracy.biggest_overage.difference) }}</span>
             </div>

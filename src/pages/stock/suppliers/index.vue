@@ -148,7 +148,8 @@ async function save() {
     if (dialogMode.value === 'create')
       await axios.post('/suppliers/', form.value)
     else
-      await axios.patch(`/suppliers/${selectedItem.value.id}/`, form.value)
+      // Supplier detail route allows GET/PUT/DELETE (not PATCH).
+      await axios.put(`/suppliers/${selectedItem.value.id}/`, form.value)
     notify(dialogMode.value === 'create' ? t('Supplier created') : t('Supplier updated'))
     dialog.value = false
     await loadSuppliers()

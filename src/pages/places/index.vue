@@ -9,14 +9,14 @@ const tables = ref<any[]>([])
 const loading = ref(false)
 const tablesLoading = ref(false)
 
-const placeTypes = ['HALL', 'TERRACE', 'VIP', 'BAR', 'OUTDOOR']
-const tableStatuses = ['AVAILABLE', 'OCCUPIED', 'RESERVED', 'CLEANING']
+const placeTypes = ['HALL', 'TERRACE', 'PRIVATE_ROOM', 'BAR', 'OUTDOOR']
+const tableStatuses = ['AVAILABLE', 'OCCUPIED', 'RESERVED', 'OUT_OF_SERVICE']
 
 const statusColors: Record<string, string> = {
   AVAILABLE: 'success',
   OCCUPIED: 'error',
   RESERVED: 'warning',
-  CLEANING: 'info',
+  OUT_OF_SERVICE: 'info',
 }
 
 // Place dialog

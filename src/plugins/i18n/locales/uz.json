@@ -3878,5 +3878,17 @@
   "Whole day": "Kun bo‘yi",
   "Operating hours": "Ish vaqti",
   "The open window used by the “Working hours” time filter.": "«Ish soatlari» vaqt filtri uchun ishlatiladigan ochiq oyna.",
-  "Performance · hourly": "Ko‘rsatkichlar · soatlab"
+  "Performance · hourly": "Ko‘rsatkichlar · soatlab",
+  "Revenue is down {pct}% this month": "Bu oyda daromad {pct}% ga kamaydi",
+  "Peak {day} at {hour}": "Eng band: {day}, {hour}",
+  "No staff data for this range": "Bu davr uchun xodimlar ma'lumoti yo'q",
+  "Trail of admin actions across the system": "Tizimdagi administrator amallari tarixi",
+  "Pending total": "Kutilayotgan — jami",
+  "Approved total": "Tasdiqlangan — jami",
+  "Paid total": "To'langan — jami",
+  "menu_class_STAR": "Yulduz",
+  "menu_class_PLOWHORSE": "Ishchi ot",
+  "menu_class_PUZZLE": "Jumboq",
+  "menu_class_DOG": "Zaif",
+  "COGS fraction must be between 0.05 and 0.95": "TMD ulushi 0.05 va 0.95 orasida bo'lishi kerak"
 }

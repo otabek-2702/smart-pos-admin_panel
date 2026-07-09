@@ -17,6 +17,7 @@ import { useToast } from '@/components/design/useToast'
 import { fmtDateTime } from '@/components/design/utils/format'
 import { cx } from '@/components/design/utils'
 import { useDashboardData } from '@/composables/useDashboardData'
+import { businessPreset } from '@/composables/useBusinessDay'
 
 const { t } = useI18n({ useScope: 'global' })
 const toast = useToast()
@@ -86,7 +87,11 @@ function readStoredView(): ViewId {
 
 const view = ref<ViewId>(readStoredView())
 const localLoading = ref(false)
-const dateRange = ref<DateRangeValue>({ from: '', to: '', preset: '30d' })
+// Seed a concrete 30-day window so the trigger label, the highlighted preset,
+// and the fetched range all agree on first paint (was { from:'', to:'' } which
+// left the picker highlighting "All time" while the label read "Last 30 days"
+// and the shared fetch fell back to today).
+const dateRange = ref<DateRangeValue>({ ...businessPreset('30d'), preset: '30d' })
 
 // Loading flag the page exposes to the UI = either the hub-level shared
 // fetch OR an in-flight manual refresh.

@@ -103,7 +103,8 @@ async function save() {
     if (props.mode === 'create')
       await axios.post('/items/', payload)
     else
-      await axios.patch(`/items/${props.item.id}/`, payload)
+      // Item detail route allows GET/PUT/DELETE (not PATCH).
+      await axios.put(`/items/${props.item.id}/`, payload)
     notify(props.mode === 'create' ? t('Item created') : t('Item updated'))
     dialog.value = false
     emit('saved')

@@ -3882,5 +3882,10 @@
   "Whole day": "Весь день",
   "Operating hours": "Часы работы",
   "The open window used by the “Working hours” time filter.": "Окно, которое использует фильтр «Рабочие часы».",
-  "Performance · hourly": "Показатели · по часам"
+  "Performance · hourly": "Показатели · по часам",
+  "menu_class_STAR": "Звезда",
+  "menu_class_PLOWHORSE": "Рабочая лошадка",
+  "menu_class_PUZZLE": "Загадка",
+  "menu_class_DOG": "Собака",
+  "COGS fraction must be between 0.05 and 0.95": "Доля себестоимости должна быть от 0.05 до 0.95"
 }

@@ -3980,5 +3980,15 @@
   "Whole day": "Whole day",
   "Operating hours": "Operating hours",
   "The open window used by the “Working hours” time filter.": "The open window used by the “Working hours” time filter.",
-  "Performance · hourly": "Performance · hourly"
+  "Performance · hourly": "Performance · hourly",
+  "Revenue vs expenses · {window}": "Revenue vs expenses · {window}",
+  "By channel · {window}": "By channel · {window}",
+  "{window} · order count": "{window} · order count",
+  "{window} · revenue": "{window} · revenue",
+  "Expenses · {window}": "Expenses · {window}",
+  "{n} units · {window}": "{n} units · {window}",
+  "Units sold · {window}": "Units sold · {window}",
+  "Product trends · {window}": "Product trends · {window}",
+  "in {window}": "in {window}",
+  "Total hours · {window}": "Total hours · {window}"
 }

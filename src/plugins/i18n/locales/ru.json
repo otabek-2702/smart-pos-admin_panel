@@ -3887,5 +3887,15 @@
   "menu_class_PLOWHORSE": "Рабочая лошадка",
   "menu_class_PUZZLE": "Загадка",
   "menu_class_DOG": "Собака",
-  "COGS fraction must be between 0.05 and 0.95": "Доля себестоимости должна быть от 0.05 до 0.95"
+  "COGS fraction must be between 0.05 and 0.95": "Доля себестоимости должна быть от 0.05 до 0.95",
+  "Revenue vs expenses · {window}": "Доход и расходы · {window}",
+  "By channel · {window}": "По каналам · {window}",
+  "{window} · order count": "{window} · количество заказов",
+  "{window} · revenue": "{window} · доход",
+  "Expenses · {window}": "Расходы · {window}",
+  "{n} units · {window}": "{n} шт · {window}",
+  "Units sold · {window}": "Продано · {window}",
+  "Product trends · {window}": "Тренды товаров · {window}",
+  "in {window}": "за {window}",
+  "Total hours · {window}": "Всего часов · {window}"
 }

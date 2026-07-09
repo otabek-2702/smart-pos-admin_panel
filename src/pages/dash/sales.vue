@@ -12,6 +12,7 @@ import { fmtAbbr, fmtNum } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
 import { useDashboardData } from '@/composables/useDashboardData'
 import { buildDateParams } from '@/composables/useBusinessDay'
+import { formatWindow } from '@/composables/useWindowLabel'
 import type { Tone } from '@/components/design/utils'
 // MOCK_DASH dropped — real BE data only. /dashboard/sales endpoint pending (BACKEND_TODO item 11).
 export interface ChannelDay { day: string; hall: number; delivery: number; pickup: number }
@@ -104,7 +105,7 @@ const heroKpis = computed<HeroKpiData[]>(() => {
       sub: t('single-day record'),
     },
     {
-      label: t('Expenses (30d)'),
+      label: t('Expenses · {window}', { window: windowLabel.value }),
       value: expense30.reduce((a, b) => a + b, 0),
       money: true,
       unit: 'UZS',
@@ -319,6 +320,10 @@ async function loadDashboard() {
 // Re-fetch on hub range change.
 const { range: sharedRange } = useDashboardData()
 watch(sharedRange, () => { void loadDashboard() })
+
+// Localized label for the active date-picker window, interpolated into the
+// range-scoped card titles below so they stop hardcoding "· 30 days".
+const windowLabel = computed(() => formatWindow(sharedRange.value, t))
 onMounted(() => {
   loadDashboard()
 })
@@ -433,7 +438,7 @@ onMounted(() => {
           <div class="card__head">
             <div class="card__head-text">
               <div class="kpi__label">
-                {{ t('Revenue vs expenses · 30 days') }}
+                {{ t('Revenue vs expenses · {window}', { window: windowLabel }) }}
               </div>
               <h3 class="card__insight">
                 {{ t('Margin holding at {pct}%', { pct: Math.round((Number(data?.grossMargin) || 0) * 100) }) }}
@@ -617,7 +622,7 @@ onMounted(() => {
           <div class="card__head">
             <div class="card__head-text">
               <div class="kpi__label">
-                {{ t('By channel · last 7 days') }}
+                {{ t('By channel · {window}', { window: windowLabel }) }}
               </div>
               <h3 class="card__title">
                 {{ t('Hall vs delivery vs pickup') }}
@@ -714,7 +719,7 @@ onMounted(() => {
           <div class="card__head">
             <div class="card__head-text">
               <div class="kpi__label">
-                {{ t('Last 30 days · order count') }}
+                {{ t('{window} · order count', { window: windowLabel }) }}
               </div>
               <h3 class="card__title">
                 {{ t('Daily orders') }}
@@ -736,7 +741,7 @@ onMounted(() => {
           <div class="card__head">
             <div class="card__head-text">
               <div class="kpi__label">
-                {{ t('Last 30 days · revenue') }}
+                {{ t('{window} · revenue', { window: windowLabel }) }}
               </div>
               <h3 class="card__title">
                 {{ t('Daily revenue') }}

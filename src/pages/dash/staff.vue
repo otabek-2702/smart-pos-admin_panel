@@ -24,6 +24,7 @@ import StackedBar from '@/components/design/charts/StackedBar.vue'
 import { fmtAbbr, fmtNum } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
 import { useDashboardData } from '@/composables/useDashboardData'
+import { formatWindow } from '@/composables/useWindowLabel'
 import { buildDateParams } from '@/composables/useBusinessDay'
 // staffFixture mock dropped — real BE data only (Abrorbek deployed /staff/performance 2026-06-25).
 
@@ -129,6 +130,9 @@ async function loadStaff() {
 
 const { range: sharedRange } = useDashboardData()
 watch(sharedRange, () => { void loadStaff() })
+
+// Localized label for the active date-picker window (see useWindowLabel).
+const windowLabel = computed(() => formatWindow(sharedRange.value, t))
 onMounted(loadStaff)
 
 /* Defensive ranks — fixture is pre-sorted by revenue desc, but normalise here
@@ -158,14 +162,14 @@ const heroKpis = computed(() => {
       value: ranked.value.length,
       icon: 'users',
       tone: 'primary' as const,
-      sub: t('in last 30 days'),
+      sub: t('in {window}', { window: windowLabel.value }),
     },
     {
       label: t('Top performer'),
       value: top ? top.name : '—',
       icon: 'star',
       tone: 'warning' as const,
-      sub: top ? `${fmtAbbr(top.revenue)} · 30d` : '',
+      sub: top ? `${fmtAbbr(top.revenue)} · ${windowLabel.value}` : '',
     },
     {
       label: t('Avg accuracy'),
@@ -174,7 +178,7 @@ const heroKpis = computed(() => {
       tone: 'success' as const,
     },
     {
-      label: t('Total hours (30d)'),
+      label: t('Total hours · {window}', { window: windowLabel.value }),
       value: totalHours.value,
       icon: 'clock',
       tone: 'info' as const,

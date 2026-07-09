@@ -24,6 +24,7 @@ import Affinity from '@/components/design/Affinity.vue'
 import { fmtAbbr } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
 import { useDashboardData } from '@/composables/useDashboardData'
+import { formatWindow } from '@/composables/useWindowLabel'
 import { buildDateParams } from '@/composables/useBusinessDay'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -77,10 +78,10 @@ const heroKpis = computed(() => {
       value: o.bestSellerName,
       icon: 'star',
       tone: 'warning' as const,
-      sub: t('{n} units · 30d', { n: o.bestSellerUnits }),
+      sub: t('{n} units · {window}', { n: o.bestSellerUnits, window: windowLabel.value }),
     },
     {
-      label: t('Units sold (30d)'),
+      label: t('Units sold · {window}', { window: windowLabel.value }),
       value: o.units30d,
       delta: o.units30dDelta,
       icon: 'receipt',
@@ -318,6 +319,9 @@ async function loadDashboard() {
 
 const { range: sharedRange } = useDashboardData()
 watch(sharedRange, () => { void loadDashboard() })
+
+// Localized label for the active date-picker window (see useWindowLabel).
+const windowLabel = computed(() => formatWindow(sharedRange.value, t))
 onMounted(() => {
   loadDashboard()
 })
@@ -469,7 +473,7 @@ onMounted(() => {
           <div class="card__head">
             <div class="card__head-text">
               <div class="kpi__label">
-                {{ t('Product trends · 14 days') }}
+                {{ t('Product trends · {window}', { window: windowLabel }) }}
               </div>
               <h3 class="card__title">
                 {{ t('Movers & shakers') }}

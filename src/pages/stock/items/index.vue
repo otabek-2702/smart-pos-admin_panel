@@ -14,8 +14,11 @@ import DataTable, { type DataTableColumn } from '@/components/design/DataTable.v
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
+import Kpi from '@/components/design/Kpi.vue'
 import Modal from '@/components/design/Modal.vue'
+import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
+import StateFill from '@/components/design/StateFill.vue'
 import Switch from '@/components/design/Switch.vue'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -44,6 +47,9 @@ const statusFilter = ref<string>('all')
 // Categories for filter dropdown
 const categoriesList = ref<any[]>([])
 
+// Catalog stats (KPI strip) — GET /items/stats/ → { total_items, by_type, low_stock_count, no_category_count }
+const stats = ref<any>(null)
+
 // Dialogs
 const dialog = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
@@ -69,6 +75,7 @@ const { formatCurrency } = useFormatters()
 const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'sku', label: t('SKU') },
   { key: 'name', label: t('Name') },
+  { key: 'barcode', label: t('Barcode') },
   { key: 'item_type', label: t('Type') },
   { key: 'category', label: t('Category') },
   { key: 'base_unit', label: t('Unit') },
@@ -107,6 +114,14 @@ async function loadItems() {
   }
 }
 
+async function loadStats() {
+  try {
+    const res = await axios.get('/items/stats/')
+    stats.value = res.data?.data ?? res.data
+  }
+  catch { /* stats are non-critical — leave KPIs blank on failure */ }
+}
+
 async function loadMeta() {
   try {
     const [catRes, unitRes] = await Promise.all([
@@ -123,7 +138,13 @@ async function loadMeta() {
   catch { /* ignore */ }
 }
 
-onMounted(() => { loadItems(); loadMeta() })
+onMounted(() => { loadItems(); loadMeta(); loadStats() })
+
+// Reload table + stats together after any mutation.
+function reloadAll() {
+  loadItems()
+  loadStats()
+}
 watch([page, itemsPerPage], loadItems)
 watch([search, typeFilter, categoryFilter, lowStockOnly, statusFilter], () => { page.value = 1; loadItems() })
 
@@ -138,6 +159,33 @@ const statusSelectOptions = computed(() => [
   { value: 'active', label: t('item_status_active') },
   { value: 'inactive', label: t('item_status_inactive') },
 ])
+
+// --- KPI values (over the whole catalog, not just the current page) ---
+const kpiTotal = computed(() => (stats.value ? stats.value.total_items ?? 0 : null))
+const kpiLowStock = computed(() => (stats.value ? stats.value.low_stock_count ?? 0 : null))
+const kpiRaw = computed(() => (stats.value ? stats.value.by_type?.RAW ?? 0 : null))
+const kpiUncategorized = computed(() => (stats.value ? stats.value.no_category_count ?? 0 : null))
+
+// Clicking the low-stock KPI toggles the low-stock filter.
+function toggleLowStock() {
+  lowStockOnly.value = !lowStockOnly.value
+}
+
+// --- Active filter chips ---
+const hasFilters = computed(() =>
+  !!(search.value || typeFilter.value || categoryFilter.value !== undefined
+    || (statusFilter.value && statusFilter.value !== 'all') || lowStockOnly.value),
+)
+function clearAll() {
+  search.value = ''
+  typeFilter.value = undefined
+  categoryFilter.value = undefined
+  statusFilter.value = 'all'
+  lowStockOnly.value = false
+}
+const categoryLabel = computed(() =>
+  categoriesList.value.find(c => c.id === categoryFilter.value)?.name ?? '',
+)
 
 function openCreate() {
   dialogMode.value = 'create'
@@ -162,7 +210,7 @@ async function doDelete() {
     await axios.delete(`/items/${selectedItem.value.id}/`)
     notify(t('Item deleted'))
     deleteDialog.value = false
-    await loadItems()
+    reloadAll()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting item'), 'error')
@@ -205,9 +253,16 @@ async function lookupBarcode() {
 
 async function toggleActive(item: any) {
   try {
-    await axios.patch(`/items/${item.id}/`, { is_active: !item.is_active })
+    // The item detail route accepts GET/PUT/DELETE (NOT PATCH). Deactivation is a
+    // soft-delete (DELETE), which the backend blocks while stock remains on hand;
+    // reactivation goes through PUT. Using the real verbs avoids a 405 and surfaces
+    // the backend's "adjust stock to zero first" guard to the operator.
+    if (item.is_active)
+      await axios.delete(`/items/${item.id}/`)
+    else
+      await axios.put(`/items/${item.id}/`, { is_active: true })
     notify(item.is_active ? t('Item deactivated') : t('Item activated'))
-    await loadItems()
+    reloadAll()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error updating item'), 'error')
@@ -225,7 +280,70 @@ const dtPagination = computed(() => ({
 </script>
 
 <template>
-  <div>
+  <div class="page">
+    <!-- Page header -->
+    <PageHeader
+      :title="t('items_page_title')"
+      :subtitle="t('items_page_subtitle')"
+    >
+      <template #actions>
+        <Button
+          variant="primary"
+          icon="plus"
+          @click="openCreate"
+        >
+          {{ t('Add Item') }}
+        </Button>
+      </template>
+    </PageHeader>
+
+    <!-- KPI strip -->
+    <div class="grid cols-4 kpi-grid" style="margin-bottom: var(--sp-5);">
+      <Kpi
+        :data="{
+          label: t('items_kpi_total'),
+          icon: 'package',
+          tone: 'primary',
+          value: kpiTotal,
+        }"
+      />
+      <div
+        class="kpi-click"
+        :class="{ 'is-active': lowStockOnly }"
+        role="button"
+        tabindex="0"
+        :title="t('items_kpi_low_stock_hint')"
+        @click="toggleLowStock"
+        @keydown.enter.prevent="toggleLowStock"
+        @keydown.space.prevent="toggleLowStock"
+      >
+        <Kpi
+          :data="{
+            label: t('items_kpi_low_stock'),
+            icon: 'alert',
+            tone: 'warning',
+            value: kpiLowStock,
+          }"
+        />
+      </div>
+      <Kpi
+        :data="{
+          label: t('items_kpi_raw'),
+          icon: 'box',
+          tone: 'success',
+          value: kpiRaw,
+        }"
+      />
+      <Kpi
+        :data="{
+          label: t('items_kpi_uncategorized'),
+          icon: 'tag',
+          tone: 'neutral',
+          value: kpiUncategorized,
+        }"
+      />
+    </div>
+
     <div class="card">
       <!-- Toolbar -->
       <div class="toolbar items-toolbar">
@@ -292,16 +410,42 @@ const dtPagination = computed(() => ({
           <Switch v-model="lowStockOnly" />
           <span class="tb-switch__label">{{ t('Low stock only') }}</span>
         </label>
+      </div>
 
-        <div class="tb-spacer" />
+      <!-- Active filter chips -->
+      <div v-if="hasFilters" class="toolbar" style="padding-top: 0;">
+        <div class="chips">
+          <span class="tertiary" style="font-size: 13px; margin-right: 2px;">{{ t('Filters') }}:</span>
 
-        <Button
-          variant="primary"
-          icon="plus"
-          @click="openCreate"
-        >
-          {{ t('Add Item') }}
-        </Button>
+          <span v-if="search" class="chip">
+            <span>{{ t('Search') }}: <b>{{ search }}</b></span>
+            <span class="chip__x" @click="search = ''"><DesignIcon name="close" :size="13" /></span>
+          </span>
+
+          <span v-if="typeFilter" class="chip">
+            <span>{{ t('Type') }}: <b>{{ t(`item_type_${typeFilter}`) }}</b></span>
+            <span class="chip__x" @click="typeFilter = undefined"><DesignIcon name="close" :size="13" /></span>
+          </span>
+
+          <span v-if="categoryFilter !== undefined" class="chip">
+            <span>{{ t('Category') }}: <b>{{ categoryLabel }}</b></span>
+            <span class="chip__x" @click="categoryFilter = undefined"><DesignIcon name="close" :size="13" /></span>
+          </span>
+
+          <span v-if="statusFilter && statusFilter !== 'all'" class="chip">
+            <span>{{ t('Status') }}: <b>{{ t(`item_status_${statusFilter}`) }}</b></span>
+            <span class="chip__x" @click="statusFilter = 'all'"><DesignIcon name="close" :size="13" /></span>
+          </span>
+
+          <span v-if="lowStockOnly" class="chip">
+            <span>{{ t('Low stock only') }}</span>
+            <span class="chip__x" @click="lowStockOnly = false"><DesignIcon name="close" :size="13" /></span>
+          </span>
+
+          <button class="chip--clear" @click="clearAll">
+            {{ t('Clear all') }}
+          </button>
+        </div>
       </div>
 
       <div class="card__divider" />
@@ -319,6 +463,11 @@ const dtPagination = computed(() => ({
       >
         <template #cell.sku="{ row }">
           <span class="cell-strong mono">{{ row.sku ?? '—' }}</span>
+        </template>
+
+        <template #cell.barcode="{ row }">
+          <span v-if="row.barcode" class="cell-muted mono">{{ row.barcode }}</span>
+          <span v-else class="cell-muted">—</span>
         </template>
 
         <template #cell.item_type="{ row }">
@@ -364,6 +513,25 @@ const dtPagination = computed(() => ({
             @click="confirmDelete(row)"
           />
         </template>
+
+        <template #empty>
+          <StateFill
+            icon="inbox"
+            :title="t('items_no_results_title')"
+            :sub="hasFilters ? t('items_no_results_sub') : t('items_empty_sub')"
+          >
+            <div v-if="hasFilters" style="margin-top: 12px;">
+              <Button variant="secondary" @click="clearAll">
+                {{ t('Clear filters') }}
+              </Button>
+            </div>
+            <div v-else style="margin-top: 12px;">
+              <Button variant="primary" icon="plus" @click="openCreate">
+                {{ t('Add Item') }}
+              </Button>
+            </div>
+          </StateFill>
+        </template>
       </DataTable>
     </div>
 
@@ -374,7 +542,7 @@ const dtPagination = computed(() => ({
       :item="selectedItem"
       :category-options="categoryOptions"
       :unit-options="unitOptions"
-      @saved="loadItems"
+      @saved="reloadAll"
     />
 
     <!-- Delete confirmation -->
@@ -451,6 +619,35 @@ const dtPagination = computed(() => ({
 .scan-trigger:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Clickable low-stock KPI */
+.kpi-click {
+  cursor: pointer;
+  border-radius: var(--radius, 12px);
+  transition: box-shadow 0.12s ease, transform 0.12s ease;
+}
+.kpi-click:hover {
+  transform: translateY(-1px);
+}
+.kpi-click:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-warning-strong));
+  outline-offset: 2px;
+}
+.kpi-click.is-active {
+  box-shadow: 0 0 0 2px rgb(var(--v-theme-warning-strong)) inset;
+  border-radius: 14px;
+}
+
+@media (max-width: 1100px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 420px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* --- Responsive toolbar --- */

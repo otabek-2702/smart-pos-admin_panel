@@ -81,8 +81,14 @@ const stats = ref<any>(null)
 const search = ref('')
 const statusFilter = ref<string>('')
 const includeDeleted = ref(false)
+const sortBy = ref<string>('sort_order')
 const page = ref(1)
 const itemsPerPage = ref(10)
+
+// Manual drag-reorder is only meaningful when the list is shown in its stored
+// sort_order. Any other sort makes the visual order not match sort_order, so we
+// disable dragging to avoid saving a misleading order.
+const manualSort = computed(() => sortBy.value === 'sort_order')
 
 // Dialog
 const dialogOpen = ref(false)
@@ -100,6 +106,14 @@ const form = ref({
   name: '',
   description: '',
   color: '',
+  status: 'ACTIVE',
+})
+
+// Switch proxy: the form stores a raw ACTIVE/INACTIVE status string, the UI
+// exposes it as an on/off toggle.
+const formActive = computed<boolean>({
+  get: () => form.value.status === 'ACTIVE',
+  set: (v) => { form.value.status = v ? 'ACTIVE' : 'INACTIVE' },
 })
 
 // Color mode: 'none' = no color (empty), 'pick' = user chose a color
@@ -203,10 +217,18 @@ async function loadCategories() {
       params.status = statusFilter.value
     if (includeDeleted.value)
       params.include_deleted = true
+    if (sortBy.value)
+      params.order_by = sortBy.value
     const res = await axios.get('/categories', { params })
     const d = res.data?.data
 
-    categories.value = (d?.categories ?? []).sort((a: any, b: any) => a.sort_order - b.sort_order)
+    const list = d?.categories ?? []
+    // When the manual/stored order is requested, keep the client-side
+    // sort_order guard (BE already orders by it, this is belt-and-braces). For
+    // any other sort, trust the server order untouched.
+    categories.value = manualSort.value
+      ? list.sort((a: any, b: any) => a.sort_order - b.sort_order)
+      : list
     totalCategories.value = d?.pagination?.total_categories ?? d?.pagination?.total ?? categories.value.length
   }
   catch {
@@ -233,7 +255,7 @@ onMounted(() => {
 
 watch(search, debouncedSearch)
 watch([page, itemsPerPage], loadCategories)
-watch([statusFilter, includeDeleted], () => { page.value = 1; loadCategories() })
+watch([statusFilter, includeDeleted, sortBy], () => { page.value = 1; loadCategories() })
 
 // ---- drag & drop ----
 function onDragStart(e: DragEvent, index: number) {
@@ -284,8 +306,33 @@ async function saveOrder(items: any[]) {
   catch { /* ignore */ }
 }
 
+// ---- quick status toggle (per-card, no modal) ----
+const togglingId = ref<number | null>(null)
+async function toggleStatus(cat: any, ev?: Event) {
+  ev?.stopPropagation()
+  if (togglingId.value !== null)
+    return
+  togglingId.value = cat.id
+  const prev = cat.status
+  // Optimistic flip for instant feedback; revert on failure.
+  cat.status = prev === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+  try {
+    const res = await axios.post(`/categories/${cat.id}/toggle`)
+    cat.status = res.data?.data?.status ?? cat.status
+    notify(cat.status === 'ACTIVE' ? t('Category activated') : t('Category deactivated'))
+    loadStats()
+  }
+  catch (e: any) {
+    cat.status = prev
+    notify(e?.response?.data?.message ?? t('Error updating status'), 'error')
+  }
+  finally {
+    togglingId.value = null
+  }
+}
+
 // ---- dirty tracking ----
-const initialForm = ref({ name: '', description: '', color: '' })
+const initialForm = ref({ name: '', description: '', color: '', status: 'ACTIVE' })
 const isDirty = computed(() => JSON.stringify(form.value) !== JSON.stringify(initialForm.value))
 
 function tryCloseDialog(val: boolean) {
@@ -305,7 +352,7 @@ function openCreate() {
   colorMode.value = 'none'
   baseColor.value = '#e74c3c'
   intensity.value = 0.7
-  form.value = { name: '', description: '', color: '' }
+  form.value = { name: '', description: '', color: '', status: 'ACTIVE' }
   nextTick(() => { initialForm.value = { ...form.value } })
   dialogOpen.value = true
 }
@@ -322,6 +369,7 @@ function openEdit(cat: any) {
     name: cat.name ?? '',
     description: cat.description ?? '',
     color: existingColor,
+    status: cat.status ?? 'ACTIVE',
   }
   nextTick(() => { initialForm.value = { ...form.value } })
   dialogOpen.value = true
@@ -334,6 +382,7 @@ async function saveCategory() {
       name: form.value.name,
       description: form.value.description,
       colors: [form.value.color],
+      status: form.value.status,
       sort_order: editingCategory.value?.sort_order ?? categories.value.length,
     }
 
@@ -406,11 +455,27 @@ const kpiInactive = computed(() => ({
   icon: 'pause',
   tone: 'warning' as const,
 }))
+const kpiDeleted = computed(() => ({
+  label: t('Deleted'),
+  value: stats.value ? (stats.value.deleted_categories ?? null) : null,
+  icon: 'trash',
+  tone: 'error' as const,
+  sub: t('Recoverable'),
+}))
 
 // ---- Status filter options ----
 const statusOptions = computed(() => [
   { value: 'ACTIVE', label: t('category_status_ACTIVE') },
   { value: 'INACTIVE', label: t('category_status_INACTIVE') },
+])
+
+// ---- Sort options (order_by values validated by BE ALLOWED_ORDER_FIELDS) ----
+const sortOptions = computed(() => [
+  { value: 'sort_order', label: t('sort_manual') },
+  { value: 'name', label: t('sort_name_az') },
+  { value: '-name', label: t('sort_name_za') },
+  { value: '-created_at', label: t('sort_newest') },
+  { value: 'created_at', label: t('sort_oldest') },
 ])
 
 // Map raw BE status to design Badge tone
@@ -493,6 +558,7 @@ function clearAllFilters() {
       <Kpi :data="kpiTotal" />
       <Kpi :data="kpiActive" />
       <Kpi :data="kpiInactive" />
+      <Kpi :data="kpiDeleted" />
     </div>
 
     <!-- Toolbar -->
@@ -512,6 +578,14 @@ function clearAllFilters() {
             icon="filter"
             :placeholder="t('All Category Statuses')"
             :options="statusOptions"
+          />
+        </div>
+
+        <div class="tb-status">
+          <Select
+            v-model="sortBy"
+            icon="sort"
+            :options="sortOptions"
           />
         </div>
 
@@ -601,8 +675,9 @@ function clearAllFilters() {
               'is-dragging': draggedIndex === index,
               'is-drag-over': dragOverIndex === index && draggedIndex !== index,
               'is-selected': selection.isSelected(cat.id),
+              'no-drag': !manualSort,
             }"
-            draggable="true"
+            :draggable="manualSort"
             @dragstart="onDragStart($event, index)"
             @dragover="onDragOver($event, index)"
             @dragleave="onDragLeave"
@@ -632,9 +707,11 @@ function clearAllFilters() {
               >
                 <span class="category-card__name">{{ cat.name }}</span>
                 <DesignIcon
+                  v-if="manualSort"
                   name="grid"
                   :size="16"
                   class="drag-hint"
+                  :title="t('Drag to reorder')"
                 />
               </div>
               <p
@@ -647,12 +724,21 @@ function clearAllFilters() {
                 class="row"
                 style="gap:6px;align-items:center;justify-content:space-between;margin-top:8px;"
               >
-                <Badge
-                  :tone="statusTone(cat.status)"
-                  dot
+                <button
+                  type="button"
+                  class="status-toggle"
+                  :class="{ 'is-busy': togglingId === cat.id }"
+                  :disabled="togglingId === cat.id"
+                  :title="cat.status === 'ACTIVE' ? t('Click to deactivate') : t('Click to activate')"
+                  @click.stop="toggleStatus(cat, $event)"
                 >
-                  {{ t(`category_status_${cat.status}`) }}
-                </Badge>
+                  <Badge
+                    :tone="statusTone(cat.status)"
+                    dot
+                  >
+                    {{ t(`category_status_${cat.status}`) }}
+                  </Badge>
+                </button>
                 <span
                   v-if="cat.product_count !== undefined && cat.product_count !== null"
                   class="mono category-card__order"
@@ -875,6 +961,27 @@ function clearAllFilters() {
             v-model="form.description"
             :placeholder="t('Description')"
           />
+        </Field>
+
+        <!-- Status toggle -->
+        <Field
+          :label="t('Status')"
+          class="span-2"
+        >
+          <label
+            class="status-field"
+            :class="{ 'is-active': formActive }"
+          >
+            <Switch v-model="formActive" />
+            <div class="status-field__text">
+              <span class="status-field__title">
+                {{ formActive ? t('category_status_ACTIVE') : t('category_status_INACTIVE') }}
+              </span>
+              <span class="status-field__hint">
+                {{ formActive ? t('Visible on the POS') : t('Hidden from the POS') }}
+              </span>
+            </div>
+          </label>
         </Field>
 
         <!-- Slug (read-only, edit mode only) -->
@@ -1153,6 +1260,12 @@ function clearAllFilters() {
   cursor: grabbing;
 }
 
+/* When sorted by anything other than manual order, dragging is off. */
+.category-card.no-drag,
+.category-card.no-drag:active {
+  cursor: pointer;
+}
+
 .category-card.is-dragging {
   opacity: 0.4;
   transform: scale(0.96);
@@ -1215,6 +1328,60 @@ function clearAllFilters() {
 .drag-hint {
   opacity: 0.3;
   flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+/* ── Card status quick-toggle ── */
+.status-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--r-xs);
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.status-toggle:hover {
+  transform: translateY(-1px);
+}
+.status-toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.status-toggle.is-busy {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ── Modal status field ── */
+.status-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-inset);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.status-field.is-active {
+  border-color: var(--success);
+}
+.status-field__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.status-field__title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.status-field__hint {
+  font-size: 12px;
   color: var(--text-tertiary);
 }
 

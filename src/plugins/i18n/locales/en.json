@@ -812,6 +812,8 @@
   "No products yet": "No products yet",
   "Instant": "Instant",
   "product_is_instant_label": "Skip kitchen",
+  "products_kpi_active": "In catalog",
+  "products_kpi_deleted_hint": "Click to show/hide",
   "product_sort_default": "Default (popular first)",
   "product_sort_name_asc": "Name A→Z",
   "product_sort_name_desc": "Name Z→A",

@@ -4,6 +4,7 @@ import { useTableSelection } from '@/composables/useTableSelection'
 import BulkActionBar from '@/components/design/BulkActionBar.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import Checkbox from '@/components/design/Checkbox.vue'
+import Kpi from '@/components/design/Kpi.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -12,6 +13,11 @@ const products = ref<any[]>([])
 const totalProducts = ref(0)
 const loading = ref(false)
 const bulkBusy = ref(false)
+
+// Catalog-wide counters for the KPI strip (GET /products/stats).
+// Loaded once on mount and refreshed after any mutation so the numbers
+// never drift from what the table shows.
+const stats = ref<{ total_products?: number, deleted_products?: number } | null>(null)
 
 // Bulk selection — uses the current visible product ID list so Shift-click
 // range selection respects sort/filter, not raw data order.
@@ -117,17 +123,37 @@ const previewColor = computed(() => {
   return categoryColorMap.value[form.value.category_id] || '#9e9e9e'
 })
 
-// Headers preserved (kept for parity with prior version)
-const headers = [
-  { title: t('ID'), key: 'id', sortable: false, width: '60px' },
-  { title: t('Name'), key: 'name', sortable: false },
-  { title: t('Price'), key: 'price', sortable: false },
-  { title: t('Category'), key: 'category', sortable: false },
-  { title: t('Created'), key: 'created_at', sortable: false },
-  { title: t('Actions'), key: 'actions', sortable: false, align: 'end' },
-]
-
 const { formatCurrency, formatDateShort: formatDate } = useFormatters()
+
+// ---- KPI strip ----
+async function loadStats() {
+  try {
+    const res = await axios.get('/products/stats')
+    stats.value = res.data?.data ?? res.data ?? null
+  }
+  catch { /* KPI strip is non-critical — silently degrade */ }
+}
+
+const kpiTotal = computed(() => ({
+  label: t('products_kpi_active'),
+  value: stats.value ? (stats.value.total_products ?? null) : null,
+  icon: 'package',
+  tone: 'primary' as const,
+  sub: t('Products'),
+}))
+const kpiCategories = computed(() => ({
+  label: t('Categories'),
+  value: categoriesList.value.length ? categoriesList.value.length : null,
+  icon: 'tag',
+  tone: 'info' as const,
+}))
+const kpiDeleted = computed(() => ({
+  label: t('Deleted'),
+  value: stats.value ? (stats.value.deleted_products ?? null) : null,
+  icon: 'trash',
+  tone: 'warning' as const,
+  sub: t('products_kpi_deleted_hint'),
+}))
 
 // ---- load ----
 async function loadProducts() {
@@ -173,7 +199,24 @@ async function loadCategories() {
 onMounted(() => {
   loadProducts()
   loadCategories()
+  loadStats()
+  window.addEventListener('keydown', onKeydown)
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+})
+
+// Escape closes whichever modal is open (dirty-guard still applies to the
+// edit dialog; the delete confirm only closes when it isn't mid-request).
+function onKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape')
+    return
+  if (deleteDialog.value && !deleteBusy.value)
+    deleteDialog.value = false
+  else if (dialogOpen.value)
+    tryCloseDialog()
+}
 
 watch(page, () => { selection.clear(); loadProducts() })
 watch(itemsPerPage, () => {
@@ -280,6 +323,7 @@ async function saveProduct() {
     }
     dialogOpen.value = false
     await loadProducts()
+    loadStats()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error saving product'), 'error')
@@ -304,6 +348,7 @@ async function restoreProduct(product: any) {
     await axios.post(`/products/${product.id}/restore`)
     notify(t('Product restored'))
     await loadProducts()
+    loadStats()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error restoring product'), 'error')
@@ -319,6 +364,7 @@ async function deleteProduct() {
     notify(t('Product deleted'))
     deleteDialog.value = false
     await loadProducts()
+    loadStats()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting product'), 'error')
@@ -340,6 +386,7 @@ async function bulkDelete() {
     await axios.post('/products/bulk-delete', { ids })
     selection.clear()
     await loadProducts()
+    loadStats()
     // Sonner undo toast — one click restores the deleted IDs via bulk-restore.
     const { toast: sonner } = await import('vue-sonner')
     sonner.success(t('Deleted {n} products', { n: ids.length }), {
@@ -351,6 +398,7 @@ async function bulkDelete() {
             await axios.post('/products/bulk-restore', { ids })
             notify(t('Restored {n} products', { n: ids.length }))
             await loadProducts()
+            loadStats()
           }
           catch (e: any) {
             notify(e?.response?.data?.message ?? t('Error restoring products'), 'error')
@@ -377,6 +425,7 @@ async function bulkRestore() {
     notify(t('Restored {n} products', { n: ids.length }))
     selection.clear()
     await loadProducts()
+    loadStats()
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error restoring products'), 'error')
@@ -520,6 +569,28 @@ function goPage(p: number | '…') {
           </svg>
           {{ t('Add Product') }}
         </button>
+      </div>
+    </div>
+
+    <!-- ============== KPI STRIP ============== -->
+    <div
+      class="grid cols-3 products-kpis"
+      style="margin-bottom: var(--sp-5);"
+    >
+      <Kpi :data="kpiTotal" />
+      <Kpi :data="kpiCategories" />
+      <!-- Deleted KPI doubles as a shortcut: click to surface soft-deleted rows -->
+      <div
+        class="products-kpi-click"
+        :class="{ 'is-active': includeDeleted }"
+        role="button"
+        tabindex="0"
+        :title="t('products_kpi_deleted_hint')"
+        @click="includeDeleted = !includeDeleted"
+        @keydown.enter.prevent="includeDeleted = !includeDeleted"
+        @keydown.space.prevent="includeDeleted = !includeDeleted"
+      >
+        <Kpi :data="kpiDeleted" />
       </div>
     </div>
 
@@ -1713,6 +1784,27 @@ function goPage(p: number | '…') {
   background: var(--surface-inset);
   color: var(--text-secondary);
   border: 1px solid var(--border-strong);
+}
+
+/* ── Clickable "Deleted" KPI (shortcut to include-deleted view) ── */
+.products-kpi-click {
+  cursor: pointer;
+  border-radius: var(--r-lg, 14px);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  outline: none;
+}
+
+.products-kpi-click:hover {
+  transform: translateY(-1px);
+}
+
+.products-kpi-click:focus-visible {
+  box-shadow: 0 0 0 2px var(--primary);
+}
+
+.products-kpi-click.is-active :deep(.kpi) {
+  border-color: var(--warning, #f0ad4e);
+  box-shadow: 0 0 0 1px var(--warning, #f0ad4e) inset;
 }
 
 /* ── Responsive toolbar / modals ── */

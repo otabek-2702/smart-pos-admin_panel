@@ -80,7 +80,7 @@ const actingOnId = ref<number | string | null>(null)
 const bulking = ref(false)
 
 // Destructive-action confirm dialogs
-type ConfirmKind = 'cancel-one' | 'cancel-bulk' | 'pay-one' | 'pay-bulk'
+type ConfirmKind = 'cancel-one' | 'cancel-bulk' | 'pay-one' | 'pay-bulk' | 'unpay-one'
 const confirmDialog = ref<{ kind: ConfirmKind, order?: any } | null>(null)
 function openConfirm(kind: ConfirmKind, order?: any) {
   confirmDialog.value = { kind, order }
@@ -258,6 +258,42 @@ async function cancelOrder(order: any) {
   }
 }
 
+// Advance an OPEN / PREPARING order to READY (kitchen/counter hand-off).
+// Non-destructive, so it fires directly with the same per-row guard — no modal.
+async function markReady(order: any) {
+  if (actingOnId.value === order.id) return
+  actingOnId.value = order.id
+  try {
+    await axios.post(`/orders/${order.id}/ready`)
+    notify(t('Order marked as ready'))
+    await Promise.all([loadOrders(), loadStats()])
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error updating order'), 'error')
+  }
+  finally {
+    actingOnId.value = null
+  }
+}
+
+// Reverse an accidental payment (returns the cash leg to the drawer, restores
+// stock server-side). Financially sensitive → routed through the confirm modal.
+async function unpayOrder(order: any) {
+  if (actingOnId.value === order.id) return
+  actingOnId.value = order.id
+  try {
+    await axios.post(`/orders/${order.id}/unpay`)
+    notify(t('Order payment reversed'))
+    await Promise.all([loadOrders(), loadStats()])
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error updating order'), 'error')
+  }
+  finally {
+    actingOnId.value = null
+  }
+}
+
 // Wrappers triggered from confirm dialog
 async function confirmCancelOne() {
   const o = confirmDialog.value?.order
@@ -268,6 +304,11 @@ async function confirmPayOne() {
   const o = confirmDialog.value?.order
   closeConfirm()
   if (o) await markPaid(o)
+}
+async function confirmUnpayOne() {
+  const o = confirmDialog.value?.order
+  closeConfirm()
+  if (o) await unpayOrder(o)
 }
 async function confirmCancelBulk() {
   closeConfirm()
@@ -991,12 +1032,28 @@ function onPaymentToggle(p: string) {
         <!-- Inline row actions -->
         <template #row-actions="{ row: o }">
           <IconAction
+            v-if="(o.status === 'OPEN' || o.status === 'PREPARING')"
+            icon="check"
+            tone="warning"
+            :title="t('Mark ready')"
+            :disabled="actingOnId === o.id"
+            @click="markReady(o)"
+          />
+          <IconAction
             v-if="!o.is_paid && o.status !== 'CANCELED'"
             icon="dollar"
             tone="success"
             :title="t('Pay')"
             :disabled="actingOnId === o.id"
             @click="openConfirm('pay-one', o)"
+          />
+          <IconAction
+            v-if="o.is_paid && o.status !== 'CANCELED'"
+            icon="refresh"
+            tone="primary"
+            :title="t('Reverse payment')"
+            :disabled="actingOnId === o.id"
+            @click="openConfirm('unpay-one', o)"
           />
           <IconAction
             v-if="o.status !== 'CANCELED' && o.status !== 'COMPLETED'"
@@ -1006,7 +1063,6 @@ function onPaymentToggle(p: string) {
             :disabled="actingOnId === o.id"
             @click="openConfirm('cancel-one', o)"
           />
-          <IconAction icon="more" :title="t('More')" />
         </template>
 
         <!-- Expanded row: order items (compact) -->
@@ -1070,16 +1126,20 @@ function onPaymentToggle(p: string) {
       :title="confirmDialog?.kind === 'cancel-one' ? t('Cancel this order?')
         : confirmDialog?.kind === 'cancel-bulk' ? t('Cancel selected orders?')
           : confirmDialog?.kind === 'pay-one' ? t('Mark this order as paid?')
-            : t('Mark selected orders as paid?')"
+            : confirmDialog?.kind === 'unpay-one' ? t('Reverse this payment?')
+              : t('Mark selected orders as paid?')"
       :subtitle="(confirmDialog?.kind === 'cancel-one' || confirmDialog?.kind === 'cancel-bulk')
         ? t('This action cannot be undone')
-        : t('Payment status will change immediately.')"
+        : confirmDialog?.kind === 'unpay-one'
+          ? t('Payment will be reversed and the drawer adjusted.')
+          : t('Payment status will change immediately.')"
       @close="closeConfirm"
     >
       <div v-if="confirmDialog" class="row" style="gap:14px;align-items:flex-start;">
         <div
           class="kpi__icon"
-          :class="(confirmDialog.kind === 'cancel-one' || confirmDialog.kind === 'cancel-bulk') ? 't-error' : 't-success'"
+          :class="(confirmDialog.kind === 'cancel-one' || confirmDialog.kind === 'cancel-bulk') ? 't-error'
+            : confirmDialog.kind === 'unpay-one' ? 't-warning' : 't-success'"
           style="width:44px;height:44px;flex:0 0 44px;"
         >
           <DesignIcon name="alert" :size="22" />
@@ -1095,6 +1155,9 @@ function onPaymentToggle(p: string) {
           <p class="muted" style="margin:6px 0 0;font-size:14px;">
             <template v-if="confirmDialog.kind === 'cancel-one' || confirmDialog.kind === 'cancel-bulk'">
               {{ t('Cancelling may require a refund and impact the customer.') }}
+            </template>
+            <template v-else-if="confirmDialog.kind === 'unpay-one'">
+              {{ t('The cash leg returns to the drawer and stock is restored.') }}
             </template>
             <template v-else>
               {{ t('No refund flow will be triggered.') }}
@@ -1124,6 +1187,15 @@ function onPaymentToggle(p: string) {
           @click="confirmCancelBulk"
         >
           {{ t('Cancel orders') }}
+        </Button>
+        <Button
+          v-else-if="confirmDialog?.kind === 'unpay-one'"
+          variant="secondary"
+          :loading="actingOnId !== null"
+          :disabled="actingOnId !== null"
+          @click="confirmUnpayOne"
+        >
+          {{ t('Reverse payment') }}
         </Button>
         <Button
           v-else-if="confirmDialog?.kind === 'pay-one'"

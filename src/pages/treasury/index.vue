@@ -59,6 +59,13 @@ async function loadAccounts() {
   }
 }
 
+// Combined money on hand across both accounts — the single figure an operator
+// checks first ("how much cash does the business currently control?").
+const accountsReady = computed(() => !!(accounts.value?.SAFE || accounts.value?.BANK))
+const totalBalance = computed(() =>
+  Number(accounts.value?.SAFE?.balance ?? 0) + Number(accounts.value?.BANK?.balance ?? 0),
+)
+
 // -------- history --------
 const txns = ref<any[]>([])
 const total = ref(0)
@@ -95,6 +102,60 @@ const filteredTxns = computed(() => {
     return true
   })
 })
+
+// Client-side filters (search + date range) narrow only the rows already on the
+// current page — expose whether any are active so we can offer a quick reset and
+// an honest "showing X of Y on this page" count.
+const hasClientFilters = computed(() =>
+  !!(search.value.trim() || dateFrom.value || dateTo.value),
+)
+
+function clearClientFilters() {
+  search.value = ''
+  dateFrom.value = ''
+  dateTo.value = ''
+}
+
+// Export the currently visible (filtered) ledger rows to CSV — the standard
+// hand-off accountants expect. Uses the same UTF-8 BOM + quoting convention as
+// the Orders export so Excel opens Cyrillic correctly.
+function exportCsv() {
+  const rows = filteredTxns.value
+  if (!rows.length) {
+    notify(t('Nothing to export yet'), 'warning')
+
+    return
+  }
+  const cols: Array<[string, (r: any) => any]> = [
+    [t('Date'), r => r.created_at],
+    [t('Account'), r => t(`treasury_account_${r.account}`)],
+    [t('Type'), r => t(`treasury_txn_${r.type}`)],
+    [t('Amount'), r => r.delta],
+    [t('Fee'), r => r.fee ?? 0],
+    [t('Balance after'), r => r.balance_after],
+    [t('Category'), r => r.category ?? ''],
+    [t('Description'), r => r.description ?? ''],
+    [t('Reference'), r => (r.reference_type && r.reference_id ? `${r.reference_type} #${r.reference_id}` : '')],
+    [t('By'), r => r.performed_by ?? ''],
+  ]
+  const head = cols.map(c => `"${c[0]}"`).join(',')
+  const body = rows.map(r =>
+    cols.map(c => `"${String(c[1](r) ?? '').replace(/"/g, '""')}"`).join(','),
+  ).join('\n')
+  const csv = `﻿${head}\n${body}\n`
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const stamp = new Date().toISOString().slice(0, 10)
+
+  a.href = url
+  a.download = `treasury-${stamp}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  notify(t('Exported {n} transactions', { n: rows.length }), 'success')
+}
 
 const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'created_at', label: t('Date'), width: 160 },
@@ -171,6 +232,12 @@ function openTransfer() {
   transferDialog.value = true
 }
 
+function swapTransferAccounts() {
+  const { from, to } = transferForm.value
+  transferForm.value.from = to
+  transferForm.value.to = from
+}
+
 const transferCredited = computed(() =>
   Math.max(0, Number(transferForm.value.amount || 0) - Number(transferForm.value.fee || 0)),
 )
@@ -228,9 +295,30 @@ function openExpense() {
   expenseDialog.value = true
 }
 
+// The backend debits amount + fee from the chosen account, so preview the true
+// outflow and guard against overspending before the request is sent — mirrors
+// the transfer dialog's insufficient-balance check.
+const expenseAccountBalance = computed(() =>
+  Number(accounts.value?.[expenseForm.value.account]?.balance ?? 0),
+)
+const expenseTotalOut = computed(() =>
+  Math.max(0, Number(expenseForm.value.amount || 0) + Number(expenseForm.value.fee || 0)),
+)
+const expenseInsufficient = computed(() =>
+  expenseTotalOut.value > 0 && expenseTotalOut.value > expenseAccountBalance.value,
+)
+const expenseRemaining = computed(() =>
+  expenseAccountBalance.value - expenseTotalOut.value,
+)
+
 async function doExpense() {
   if (!expenseForm.value.amount || expenseForm.value.amount <= 0) {
     notify(t('Amount must be greater than 0'), 'error')
+
+    return
+  }
+  if (expenseInsufficient.value) {
+    notify(t('Insufficient balance: available {bal}', { bal: formatCurrency(expenseAccountBalance.value) }), 'error')
 
     return
   }
@@ -267,7 +355,7 @@ function deltaDisplay(t_: any) {
     />
 
     <!-- Account cards -->
-    <div class="grid cols-2 treasury-kpis">
+    <div class="grid cols-3 treasury-kpis">
       <div class="kpi-card">
         <div class="kpi-card__top">
           <div class="kpi-card__icon t-success">
@@ -297,6 +385,22 @@ function deltaDisplay(t_: any) {
         <Skeleton v-else :h="28" w="140px" :r="4" style="margin: 4px 0;" />
         <div v-if="accounts.BANK?.last_updated" class="kpi-card__sub">
           {{ t('Updated') }}: {{ formatDate(accounts.BANK.last_updated) }}
+        </div>
+      </div>
+
+      <div class="kpi-card treasury-total">
+        <div class="kpi-card__top">
+          <div class="kpi-card__icon t-info">
+            <DesignIcon name="wallet" :size="20" />
+          </div>
+          <div class="kpi-card__label">{{ t('Total treasury') }}</div>
+        </div>
+        <div v-if="accountsReady" class="kpi-card__value num-tabular">
+          {{ formatCurrency(totalBalance) }}<span class="kpi-card__unit">{{ t('currency_short') }}</span>
+        </div>
+        <Skeleton v-else :h="28" w="140px" :r="4" style="margin: 4px 0;" />
+        <div class="kpi-card__sub">
+          {{ t('Safe + Bank combined') }}
         </div>
       </div>
     </div>
@@ -347,6 +451,22 @@ function deltaDisplay(t_: any) {
 
         <div class="treasury-actions">
           <Button
+            v-if="hasClientFilters"
+            variant="ghost"
+            icon="close"
+            @click="clearClientFilters"
+          >
+            {{ t('Clear filters') }}
+          </Button>
+          <Button
+            variant="secondary"
+            icon="download"
+            :disabled="!filteredTxns.length"
+            @click="exportCsv"
+          >
+            {{ t('Export CSV') }}
+          </Button>
+          <Button
             variant="secondary"
             icon="refresh"
             @click="openTransfer"
@@ -361,6 +481,13 @@ function deltaDisplay(t_: any) {
             {{ t('Record Expense') }}
           </Button>
         </div>
+      </div>
+
+      <div
+        v-if="hasClientFilters && !loading"
+        class="treasury-filternote cell-muted"
+      >
+        {{ t('Showing {n} of {total} on this page', { n: filteredTxns.length, total: txns.length }) }}
       </div>
 
       <div class="card__divider" />
@@ -488,6 +615,16 @@ function deltaDisplay(t_: any) {
             :options="accountOptions"
           />
         </Field>
+        <div class="treasury-swap-row">
+          <button
+            type="button"
+            class="treasury-swap-btn"
+            @click="swapTransferAccounts"
+          >
+            <DesignIcon name="sort" :size="14" />
+            {{ t('Swap direction') }}
+          </button>
+        </div>
         <Field
           :label="t('Amount')"
           :error="transferInsufficient ? t('Insufficient balance: available {bal}', { bal: formatCurrency(transferSourceBalance) }) : ''"
@@ -535,7 +672,7 @@ function deltaDisplay(t_: any) {
           variant="primary"
           icon="exchange"
           :loading="transferSaving"
-          :disabled="transferSaving"
+          :disabled="transferSaving || transferInsufficient || transferForm.from === transferForm.to"
           @click="doTransfer"
         >
           {{ t('Transfer') }}
@@ -558,11 +695,15 @@ function deltaDisplay(t_: any) {
             :options="accountOptions"
           />
         </Field>
-        <Field :label="t('Amount')">
+        <Field
+          :label="t('Amount')"
+          :error="expenseInsufficient ? t('Insufficient balance: available {bal}', { bal: formatCurrency(expenseAccountBalance) }) : ''"
+        >
           <Input
             v-model="expenseForm.amount"
             type="number"
             min="0"
+            :error="expenseInsufficient"
             autofocus
           />
         </Field>
@@ -591,6 +732,22 @@ function deltaDisplay(t_: any) {
             <Input v-model="expenseForm.description" />
           </Field>
         </div>
+        <div
+          v-if="expenseTotalOut > 0"
+          class="treasury-expense-preview"
+        >
+          <div class="treasury-preview-row">
+            <span class="cell-muted">{{ t('Total debited') }}</span>
+            <span class="num-tabular cell-strong">{{ formatCurrency(expenseTotalOut) }}</span>
+          </div>
+          <div class="treasury-preview-row">
+            <span class="cell-muted">{{ t('Balance after this expense') }}</span>
+            <span
+              class="num-tabular cell-strong"
+              :class="expenseInsufficient ? 'text-error-strong' : ''"
+            >{{ formatCurrency(expenseRemaining) }}</span>
+          </div>
+        </div>
       </div>
 
       <template #footer>
@@ -605,7 +762,7 @@ function deltaDisplay(t_: any) {
           variant="danger"
           icon="minus"
           :loading="expenseSaving"
-          :disabled="expenseSaving"
+          :disabled="expenseSaving || expenseInsufficient"
           @click="doExpense"
         >
           {{ t('Record Expense') }}
@@ -667,8 +824,54 @@ function deltaDisplay(t_: any) {
 .text-success-strong { color: rgb(var(--v-theme-success-strong)); }
 .text-error-strong { color: rgb(var(--v-theme-error-strong)); }
 
+.treasury-total .kpi-card__value { color: rgb(var(--v-theme-info-strong, var(--v-theme-primary))); }
+
+.treasury-filternote {
+  padding: var(--sp-2) var(--sp-4) 0;
+  font-size: var(--fs-label);
+}
+
 .treasury-form-grid {
   gap: var(--sp-4);
+}
+
+.treasury-swap-row {
+  grid-column: span 2;
+  display: flex;
+  justify-content: center;
+  margin-top: calc(-1 * var(--sp-2));
+}
+
+.treasury-swap-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: var(--fs-label);
+  color: rgb(var(--v-theme-primary));
+  background: transparent;
+  border: 1px solid rgba(var(--v-theme-primary), 0.35);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.treasury-swap-btn:hover { background: rgba(var(--v-theme-primary), 0.08); }
+
+.treasury-expense-preview {
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: rgba(var(--v-theme-on-surface), 0.03);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  border-radius: 8px;
+}
+
+.treasury-preview-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 @media (max-width: 768px) {
@@ -679,6 +882,8 @@ function deltaDisplay(t_: any) {
   .treasury-actions > * { flex: 1 1 auto; }
   .treasury-form-grid { grid-template-columns: 1fr; }
   .treasury-form-grid > div[style*="span 2"] { grid-column: span 1 !important; }
+  .treasury-swap-row,
+  .treasury-expense-preview { grid-column: span 1; }
 }
 
 @media (max-width: 480px) {

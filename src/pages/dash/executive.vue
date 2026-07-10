@@ -259,12 +259,43 @@ function asNum(v: unknown): number {
 }
 
 // Payment mix colors (kept stable across renders so DonutChart legend is consistent).
+// Keys are LOWERCASED before lookup: /dashboard returns { cash, card, payme, … }
+// while /dashboard/today returns { CASH, UZCARD, HUMO, … }. Matching on one case
+// silently missed every key, so every slice fell back to an undefined CSS var
+// (--v-theme-neutral doesn't exist) -> invalid color -> the donut painted black.
 const PAY_COLORS: Record<string, string> = {
-  CASH: 'rgb(var(--v-theme-success))',
-  UZCARD: 'rgb(var(--v-theme-info))',
-  HUMO: 'rgb(var(--v-theme-warning))',
-  PAYME: 'rgb(var(--v-theme-primary))',
-  MIXED: 'rgb(var(--v-theme-text-tertiary))',
+  cash: 'rgb(var(--v-theme-success))',
+  card: 'rgb(var(--v-theme-info))',
+  uzcard: 'rgb(var(--v-theme-info))',
+  humo: 'rgb(var(--v-theme-warning))',
+  payme: 'rgb(var(--v-theme-primary))',
+  mixed: 'rgb(var(--v-theme-text-tertiary))',
+}
+// i18n key per tender; brand names (Humo/Uzcard/Payme) stay as-is.
+const PAY_LABEL: Record<string, string> = {
+  cash: 'Cash',
+  card: 'Card',
+  uzcard: 'Uzcard',
+  humo: 'Humo',
+  payme: 'Payme',
+  mixed: 'Mixed',
+}
+const PAY_FALLBACK = 'rgb(var(--v-theme-text-tertiary))' // a var that actually exists
+
+/** Build donut slices from either payload shape, skipping nested objects
+ *  (/dashboard ships a `card_detail: { UZCARD, HUMO, CARD }` breakdown). */
+function toPaymentMix(pay: Record<string, unknown>): PaymentSlice[] {
+  return Object.entries(pay ?? {})
+    .filter(([, v]) => v !== null && typeof v !== 'object')
+    .map(([k, v]) => {
+      const key = k.toLowerCase()
+      return {
+        label: t(PAY_LABEL[key] ?? k),
+        value: asNum(v),
+        color: PAY_COLORS[key] ?? PAY_FALLBACK,
+      }
+    })
+    .filter(s => s.value > 0)
 }
 
 function mapRangePayload(p: any): DashData {
@@ -275,10 +306,7 @@ function mapRangePayload(p: any): DashData {
   d.monthOrders = orders
   d.avgAov = orders > 0 ? Math.round(rev / orders) : 0
 
-  const pay = p?.payment_breakdown ?? {}
-  d.paymentMix = Object.entries(pay)
-    .map(([k, v]) => ({ label: k, value: asNum(v), color: PAY_COLORS[k] ?? 'rgb(var(--v-theme-neutral))' }))
-    .filter(s => s.value > 0)
+  d.paymentMix = toPaymentMix(p?.payment_breakdown)
 
   // /dashboard (range) now returns category_stats over the selected window
   // (same shape as /dashboard/today's category_stats_today). Consume it so the
@@ -299,10 +327,7 @@ function mapTodayPayload(p: any): DashData {
   d.monthOrders = orders
   d.avgAov = orders > 0 ? Math.round(rev / orders) : 0
 
-  const pay = p?.payment_breakdown_today ?? {}
-  d.paymentMix = Object.entries(pay)
-    .map(([k, v]) => ({ label: k, value: asNum(v), color: PAY_COLORS[k] ?? 'rgb(var(--v-theme-neutral))' }))
-    .filter(s => s.value > 0)
+  d.paymentMix = toPaymentMix(p?.payment_breakdown_today)
 
   const cats = Array.isArray(p?.category_stats_today) ? p.category_stats_today : []
   d.categories = cats

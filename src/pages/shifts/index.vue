@@ -388,15 +388,28 @@ async function endShift(s: ShiftV3) {
 /* ============================================================
    Receive cash modal
    ============================================================ */
-const counted = ref<string>('')
+/* Per-tender BLIND count. The manager counts each tender without seeing the
+   system figure; expected + difference are revealed only once a value is typed.
+   Confirmed amounts post to the SAFE (cash) / BANK (cards + Payme) via the
+   backend's deposit_shift, driven by the `confirmed` map on /reconcile. */
+const TENDERS = ['CASH', 'HUMO', 'UZCARD', 'PAYME'] as const
+type Tender = typeof TENDERS[number]
+const CARD_TENDERS: Tender[] = ['HUMO', 'UZCARD', 'PAYME']
+const TENDER_LABEL: Record<Tender, string> = { CASH: 'Cash', HUMO: 'Humo', UZCARD: 'Uzcard', PAYME: 'Payme' }
+
 const noteText = ref<string>('')
 const reconBusy = ref(false)
+const settlementLoading = ref(false)
+const expectedByTender = ref<Record<Tender, number>>({ CASH: 0, HUMO: 0, UZCARD: 0, PAYME: 0 })
+const countedByTender = ref<Record<Tender, string>>({ CASH: '', HUMO: '', UZCARD: '', PAYME: '' })
 
 function openReceive(s: ShiftV3) {
   receiving.value = s
-  counted.value = ''
   noteText.value = ''
   reconBusy.value = false
+  countedByTender.value = { CASH: '', HUMO: '', UZCARD: '', PAYME: '' }
+  expectedByTender.value = { CASH: 0, HUMO: 0, UZCARD: 0, PAYME: 0 }
+  void loadSettlement(s.id)
 }
 function closeReceive() {
   if (reconBusy.value)
@@ -404,50 +417,91 @@ function closeReceive() {
   receiving.value = null
 }
 
-const parsedCounted = computed<number | null>(() => {
-  if (counted.value === '' || counted.value === null || counted.value === undefined)
+// Per-tender expected lives on the shift DETAIL (`settlement[]`); the list row
+// only carries the rolled-up cash figure.
+//
+// CASH is taken from `expected_cash` (Order-level: cash sales − cashbox expenses),
+// NOT from settlement.CASH. Reason: settlement is derived from OrderPayment rows,
+// and a payment path still exists that never writes them — verified on prod shift
+// 47 (cash_collected 8,870,000 vs settlement CASH 6,593,000, expenses 0). Using
+// settlement.CASH would understate the drawer and make an honest cashier look
+// massively over. Card/Payme OrderPayment rows are complete, so settlement is
+// correct for those. Revert CASH to settlement once the backend writes an
+// OrderPayment for every cash sale.
+async function loadSettlement(id: number | string) {
+  settlementLoading.value = true
+  try {
+    const res = await axios.get(`/shifts/${id}`)
+    const data = res.data?.data ?? res.data ?? {}
+    const rows: any[] = data?.settlement ?? []
+    const next: Record<Tender, number> = { CASH: 0, HUMO: 0, UZCARD: 0, PAYME: 0 }
+    for (const r of rows) {
+      const m = String(r?.method ?? '').toUpperCase() as Tender
+      if ((TENDERS as readonly string[]).includes(m))
+        next[m] = Number(r?.expected) || 0
+    }
+    const orderLevelCash = Number(data?.expected_cash)
+    if (Number.isFinite(orderLevelCash))
+      next.CASH = orderLevelCash
+    expectedByTender.value = next
+  }
+  catch { /* leave zeros — the blind count still works */ }
+  finally {
+    settlementLoading.value = false
+  }
+}
+
+function parseAmount(v: string): number | null {
+  if (v === '' || v === null || v === undefined)
     return null
-  const cleaned = String(counted.value).replace(/[^\d-]/g, '')
+  const cleaned = String(v).replace(/[^\d-]/g, '')
   if (cleaned === '' || cleaned === '-')
     return null
   const n = Number(cleaned)
   return Number.isNaN(n) ? null : n
-})
+}
+function countedOf(m: Tender): number | null {
+  return parseAmount(countedByTender.value[m])
+}
+function varianceOf(m: Tender): number | null {
+  const c = countedOf(m)
+  return c === null ? null : c - (expectedByTender.value[m] ?? 0)
+}
+function toneOf(m: Tender): 'neutral' | 'success' | 'error' {
+  const v = varianceOf(m)
+  if (v === null || v === 0)
+    return 'neutral'
+  return v > 0 ? 'success' : 'error'
+}
+function fmtVariance(m: Tender): string {
+  const v = varianceOf(m) ?? 0
+  const sign = v > 0 ? '+' : v < 0 ? '−' : ''
+  return sign + Fmt.money(Math.abs(v))
+}
 
-const liveVariance = computed<number | null>(() => {
-  if (parsedCounted.value === null || !receiving.value || receiving.value.expectedCash === null)
-    return null
-  return parsedCounted.value - (receiving.value.expectedCash ?? 0)
-})
-
-const variancePill = computed(() => pillFor(liveVariance.value))
-
-const varianceBgStyle = computed<Record<string, string>>(() => {
-  const v = liveVariance.value
-  if (v === null)
-    return { background: 'rgb(var(--v-theme-surface-2))', borderColor: 'rgb(var(--v-theme-border))' }
-  if (v === 0)
-    return { background: 'rgb(var(--v-theme-neutral-weak))', borderColor: 'rgb(var(--v-theme-neutral-border))' }
-  if (v > 0)
-    return { background: 'rgb(var(--v-theme-success-weak))', borderColor: 'rgb(var(--v-theme-success-border))' }
-  return { background: 'rgb(var(--v-theme-error-weak))', borderColor: 'rgb(var(--v-theme-error-border))' }
-})
+const anyCounted = computed(() => TENDERS.some(m => countedOf(m) !== null))
+const toSafe = computed(() => countedOf('CASH') ?? 0)
+const toBank = computed(() => CARD_TENDERS.reduce((a, m) => a + (countedOf(m) ?? 0), 0))
+const totalReceived = computed(() => toSafe.value + toBank.value)
 
 async function confirmReceive() {
-  if (!receiving.value || parsedCounted.value === null)
+  if (!receiving.value || !anyCounted.value)
     return
   reconBusy.value = true
   const target = receiving.value
   try {
+    const confirmed: Record<string, number> = {}
+    for (const m of TENDERS) confirmed[m] = countedOf(m) ?? 0
     await axios.post(`/shifts/${target.id}/reconcile`, {
-      actual_cash: parsedCounted.value,
+      actual_cash: confirmed.CASH, // BE still requires cash explicitly (back-compat)
+      confirmed, // per-tender → posts cash to SAFE, cards + Payme to BANK
       notes: noteText.value,
     })
-    const v = liveVariance.value ?? 0
-    const tail = v === 0
+    const v = varianceOf('CASH')
+    const tail = v === null || v === 0
       ? t('exact match')
       : (v > 0 ? `${t('over by')} ${Fmt.money(Math.abs(v))}` : `${t('short by')} ${Fmt.money(Math.abs(v))}`)
-    notify(`${t('Cash received from')} ${target.cashier} · ${Fmt.money(parsedCounted.value)} UZS · ${tail}`)
+    notify(`${t('Money received from')} ${target.cashier} · ${Fmt.money(totalReceived.value)} UZS · ${tail}`)
     receiving.value = null
     await loadShifts()
   }
@@ -1038,55 +1092,110 @@ function gotoReport(_s: ShiftV3) {
     <!-- Receive cash modal -->
     <Modal
       :open="!!receiving"
-      :title="receiving ? `${t('Receive cash')} · ${receiving.cashier}` : ''"
-      :subtitle="receiving ? `${t('Shift')} #${receiving.id} · ${t('count the drawer and confirm the handover')}` : ''"
-      :width="520"
+      :title="receiving ? `${t('Receive money')} · ${receiving.cashier}` : ''"
+      :subtitle="receiving ? `${t('Shift')} #${receiving.id} · ${t('count each tender and confirm the handover')}` : ''"
+      :width="620"
       @close="closeReceive"
     >
       <template v-if="receiving">
-        <!-- expected breakdown -->
-        <div
-          style="background: rgb(var(--v-theme-surface-inset)); border: 1px solid rgb(var(--v-theme-border)); border-radius: var(--r-md); padding: var(--sp-4); margin-bottom: var(--sp-5);"
+        <!-- Blind count: the system figure stays hidden per tender until counted -->
+        <p
+          class="tertiary"
+          style="font-size: 13px; margin: 0 0 14px;"
         >
+          {{ t('Count each tender first. The system figure and the difference appear only after you enter an amount.') }}
+        </p>
+
+        <div class="rm-grid">
+          <div class="rm-head">
+            <span>{{ t('Payment type') }}</span>
+            <span>{{ t('Counted') }}</span>
+            <span class="rm-right">{{ t('System expected') }}</span>
+            <span class="rm-right">{{ t('Difference') }}</span>
+          </div>
+
+          <div
+            v-for="m in TENDERS"
+            :key="m"
+            class="rm-row"
+          >
+            <span class="rm-tender">
+              <DesignIcon
+                :name="m === 'CASH' ? 'coins' : 'wallet'"
+                :size="15"
+                :style="{ color: m === 'CASH' ? 'rgb(var(--v-theme-success))' : 'rgb(var(--v-theme-primary))' }"
+              />
+              {{ m === 'CASH' ? t('Cash') : TENDER_LABEL[m] }}
+            </span>
+
+            <Input
+              v-model="countedByTender[m]"
+              inputmode="numeric"
+              :placeholder="t('Count…')"
+            />
+
+            <span class="mono rm-right rm-dim">
+              <template v-if="countedOf(m) !== null">{{ Fmt.money(expectedByTender[m]) }}</template>
+              <span
+                v-else
+                class="tertiary"
+              >—</span>
+            </span>
+
+            <span class="rm-right">
+              <Badge
+                v-if="varianceOf(m) !== null"
+                :tone="toneOf(m)"
+              >{{ fmtVariance(m) }}</Badge>
+              <span
+                v-else
+                class="tertiary"
+              >—</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- where the money lands -->
+        <div class="rm-totals">
           <div
             class="row"
-            style="justify-content: space-between; padding: 5px 0;"
+            style="justify-content: space-between; padding: 4px 0;"
           >
             <span
               class="row"
-              style="gap: 8px; color: rgb(var(--v-theme-text-secondary)); font-size: 13px;"
+              style="gap: 8px; font-size: 13px; color: rgb(var(--v-theme-text-secondary));"
             >
               <DesignIcon
-                name="coins"
+                name="lock"
                 :size="15"
                 :style="{ color: 'rgb(var(--v-theme-success))' }"
               />
-              {{ t('Cash sales') }}
+              {{ t('To Safe (cash)') }}
             </span>
             <span
               class="mono"
               style="font-weight: 600; font-size: 13px;"
-            >{{ Fmt.money(receiving.cash) }}</span>
+            >{{ Fmt.money(toSafe) }}</span>
           </div>
           <div
             class="row"
-            style="justify-content: space-between; padding: 5px 0;"
+            style="justify-content: space-between; padding: 4px 0;"
           >
             <span
               class="row"
-              style="gap: 8px; color: rgb(var(--v-theme-text-secondary)); font-size: 13px;"
+              style="gap: 8px; font-size: 13px; color: rgb(var(--v-theme-text-secondary));"
             >
               <DesignIcon
-                name="receipt"
+                name="building"
                 :size="15"
-                class="tertiary"
+                :style="{ color: 'rgb(var(--v-theme-primary))' }"
               />
-              {{ t('Cash expenses paid') }}
+              {{ t('To Bank (cards + Payme)') }}
             </span>
             <span
               class="mono"
-              style="font-weight: 600; font-size: 13px; color: rgb(var(--v-theme-text-secondary));"
-            >− {{ Fmt.money(receiving.expenses) }}</span>
+              style="font-weight: 600; font-size: 13px;"
+            >{{ Fmt.money(toBank) }}</span>
           </div>
           <div
             class="hr"
@@ -1096,79 +1205,18 @@ function gotoReport(_s: ShiftV3) {
             class="row"
             style="justify-content: space-between;"
           >
-            <span style="font-weight: 600; font-size: 14px;">{{ t('Expected in drawer') }}</span>
+            <span style="font-weight: 600; font-size: 14px;">{{ t('Total received') }}</span>
             <span
               class="mono"
               style="font-weight: 700; font-size: 16px;"
             >
-              {{ Fmt.money(receiving.expectedCash ?? 0) }}
+              {{ Fmt.money(totalReceived) }}
               <span
                 class="tertiary"
                 style="font-size: 12px;"
               >UZS</span>
             </span>
           </div>
-        </div>
-
-        <Field
-          :label="t('Counted cash (UZS)')"
-          :hint="t('Enter the amount you physically counted from the till.')"
-        >
-          <Input
-            v-model="counted"
-            inputmode="numeric"
-            :placeholder="t('e.g. 1 301 000')"
-            icon="wallet"
-            autofocus
-          />
-        </Field>
-
-        <!-- live variance row -->
-        <div
-          class="row"
-          :style="{
-            justifyContent: 'space-between',
-            marginTop: '14px',
-            padding: '12px 14px',
-            borderRadius: 'var(--r-md)',
-            background: varianceBgStyle.background,
-            border: `1px solid ${varianceBgStyle.borderColor}`,
-          }"
-        >
-          <span style="font-weight: 600; font-size: 14px;">{{ t('Variance') }}</span>
-          <span
-            v-if="liveVariance === null"
-            class="tertiary"
-          >{{ t('Enter counted amount') }}</span>
-          <span
-            v-else
-            class="row"
-            style="gap: 10px;"
-          >
-            <span
-              class="mono"
-              :style="{
-                fontWeight: 700,
-                fontSize: '16px',
-                color: liveVariance === 0
-                  ? 'rgb(var(--v-theme-on-surface))'
-                  : liveVariance > 0
-                    ? 'rgb(var(--v-theme-success))'
-                    : 'rgb(var(--v-theme-error))',
-              }"
-            >
-              {{ (liveVariance > 0 ? '+' : liveVariance < 0 ? '−' : '') + Fmt.money(Math.abs(liveVariance)) }}
-            </span>
-            <Badge
-              v-if="variancePill"
-              :tone="variancePill.tone"
-            >
-              {{ variancePill.word }}
-              <template v-if="liveVariance !== 0">
-                {{ ' ' + variancePill.sign + Fmt.num(variancePill.abs) }}
-              </template>
-            </Badge>
-          </span>
         </div>
 
         <Field
@@ -1196,10 +1244,10 @@ function gotoReport(_s: ShiftV3) {
           variant="primary"
           icon="check"
           :loading="reconBusy"
-          :disabled="parsedCounted === null"
+          :disabled="!anyCounted"
           @click="confirmReceive"
         >
-          {{ t('Confirm handover') }}
+          {{ t('Confirm & deposit') }}
         </Button>
       </template>
     </Modal>
@@ -1226,6 +1274,58 @@ function gotoReport(_s: ShiftV3) {
   place-items: center;
   font-weight: 700;
   font-size: 14px;
+}
+
+/* Receive-money modal — per-tender blind-count grid */
+.rm-grid {
+  border: 1px solid rgb(var(--v-theme-border));
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.rm-head,
+.rm-row {
+  display: grid;
+  grid-template-columns: 1.05fr 1.15fr 1fr 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+}
+.rm-head {
+  background: rgb(var(--v-theme-surface-inset));
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: rgb(var(--v-theme-text-secondary));
+}
+.rm-row {
+  border-top: 1px solid rgb(var(--v-theme-border));
+}
+.rm-tender {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  font-size: 13px;
+}
+.rm-right {
+  text-align: right;
+  justify-self: end;
+}
+.rm-dim {
+  color: rgb(var(--v-theme-text-secondary));
+  font-size: 13px;
+}
+.rm-totals {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: rgb(var(--v-theme-surface-inset));
+  border: 1px solid rgb(var(--v-theme-border));
+}
+@media (max-width: 560px) {
+  .rm-head { display: none; }
+  .rm-row { grid-template-columns: 1fr 1fr; row-gap: 8px; }
 }
 
 /* Responsive toolbar */

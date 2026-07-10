@@ -3990,5 +3990,16 @@
   "Units sold · {window}": "Units sold · {window}",
   "Product trends · {window}": "Product trends · {window}",
   "in {window}": "in {window}",
-  "Total hours · {window}": "Total hours · {window}"
+  "Total hours · {window}": "Total hours · {window}",
+  "Receive money": "Receive money",
+  "count each tender and confirm the handover": "count each tender and confirm the handover",
+  "Count each tender first. The system figure and the difference appear only after you enter an amount.": "Count each tender first. The system figure and the difference appear only after you enter an amount.",
+  "Payment type": "Payment type",
+  "System expected": "System expected",
+  "Count…": "Count…",
+  "To Safe (cash)": "To Safe (cash)",
+  "To Bank (cards + Payme)": "To Bank (cards + Payme)",
+  "Total received": "Total received",
+  "Confirm & deposit": "Confirm & deposit",
+  "Money received from": "Money received from"
 }

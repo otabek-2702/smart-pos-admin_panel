@@ -3900,5 +3900,16 @@
   "Units sold · {window}": "Sotilgan dona · {window}",
   "Product trends · {window}": "Mahsulot tendentsiyalari · {window}",
   "in {window}": "{window} ichida",
-  "Total hours · {window}": "Jami soat · {window}"
+  "Total hours · {window}": "Jami soat · {window}",
+  "Receive money": "Pulni qabul qilish",
+  "count each tender and confirm the handover": "har bir toʻlov turini sanang va topshirishni tasdiqlang",
+  "Count each tender first. The system figure and the difference appear only after you enter an amount.": "Avval har bir toʻlov turini sanang. Tizim koʻrsatkichi va farq siz summa kiritganingizdan keyin koʻrinadi.",
+  "Payment type": "Toʻlov turi",
+  "System expected": "Tizim boʻyicha",
+  "Count…": "Sanang…",
+  "To Safe (cash)": "Xazinaga (naqd)",
+  "To Bank (cards + Payme)": "Bankka (karta + Payme)",
+  "Total received": "Jami qabul qilindi",
+  "Confirm & deposit": "Tasdiqlash va topshirish",
+  "Money received from": "Pul qabul qilindi:"
 }

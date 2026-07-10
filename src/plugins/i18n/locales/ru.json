@@ -3897,5 +3897,16 @@
   "Units sold · {window}": "Продано · {window}",
   "Product trends · {window}": "Тренды товаров · {window}",
   "in {window}": "за {window}",
-  "Total hours · {window}": "Всего часов · {window}"
+  "Total hours · {window}": "Всего часов · {window}",
+  "Receive money": "Приём денег",
+  "count each tender and confirm the handover": "пересчитайте каждый тип оплаты и подтвердите передачу",
+  "Count each tender first. The system figure and the difference appear only after you enter an amount.": "Сначала пересчитайте каждый тип оплаты. Системная сумма и разница появятся только после ввода.",
+  "Payment type": "Тип оплаты",
+  "System expected": "По системе",
+  "Count…": "Сумма…",
+  "To Safe (cash)": "В сейф (наличные)",
+  "To Bank (cards + Payme)": "В банк (карты + Payme)",
+  "Total received": "Всего принято",
+  "Confirm & deposit": "Подтвердить и внести",
+  "Money received from": "Деньги приняты от"
 }

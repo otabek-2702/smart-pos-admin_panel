@@ -386,7 +386,7 @@ async function endShift(s: ShiftV3) {
 }
 
 /* ============================================================
-   Receive cash modal
+   Receive money modal — per-tender blind count
    ============================================================ */
 /* Per-tender BLIND count. The manager counts each tender without seeing the
    system figure; expected + difference are revealed only once a value is typed.
@@ -1056,7 +1056,7 @@ function gotoReport(_s: ShiftV3) {
               style="flex: 1;"
               @click="openReceive(s)"
             >
-              {{ t('Receive cash') }}
+              {{ t('Receive money') }}
             </Button>
             <Button
               variant="secondary"
@@ -1089,7 +1089,7 @@ function gotoReport(_s: ShiftV3) {
       </Card>
     </div>
 
-    <!-- Receive cash modal -->
+    <!-- Receive money modal (per-tender blind count) -->
     <Modal
       :open="!!receiving"
       :title="receiving ? `${t('Receive money')} · ${receiving.cashier}` : ''"

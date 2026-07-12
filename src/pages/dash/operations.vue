@@ -12,6 +12,7 @@ import { fmtNum } from '@/components/design/utils/format'
 import axiosIns from '@/plugins/axios'
 import { useDashboardData } from '@/composables/useDashboardData'
 import { businessPreset, buildDateParams } from '@/composables/useBusinessDay'
+import { formatWindow } from '@/composables/useWindowLabel'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -53,7 +54,15 @@ const FUNNEL_TONE: Record<string, string> = {
 
 async function loadOperations(): Promise<void> {
   try {
-    const res = await axiosIns.get('/dashboard/operations')
+    // Follow the hub's date picker. This used to be called with NO params, so the
+    // backend fell back to today's business day — the tab re-fetched on every range
+    // change but always returned today, silently ignoring the picker. (The "live"
+    // counters above stay pinned to today on purpose; these panels are analytical.)
+    const r = sharedRange.value
+    const params = (r?.from && r?.to)
+      ? buildDateParams({ from: r.from, to: r.to, fromTime: r.fromTime, toTime: r.toTime })
+      : buildDateParams({ ...businessPreset('30d') })
+    const res = await axiosIns.get('/dashboard/operations', { params })
     const d = res?.data?.data ?? {}
     // Funnel: BE { status, count } → FE { label, value, color }
     if (Array.isArray(d.funnel)) {
@@ -109,13 +118,17 @@ onMounted(() => {
   void loadOperations()
 })
 
-// Ops endpoints are today-only (not range-scoped), but re-fetch on hub range
-// change so live counters stay fresh when user flips back to this tab.
+// /dashboard/operations IS range-scoped (loadOperations now forwards from/to).
+// The "live" counters (loadOrderStats) stay pinned to today on purpose.
 const { range: sharedRange } = useDashboardData()
 watch(sharedRange, () => {
   void loadOrderStats()
   void loadOperations()
 })
+
+// Localized label for the active picker window, so card titles stop claiming
+// "today" when the user has selected something else.
+const windowLabel = computed(() => formatWindow(sharedRange.value, t))
 
 // Open orders = paid but not completed yet (in-flight) + unpaid. A "live"
 // number the manager actually cares about during service.
@@ -353,7 +366,7 @@ const liveValues = liveCounts.value.map((_c, i) => useCountUp(() => liveCounts.v
       <Card v-if="ordersByHour.length">
         <div class="card__head">
           <div class="card__head-text">
-            <div class="kpi__label">{{ t('Orders by hour · today') }}</div>
+            <div class="kpi__label">{{ t('Orders by hour · {window}', { window: windowLabel }) }}</div>
           </div>
         </div>
         <div class="card__body">

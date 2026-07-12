@@ -446,7 +446,11 @@ onMounted(() => {
       </div>
 
       <!-- Frequently bought together — switchable views -->
-      <Affinity :loading="loading" />
+      <Affinity
+        :loading="loading"
+        :range="sharedRange?.from && sharedRange?.to ? { from: sharedRange.from, to: sharedRange.to } : null"
+        :window-label="windowLabel"
+      />
 
       <!-- Pareto + sparkline-trends table -->
       <div class="grid dashprod-grid--pareto">

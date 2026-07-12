@@ -30,11 +30,14 @@ interface Props {
   loading?: boolean
   /** Optional [from, to] window override (yyyy-MM-dd). Defaults to last 30d. */
   range?: { from: string; to: string } | null
+  /** Localized label of the active window, so the title stops hardcoding "30 days". */
+  windowLabel?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
   range: null,
+  windowLabel: '',
 })
 
 const { t } = useI18n({ useScope: 'global' })
@@ -552,7 +555,9 @@ function firstWord(s: string): string {
       <div class="card__head">
         <div class="card__head-text">
           <div class="kpi__label">
-            {{ t('Frequently bought together · 30 days') }}
+            {{ windowLabel
+              ? t('Frequently bought together · {window}', { window: windowLabel })
+              : t('Frequently bought together · 30 days') }}
           </div>
           <h3 class="card__insight">
             {{ headerInsight }}

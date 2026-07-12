@@ -10,7 +10,6 @@ export {}
 declare module '@vue/runtime-core' {
   export interface GlobalComponents {
     AppBarSearch: typeof import('./src/@core/components/AppBarSearch.vue')['default']
-    AppCardActions: typeof import('./src/@core/components/AppCardActions.vue')['default']
     AppDateTimePicker: typeof import('./src/@core/components/AppDateTimePicker.vue')['default']
     AppDrawerHeaderSection: typeof import('./src/@core/components/AppDrawerHeaderSection.vue')['default']
     AppOtpInput: typeof import('./src/@core/components/AppOtpInput.vue')['default']

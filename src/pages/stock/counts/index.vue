@@ -19,6 +19,7 @@ import Input from '@/components/design/Input.vue'
 import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
+import Switch from '@/components/design/Switch.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -32,6 +33,7 @@ const locationFilter = ref<number | undefined>(undefined)
 const typeFilter = ref<string | undefined>(undefined)
 
 const locationsList = ref<any[]>([])
+const categoriesList = ref<any[]>([])
 
 const createDialog = ref(false)
 const saving = ref(false)
@@ -39,11 +41,14 @@ const saving = ref(false)
 const form = ref({
   location_id: null as number | null,
   count_type: 'FULL',
+  category_id: null as number | null,
+  include_zero_stock: true,
+  auto_adjust: false,
   notes: '',
 })
 
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
-const { formatDateShort } = useFormatters()
+const { formatDateShort, formatCurrency } = useFormatters()
 
 const statuses = ['DRAFT', 'IN_PROGRESS', 'PENDING_APPROVAL', 'APPROVED', 'CANCELED']
 const countTypes = ['FULL', 'PARTIAL', 'CYCLE', 'SPOT']
@@ -95,7 +100,17 @@ async function loadLocations() {
   catch { /* ignore */ }
 }
 
-onMounted(() => { loadCounts(); loadLocations() })
+async function loadCategories() {
+  try {
+    const res = await axios.get('/categories/', { params: { per_page: 500 } })
+    const d = res.data?.data ?? res.data
+
+    categoriesList.value = d?.categories ?? []
+  }
+  catch { /* ignore */ }
+}
+
+onMounted(() => { loadCounts(); loadLocations(); loadCategories() })
 watch([page, itemsPerPage], loadCounts)
 watch([statusFilter, locationFilter, typeFilter], () => { page.value = 1; loadCounts() })
 
@@ -103,12 +118,35 @@ const locationOptions = computed(() =>
   locationsList.value.map(l => ({ value: String(l.id), label: l.name })),
 )
 
+const categoryOptions = computed(() =>
+  categoriesList.value.map(c => ({ value: String(c.id), label: c.name })),
+)
+
+function openCreate() {
+  form.value = {
+    location_id: null,
+    count_type: 'FULL',
+    category_id: null,
+    include_zero_stock: true,
+    auto_adjust: false,
+    notes: '',
+  }
+  createDialog.value = true
+}
+
 async function createCount() {
+  if (form.value.location_id == null) {
+    notify(t('Select location'), 'error')
+
+    return
+  }
   saving.value = true
   try {
     const payload: any = { ...form.value }
     if (!payload.notes)
       delete payload.notes
+    if (payload.category_id == null)
+      delete payload.category_id
     await axios.post('/counts/', payload)
     notify(t('Stock count created'))
     createDialog.value = false
@@ -245,6 +283,88 @@ function varianceTone(v: number): 'success' | 'warning' | 'error' {
   return 'warning'
 }
 
+// Live summary derived from the in-memory items so the KPI strip + progress bar
+// update instantly as each line is recorded (the server-side summary snapshot
+// would otherwise stay stale until the modal is reopened).
+const liveSummary = computed(() => {
+  const items = detailItems.value
+  const total = items.length
+  const counted = items.filter((i: any) => i.counted_quantity != null).length
+  const withVariance = items.filter(
+    (i: any) => i.counted_quantity != null && Number(i.variance ?? 0) !== 0,
+  ).length
+  const varianceCost = items.reduce(
+    (sum: number, i: any) => sum + (i.counted_quantity != null ? Number(i.variance_cost ?? 0) : 0),
+    0,
+  )
+
+  return { total, counted, pending: total - counted, withVariance, varianceCost }
+})
+
+const progressPct = computed(() => {
+  const s = liveSummary.value
+  return s.total ? Math.round((s.counted / s.total) * 100) : 0
+})
+
+// All lines recorded — used to surface an inline "Complete" affordance in the
+// detail footer (the backend rejects completion while any item is uncounted).
+const allCounted = computed(() => liveSummary.value.total > 0 && liveSummary.value.pending === 0)
+
+// -------- Cancel with reason (backend accepts an optional `reason`) --------
+const cancelDialog = ref(false)
+const cancelItem = ref<any>(null)
+const cancelReason = ref('')
+const cancelling = ref(false)
+
+function openCancel(item: any) {
+  cancelItem.value = item
+  cancelReason.value = ''
+  cancelDialog.value = true
+}
+
+async function doCancel() {
+  if (!cancelItem.value)
+    return
+  cancelling.value = true
+  try {
+    const payload: any = {}
+    if (cancelReason.value.trim())
+      payload.reason = cancelReason.value.trim()
+    await axios.post(`/counts/${cancelItem.value.id}/cancel/`, payload)
+    notify(t('Stock count cancelled'))
+    cancelDialog.value = false
+    if (detailDialog.value && detailCount.value?.id === cancelItem.value.id)
+      detailDialog.value = false
+    await loadCounts()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+  finally {
+    cancelling.value = false
+  }
+}
+
+// Complete the count directly from the detail view once every line is recorded.
+const completing = ref(false)
+async function completeFromDetail() {
+  if (!detailCount.value)
+    return
+  completing.value = true
+  try {
+    await axios.post(`/counts/${detailCount.value.id}/complete/`)
+    notify(t('Counting completed'))
+    detailDialog.value = false
+    await loadCounts()
+  }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+  finally {
+    completing.value = false
+  }
+}
+
 // ---------------- DataTable columns ----------------
 const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'count_number', label: t('Count #') },
@@ -281,7 +401,7 @@ const itemFilterOptions = computed(() => [
         <Button
           variant="primary"
           icon="plus"
-          @click="createDialog = true"
+          @click="openCreate"
         >
           {{ t('New Count') }}
         </Button>
@@ -403,7 +523,7 @@ const itemFilterOptions = computed(() => [
             icon="close"
             tone="danger"
             :title="t('Cancel')"
-            @click="openAction(r, 'cancel')"
+            @click="openCancel(r)"
           />
         </template>
       </DataTable>
@@ -434,6 +554,38 @@ const itemFilterOptions = computed(() => [
             @update:model-value="(v: string) => form.count_type = v"
           />
         </Field>
+
+        <Field :label="t('Category (optional)')" :hint="t('count_category_hint')">
+          <Select
+            :model-value="form.category_id !== null ? String(form.category_id) : ''"
+            :placeholder="t('All categories')"
+            :options="categoryOptions"
+            @update:model-value="(v: string) => form.category_id = v ? Number(v) : null"
+          />
+        </Field>
+
+        <div class="opt-row">
+          <label class="opt-toggle">
+            <Switch
+              :model-value="form.include_zero_stock"
+              @update:model-value="(v: boolean) => form.include_zero_stock = v"
+            />
+            <span class="opt-text">
+              <span class="opt-title">{{ t('Include zero-stock items') }}</span>
+              <span class="opt-sub">{{ t('count_include_zero_hint') }}</span>
+            </span>
+          </label>
+          <label class="opt-toggle">
+            <Switch
+              :model-value="form.auto_adjust"
+              @update:model-value="(v: boolean) => form.auto_adjust = v"
+            />
+            <span class="opt-text">
+              <span class="opt-title">{{ t('Auto-adjust on approval') }}</span>
+              <span class="opt-sub">{{ t('count_auto_adjust_hint') }}</span>
+            </span>
+          </label>
+        </div>
 
         <Field :label="t('Notes')">
           <Input
@@ -491,34 +643,61 @@ const itemFilterOptions = computed(() => [
       :width="1100"
       @close="detailDialog = false"
     >
-      <!-- status pill -->
-      <div v-if="detailCount?.status" style="margin-bottom: 14px;">
+      <!-- status pill + notes -->
+      <div v-if="detailCount?.status" class="detail-head">
         <Badge :tone="statusTone(detailCount.status)" dot>
           {{ t(`count_status_${detailCount.status}`) }}
         </Badge>
+        <span v-if="detailCount?.notes" class="detail-notes" :title="detailCount.notes">
+          {{ detailCount.notes }}
+        </span>
+      </div>
+
+      <!-- progress bar -->
+      <div v-if="liveSummary.total" class="count-progress">
+        <div class="count-progress__meta">
+          <span class="cell-muted">{{ t('Count progress') }}</span>
+          <span class="mono cell-strong">{{ liveSummary.counted }} / {{ liveSummary.total }} · {{ progressPct }}%</span>
+        </div>
+        <div class="count-progress__track">
+          <div
+            class="count-progress__fill"
+            :class="{ 'is-done': progressPct === 100 }"
+            :style="{ width: `${progressPct}%` }"
+          />
+        </div>
       </div>
 
       <!-- summary strip -->
       <div
-        v-if="detailSummary"
+        v-if="liveSummary.total"
         class="grid summary-grid"
         style="margin-bottom: 16px;"
       >
         <div class="summary-cell">
           <div class="kpi__label">{{ t('Total items') }}</div>
-          <div class="summary-val mono">{{ detailSummary.total_items }}</div>
+          <div class="summary-val mono">{{ liveSummary.total }}</div>
         </div>
         <div class="summary-cell">
           <div class="kpi__label" style="color: rgb(var(--v-theme-success-strong));">{{ t('Counted') }}</div>
-          <div class="summary-val mono">{{ detailSummary.counted_items }}</div>
+          <div class="summary-val mono">{{ liveSummary.counted }}</div>
         </div>
         <div class="summary-cell">
           <div class="kpi__label" style="color: rgb(var(--v-theme-warning-strong));">{{ t('Pending') }}</div>
-          <div class="summary-val mono">{{ detailSummary.pending_items }}</div>
+          <div class="summary-val mono">{{ liveSummary.pending }}</div>
         </div>
         <div class="summary-cell">
           <div class="kpi__label" style="color: rgb(var(--v-theme-error-strong));">{{ t('With variance') }}</div>
-          <div class="summary-val mono">{{ detailSummary.items_with_variance }}</div>
+          <div class="summary-val mono">{{ liveSummary.withVariance }}</div>
+        </div>
+        <div class="summary-cell">
+          <div class="kpi__label">{{ t('Variance cost') }}</div>
+          <div
+            class="summary-val mono"
+            :style="{ color: liveSummary.varianceCost < 0 ? 'rgb(var(--v-theme-error-strong))' : (liveSummary.varianceCost > 0 ? 'rgb(var(--v-theme-warning-strong))' : undefined) }"
+          >
+            {{ liveSummary.varianceCost > 0 ? '+' : '' }}{{ formatCurrency(liveSummary.varianceCost) }}
+          </div>
         </div>
       </div>
 
@@ -563,12 +742,18 @@ const itemFilterOptions = computed(() => [
                 />
               </td>
               <td class="num">
-                <Badge
-                  v-if="i.counted_quantity != null"
-                  :tone="varianceTone(Number(i.variance ?? 0))"
-                >
-                  <span class="mono">{{ i.variance ?? 0 }} ({{ i.variance_percentage ?? 0 }}%)</span>
-                </Badge>
+                <div v-if="i.counted_quantity != null" class="variance-cell">
+                  <Badge :tone="varianceTone(Number(i.variance ?? 0))">
+                    <span class="mono">{{ i.variance ?? 0 }} ({{ i.variance_percentage ?? 0 }}%)</span>
+                  </Badge>
+                  <span
+                    v-if="Number(i.variance_cost ?? 0) !== 0"
+                    class="variance-cost mono"
+                    :class="Number(i.variance_cost) < 0 ? 'is-neg' : 'is-pos'"
+                  >
+                    {{ Number(i.variance_cost) > 0 ? '+' : '' }}{{ formatCurrency(i.variance_cost) }}
+                  </span>
+                </div>
                 <span v-else class="cell-muted">—</span>
               </td>
               <td>
@@ -610,6 +795,50 @@ const itemFilterOptions = computed(() => [
         <Button variant="ghost" @click="detailDialog = false">
           {{ t('Close') }}
         </Button>
+        <Button
+          v-if="detailCount?.status === 'IN_PROGRESS'"
+          variant="primary"
+          icon="check"
+          :loading="completing"
+          :disabled="!allCounted"
+          :title="!allCounted ? t('count_complete_disabled_hint') : ''"
+          @click="completeFromDetail"
+        >
+          {{ t('Complete Count') }}
+        </Button>
+      </template>
+    </Modal>
+
+    <!-- ============ CANCEL modal (with optional reason) ============ -->
+    <Modal
+      :open="cancelDialog"
+      :title="t('Cancel Count')"
+      :width="440"
+      @close="cancelDialog = false"
+    >
+      <p style="margin: 0 0 12px; color: var(--text-secondary); font-size: 14px;">
+        {{ t('Confirm action for count') }}
+        <strong class="mono">{{ cancelItem?.count_number }}</strong>?
+      </p>
+      <Field :label="t('Reason (optional)')">
+        <Input
+          :model-value="cancelReason"
+          :placeholder="t('count_cancel_reason_ph')"
+          @update:model-value="(v: string) => cancelReason = v"
+        />
+      </Field>
+
+      <template #footer>
+        <Button variant="ghost" @click="cancelDialog = false">
+          {{ t('Back') }}
+        </Button>
+        <Button
+          variant="danger"
+          :loading="cancelling"
+          @click="doCancel"
+        >
+          {{ t('Cancel Count') }}
+        </Button>
       </template>
     </Modal>
 
@@ -637,10 +866,57 @@ const itemFilterOptions = computed(() => [
 .filter-cell { width: 220px; min-width: 0; }
 .toolbar-spacer { margin-left: auto; }
 
-/* Summary strip: 4 cols on desktop, 2 on tablet, 1 on phone */
-.summary-grid { grid-template-columns: repeat(4, 1fr); }
+/* Summary strip: 5 cols on desktop, 2 on tablet, 1 on phone */
+.summary-grid { grid-template-columns: repeat(5, 1fr); }
 .summary-cell { padding: 4px 0; }
 .summary-val { font-size: 22px; font-weight: 700; color: var(--text); }
+
+/* Detail head: status pill + inline notes */
+.detail-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.detail-notes {
+  color: var(--text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
+}
+
+/* Count progress bar */
+.count-progress { margin-bottom: 16px; }
+.count-progress__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.count-progress__track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(var(--v-theme-on-surface), 0.08);
+  overflow: hidden;
+}
+.count-progress__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: rgb(var(--v-theme-primary));
+  transition: width 0.3s ease;
+}
+.count-progress__fill.is-done { background: rgb(var(--v-theme-success-strong)); }
+
+/* Per-item variance cost line under the badge */
+.variance-cell { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.variance-cost { font-size: 11px; line-height: 1; }
+.variance-cost.is-neg { color: rgb(var(--v-theme-error-strong)); }
+.variance-cost.is-pos { color: rgb(var(--v-theme-warning-strong)); }
+
+/* Create modal: option toggles (include zero-stock / auto-adjust) */
+.opt-row { display: flex; flex-direction: column; gap: 12px; padding: 4px 0; }
+.opt-toggle { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+.opt-text { display: flex; flex-direction: column; gap: 1px; }
+.opt-title { color: var(--text); font-size: 13px; font-weight: 600; }
+.opt-sub { color: var(--text-secondary); font-size: 12px; line-height: 1.3; }
 
 /* Create/detail modal form grid */
 .form-grid { display: grid; gap: 12px; grid-template-columns: 1fr; }

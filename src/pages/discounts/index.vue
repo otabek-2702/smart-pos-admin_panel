@@ -10,11 +10,12 @@ import Input from '@/components/design/Input.vue'
 import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
+import Skeleton from '@/components/design/Skeleton.vue'
 import Switch from '@/components/design/Switch.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
-const { formatCurrency } = useFormatters()
+const { formatCurrency, formatDateShort } = useFormatters()
 
 // ---- state ----
 const discounts = ref<any[]>([])
@@ -24,6 +25,7 @@ const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
 const isActiveFilter = ref<string>('')
+const typeFilter = ref<string>('')
 
 const types = ref<any[]>([])
 
@@ -34,15 +36,27 @@ const saving = ref(false)
 const deleteDialog = ref(false)
 const deletingDiscount = ref<any>(null)
 
+// ---- stats drawer ----
+const statsDialog = ref(false)
+const statsLoading = ref(false)
+const statsData = ref<any>(null)
+const statsDiscount = ref<any>(null)
+
 const form = ref({
   name: '',
   code: '',
   discount_type_id: null as number | null,
   value: 0,
   min_order_amount: 0,
+  max_discount_amount: null as number | null,
+  usage_limit: null as number | null,
+  usage_per_user: null as number | null,
+  is_stackable: false,
+  is_staff_only: false,
   is_active: true,
   start_date: '',
   end_date: '',
+  description: '',
   secret_word: '',
 })
 
@@ -52,6 +66,7 @@ const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'code', label: t('Code'), sortable: false, align: 'left' },
   { key: 'discount_type', label: t('Type'), sortable: false, align: 'left' },
   { key: 'value', label: t('Value'), sortable: false, align: 'right' },
+  { key: 'usage', label: t('discount_col_usage'), sortable: false, align: 'left', width: 150 },
   { key: 'is_active', label: t('Status'), sortable: false, align: 'left' },
 ])
 
@@ -74,6 +89,68 @@ function formatValue(row: any): string {
   return formatCurrency(value)
 }
 
+// Lifecycle status: goes beyond the raw is_active flag. A discount can be
+// "active" yet already expired, not-yet-started, or fully redeemed — an
+// operator needs to see that at a glance so a dead promo isn't mistaken
+// for a live one. Mirrors the guards in DiscountService.validate_code.
+type Lifecycle = 'ACTIVE' | 'INACTIVE' | 'SCHEDULED' | 'EXPIRED' | 'DEPLETED'
+function lifecycleOf(row: any): Lifecycle {
+  if (!row.is_active)
+    return 'INACTIVE'
+  const now = Date.now()
+  if (row.end_date && new Date(row.end_date).getTime() < now)
+    return 'EXPIRED'
+  if (row.start_date && new Date(row.start_date).getTime() > now)
+    return 'SCHEDULED'
+  if (row.usage_limit && (row.usage_count ?? 0) >= row.usage_limit)
+    return 'DEPLETED'
+  return 'ACTIVE'
+}
+
+function lifecycleTone(state: Lifecycle): 'success' | 'neutral' | 'info' | 'error' | 'warning' {
+  switch (state) {
+    case 'ACTIVE': return 'success'
+    case 'SCHEDULED': return 'info'
+    case 'EXPIRED': return 'error'
+    case 'DEPLETED': return 'warning'
+    default: return 'neutral'
+  }
+}
+
+function lifecycleLabel(state: Lifecycle): string {
+  if (state === 'ACTIVE')
+    return t('discount_status_ACTIVE')
+  if (state === 'INACTIVE')
+    return t('discount_status_INACTIVE')
+  return t(`discount_lifecycle_${state}`)
+}
+
+function scheduleHint(row: any): string {
+  const state = lifecycleOf(row)
+  if (state === 'SCHEDULED' && row.start_date)
+    return t('discount_starts_hint', { date: formatDateShort(row.start_date) })
+  if (state === 'EXPIRED' && row.end_date)
+    return t('discount_expired_hint', { date: formatDateShort(row.end_date) })
+  if (state === 'ACTIVE' && row.end_date)
+    return t('discount_ends_hint', { date: formatDateShort(row.end_date) })
+  return ''
+}
+
+function usagePct(row: any): number {
+  if (!row.usage_limit)
+    return 0
+  return Math.min(100, Math.round(((row.usage_count ?? 0) / row.usage_limit) * 100))
+}
+
+function usageFillTone(row: any): string {
+  const pct = usagePct(row)
+  if (pct >= 100)
+    return 'is-full'
+  if (pct >= 80)
+    return 'is-high'
+  return 'is-ok'
+}
+
 // ---- load ----
 async function loadDiscounts() {
   loading.value = true
@@ -83,6 +160,8 @@ async function loadDiscounts() {
       params.search = search.value
     if (isActiveFilter.value !== '')
       params.is_active = isActiveFilter.value === 'true'
+    if (typeFilter.value !== '')
+      params.discount_type_id = Number(typeFilter.value)
     const res = await axios.get('/discounts/', { params })
     const d = res.data?.data ?? res.data
 
@@ -114,6 +193,7 @@ const debouncedSearch = useDebounceFn(() => { page.value = 1; loadDiscounts() },
 
 watch(search, debouncedSearch)
 watch(isActiveFilter, () => { page.value = 1; loadDiscounts() })
+watch(typeFilter, () => { page.value = 1; loadDiscounts() })
 
 // ---- options ----
 const statusOptions = computed(() => [
@@ -134,9 +214,15 @@ function openCreate() {
     discount_type_id: types.value[0]?.id ?? null,
     value: 0,
     min_order_amount: 0,
+    max_discount_amount: null,
+    usage_limit: null,
+    usage_per_user: null,
+    is_stackable: false,
+    is_staff_only: false,
     is_active: true,
     start_date: '',
     end_date: '',
+    description: '',
     secret_word: '',
   }
   dialog.value = true
@@ -150,9 +236,15 @@ function openEdit(d: any) {
     discount_type_id: d.discount_type?.id ?? d.discount_type_id ?? null,
     value: Number(d.value ?? 0),
     min_order_amount: Number(d.min_order_amount ?? 0),
+    max_discount_amount: d.max_discount_amount != null ? Number(d.max_discount_amount) : null,
+    usage_limit: d.usage_limit ?? null,
+    usage_per_user: d.usage_per_user ?? null,
+    is_stackable: d.is_stackable ?? false,
+    is_staff_only: d.is_staff_only ?? false,
     is_active: d.is_active ?? true,
     start_date: d.start_date ?? '',
     end_date: d.end_date ?? '',
+    description: d.description ?? '',
     // BE never returns secret_word (only has_secret_word: bool). Leave blank;
     // payload omits the field on PUT unless user types a new value.
     secret_word: '',
@@ -166,6 +258,13 @@ async function save() {
     // Build payload — when editing, omit secret_word if blank so we don't
     // overwrite the stored secret (BE never returns it, so it can't be repopulated).
     const payload: any = { ...form.value }
+    // Optional numeric caps: a blank field means "no cap / unlimited", which
+    // the backend models as NULL. Send null rather than 0 so an empty usage
+    // limit isn't stored as "0 uses allowed".
+    for (const k of ['usage_limit', 'usage_per_user', 'max_discount_amount'] as const) {
+      const v = payload[k]
+      payload[k] = (v === '' || v === null || v === undefined) ? null : Number(v)
+    }
     if (editing.value && !payload.secret_word)
       delete payload.secret_word
     if (editing.value)
@@ -214,6 +313,26 @@ async function remove() {
   }
 }
 
+// ---- stats ----
+async function openStats(d: any) {
+  statsDiscount.value = d
+  statsData.value = null
+  statsDialog.value = true
+  statsLoading.value = true
+  try {
+    const res = await axios.get(`/discounts/${d.id}/stats/`)
+    const payload = res.data?.data ?? res.data
+    statsData.value = payload?.stats ?? payload
+  }
+  catch {
+    notify(t('discount_stats_load_error'), 'error')
+    statsDialog.value = false
+  }
+  finally {
+    statsLoading.value = false
+  }
+}
+
 // ---- pagination control object for DataTable ----
 const pagination = computed<DataTablePagination>(() => ({
   page: page.value,
@@ -223,9 +342,14 @@ const pagination = computed<DataTablePagination>(() => ({
   onPerPage: (n: number) => { itemsPerPage.value = n; page.value = 1 },
 }))
 
+const hasActiveFilters = computed(() =>
+  !!search.value || isActiveFilter.value !== '' || typeFilter.value !== '',
+)
+
 function clearAllFilters() {
   search.value = ''
   isActiveFilter.value = ''
+  typeFilter.value = ''
 }
 </script>
 
@@ -257,14 +381,23 @@ function clearAllFilters() {
         </div>
         <div class="toolbar__filter">
           <Select
+            v-model="typeFilter"
+            icon="tag"
+            :placeholder="t('All Types')"
+            :options="typeOptions"
+          />
+        </div>
+        <div class="toolbar__filter">
+          <Select
             v-model="isActiveFilter"
             icon="filter"
             :placeholder="t('All Discount Statuses')"
             :options="statusOptions"
           />
         </div>
+        <div class="toolbar__spacer" />
         <div
-          v-if="search || isActiveFilter"
+          v-if="hasActiveFilters"
           class="toolbar__clear"
         >
           <Button
@@ -274,6 +407,12 @@ function clearAllFilters() {
             {{ t('Clear filters') }}
           </Button>
         </div>
+        <IconAction
+          icon="refresh"
+          :title="t('Refresh')"
+          :disabled="loading"
+          @click="loadDiscounts"
+        />
       </div>
 
       <DataTable
@@ -301,16 +440,50 @@ function clearAllFilters() {
           <span class="mono">{{ formatValue(row) }}</span>
         </template>
 
+        <template #cell.usage="{ row }">
+          <div class="usage-cell">
+            <div class="usage-cell__top">
+              <span class="mono">{{ row.usage_count ?? 0 }}</span>
+              <span class="usage-cell__limit">
+                {{ row.usage_limit ? `/ ${row.usage_limit}` : `· ${t('discount_usage_unlimited')}` }}
+              </span>
+            </div>
+            <div
+              v-if="row.usage_limit"
+              class="usage-bar"
+            >
+              <div
+                class="usage-bar__fill"
+                :class="usageFillTone(row)"
+                :style="{ width: `${usagePct(row)}%` }"
+              />
+            </div>
+          </div>
+        </template>
+
         <template #cell.is_active="{ row }">
-          <Badge
-            :tone="row.is_active ? 'success' : 'neutral'"
-            dot
-          >
-            {{ row.is_active ? t('discount_status_ACTIVE') : t('discount_status_INACTIVE') }}
-          </Badge>
+          <div class="status-cell">
+            <Badge
+              :tone="lifecycleTone(lifecycleOf(row))"
+              dot
+            >
+              {{ lifecycleLabel(lifecycleOf(row)) }}
+            </Badge>
+            <span
+              v-if="scheduleHint(row)"
+              class="status-cell__hint"
+            >
+              {{ scheduleHint(row) }}
+            </span>
+          </div>
         </template>
 
         <template #row-actions="{ row }">
+          <IconAction
+            icon="chart"
+            :title="t('discount_view_stats')"
+            @click="openStats(row)"
+          />
           <IconAction
             :icon="row.is_active ? 'pause' : 'play'"
             :tone="row.is_active ? 'warning' : 'success'"
@@ -375,6 +548,38 @@ function clearAllFilters() {
             :placeholder="t('Min Order Amount')"
           />
         </Field>
+        <Field
+          :label="t('discount_max_amount')"
+          :hint="t('discount_max_amount_hint')"
+        >
+          <Input
+            v-model="form.max_discount_amount"
+            type="number"
+            :placeholder="t('discount_no_cap')"
+          />
+        </Field>
+        <Field
+          :label="t('discount_usage_limit')"
+          :hint="t('discount_usage_limit_hint')"
+        >
+          <Input
+            v-model="form.usage_limit"
+            type="number"
+            min="0"
+            :placeholder="t('discount_usage_unlimited')"
+          />
+        </Field>
+        <Field
+          :label="t('discount_usage_per_user')"
+          :hint="t('discount_usage_per_user_hint')"
+        >
+          <Input
+            v-model="form.usage_per_user"
+            type="number"
+            min="0"
+            :placeholder="t('discount_usage_unlimited')"
+          />
+        </Field>
         <Field :label="t('Starts At')">
           <Input
             v-model="form.start_date"
@@ -388,6 +593,15 @@ function clearAllFilters() {
           />
         </Field>
         <Field
+          :label="t('Description')"
+          class="span-2"
+        >
+          <Input
+            v-model="form.description"
+            :placeholder="t('discount_description_ph')"
+          />
+        </Field>
+        <Field
           :label="t('Secret Word (optional)')"
           class="span-2"
         >
@@ -395,6 +609,28 @@ function clearAllFilters() {
             v-model="form.secret_word"
             :placeholder="editing && editing.has_secret_word ? t('Leave blank to keep existing') : t('Secret Word (optional)')"
           />
+        </Field>
+        <Field
+          :label="t('discount_stackable')"
+          :hint="t('discount_stackable_hint')"
+        >
+          <div class="row-switch">
+            <Switch v-model="form.is_stackable" />
+            <span class="row-switch__label">
+              {{ form.is_stackable ? t('discount_stackable_on') : t('discount_stackable_off') }}
+            </span>
+          </div>
+        </Field>
+        <Field
+          :label="t('discount_staff_only')"
+          :hint="t('discount_staff_only_hint')"
+        >
+          <div class="row-switch">
+            <Switch v-model="form.is_staff_only" />
+            <span class="row-switch__label">
+              {{ form.is_staff_only ? t('discount_staff_only_on') : t('discount_staff_only_off') }}
+            </span>
+          </div>
         </Field>
         <Field
           :label="t('Active')"
@@ -427,6 +663,87 @@ function clearAllFilters() {
           {{ t('Save') }}
         </Button>
       </template>
+    </Modal>
+
+    <!-- Stats Modal -->
+    <Modal
+      :open="statsDialog"
+      :title="t('discount_stats_title')"
+      :subtitle="statsDiscount?.name"
+      :width="560"
+      @close="statsDialog = false"
+    >
+      <div class="stats-grid">
+        <div
+          v-for="(tile, i) in [
+            { key: 'total_uses', label: t('discount_stats_total_uses'), icon: 'refresh' },
+            { key: 'order_count', label: t('discount_stats_orders'), icon: 'receipt' },
+            { key: 'total_discount_given', label: t('discount_stats_given'), icon: 'coins', money: true },
+          ]"
+          :key="i"
+          class="stat-tile"
+        >
+          <span class="stat-tile__label">{{ tile.label }}</span>
+          <Skeleton
+            v-if="statsLoading"
+            :h="24"
+            w="60%"
+          />
+          <span
+            v-else
+            class="stat-tile__value mono"
+          >
+            {{ tile.money
+              ? formatCurrency(statsData?.[tile.key] ?? 0)
+              : (statsData?.[tile.key] ?? 0) }}
+          </span>
+        </div>
+      </div>
+
+      <div class="stats-top">
+        <h4 class="stats-top__title">
+          {{ t('discount_stats_top_users') }}
+        </h4>
+        <div
+          v-if="statsLoading"
+          class="stats-top__list"
+        >
+          <div
+            v-for="n in 3"
+            :key="n"
+            class="stats-top__row"
+          >
+            <Skeleton
+              :h="14"
+              w="40%"
+            />
+            <Skeleton
+              :h="18"
+              :w="48"
+              :r="6"
+            />
+          </div>
+        </div>
+        <div
+          v-else-if="statsData?.top_users?.length"
+          class="stats-top__list"
+        >
+          <div
+            v-for="u in (statsData.top_users as any[])"
+            :key="u.user_id"
+            class="stats-top__row"
+          >
+            <span class="stats-top__name">{{ (u.name || '').trim() || t('discount_stats_unknown_user') }}</span>
+            <Badge tone="neutral">{{ t('discount_stats_uses_count', { count: u.use_count }) }}</Badge>
+          </div>
+        </div>
+        <p
+          v-else
+          class="stats-empty"
+        >
+          {{ t('discount_stats_no_uses') }}
+        </p>
+      </div>
     </Modal>
 
     <!-- Delete confirm -->
@@ -490,8 +807,8 @@ function clearAllFilters() {
   min-width: 160px;
 }
 
-.toolbar__clear {
-  margin-left: auto;
+.toolbar__spacer {
+  flex: 1;
 }
 
 /* ── Cells ── */
@@ -500,6 +817,57 @@ function clearAllFilters() {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+/* Usage cell — count vs limit + progress toward the cap */
+.usage-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 110px;
+}
+.usage-cell__top {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 13px;
+}
+.usage-cell__limit {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+.usage-bar {
+  height: 5px;
+  border-radius: 99px;
+  background: rgba(var(--v-theme-on-surface), 0.1);
+  overflow: hidden;
+}
+.usage-bar__fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+.usage-bar__fill.is-ok {
+  background: rgb(var(--v-theme-success-strong));
+}
+.usage-bar__fill.is-high {
+  background: rgb(var(--v-theme-warning-strong));
+}
+.usage-bar__fill.is-full {
+  background: rgb(var(--v-theme-error-strong));
+}
+
+/* Status cell — lifecycle badge + optional schedule hint */
+.status-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+}
+.status-cell__hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
 }
 
 /* ── Form grid (modal) ── */
@@ -524,6 +892,67 @@ function clearAllFilters() {
   font-weight: 500;
 }
 
+/* ── Stats modal ── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-3, 12px);
+}
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--sp-3, 12px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm, 8px);
+  background: var(--surface-2, rgba(var(--v-theme-on-surface), 0.02));
+}
+.stat-tile__label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+.stat-tile__value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+.stats-top {
+  margin-top: var(--sp-4, 16px);
+}
+.stats-top__title {
+  margin: 0 0 var(--sp-2, 8px);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.stats-top__list {
+  display: flex;
+  flex-direction: column;
+}
+.stats-top__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.stats-top__row:last-child {
+  border-bottom: none;
+}
+.stats-top__name {
+  font-size: 13px;
+  color: var(--text);
+}
+.stats-empty {
+  margin: 0;
+  padding: var(--sp-3, 12px) 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
 /* ── Delete message ── */
 .delete-msg {
   margin: 0;
@@ -544,6 +973,9 @@ function clearAllFilters() {
     min-width: 0;
     width: 100%;
   }
+  .toolbar__spacer {
+    display: none;
+  }
   .toolbar__clear {
     margin-left: 0;
   }
@@ -552,6 +984,9 @@ function clearAllFilters() {
   }
   .form-grid .span-2 {
     grid-column: span 1;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

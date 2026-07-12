@@ -225,6 +225,23 @@ const liveOnly = ref(false)
 const dateFrom = ref('')
 const dateTo = ref('')
 
+// sort (client-side; server list is a page snapshot)
+const sortBy = ref<string>('priority')
+const sortOptions = [
+  { value: 'priority', label: 'Priority (needs action)' },
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'gross', label: 'Highest gross' },
+  { value: 'cashier', label: 'Cashier A–Z' },
+]
+
+// live refresh
+const refreshing = ref(false)
+const lastUpdated = ref<number>(0)
+const now = ref<number>(Date.now())
+let clockTimer: ReturnType<typeof setInterval> | null = null
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
 // modal
 const receiving = ref<ShiftV3 | null>(null)
 
@@ -268,10 +285,65 @@ async function loadShifts() {
   }
   finally {
     loading.value = false
+    lastUpdated.value = Date.now()
+    now.value = Date.now()
   }
 }
 
-onMounted(loadShifts)
+// Manual / auto refresh — never flashes the skeleton (data already present),
+// so the operator can re-check live shifts without losing scroll position.
+async function refresh() {
+  if (refreshing.value || loading.value)
+    return
+  refreshing.value = true
+  try {
+    await loadShifts()
+  }
+  finally {
+    refreshing.value = false
+  }
+}
+
+onMounted(() => {
+  loadShifts()
+  // tick the clock so live durations + "updated Nm ago" stay honest
+  clockTimer = setInterval(() => { now.value = Date.now() }, 30_000)
+  // quietly poll while cashiers are on the floor; pause when the tab is hidden
+  // or the user is mid-action (modal open / ending / reconciling).
+  pollTimer = setInterval(() => {
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible')
+      return
+    if (receiving.value || reconBusy.value || ending.value !== null || loading.value || refreshing.value)
+      return
+    if (activeCount.value > 0)
+      refresh()
+  }, 60_000)
+})
+
+onUnmounted(() => {
+  if (clockTimer)
+    clearInterval(clockTimer)
+  if (pollTimer)
+    clearInterval(pollTimer)
+})
+
+const updatedAgo = computed(() => {
+  if (!lastUpdated.value)
+    return ''
+  const secs = Math.max(0, Math.floor((now.value - lastUpdated.value) / 1000))
+  if (secs < 60)
+    return t('just now')
+  return `${Math.floor(secs / 60)} ${t('min ago')}`
+})
+
+// Live duration for still-running shifts (recomputes as the clock ticks);
+// ended shifts keep their frozen label.
+function durationFor(s: ShiftV3): string {
+  if (s.end)
+    return s.durationLabel
+  void now.value
+  return durationLabel(s.start, null)
+}
 
 /* ============================================================
    Derived — cashier options + filtered list + KPI metrics
@@ -323,6 +395,41 @@ const cashToReceive = computed(() => awaitingList.value.reduce((a, s) => a + (s.
 const netVariance = computed(() => shifts.value
   .filter(s => shiftState(s) === 'reconciled' && s.variance !== null)
   .reduce((a, s) => a + (s.variance ?? 0), 0))
+
+/* ============================================================
+   Sort — default surfaces the cards that need action first
+   (awaiting cash → active → reconciled), then newest.
+   ============================================================ */
+const statePriority: Record<string, number> = { awaiting: 0, active: 1, reconciled: 2 }
+function startMs(s: ShiftV3): number {
+  if (!s.start)
+    return 0
+  const ms = new Date(s.start).getTime()
+  return Number.isNaN(ms) ? 0 : ms
+}
+const sorted = computed<ShiftV3[]>(() => {
+  const arr = [...filtered.value]
+  switch (sortBy.value) {
+    case 'newest':
+      arr.sort((a, b) => startMs(b) - startMs(a))
+      break
+    case 'oldest':
+      arr.sort((a, b) => startMs(a) - startMs(b))
+      break
+    case 'gross':
+      arr.sort((a, b) => b.gross - a.gross)
+      break
+    case 'cashier':
+      arr.sort((a, b) => a.cashier.localeCompare(b.cashier))
+      break
+    default:
+      arr.sort((a, b) => {
+        const d = statePriority[shiftState(a)] - statePriority[shiftState(b)]
+        return d !== 0 ? d : startMs(b) - startMs(a)
+      })
+  }
+  return arr
+})
 
 /* ============================================================
    Filter chips
@@ -526,7 +633,23 @@ function gotoReport(_s: ShiftV3) {
     <PageHeader
       :title="t('Shifts')"
       :subtitle="t('Reconcile cashiers and receive end-of-shift cash')"
-    />
+    >
+      <template #actions>
+        <span
+          v-if="updatedAgo"
+          class="tertiary"
+          style="font-size: 12px; white-space: nowrap;"
+        >{{ t('Updated') }} {{ updatedAgo }}</span>
+        <Button
+          variant="secondary"
+          icon="refresh"
+          :loading="refreshing"
+          @click="refresh"
+        >
+          {{ t('Refresh') }}
+        </Button>
+      </template>
+    </PageHeader>
 
     <!-- KPI strip -->
     <div
@@ -599,6 +722,14 @@ function gotoReport(_s: ShiftV3) {
             :options="statusOptions.map(o => ({ value: o.value, label: t(o.label) }))"
           />
         </div>
+        <div style="width: 200px;">
+          <Select
+            v-model="sortBy"
+            icon="sort"
+            :placeholder="t('Sort by')"
+            :options="sortOptions.map(o => ({ value: o.value, label: t(o.label) }))"
+          />
+        </div>
         <div
           class="row"
           style="gap: 8px;"
@@ -664,6 +795,18 @@ function gotoReport(_s: ShiftV3) {
         </div>
       </div>
     </Card>
+
+    <!-- result count -->
+    <div
+      v-if="!(loading && shifts.length === 0) && sorted.length > 0"
+      class="row"
+      style="margin-bottom: var(--sp-4);"
+    >
+      <span
+        class="tertiary"
+        style="font-size: 13px;"
+      >{{ t('Showing') }} {{ sorted.length }} {{ t('of') }} {{ shifts.length }} {{ t('shifts') }}</span>
+    </div>
 
     <!-- skeleton grid -->
     <div
@@ -743,7 +886,7 @@ function gotoReport(_s: ShiftV3) {
       style="grid-template-columns: repeat(auto-fill, minmax(430px, 1fr)); align-items: start;"
     >
       <Card
-        v-for="s in filtered"
+        v-for="s in sorted"
         :key="s.id"
         :style="{
           display: 'flex',
@@ -824,7 +967,7 @@ function gotoReport(_s: ShiftV3) {
               name="clock"
               :size="13"
             />
-            {{ s.durationLabel }}
+            {{ durationFor(s) }}
           </span>
         </div>
 

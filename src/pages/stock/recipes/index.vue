@@ -73,6 +73,31 @@ const form = ref({
 })
 
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
+const router = useRouter()
+
+/* Navigate to the full drill-down page (ingredients, cost, availability, versions). */
+function openFull(row: any) {
+  if (row?.id != null)
+    router.push(`/stock/recipes/${row.id}`)
+}
+
+/* Toolbar: reset every filter/search back to defaults in one click. */
+const hasActiveFilters = computed(() =>
+  !!search.value
+  || !!typeFilter.value
+  || outputItemFilter.value !== undefined
+  || productionLocationFilter.value !== undefined
+  || showInactive.value
+  || showOldVersions.value,
+)
+function resetFilters() {
+  search.value = ''
+  typeFilter.value = undefined
+  outputItemFilter.value = undefined
+  productionLocationFilter.value = undefined
+  showInactive.value = false
+  showOldVersions.value = false
+}
 
 /* ---------------- load (preserved) ---------------- */
 async function loadRecipes() {
@@ -366,7 +391,7 @@ const formDifficultyStr = computed<string>({
             v-model="productionLocationFilterStr"
             :options="locationOptions"
             :placeholder="t('Production Location')"
-            icon="pin"
+            icon="building"
           />
         </div>
 
@@ -383,6 +408,22 @@ const formDifficultyStr = computed<string>({
 
       <div class="card__divider" />
 
+      <!-- Results bar: live count + one-click filter reset -->
+      <div class="results-bar">
+        <span class="cell-muted">
+          {{ t('recipes_result_count', { count: total }) }}
+        </span>
+        <Button
+          v-if="hasActiveFilters"
+          variant="ghost"
+          size="sm"
+          icon="close"
+          @click="resetFilters"
+        >
+          {{ t('recipes_reset_filters') }}
+        </Button>
+      </div>
+
       <!-- DataTable -->
       <DataTable
         :columns="columns"
@@ -393,16 +434,23 @@ const formDifficultyStr = computed<string>({
         :per-page-options="[10, 20, 50]"
         :empty-title="t('recipes_empty_title')"
         :empty-sub="t('recipes_empty_body')"
-        empty-icon="recipe"
+        empty-icon="receipt"
       >
         <!-- Code -->
         <template #cell.code="{ row }">
           <span class="cell-strong mono">{{ row.code ?? '—' }}</span>
         </template>
 
-        <!-- Name -->
+        <!-- Name (opens full drill-down page) -->
         <template #cell.name="{ row }">
-          <span class="cell-strong">{{ row.name ?? '—' }}</span>
+          <button
+            type="button"
+            class="link-name cell-strong"
+            :title="t('recipe_open_full')"
+            @click="openFull(row)"
+          >
+            {{ row.name ?? '—' }}
+          </button>
         </template>
 
         <!-- Type badge -->
@@ -438,9 +486,14 @@ const formDifficultyStr = computed<string>({
         <!-- Row actions -->
         <template #row-actions="{ row }">
           <IconAction
-            icon="eye"
+            icon="list"
             :title="t('View Ingredients')"
             @click="openDetail(row)"
+          />
+          <IconAction
+            icon="chevright"
+            :title="t('recipe_open_full')"
+            @click="openFull(row)"
           />
           <IconAction
             icon="pencil"
@@ -492,7 +545,7 @@ const formDifficultyStr = computed<string>({
             <Select
               v-model="form.recipe_type"
               :options="recipeTypeOptions"
-              icon="layers"
+              icon="tag"
             />
           </Field>
         </div>
@@ -501,7 +554,7 @@ const formDifficultyStr = computed<string>({
             <Select
               v-model="formDifficultyStr"
               :options="difficultyOptions"
-              icon="bolt"
+              icon="star"
             />
           </Field>
         </div>
@@ -533,7 +586,7 @@ const formDifficultyStr = computed<string>({
               v-model="formOutputUnitStr"
               :options="unitOptions"
               :placeholder="t('Output Unit')"
-              icon="ruler"
+              icon="weight"
             />
           </Field>
         </div>
@@ -634,6 +687,38 @@ const formDifficultyStr = computed<string>({
 .row {
   display: flex;
   align-items: center;
+}
+
+/* Recipe name acts as a link to the full drill-down page */
+.link-name {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.link-name:hover {
+  color: rgb(var(--v-theme-primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link-name:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+}
+
+/* Slim bar between the toolbar and the table */
+.results-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px var(--sp-4, 16px);
+  min-height: 44px;
+  flex-wrap: wrap;
 }
 
 /* Search input wrapper — bounded on desktop, full-width on phone */

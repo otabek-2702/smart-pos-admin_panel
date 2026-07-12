@@ -14,7 +14,6 @@ import DataTable, { type DataTableColumn } from '@/components/design/DataTable.v
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import Field from '@/components/design/Field.vue'
 import Input from '@/components/design/Input.vue'
-import Kpi from '@/components/design/Kpi.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -71,6 +70,12 @@ const classIcon: Record<string, string> = {
   Puzzle: 'info',
   Dog: 'arrowdown',
 }
+
+// Menu-engineering matrix layout order (high margin on top, high popularity
+// on the right — the classic Kasavana-Smith quadrant):
+//   Puzzle | Star
+//   Dog    | Plowhorse
+const matrixOrder = ['Puzzle', 'Star', 'Dog', 'Plowhorse'] as const
 
 async function load() {
   if (!cogsFractionValid.value) {
@@ -152,6 +157,74 @@ function clearClassFilter() {
 }
 
 const subtitle = computed(() => `${dateFrom.value} — ${dateTo.value}`)
+
+// Aggregate totals over the currently filtered set — a real operator wants
+// to see the cash impact of whatever slice they're looking at.
+const totals = computed(() => {
+  return items.value.reduce(
+    (acc: { revenue: number, profit: number, units: number }, i: any) => {
+      acc.revenue += Number(i.revenue) || 0
+      acc.profit += Number(i.profit) || 0
+      acc.units += Number(i.qty_sold) || 0
+      return acc
+    },
+    { revenue: 0, profit: 0, units: 0 },
+  )
+})
+
+// Client-side CSV export of the current (filtered) rows — no backend export
+// endpoint exists for this report, so we build it from what's on screen.
+const exporting = ref(false)
+function csvCell(v: unknown): string {
+  const s = String(v ?? '')
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+function exportCsv() {
+  if (exporting.value)
+    return
+  if (!items.value.length) {
+    notify(t('Nothing to export'), 'error')
+    return
+  }
+  exporting.value = true
+  try {
+    const headers = [
+      t('Class'), t('Product'), t('Price'), t('Sold'),
+      t('Revenue'), t('Margin/unit'), t('Margin %'), t('Profit'),
+    ]
+    const lines = [headers.map(csvCell).join(',')]
+    for (const i of items.value as any[]) {
+      lines.push([
+        t(`menu_class_${String(i.class).toUpperCase()}`),
+        i.product_name ?? '',
+        i.price ?? 0,
+        i.qty_sold ?? 0,
+        i.revenue ?? 0,
+        i.margin_per_unit ?? 0,
+        i.margin_pct ?? 0,
+        i.profit ?? 0,
+      ].map(csvCell).join(','))
+    }
+    // BOM so Excel reads UTF-8 (Cyrillic/Uzbek) correctly.
+    const blob = new Blob([`﻿${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+
+    a.href = url
+    a.download = `menu-engineering-${dateFrom.value}_${dateTo.value}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    notify(t('Exported'), 'success')
+  }
+  catch {
+    notify(t('Failed to load'), 'error')
+  }
+  finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <template>
@@ -246,36 +319,73 @@ const subtitle = computed(() => `${dateFrom.value} — ${dateTo.value}`)
         >
           {{ t('Analyze') }}
         </Button>
+
+        <Button
+          variant="secondary"
+          size="sm"
+          icon="download"
+          :loading="exporting"
+          :disabled="loading || !items.length"
+          @click="exportCsv"
+        >
+          {{ t('Export CSV') }}
+        </Button>
       </div>
     </div>
 
-    <!-- Class KPI strip — click to filter by class -->
+    <!-- Menu-engineering 2×2 matrix — click a quadrant to filter by class.
+         High margin on top, high popularity on the right. -->
     <div
       v-if="summary"
-      class="grid cols-4 me-kpi-grid"
+      class="me-matrix-block"
       style="margin-bottom: var(--sp-5);"
     >
-      <div
-        v-for="(klass, key) in { Star: summary.stars, Plowhorse: summary.plowhorses, Puzzle: summary.puzzles, Dog: summary.dogs }"
-        :key="key"
-        class="me-kpi-wrap"
-        :class="{ 'is-active': classFilter === key }"
-        role="button"
-        tabindex="0"
-        :aria-pressed="classFilter === key"
-        :aria-label="t(`menu_class_${(key as string).toUpperCase()}`)"
-        @click="toggleClass(key as string)"
-        @keydown.enter.prevent="toggleClass(key as string)"
-        @keydown.space.prevent="toggleClass(key as string)"
-      >
-        <Kpi
-          :data="{
-            label: t(`menu_class_${(key as string).toUpperCase()}`),
-            icon: classIcon[key],
-            tone: classTone[key],
-            value: klass ?? 0,
-          }"
-        />
+      <div class="me-matrix-body">
+        <!-- Y-axis (margin) -->
+        <div class="me-axis me-axis--y">
+          <span>{{ t('Higher margin') }}</span>
+          <span class="me-axis-arrow">↑</span>
+          <span class="me-axis-title">{{ t('Profitability') }}</span>
+          <span class="me-axis-arrow">↓</span>
+          <span>{{ t('Lower margin') }}</span>
+        </div>
+
+        <div class="me-matrix">
+          <div
+            v-for="key in matrixOrder"
+            :key="key"
+            class="me-quad"
+            :class="[`me-quad--${classTone[key]}`, { 'is-active': classFilter === key, 'is-dim': classFilter && classFilter !== key }]"
+            role="button"
+            tabindex="0"
+            :aria-pressed="classFilter === key"
+            :aria-label="t(`menu_class_${key.toUpperCase()}`)"
+            @click="toggleClass(key)"
+            @keydown.enter.prevent="toggleClass(key)"
+            @keydown.space.prevent="toggleClass(key)"
+          >
+            <div class="me-quad__head">
+              <span class="me-quad__icon">
+                <DesignIcon
+                  :name="classIcon[key]"
+                  :size="16"
+                />
+              </span>
+              <span class="me-quad__name">{{ t(`menu_class_${key.toUpperCase()}`) }}</span>
+              <span class="me-quad__count">{{ ({ Star: summary.stars, Plowhorse: summary.plowhorses, Puzzle: summary.puzzles, Dog: summary.dogs })[key] ?? 0 }}</span>
+            </div>
+            <p class="me-quad__hint">
+              {{ t(`menu_action_${key.toUpperCase()}`) }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- X-axis (popularity) -->
+      <div class="me-axis me-axis--x">
+        <span>← {{ t('Less popular') }}</span>
+        <span class="me-axis-title">{{ t('Popularity') }}</span>
+        <span>{{ t('More popular') }} →</span>
       </div>
     </div>
 
@@ -307,13 +417,24 @@ const subtitle = computed(() => `${dateFrom.value} — ${dateTo.value}`)
           </span>
         </div>
         <div style="flex: 1;" />
-        <span
+        <div
           v-if="summary"
           class="me-meta"
         >
-          {{ t('{count} days analyzed', { count: summary.window_days }) }} ·
-          {{ t('Avg quantity') }}: {{ summary.avg_qty }}
-        </span>
+          <span class="me-meta__stat">
+            <span class="me-meta__label">{{ t('Revenue') }}</span>
+            <b class="mono">{{ formatCurrency(totals.revenue) }}</b>
+          </span>
+          <span class="me-meta__stat">
+            <span class="me-meta__label">{{ t('Total profit') }}</span>
+            <b class="mono">{{ formatCurrency(totals.profit) }}</b>
+          </span>
+          <span class="me-meta__stat">
+            <span class="me-meta__label">{{ t('Avg quantity') }}</span>
+            <b class="mono">{{ summary.avg_qty }}</b>
+          </span>
+          <span class="me-meta__note">{{ t('{count} days analyzed', { count: summary.window_days }) }}</span>
+        </div>
       </div>
 
       <div
@@ -395,26 +516,140 @@ const subtitle = computed(() => `${dateFrom.value} — ${dateTo.value}`)
   gap: 6px;
 }
 
-/* KPI strip — clickable wrappers with active-state highlight */
-.me-kpi-grid .me-kpi-wrap {
+/* ── Menu-engineering matrix ─────────────────────────────── */
+.me-matrix-body {
+  display: flex;
+  align-items: stretch;
+  gap: var(--sp-3);
+}
+
+.me-axis {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--text-tertiary, var(--text-secondary));
+  font-size: var(--fs-label);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.me-axis--y {
+  flex-direction: column;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  padding-block: var(--sp-2);
+}
+.me-axis--x {
+  margin-top: var(--sp-3);
+  justify-content: space-between;
+  padding-inline: var(--sp-1);
+}
+.me-axis-title {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+.me-axis-arrow {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.me-matrix {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-3);
+}
+
+.me-quad {
   cursor: pointer;
+  border: 1px solid var(--border);
   border-radius: var(--r-lg);
+  padding: var(--sp-4);
   outline: none;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  background: var(--surface);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+  min-height: 108px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
 }
-.me-kpi-grid .me-kpi-wrap:hover {
-  transform: translateY(-1px);
+.me-quad:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
-.me-kpi-grid .me-kpi-wrap.is-active {
-  box-shadow: 0 0 0 2px var(--primary), var(--shadow-md);
-}
-.me-kpi-grid .me-kpi-wrap:focus-visible {
+.me-quad:focus-visible {
   box-shadow: var(--shadow-focus);
+}
+.me-quad.is-active {
+  box-shadow: 0 0 0 2px currentColor, var(--shadow-md);
+}
+.me-quad.is-dim {
+  opacity: 0.5;
+}
+
+.me-quad--success { color: var(--success); background: var(--success-weak); border-color: var(--success-border); }
+.me-quad--info    { color: var(--info);    background: var(--info-weak);    border-color: var(--info-border); }
+.me-quad--warning { color: var(--warning); background: var(--warning-weak); border-color: var(--warning-border); }
+.me-quad--error   { color: var(--error);   background: var(--error-weak);   border-color: var(--error-border); }
+
+.me-quad__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.me-quad__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 26px;
+  block-size: 26px;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  flex-shrink: 0;
+}
+.me-quad__name {
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+}
+.me-quad__count {
+  margin-inline-start: auto;
+  font-size: var(--fs-h4, 1.35rem);
+  font-weight: 800;
+  line-height: 1;
+}
+.me-quad__hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-label);
+  line-height: 1.35;
 }
 
 .me-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
   color: var(--text-secondary);
   font-size: var(--fs-sm);
+}
+.me-meta__stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.me-meta__label {
+  color: var(--text-tertiary, var(--text-secondary));
+  font-size: var(--fs-label);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.me-meta__stat b {
+  color: var(--text-primary);
+}
+.me-meta__note {
+  color: var(--text-tertiary, var(--text-secondary));
 }
 
 .me-margin-pct {
@@ -434,11 +669,11 @@ const subtitle = computed(() => `${dateFrom.value} — ${dateTo.value}`)
 }
 
 @media (max-width: 768px) {
-  .me-kpi-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
   .me-toolbar {
     flex-wrap: wrap;
+  }
+  .me-axis--y {
+    display: none;
   }
   .me-meta {
     flex: 1 1 100%;
@@ -447,7 +682,7 @@ const subtitle = computed(() => `${dateFrom.value} — ${dateTo.value}`)
 }
 
 @media (max-width: 420px) {
-  .me-kpi-grid {
+  .me-matrix {
     grid-template-columns: 1fr;
   }
 }

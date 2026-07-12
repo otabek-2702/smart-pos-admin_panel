@@ -45,3 +45,7 @@ playwright/.cache/
 .env
 .env.local
 .env.*.local
+.playwright-mcp/
+/*.png
+/*.jpeg
+/*.jpg

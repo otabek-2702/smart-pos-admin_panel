@@ -23,6 +23,7 @@ import { useStateAction } from '@/composables/useStateAction'
 import { getStoredUserData } from '@/utils/storage'
 
 const { t } = useI18n({ useScope: 'global' })
+const router = useRouter()
 
 const orders = ref<any[]>([])
 const total = ref(0)
@@ -76,6 +77,28 @@ const statusOptions = computed(() =>
 const paymentStatusOptions = computed(() =>
   ['UNPAID', 'PARTIAL', 'PAID'].map(s => ({ value: s, label: t(`po_payment_${s}`) })),
 )
+// Backend stores currency as a 3-char code (default UZS). Offer the codes an
+// operator here actually deals with instead of a free-text box that can be typo'd.
+const currencyOptions = ['UZS', 'USD', 'EUR', 'RUB'].map(c => ({ value: c, label: c }))
+
+// Active-filter awareness — drives the clear-filters control, the filter chips,
+// and a context-aware empty state (mirrors the sibling Receiving page).
+const hasFilters = computed(() =>
+  !!(search.value || statusFilter.value || paymentFilter.value || supplierFilter.value || dateFrom.value || dateTo.value),
+)
+
+function clearFilters() {
+  search.value = ''
+  statusFilter.value = ''
+  paymentFilter.value = ''
+  supplierFilter.value = ''
+  dateFrom.value = ''
+  dateTo.value = ''
+}
+
+function supplierLabel(id: string) {
+  return suppliersList.value.find(s => String(s.id) === String(id))?.name ?? id
+}
 
 const columns: DataTableColumn<any>[] = [
   { key: 'order_number', label: t('po_col_order_number'), sortable: false },
@@ -174,8 +197,21 @@ const supplierOptions = computed(() => suppliersList.value.map(s => ({ value: St
 const locationOptions = computed(() => locationsList.value.map(l => ({ value: String(l.id), label: l.name })))
 
 async function createOrder() {
+  // The backend requires BOTH a supplier and a delivery location (it 404s with
+  // "Supplier not found" otherwise), so validate supplier up front instead of
+  // letting a confusing server error surface.
+  if (!form.value.supplier_id) {
+    notify(t('Supplier is required'), 'error')
+
+    return
+  }
   if (!form.value.delivery_location_id) {
     notify(t('Delivery location is required'), 'error')
+
+    return
+  }
+  if (form.value.expected_date && form.value.expected_date < form.value.order_date) {
+    notify(t('po_expected_before_order'), 'error')
 
     return
   }
@@ -230,6 +266,14 @@ const actionTitle = computed(() => {
     default: return t('Confirm')
   }
 })
+
+// Receiving goods is a dedicated multi-step flow (create receiving → add lines →
+// complete) that lives on its own page. The PO action endpoint only supports
+// send/confirm/cancel, so route the operator to the Receiving page rather than
+// firing a POST the backend rejects as an unknown action.
+function goReceive(item: any) {
+  router.push({ path: '/stock/receiving', query: { po: String(item.id) } })
+}
 
 function canSend(item: any) { return item.status === 'DRAFT' }
 function canConfirm(item: any) { return item.status === 'SENT' }
@@ -316,6 +360,98 @@ const pagination = computed(() => ({
         </div>
       </div>
 
+      <!-- Active-filter chips + live result count -->
+      <div
+        v-if="hasFilters || (!loading && total > 0)"
+        class="po-subbar"
+      >
+        <div
+          v-if="hasFilters"
+          class="chips"
+        >
+          <span
+            v-if="search"
+            class="chip"
+          >
+            <span>{{ t('Search') }}: <b>{{ search }}</b></span>
+            <span
+              class="chip__x"
+              @click="search = ''"
+            >
+              <DesignIcon name="close" :size="13" />
+            </span>
+          </span>
+          <span
+            v-if="statusFilter"
+            class="chip"
+          >
+            <span>{{ t('Status') }}: <b>{{ t(`po_status_${statusFilter}`) }}</b></span>
+            <span
+              class="chip__x"
+              @click="statusFilter = ''"
+            >
+              <DesignIcon name="close" :size="13" />
+            </span>
+          </span>
+          <span
+            v-if="paymentFilter"
+            class="chip"
+          >
+            <span>{{ t('Payment') }}: <b>{{ t(`po_payment_${paymentFilter}`) }}</b></span>
+            <span
+              class="chip__x"
+              @click="paymentFilter = ''"
+            >
+              <DesignIcon name="close" :size="13" />
+            </span>
+          </span>
+          <span
+            v-if="supplierFilter"
+            class="chip"
+          >
+            <span>{{ t('Supplier') }}: <b>{{ supplierLabel(supplierFilter) }}</b></span>
+            <span
+              class="chip__x"
+              @click="supplierFilter = ''"
+            >
+              <DesignIcon name="close" :size="13" />
+            </span>
+          </span>
+          <span
+            v-if="dateFrom"
+            class="chip"
+          >
+            <span>{{ t('Date From') }}: <b>{{ dateFrom }}</b></span>
+            <span
+              class="chip__x"
+              @click="dateFrom = ''"
+            >
+              <DesignIcon name="close" :size="13" />
+            </span>
+          </span>
+          <span
+            v-if="dateTo"
+            class="chip"
+          >
+            <span>{{ t('Date To') }}: <b>{{ dateTo }}</b></span>
+            <span
+              class="chip__x"
+              @click="dateTo = ''"
+            >
+              <DesignIcon name="close" :size="13" />
+            </span>
+          </span>
+          <button
+            class="chip--clear"
+            @click="clearFilters"
+          >
+            {{ t('Clear filters') }}
+          </button>
+        </div>
+
+        <span class="po-count">{{ t('po_result_count', { count: total }) }}</span>
+      </div>
+
       <div class="card__divider" />
 
       <DataTable
@@ -325,9 +461,9 @@ const pagination = computed(() => ({
         :loading="loading"
         :pagination="pagination"
         expandable
-        :empty-title="t('po_empty_title')"
-        :empty-sub="t('po_empty_sub')"
-        empty-icon="receipt"
+        :empty-title="hasFilters ? t('po_empty_filtered_title') : t('po_empty_title')"
+        :empty-sub="hasFilters ? t('po_empty_filtered_sub') : t('po_empty_sub')"
+        :empty-icon="hasFilters ? 'search' : 'receipt'"
       >
         <template #cell.order_number="{ row }">
           <span class="cell-strong">{{ row.order_number }}</span>
@@ -370,8 +506,8 @@ const pagination = computed(() => ({
             v-if="canReceive(row)"
             icon="package"
             tone="primary"
-            :title="t('po_action_receive_title')"
-            @click="openAction(row, 'receive')"
+            :title="t('po_action_receive_goto')"
+            @click="goReceive(row)"
           />
           <IconAction
             v-if="canCancel(row)"
@@ -485,7 +621,7 @@ const pagination = computed(() => ({
       <form @submit.prevent="createOrder">
         <div class="form-grid">
           <Field
-            :label="t('Supplier')"
+            :label="t('Supplier *')"
             class="span-2"
           >
             <Select
@@ -525,9 +661,11 @@ const pagination = computed(() => ({
           </Field>
 
           <Field :label="t('Currency')">
-            <Input
+            <Select
               v-model="form.currency"
+              icon="wallet"
               :placeholder="t('Currency')"
+              :options="currencyOptions"
             />
           </Field>
 
@@ -608,7 +746,7 @@ const pagination = computed(() => ({
           icon="check"
           :loading="actioning"
           :disabled="actioning"
-          @click="doAction"
+          @click="() => doAction()"
         >
           {{ t('Confirm') }}
         </Button>
@@ -649,6 +787,25 @@ const pagination = computed(() => ({
 .po-tb-date {
   flex: 1 1 160px;
   min-width: 150px;
+}
+
+/* Sub-bar under the toolbar: active-filter chips on the left, live result
+   count on the right. Collapses to a stacked layout on narrow screens. */
+.po-subbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px 14px;
+  flex-wrap: wrap;
+}
+
+.po-count {
+  margin-inline-start: auto;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgb(var(--v-theme-text-secondary));
+  white-space: nowrap;
 }
 
 .po-expand {

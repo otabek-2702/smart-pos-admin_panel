@@ -19,18 +19,31 @@ const statusColors: Record<string, string> = {
   OUT_OF_SERVICE: 'info',
 }
 
+const statusIcons: Record<string, string> = {
+  AVAILABLE: 'bx-check-circle',
+  OCCUPIED: 'bx-user',
+  RESERVED: 'bx-time-five',
+  OUT_OF_SERVICE: 'bx-wrench',
+}
+
 // Place dialog
 const placeDialog = ref(false)
 const placeEdit = ref<any>(null)
 const placeForm = ref({ name: '', place_type: 'HALL', capacity: 0 })
+const savingPlace = ref(false)
 
 // Table dialog
 const tableDialog = ref(false)
 const tableEdit = ref<any>(null)
 const tableForm = ref({ place_id: null as number | null, number: '', capacity: 4 })
+const savingTable = ref(false)
 
 // Selected place filter
 const selectedPlaceId = ref<number | null>(null)
+
+// Table view filters (client-side over the loaded set so counts stay accurate)
+const statusFilter = ref<string | null>(null)
+const search = ref('')
 
 async function loadPlaces() {
   loading.value = true
@@ -67,8 +80,55 @@ async function loadTables() {
   }
 }
 
+function refreshAll() {
+  loadPlaces()
+  loadTables()
+}
+
 onMounted(() => { loadPlaces(); loadTables() })
 watch(selectedPlaceId, loadTables)
+
+// Live status counts over the current scope (selected place or all)
+const statusCounts = computed<Record<string, number>>(() => {
+  const counts: Record<string, number> = { AVAILABLE: 0, OCCUPIED: 0, RESERVED: 0, OUT_OF_SERVICE: 0 }
+  for (const tbl of tables.value) {
+    if (counts[tbl.status] !== undefined)
+      counts[tbl.status]++
+  }
+  return counts
+})
+
+const totalSeats = computed(() => tables.value.reduce((sum, tbl) => sum + (Number(tbl.capacity) || 0), 0))
+
+// Share of tables that are occupied or reserved (in use) — a quick floor-load read
+const occupancyPct = computed(() => {
+  const total = tables.value.length
+  if (!total)
+    return 0
+  const inUse = statusCounts.value.OCCUPIED + statusCounts.value.RESERVED
+  return Math.round((inUse / total) * 100)
+})
+
+const statusFilters = computed(() => [
+  { value: null as string | null, label: t('All'), count: tables.value.length, color: 'primary' },
+  ...tableStatuses.map(s => ({ value: s as string | null, label: t(`status_${s}`), count: statusCounts.value[s] ?? 0, color: statusColors[s] })),
+])
+
+const filteredTables = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  return tables.value.filter((tbl) => {
+    if (statusFilter.value && tbl.status !== statusFilter.value)
+      return false
+    if (q && !String(tbl.number ?? '').toLowerCase().includes(q))
+      return false
+    return true
+  })
+})
+
+function clearFilters() {
+  statusFilter.value = null
+  search.value = ''
+}
 
 function openPlaceDialog(p: any = null) {
   placeEdit.value = p
@@ -77,6 +137,13 @@ function openPlaceDialog(p: any = null) {
 }
 
 async function savePlace() {
+  if (savingPlace.value)
+    return
+  if (!placeForm.value.name?.trim()) {
+    notify(t('Name is required'), 'error')
+    return
+  }
+  savingPlace.value = true
   try {
     if (placeEdit.value)
       await axios.put(`/places/${placeEdit.value.id}`, placeForm.value)
@@ -89,6 +156,9 @@ async function savePlace() {
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
   }
+  finally {
+    savingPlace.value = false
+  }
 }
 
 async function deletePlace(p: any) {
@@ -97,6 +167,8 @@ async function deletePlace(p: any) {
   try {
     await axios.delete(`/places/${p.id}`)
     notify(t('Place deleted'))
+    if (selectedPlaceId.value === p.id)
+      selectedPlaceId.value = null
     await Promise.all([loadPlaces(), loadTables()])
   }
   catch (e: any) {
@@ -113,6 +185,13 @@ function openTableDialog(tbl: any = null) {
 }
 
 async function saveTable() {
+  if (savingTable.value)
+    return
+  if (!String(tableForm.value.number ?? '').trim()) {
+    notify(t('Table number is required'), 'error')
+    return
+  }
+  savingTable.value = true
   try {
     if (tableEdit.value)
       await axios.put(`/tables/${tableEdit.value.id}`, tableForm.value)
@@ -124,6 +203,9 @@ async function saveTable() {
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
+  }
+  finally {
+    savingTable.value = false
   }
 }
 
@@ -141,6 +223,8 @@ async function deleteTable(tbl: any) {
 }
 
 async function changeTableStatus(tbl: any, status: string) {
+  if (tbl.status === status)
+    return
   try {
     await axios.patch(`/tables/${tbl.id}/status`, { status })
     notify(t('Status updated'))
@@ -163,8 +247,142 @@ async function changeTableStatus(tbl: any, status: string) {
           {{ t('Manage hall layout, tables and seat capacity') }}
         </div>
       </div>
-      <div class="page-head__actions" />
+      <div class="page-head__actions">
+        <VBtn
+          variant="tonal"
+          color="secondary"
+          size="small"
+          prepend-icon="bx-refresh"
+          :loading="loading || tablesLoading"
+          @click="refreshAll"
+        >
+          {{ t('Refresh') }}
+        </VBtn>
+      </div>
     </div>
+
+    <!-- KPI overview -->
+    <VRow class="mb-1">
+      <VCol
+        cols="6"
+        md="3"
+      >
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-primary">
+              <VIcon
+                icon="bx-grid-alt"
+                size="20"
+              />
+            </div>
+            <div class="kpi-card__label">
+              {{ t('Total Tables') }}
+            </div>
+          </div>
+          <div
+            v-if="!tablesLoading || tables.length"
+            class="kpi-card__value num-tabular"
+          >
+            {{ tables.length }}
+          </div>
+          <div
+            v-else
+            class="sk-box mb-1"
+            style="width:56px;height:24px;border-radius:4px;"
+          />
+        </div>
+      </VCol>
+      <VCol
+        cols="6"
+        md="3"
+      >
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-success">
+              <VIcon
+                icon="bx-check-circle"
+                size="20"
+              />
+            </div>
+            <div class="kpi-card__label">
+              {{ t('status_AVAILABLE') }}
+            </div>
+          </div>
+          <div
+            v-if="!tablesLoading || tables.length"
+            class="kpi-card__value num-tabular"
+          >
+            {{ statusCounts.AVAILABLE }}
+          </div>
+          <div
+            v-else
+            class="sk-box mb-1"
+            style="width:56px;height:24px;border-radius:4px;"
+          />
+        </div>
+      </VCol>
+      <VCol
+        cols="6"
+        md="3"
+      >
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-error">
+              <VIcon
+                icon="bx-user"
+                size="20"
+              />
+            </div>
+            <div class="kpi-card__label">
+              {{ t('Occupancy') }}
+            </div>
+          </div>
+          <div
+            v-if="!tablesLoading || tables.length"
+            class="kpi-card__value num-tabular"
+          >
+            {{ occupancyPct }}<span class="kpi-card__unit">%</span>
+          </div>
+          <div
+            v-else
+            class="sk-box mb-1"
+            style="width:56px;height:24px;border-radius:4px;"
+          />
+          <div class="kpi-card__foot">
+            <span class="kpi-card__sub">{{ statusCounts.OCCUPIED }} {{ t('status_OCCUPIED').toLowerCase() }} · {{ statusCounts.RESERVED }} {{ t('status_RESERVED').toLowerCase() }}</span>
+          </div>
+        </div>
+      </VCol>
+      <VCol
+        cols="6"
+        md="3"
+      >
+        <div class="kpi-card">
+          <div class="kpi-card__top">
+            <div class="kpi-card__icon t-info">
+              <VIcon
+                icon="bx-chair"
+                size="20"
+              />
+            </div>
+            <div class="kpi-card__label">
+              {{ t('Total Seats') }}
+            </div>
+          </div>
+          <div
+            v-if="!tablesLoading || tables.length"
+            class="kpi-card__value num-tabular"
+          >
+            {{ totalSeats }}
+          </div>
+          <div
+            v-else
+            class="sk-box mb-1"
+            style="width:56px;height:24px;border-radius:4px;"
+          />
+        </div>
+      </VCol>
+    </VRow>
 
     <VRow>
       <VCol
@@ -207,13 +425,45 @@ async function changeTableStatus(tbl: any, status: string) {
                 />
               </VListItem>
             </template>
+            <template v-else-if="places.length === 0">
+              <div class="text-center text-disabled py-6 px-4">
+                <VIcon
+                  icon="bx-building-house"
+                  size="40"
+                  class="mb-2"
+                />
+                <div class="text-body-2 mb-1">
+                  {{ t('No places yet') }}
+                </div>
+                <div class="text-caption mb-3">
+                  {{ t('Create your first hall or dining area') }}
+                </div>
+                <VBtn
+                  size="small"
+                  prepend-icon="bx-plus"
+                  @click="openPlaceDialog"
+                >
+                  {{ t('Add Place') }}
+                </VBtn>
+              </div>
+            </template>
             <VListItem
               v-for="p in places"
               :key="p.id"
               :active="selectedPlaceId === p.id"
               @click="selectedPlaceId = p.id"
             >
-              <VListItemTitle>{{ p.name }}</VListItemTitle>
+              <VListItemTitle class="d-flex align-center" style="gap:6px;">
+                {{ p.name }}
+                <VChip
+                  v-if="p.is_active === false"
+                  size="x-small"
+                  color="secondary"
+                  variant="tonal"
+                >
+                  {{ t('active_false') }}
+                </VChip>
+              </VListItemTitle>
               <VListItemSubtitle>{{ t(`place_type_${p.place_type}`) }} · {{ t('Capacity') }}: {{ p.capacity }}</VListItemSubtitle>
               <template #append>
                 <div
@@ -230,6 +480,12 @@ async function changeTableStatus(tbl: any, status: string) {
                       icon="bx-edit-alt"
                       size="16"
                     />
+                    <VTooltip
+                      activator="parent"
+                      location="top"
+                    >
+                      {{ t('Edit') }}
+                    </VTooltip>
                   </VBtn>
                   <VBtn
                     icon
@@ -242,6 +498,12 @@ async function changeTableStatus(tbl: any, status: string) {
                       icon="bx-trash"
                       size="16"
                     />
+                    <VTooltip
+                      activator="parent"
+                      location="top"
+                    >
+                      {{ t('Delete') }}
+                    </VTooltip>
                   </VBtn>
                 </div>
               </template>
@@ -255,22 +517,58 @@ async function changeTableStatus(tbl: any, status: string) {
         md="8"
       >
         <VCard>
-          <VCardText class="d-flex align-center justify-space-between">
+          <VCardText class="d-flex align-center justify-space-between flex-wrap" style="gap:12px;">
             <span class="text-h6">{{ t('Tables') }}</span>
-            <VBtn
-              size="small"
-              prepend-icon="bx-plus"
-              :disabled="!places.length"
-              @click="openTableDialog"
+            <div
+              class="d-flex align-center flex-wrap"
+              style="gap:8px;"
             >
-              {{ t('Add Table') }}
-            </VBtn>
+              <VTextField
+                v-model="search"
+                :placeholder="t('Search tables...')"
+                prepend-inner-icon="bx-search"
+                density="compact"
+                variant="outlined"
+                hide-details
+                clearable
+                style="min-width:180px;max-width:220px;"
+              />
+              <VBtn
+                size="small"
+                prepend-icon="bx-plus"
+                :disabled="!places.length"
+                @click="openTableDialog"
+              >
+                {{ t('Add Table') }}
+              </VBtn>
+            </div>
           </VCardText>
           <VDivider />
+
+          <!-- Status filter / segmented counts -->
+          <div
+            v-if="tables.length || tablesLoading"
+            class="d-flex align-center flex-wrap px-4 pt-4"
+            style="gap:8px;"
+          >
+            <VChip
+              v-for="f in statusFilters"
+              :key="String(f.value)"
+              :color="f.color"
+              :variant="statusFilter === f.value ? 'flat' : 'tonal'"
+              size="small"
+              label
+              @click="statusFilter = f.value"
+            >
+              {{ f.label }}
+              <span class="ms-1 font-weight-bold">{{ f.count }}</span>
+            </VChip>
+          </div>
+
           <VCardText>
-            <VRow v-if="tables.length || tablesLoading">
+            <VRow v-if="filteredTables.length || (tablesLoading && tables.length === 0)">
               <VCol
-                v-for="(tbl, idx) in (tablesLoading && tables.length === 0 ? Array.from({ length: 8 }) : tables)"
+                v-for="(tbl, idx) in (tablesLoading && tables.length === 0 ? Array.from({ length: 8 }) : filteredTables)"
                 :key="(tbl as any)?.id ?? idx"
                 cols="6"
                 sm="4"
@@ -280,7 +578,7 @@ async function changeTableStatus(tbl: any, status: string) {
                   v-if="tbl"
                   border
                   hover
-                  class="text-center pa-3"
+                  class="text-center pa-3 table-card"
                 >
                   <VAvatar
                     :color="statusColors[(tbl as any).status] ?? 'default'"
@@ -288,13 +586,17 @@ async function changeTableStatus(tbl: any, status: string) {
                     size="48"
                     rounded
                   >
-                    <VIcon icon="bx-grid-alt" />
+                    <VIcon :icon="statusIcons[(tbl as any).status] ?? 'bx-grid-alt'" />
                   </VAvatar>
                   <div class="text-h6 mt-2">
                     #{{ (tbl as any).number }}
                   </div>
                   <div class="text-caption text-disabled">
-                    {{ t('Capacity') }}: {{ (tbl as any).capacity }}
+                    <VIcon
+                      icon="bx-chair"
+                      size="13"
+                      class="me-1"
+                    />{{ (tbl as any).capacity }} {{ t('seats') }}
                   </div>
                   <VChip
                     size="x-small"
@@ -311,6 +613,7 @@ async function changeTableStatus(tbl: any, status: string) {
                         variant="text"
                         size="x-small"
                         class="mt-2"
+                        append-icon="bx-chevron-down"
                         block
                       >
                         {{ t('Change Status') }}
@@ -320,8 +623,17 @@ async function changeTableStatus(tbl: any, status: string) {
                       <VListItem
                         v-for="s in tableStatuses"
                         :key="s"
+                        :active="(tbl as any).status === s"
                         @click="changeTableStatus(tbl, s)"
                       >
+                        <template #prepend>
+                          <VIcon
+                            :icon="statusIcons[s]"
+                            :color="statusColors[s]"
+                            size="16"
+                            class="me-2"
+                          />
+                        </template>
                         <VListItemTitle>{{ t(`status_${s}`) }}</VListItemTitle>
                       </VListItem>
                     </VList>
@@ -340,6 +652,12 @@ async function changeTableStatus(tbl: any, status: string) {
                         icon="bx-edit-alt"
                         size="14"
                       />
+                      <VTooltip
+                        activator="parent"
+                        location="top"
+                      >
+                        {{ t('Edit') }}
+                      </VTooltip>
                     </VBtn>
                     <VBtn
                       icon
@@ -352,6 +670,12 @@ async function changeTableStatus(tbl: any, status: string) {
                         icon="bx-trash"
                         size="14"
                       />
+                      <VTooltip
+                        activator="parent"
+                        location="top"
+                      >
+                        {{ t('Delete') }}
+                      </VTooltip>
                     </VBtn>
                   </div>
                 </VCard>
@@ -362,6 +686,30 @@ async function changeTableStatus(tbl: any, status: string) {
                 />
               </VCol>
             </VRow>
+
+            <!-- No match for current filters -->
+            <div
+              v-else-if="tables.length"
+              class="text-center text-disabled py-8"
+            >
+              <VIcon
+                icon="bx-filter-alt"
+                size="48"
+                class="mb-2"
+              />
+              <div class="mb-3">
+                {{ t('No tables match your filters') }}
+              </div>
+              <VBtn
+                size="small"
+                variant="tonal"
+                @click="clearFilters"
+              >
+                {{ t('Clear filters') }}
+              </VBtn>
+            </div>
+
+            <!-- Truly empty -->
             <div
               v-else
               class="text-center text-disabled py-8"
@@ -371,7 +719,15 @@ async function changeTableStatus(tbl: any, status: string) {
                 size="48"
                 class="mb-2"
               />
-              <div>{{ t('No tables yet') }}</div>
+              <div class="mb-1">
+                {{ t('No tables yet') }}
+              </div>
+              <div
+                v-if="!places.length"
+                class="text-caption"
+              >
+                {{ t('Add a place first to create tables') }}
+              </div>
             </div>
           </VCardText>
         </VCard>
@@ -401,18 +757,21 @@ async function changeTableStatus(tbl: any, status: string) {
             v-model.number="placeForm.capacity"
             :label="t('Capacity')"
             type="number"
+            min="0"
           />
         </VCardText>
         <VCardActions>
           <VSpacer />
           <VBtn
             variant="text"
+            :disabled="savingPlace"
             @click="placeDialog = false"
           >
             {{ t('Cancel') }}
           </VBtn>
           <VBtn
             color="primary"
+            :loading="savingPlace"
             @click="savePlace"
           >
             {{ t('Save') }}
@@ -444,18 +803,21 @@ async function changeTableStatus(tbl: any, status: string) {
             v-model.number="tableForm.capacity"
             :label="t('Capacity')"
             type="number"
+            min="1"
           />
         </VCardText>
         <VCardActions>
           <VSpacer />
           <VBtn
             variant="text"
+            :disabled="savingTable"
             @click="tableDialog = false"
           >
             {{ t('Cancel') }}
           </VBtn>
           <VBtn
             color="primary"
+            :loading="savingTable"
             @click="saveTable"
           >
             {{ t('Save') }}
@@ -473,6 +835,16 @@ async function changeTableStatus(tbl: any, status: string) {
     </VSnackbar>
   </div>
 </template>
+
+<style scoped>
+.table-card {
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+
+.table-card:hover {
+  border-color: rgb(var(--v-theme-primary)) !important;
+}
+</style>
 
 <route lang="yaml">
 meta:

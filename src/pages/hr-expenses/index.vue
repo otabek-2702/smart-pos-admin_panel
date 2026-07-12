@@ -8,9 +8,11 @@ import { hrApi as axios } from '@/plugins/axios'
 import Badge from '@/components/design/Badge.vue'
 import Button from '@/components/design/Button.vue'
 import Card from '@/components/design/Card.vue'
+import ChartCard from '@/components/design/ChartCard.vue'
 import DataTable from '@/components/design/DataTable.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import Field from '@/components/design/Field.vue'
+import HBarChart from '@/components/design/HBarChart.vue'
 import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
 import Kpi from '@/components/design/Kpi.vue'
@@ -42,6 +44,7 @@ const form = ref({
   description: '',
   expense_date: new Date().toISOString().slice(0, 10),
   receipt_number: '',
+  receipt_image_url: '',
   payment_method: 'CASH' as 'CASH' | 'UZCARD' | 'HUMO' | 'PAYME' | 'BANK_TRANSFER',
   notes: '',
 })
@@ -70,6 +73,32 @@ const categoryFilterOptions = computed(() => [
 const categoryFormOptions = computed(() =>
   categories.value.map((c: any) => ({ value: String(c.id), label: c.name })),
 )
+
+// Where the money actually goes — derived from the stats endpoint's
+// by_category totals (already returned by /expenses/stats/, previously unused).
+const categoryBreakdown = computed(() => {
+  const bc = stats.value?.by_category
+  if (!bc)
+    return []
+  return Object.entries(bc)
+    .map(([name, v]) => ({
+      name: (!name || name === 'null' || name === 'None')
+        ? t('expense_uncategorized')
+        : name,
+      value: Number(v) || 0,
+    }))
+    .filter(d => d.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6)
+})
+
+const expenseCount = computed<number | null>(() => {
+  const c = stats.value?.count
+  return c == null ? null : Number(c)
+})
+
+// Backend rejects amount <= 0; guard the Save button so we fail fast in the UI.
+const amountValid = computed(() => Number(form.value.amount) > 0)
 
 // ============================================================
 // API
@@ -171,6 +200,7 @@ function openCreate() {
     description: '',
     expense_date: new Date().toISOString().slice(0, 10),
     receipt_number: '',
+    receipt_image_url: '',
     payment_method: 'CASH',
     notes: '',
   }
@@ -185,6 +215,7 @@ function openEdit(e: any) {
     description: e.description ?? '',
     expense_date: (e.expense_date ?? new Date().toISOString()).slice(0, 10),
     receipt_number: e.receipt_number ?? '',
+    receipt_image_url: e.receipt_image_url ?? '',
     payment_method: (e.payment_method ?? 'CASH') as any,
     notes: e.notes ?? '',
   }
@@ -464,6 +495,12 @@ function categoryName(row: any): string {
   return row?.category?.name ?? '—'
 }
 
+function openReceipt(row: any) {
+  const url = row?.receipt_image_url
+  if (url)
+    window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 function fullName(u: any): string {
   if (!u)
     return '—'
@@ -522,6 +559,7 @@ function statusTooltip(row: any): string {
           icon: 'wallet',
           tone: 'primary',
           money: true,
+          sub: expenseCount !== null ? `${expenseCount} ${t('expense_count_suffix')}` : undefined,
         }"
       />
       <Kpi
@@ -543,6 +581,20 @@ function statusTooltip(row: any): string {
         }"
       />
     </div>
+
+    <!-- Spend-by-category breakdown -->
+    <ChartCard
+      v-if="stats === null || categoryBreakdown.length"
+      :title="t('expense_by_category_title')"
+      :sub="t('expense_by_category_sub')"
+      class-name="breakdown-card"
+    >
+      <HBarChart
+        :data="categoryBreakdown"
+        :value-format="formatCurrency"
+        :loading="stats === null"
+      />
+    </ChartCard>
 
     <!-- Toolbar + table -->
     <Card>
@@ -636,6 +688,12 @@ function statusTooltip(row: any): string {
         </template>
 
         <template #row-actions="{ row }">
+          <IconAction
+            v-if="row.receipt_image_url"
+            icon="receipt"
+            :title="t('expense_view_receipt')"
+            @click="openReceipt(row)"
+          />
           <IconAction
             v-if="row.status === 'PENDING'"
             icon="check"
@@ -751,6 +809,18 @@ function statusTooltip(row: any): string {
           </Field>
 
           <Field
+            :label="t('expense_receipt_image')"
+            :hint="t('expense_receipt_image_hint')"
+            class="span-2"
+          >
+            <Input
+              v-model="form.receipt_image_url"
+              type="url"
+              :placeholder="t('expense_receipt_image_placeholder')"
+            />
+          </Field>
+
+          <Field
             :label="t('Description')"
             class="span-2"
           >
@@ -784,7 +854,7 @@ function statusTooltip(row: any): string {
           variant="primary"
           icon="check"
           :loading="saving"
-          :disabled="saving"
+          :disabled="saving || !amountValid"
           @click="save"
         >
           {{ t('Save') }}
@@ -1054,6 +1124,10 @@ meta:
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+  margin-block-end: 16px;
+}
+
+.breakdown-card {
   margin-block-end: 16px;
 }
 

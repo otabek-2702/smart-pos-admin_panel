@@ -18,9 +18,11 @@ import { computed, ref } from 'vue'
 import axiosIns from '@/plugins/axios'
 
 const HHMM = /^\d{1,2}:\d{2}$/
-const DEFAULT_START = '03:00'
-const DEFAULT_OPEN = '09:00'
-const DEFAULT_CLOSE = '23:00'
+// Alfa POS's service window crosses midnight: the default business date runs
+// from 07:00 on that date until 03:00 the following calendar day.
+const DEFAULT_START = '07:00'
+const DEFAULT_OPEN = '07:00'
+const DEFAULT_CLOSE = '03:00'
 
 function readLs(key: string, fallback: string): string {
   try {

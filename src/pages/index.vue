@@ -30,7 +30,7 @@ const {
 } = useDashboardData()
 
 // ---------- View registry ----------
-type ViewId = 'exec' | 'sales' | 'ops' | 'products' | 'staff'
+type ViewId = 'exec' | 'sales' | 'products' | 'staff'
 
 interface DashView {
   id: ViewId
@@ -54,13 +54,6 @@ const DASH_VIEWS: DashView[] = [
     subtitleKey: 'dash_subtitle_sales',
     icon: 'trend',
     comp: defineAsyncComponent(() => import('@/pages/dash/sales.vue')),
-  },
-  {
-    id: 'ops',
-    labelKey: 'Operations',
-    subtitleKey: 'dash_subtitle_ops',
-    icon: 'clock',
-    comp: defineAsyncComponent(() => import('@/pages/dash/operations.vue')),
   },
   {
     id: 'products',
@@ -270,9 +263,7 @@ watch(
           ? ['menuItems', 'bestSellerName', 'units30d', 'menuRevenue', 'top_products', 'affinity']
           : v.id === 'staff'
             ? ['active_count', 'top_performer', 'leaderboard', 'accuracy']
-            : v.id === 'ops'
-              ? ['live_counts', 'funnel', 'ordersByHour']
-              : ['revenue', 'orders', 'paid_orders', 'units_sold'],
+            : ['revenue', 'orders', 'paid_orders', 'units_sold'],
     })
   },
   { immediate: true },

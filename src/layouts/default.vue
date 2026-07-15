@@ -145,7 +145,7 @@ main.page-shell {
   flex-direction: column;
 }
 main.page-shell > .page {
-  padding: 0 var(--sp-4, 16px);
+  padding: 0 var(--sp-4, 16px) var(--sp-8, 32px);
   width: 100%;
 }
 

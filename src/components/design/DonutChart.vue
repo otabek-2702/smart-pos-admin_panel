@@ -76,7 +76,7 @@ const tipRows = computed(() => {
   const d = props.data[hover.value]
   const pct = Math.round(d.value / (total.value || 1) * 100)
 
-  return [{ color: d.color, label: 'Amount', value: `${fmtNum(d.value)} (${pct}%)` }]
+  return [{ color: d.color, label: t('Amount'), value: `${fmtNum(d.value)} (${pct}%)` }]
 })
 
 const tipTitle = computed(() => hover.value !== null ? props.data[hover.value].label : '')

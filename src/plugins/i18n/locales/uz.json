@@ -4243,6 +4243,12 @@
   "License Setup": "Litsenziyani sozlash",
   "Select": "Tanlash",
   "Pages": "Sahifalar",
+  "Amount": "Miqdor",
+  "Revenue · {window}": "Daromad · {window}",
+  "Compared with previous {window}": "Oldingi {window} bilan taqqoslash",
+  "Highest revenue period": "Eng yuqori daromad davri",
+  "Previous period": "Oldingi davr",
+  "Kitchen speed · {window}": "Oshxona tezligi · {window}",
   "$vuetify.pagination.ariaLabel.previous": "Oldingi sahifa",
   "$vuetify.pagination.ariaLabel.page": "Sahifa",
   "$vuetify.pagination.ariaLabel.next": "Keyingi sahifa"

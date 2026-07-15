@@ -4333,6 +4333,12 @@
   "Stock Transfers": "Stock Transfers",
   "License Plans": "License Plans",
   "License Setup": "License Setup",
+  "Amount": "Amount",
+  "Revenue · {window}": "Revenue · {window}",
+  "Compared with previous {window}": "Compared with previous {window}",
+  "Highest revenue period": "Highest revenue period",
+  "Previous period": "Previous period",
+  "Kitchen speed · {window}": "Kitchen speed · {window}",
   "$vuetify.pagination.ariaLabel.previous": "Previous page",
   "$vuetify.pagination.ariaLabel.page": "Page",
   "$vuetify.pagination.ariaLabel.next": "Next page"

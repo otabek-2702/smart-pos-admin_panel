@@ -55,7 +55,9 @@ interface ProductsDashData {
   categories: CategoryRow[]
   pareto: ParetoRow[]
   trends: TrendRow[]
+  prepByCategory: PrepRow[]
 }
+interface PrepRow { label: string; mins: number; target: number; orders: number }
 
 const data = ref<ProductsDashData | null>(null)
 const loading = ref(true)
@@ -205,21 +207,22 @@ function mapPareto(raw: any): ParetoRow[] {
   }))
 }
 
-function mapTrends(raw: any): TrendRow[] {
+function mapTrends(raw: any, previousRaw?: any): TrendRow[] {
   const series = Array.isArray(raw?.top_products_trend) ? raw.top_products_trend : []
+  const previous = new Map<string, number>((Array.isArray(previousRaw?.top_products_trend) ? previousRaw.top_products_trend : [])
+    .map((s: any) => [String(s?.product_name ?? ''), num(s?.total_revenue)]))
   return series.map((s: any) => {
     const points: any[] = Array.isArray(s?.points) ? s.points : []
     const spark = points.map(p => num(p?.revenue))
     const total = num(s?.total_revenue)
     const units = points.reduce((acc, p) => acc + num(p?.qty), 0)
-    // Delta = first-half vs second-half % change over the points array.
-    let delta = 0
-    if (spark.length >= 2) {
-      const mid = Math.floor(spark.length / 2)
-      const a = spark.slice(0, mid).reduce((x, y) => x + y, 0) || 0
-      const b = spark.slice(mid).reduce((x, y) => x + y, 0) || 0
-      delta = a > 0 ? Math.round(((b - a) / a) * 1000) / 10 : 0
-    }
+    // Compare the selected range with the immediately preceding equal-length
+    // range. Splitting a selected period in half made a four-day selection
+    // compare days 1–2 against days 3–4, which is not a useful KPI.
+    const previousRevenue = previous.get(String(s?.product_name ?? '')) ?? 0
+    const delta = previousRevenue > 0
+      ? Math.round(((total - previousRevenue) / previousRevenue) * 1000) / 10
+      : 0
     return {
       name: s?.product_name ?? '—',
       units,
@@ -257,7 +260,7 @@ async function loadDashboard() {
     const tod = { fromTime: sr?.fromTime, toTime: sr?.toTime }
     const curParams = buildDateParams({ from, to, ...tod })
     const prevParams = buildDateParams({ from: prev.from, to: prev.to, ...tod })
-    const [ovRes, catRes, parRes, trRes, ovPrevRes] = await Promise.all([
+    const [ovRes, catRes, parRes, trRes, ovPrevRes, trPrevRes, opsRes] = await Promise.all([
       axiosIns.get('/analytics/products/overview', { params: curParams }),
       axiosIns.get('/analytics/products/categories', { params: curParams }),
       axiosIns.get('/analytics/products/pareto', { params: curParams }),
@@ -265,6 +268,10 @@ async function loadDashboard() {
       // Previous-period overview so we can compute units30dDelta + menuRevenueDelta.
       // Best-effort: if it fails, deltas stay null.
       axiosIns.get('/analytics/products/overview', { params: prevParams }).catch(() => null),
+      axiosIns.get('/analytics/products/trends', { params: { ...prevParams, top_n: 6 } }).catch(() => null),
+      // The useful category-speed insight used to be isolated on Operations.
+      // Keep it with the product/category decisions it informs.
+      axiosIns.get('/dashboard/operations', { params: curParams }).catch(() => null),
     ])
 
     const ovRaw = ovRes.data?.data ?? ovRes.data
@@ -272,6 +279,16 @@ async function loadDashboard() {
     const parRaw = parRes.data?.data ?? parRes.data
     const trRaw = trRes.data?.data ?? trRes.data
     const ovPrevRaw = ovPrevRes?.data?.data ?? ovPrevRes?.data ?? null
+    const trPrevRaw = trPrevRes?.data?.data ?? trPrevRes?.data ?? null
+    const opsRaw = opsRes?.data?.data ?? opsRes?.data ?? null
+    const prepByCategory: PrepRow[] = Array.isArray(opsRaw?.prep_by_category)
+      ? opsRaw.prep_by_category.map((row: any) => ({
+          label: String(row?.category ?? row?.label ?? '—'),
+          mins: num(row?.mins ?? row?.avg_prep_minutes),
+          target: num(row?.target ?? row?.target_minutes),
+          orders: num(row?.orders),
+        })).filter((row: PrepRow) => row.label !== '—')
+      : []
 
     const categories = mapCategories(catRaw)
     let deltas: { units: number | null; revenue: number | null } = { units: null, revenue: null }
@@ -290,7 +307,8 @@ async function loadDashboard() {
       overview: mapOverview(ovRaw, categories.length, deltas),
       categories,
       pareto: mapPareto(parRaw),
-      trends: mapTrends(trRaw),
+      trends: mapTrends(trRaw, trPrevRaw),
+      prepByCategory,
     }
   }
   catch (err) {
@@ -309,6 +327,7 @@ async function loadDashboard() {
       categories: [],
       pareto: [],
       trends: [],
+      prepByCategory: [],
     }
     void err
   }
@@ -444,6 +463,28 @@ onMounted(() => {
           </div>
         </Card>
       </div>
+
+      <Card v-if="data?.prepByCategory?.length">
+        <div class="card__head">
+          <div class="card__head-text">
+            <div class="kpi__label">{{ t('Avg prep time by category') }}</div>
+            <h3 class="card__title">{{ t('Kitchen speed · {window}', { window: windowLabel }) }}</h3>
+          </div>
+        </div>
+        <div class="card__body" style="display: grid; gap: 14px;">
+          <div v-for="row in data.prepByCategory" :key="row.label">
+            <div class="row between" style="margin-bottom: 5px;">
+              <span style="font-size: 13px; font-weight: 600;">{{ row.label }}</span>
+              <span class="mono" style="font-size: 12px; font-weight: 700;">
+                {{ row.mins.toFixed(1) }}m<span v-if="row.target"> / {{ row.target }}m</span>
+              </span>
+            </div>
+            <div style="height: 10px; border-radius: 999px; background: rgb(var(--v-theme-chart-track)); overflow: hidden;">
+              <div :style="{ width: `${Math.min(100, row.target ? row.mins / row.target * 100 : 0)}%`, height: '100%', borderRadius: 'inherit', background: row.target && row.mins > row.target ? 'rgb(var(--v-theme-error))' : 'rgb(var(--v-theme-success))' }" />
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <!-- Frequently bought together — switchable views -->
       <Affinity

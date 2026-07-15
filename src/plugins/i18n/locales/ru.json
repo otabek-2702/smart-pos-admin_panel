@@ -4243,6 +4243,12 @@
   "License Setup": "Настройка лицензии",
   "Select": "Выбрать",
   "Pages": "Страницы",
+  "Amount": "Сумма",
+  "Revenue · {window}": "Выручка · {window}",
+  "Compared with previous {window}": "Сравнение с предыдущим {window}",
+  "Highest revenue period": "Период с максимальной выручкой",
+  "Previous period": "Предыдущий период",
+  "Kitchen speed · {window}": "Скорость кухни · {window}",
   "$vuetify.pagination.ariaLabel.previous": "Предыдущая страница",
   "$vuetify.pagination.ariaLabel.page": "Страница",
   "$vuetify.pagination.ariaLabel.next": "Следующая страница"

@@ -32,7 +32,7 @@ export interface ChannelDay {
    Replace these inline blocks with proper components once phase 2 lands.
    ============================================================ */
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, locale } = useI18n({ useScope: 'global' })
 const { formatCurrency } = useFormatters()
 
 // ---------- Data shape mirroring window.DASH ----------
@@ -41,7 +41,7 @@ interface DashData {
   grossMargin: number
   revenue30: number[]
   expense30: number[]
-  lastMonthRev: number[]
+  previousRevenue: number[]
   dayLabels: string[]
   HM_DAYS: string[]
   HM_HOURS: string[]
@@ -51,6 +51,7 @@ interface DashData {
 
 const data = ref<DashData | null>(null)
 const loading = ref(true)
+const isHourly = computed(() => /^\d{1,2}:\d{2}$/.test(String(data.value?.dayLabels?.[0] ?? '')))
 
 // ---------- Hero KPI strip (4 cards) ----------
 interface HeroKpiData {
@@ -73,17 +74,17 @@ const heroKpis = computed<HeroKpiData[]>(() => {
   if (!D) return []
   const revenue30 = toNumArr(D.revenue30)
   const expense30 = toNumArr(D.expense30)
-  const lastMonth = toNumArr(D.lastMonthRev)
-  const lastMonthSum = lastMonth.reduce((a, b) => a + b, 0)
+  const previousRevenue = toNumArr(D.previousRevenue)
+  const previousSum = previousRevenue.reduce((a, b) => a + b, 0)
   const monthRevenue = Number(D.monthRevenue) || 0
   // Diff is only meaningful if we ACTUALLY have a prior-month baseline. Otherwise
   // "+360.9M vs last month" is a confident lie — it's just the current value with
   // a green plus sign. When lastMonthSum is 0 we hide the comparison (— UZS).
-  const hasLastMonth = lastMonthSum > 0
-  const vsLastMonthDiff = monthRevenue - lastMonthSum
+  const hasPrevious = previousSum > 0
+  const vsPreviousDiff = monthRevenue - previousSum
   return [
     {
-      label: t('This month'),
+      label: t('Revenue · {window}', { window: windowLabel.value }),
       value: monthRevenue,
       money: true,
       unit: 'UZS',
@@ -92,20 +93,20 @@ const heroKpis = computed<HeroKpiData[]>(() => {
       spark: revenue30.slice(-14),
     },
     {
-      label: t('vs last month'),
-      value: hasLastMonth ? `${vsLastMonthDiff >= 0 ? '+' : ''}${fmtAbbr(vsLastMonthDiff)}` : '—',
-      unit: hasLastMonth ? 'UZS' : '',
+      label: t('Compared with previous {window}', { window: windowLabel.value }),
+      value: hasPrevious ? `${vsPreviousDiff >= 0 ? '+' : ''}${fmtAbbr(vsPreviousDiff)}` : '—',
+      unit: hasPrevious ? 'UZS' : '',
       icon: 'trend',
-      tone: hasLastMonth ? (vsLastMonthDiff >= 0 ? 'success' : 'error') : 'neutral',
+      tone: hasPrevious ? (vsPreviousDiff >= 0 ? 'success' : 'error') : 'neutral',
     },
     {
-      label: t('Best day'),
+      label: t('Highest revenue period'),
       value: revenue30.length ? Math.max(...revenue30) : 0,
       money: true,
       unit: 'UZS',
       icon: 'star',
       tone: 'warning',
-      sub: t('single-day record'),
+      sub: isHourly.value ? t('single-hour record') : t('single-day record'),
     },
     {
       label: t('Expenses · {window}', { window: windowLabel.value }),
@@ -208,8 +209,18 @@ const heatPeak = computed<{ day: string; hour: string } | null>(() => {
     }
   }
   if (!best) return null
-  return { day: D.HM_DAYS?.[row] || '', hour: D.HM_HOURS?.[col] || '' }
+  return { day: weekdayLabel(D.HM_DAYS?.[row] || ''), hour: D.HM_HOURS?.[col] || '' }
 })
+
+function weekdayLabel(value: string): string {
+  const key = String(value).trim().toLowerCase().slice(0, 3)
+  const index = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].indexOf(key)
+  if (index < 0) return value
+  // Use a fixed Monday week so names follow the active app locale instead of
+  // leaking English labels returned by analytics.
+  return new Intl.DateTimeFormat(String(locale.value), { weekday: 'short' })
+    .format(new Date(2024, 0, 1 + index))
+}
 
 // ---------- StackedBar helpers (inline fallback) ----------
 interface ChannelSeries {
@@ -294,8 +305,21 @@ async function loadDashboard() {
     const params: Record<string, string> = (r?.from && r?.to)
       ? buildDateParams({ from: r.from, to: r.to, fromTime: r.fromTime, toTime: r.toTime })
       : { range: r?.preset || '30d' }
-    const res = await axiosIns.get('/dashboard/sales', { params })
+    const from = r?.from || ''
+    const to = r?.to || ''
+    const start = from ? new Date(`${from}T00:00:00`) : new Date()
+    const end = to ? new Date(`${to}T00:00:00`) : new Date()
+    const span = Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000))
+    const prevTo = new Date(start); prevTo.setDate(prevTo.getDate() - 1)
+    const prevFrom = new Date(prevTo); prevFrom.setDate(prevFrom.getDate() - span)
+    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const prevParams = buildDateParams({ from: iso(prevFrom), to: iso(prevTo), fromTime: r?.fromTime, toTime: r?.toTime })
+    const [res, prevRes] = await Promise.all([
+      axiosIns.get('/dashboard/sales', { params }),
+      axiosIns.get('/dashboard/sales', { params: prevParams }).catch(() => null),
+    ])
     const raw = res.data?.data ?? res.data
+    const previous = prevRes?.data?.data ?? prevRes?.data ?? {}
     // BE channelDays shape: { day, hall, delivery, pickup }. FE stacked-bar
     // template uses { label, values: { hall, delivery, pickup } }. Adapt here
     // instead of touching N template bindings.
@@ -309,7 +333,7 @@ async function loadDashboard() {
           },
         }))
       : []
-    data.value = { ...raw, channelDays }
+    data.value = { ...raw, channelDays, previousRevenue: toNumArr(previous?.revenue30) }
   }
   catch {
     // Real data only — leave null so the page shows the empty state.
@@ -588,7 +612,7 @@ onMounted(() => {
                 <span
                   class="sales-heatmap__day"
                   :style="{ width: `${HEAT_LABEL_W - 8}px` }"
-                >{{ rLab }}</span>
+                >{{ weekdayLabel(rLab) }}</span>
                 <div
                   v-for="(_cLab, ci) in data.HM_HOURS"
                   :key="`hc${ri}-${ci}`"
@@ -597,7 +621,7 @@ onMounted(() => {
                     background: `rgba(var(--v-theme-primary-rgb, 58, 91, 219), ${heatOpacity(data.heatMatrix[ri]?.[ci] || 0)})`,
                     maxHeight: `${HEAT_CELL_MAX_H}px`,
                   }"
-                  :title="`${rLab} · ${data.HM_HOURS[ci]} — ${fmtNum(data.heatMatrix[ri]?.[ci] || 0)} ${t('orders')}`"
+                    :title="`${weekdayLabel(rLab)} · ${data.HM_HOURS[ci]} — ${fmtNum(data.heatMatrix[ri]?.[ci] || 0)} ${t('orders')}`"
                 />
               </div>
               <div

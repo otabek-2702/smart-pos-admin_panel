@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import AnomalyBell from '@/components/design/AnomalyBell.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import SettingsMenu from '@/components/design/SettingsMenu.vue'
+import NavBarI18n from '@/layouts/components/NavBarI18n.vue'
 import { useAlphaTheme } from '@/composables/useAlphaTheme'
 import { routeLabelForPath } from '@/navigation/routeLabels'
 import { useAIAssistantStore } from '@/stores/aiAssistant'
@@ -13,7 +14,7 @@ import { useAIAssistantStore } from '@/stores/aiAssistant'
    - DateRange hard-locked off (showDate = false)
    - SettingsMenu rendered between (where) DateRange (would be)
      and the theme toggle iconbtn
-   - DROPPED: language switcher (NavBarI18n + langRoot)
+   - Global language switcher
    - DROPPED: avatar dropdown (UserProfile / avatarRoot)
    - KEPT: bare <div class="avatar">{{ initials }}</div>
      (no click, no dropdown), initials computed from
@@ -117,6 +118,8 @@ void props
 
     <!-- Settings menu (gear popover) — decision #5 v3 -->
     <SettingsMenu />
+
+    <NavBarI18n />
 
     <!-- Theme toggle (sun when dark, moon when light) -->
     <button

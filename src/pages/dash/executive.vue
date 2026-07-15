@@ -136,7 +136,7 @@ const switchSeries = computed(() => {
     return []
   const base = [{ key: m.key, label: m.label, color: 'rgb(var(--v-theme-chart-revenue))', data: m.data }]
   if (compare.value && metricKey.value === 'rev' && D.lastMonthRev?.length)
-    base.push({ key: 'cmp', label: t('Last month'), color: 'rgb(var(--v-theme-chart-target))', data: D.lastMonthRev, dashed: true } as any)
+    base.push({ key: 'cmp', label: t('Previous period'), color: 'rgb(var(--v-theme-chart-target))', data: D.lastMonthRev, dashed: true } as any)
   return base
 })
 
@@ -226,8 +226,8 @@ const insightStr = computed<string | null>(() => {
   if (!last || !cur) return null
   const pct = Math.round(((cur - last) / last) * 100)
   if (pct >= 0)
-    return t('Revenue is up {pct}% this month', { pct })
-  return t('Revenue is down {pct}% this month', { pct: Math.abs(pct) })
+    return t('Revenue is up {pct}% vs previous period', { pct })
+  return t('Revenue is down {pct}% vs previous period', { pct: Math.abs(pct) })
 })
 
 // ---------- Data loader ----------
@@ -375,10 +375,23 @@ async function loadDashboard() {
     if (sr?.from && sr?.to) { from = sr.from; to = sr.to }
     else { const d = rangeDatesExec(30); from = d.from; to = d.to }
     const params = buildDateParams({ from, to, fromTime: sr?.fromTime, toTime: sr?.toTime })
-    const [rangeRes, todayRes, salesRes] = await Promise.all([
+    const start = new Date(`${from}T00:00:00`)
+    const end = new Date(`${to}T00:00:00`)
+    const span = Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000))
+    const previousTo = new Date(start); previousTo.setDate(previousTo.getDate() - 1)
+    const previousFrom = new Date(previousTo); previousFrom.setDate(previousFrom.getDate() - span)
+    const previousParams = buildDateParams({
+      from: isoDateExec(previousFrom), to: isoDateExec(previousTo),
+      fromTime: sr?.fromTime, toTime: sr?.toTime,
+    })
+    const [rangeRes, todayRes, salesRes, previousSalesRes, liveOrdersRes] = await Promise.all([
       axiosIns.get('/dashboard', { params }),
       axiosIns.get('/dashboard/today').catch(() => null),
       axiosIns.get('/dashboard/sales', { params }).catch(() => null),
+      axiosIns.get('/dashboard/sales', { params: previousParams }).catch(() => null),
+      // Use the real Orders contract instead of relying on a dashboard field
+      // that is not supplied by the API.
+      axiosIns.get('/orders', { params: { status: 'PREPARING,READY', per_page: 5, include_items: false } }).catch(() => null),
     ])
     const rangePayload = rangeRes.data?.data ?? rangeRes.data ?? {}
     const mapped = mapRangePayload(rangePayload)
@@ -391,9 +404,10 @@ async function loadDashboard() {
         mapped.categories = todayMapped.categories
     }
     const salesPayload = salesRes?.data?.data ?? salesRes?.data
+    const previousSalesPayload = previousSalesRes?.data?.data ?? previousSalesRes?.data
     if (salesPayload) {
       const rev30 = Array.isArray(salesPayload.revenue30) ? salesPayload.revenue30.map(asNum) : []
-      const last30 = Array.isArray(salesPayload.lastMonthRev) ? salesPayload.lastMonthRev.map(asNum) : []
+      const last30 = Array.isArray(previousSalesPayload?.revenue30) ? previousSalesPayload.revenue30.map(asNum) : []
       const labels = Array.isArray(salesPayload.dayLabels) ? salesPayload.dayLabels.map((s: any) => String(s)) : []
       // Accept whatever length the range yields (was gated to exactly 30, which
       // blanked the chart for any other range).
@@ -415,7 +429,18 @@ async function loadDashboard() {
       const gm = Number(salesPayload.grossMargin)
       if (Number.isFinite(gm)) mapped.grossMargin = Math.round(gm * 100)
     }
+    const liveRaw = liveOrdersRes?.data?.data ?? liveOrdersRes?.data ?? {}
+    const liveRows = Array.isArray(liveRaw?.orders) ? liveRaw.orders : (Array.isArray(liveRaw?.items) ? liveRaw.items : [])
+    mapped.liveFeed = liveRows.map((o: any) => ({
+      id: Number(o?.id ?? o?.display_id) || 0,
+      type: ['HALL', 'DELIVERY', 'PICKUP'].includes(o?.order_type) ? o.order_type : 'HALL',
+      info: o?.table?.name || o?.table_number ? `${t('Table')} ${o.table?.name ?? o.table_number}` : (o?.delivery_address || '—'),
+      total: asNum(o?.total_amount),
+      ts: new Date(o?.created_at ?? Date.now()).getTime(),
+      status: o?.status === 'READY' ? 'READY' : 'PREPARING',
+    })).filter((o: LiveOrder) => o.id > 0)
     data.value = mapped
+    feed.value = mapped.liveFeed
   }
   catch (err) {
     // Soft-degrade: synthesise an empty/zeroed shape so the page can render
@@ -459,12 +484,7 @@ function sparkTrend(values: number[]): 'up' | 'down' | 'flat' {
 
 const { range: sharedRange } = useDashboardData()
 watch(sharedRange, () => { void loadDashboard() })
-onMounted(() => {
-  loadDashboard().then(() => {
-    if (data.value?.liveFeed?.length)
-      feed.value = data.value.liveFeed
-  })
-})
+onMounted(() => { void loadDashboard() })
 
 // `locale` is read so live `ago()` re-renders when language changes via key.
 void locale

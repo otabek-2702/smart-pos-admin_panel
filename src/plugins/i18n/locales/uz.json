@@ -131,6 +131,8 @@
   "cash, card and digital payments": "naqd, karta va raqamli to'lovlar",
   "Reconciled shifts": "Solishtirilgan smenalar",
   "completed manager handovers": "menejer tasdiqlagan topshirishlar",
+  "Revenue is up {pct}% vs previous period": "Daromad oldingi davrga nisbatan {pct}% ga oshdi",
+  "Revenue is down {pct}% vs previous period": "Daromad oldingi davrga nisbatan {pct}% ga kamaydi",
   "AI service unavailable": "AI xizmat mavjud emas. Server yoki kalit sozlanmagan.",
   "Delete this template?": "Ushbu shablonni o'chirilsinmi?",
   "Template deleted": "Shablon o'chirildi",

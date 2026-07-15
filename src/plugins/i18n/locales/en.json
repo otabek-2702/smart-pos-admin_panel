@@ -121,6 +121,8 @@
   "cash, card and digital payments": "cash, card and digital payments",
   "Reconciled shifts": "Reconciled shifts",
   "completed manager handovers": "completed manager handovers",
+  "Revenue is up {pct}% vs previous period": "Revenue is up {pct}% vs previous period",
+  "Revenue is down {pct}% vs previous period": "Revenue is down {pct}% vs previous period",
   "AI service unavailable": "AI service unavailable. Server or key not configured.",
   "Delete this template?": "Delete this template?",
   "Template deleted": "Template deleted",

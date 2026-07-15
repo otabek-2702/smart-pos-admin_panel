@@ -127,6 +127,8 @@
   "cash, card and digital payments": "наличные, карты и цифровые платежи",
   "Reconciled shifts": "Сверенные смены",
   "completed manager handovers": "передачи, подтверждённые менеджером",
+  "Revenue is up {pct}% vs previous period": "Выручка выросла на {pct}% по сравнению с предыдущим периодом",
+  "Revenue is down {pct}% vs previous period": "Выручка снизилась на {pct}% по сравнению с предыдущим периодом",
   "AI service unavailable": "AI сервис недоступен. Сервер или ключ не настроен.",
   "Delete this template?": "Удалить этот шаблон?",
   "Template deleted": "Шаблон удалён",

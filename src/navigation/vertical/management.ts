@@ -59,9 +59,16 @@ export default [
     subject: 'all',
   },
   {
-    title: 'Treasury',
+    title: 'Safe & Bank',
     icon: { icon: 'bx-shield' },
     to: 'treasury',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
+    title: 'Expenses',
+    icon: { icon: 'bx-receipt' },
+    to: 'hr-expenses',
     action: 'manage',
     subject: 'all',
   },

@@ -5,6 +5,7 @@ import BulkActionBar from '@/components/design/BulkActionBar.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import Checkbox from '@/components/design/Checkbox.vue'
 import Kpi from '@/components/design/Kpi.vue'
+import Select from '@/components/design/Select.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -643,100 +644,31 @@ function goPage(p: number | '…') {
           class="products-toolbar__select"
           style="width:220px;"
         >
-          <div class="control control--select">
-            <svg
-              class="ic"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M3 6h18" />
-              <path d="M7 12h10" />
-              <path d="M10 18h4" />
-            </svg>
-            <select v-model="sortBy">
-              <option
-                v-for="opt in sortOptions"
-                :key="opt.value"
-                :value="opt.value"
-              >
-                {{ opt.title }}
-              </option>
-            </select>
-            <svg
-              class="ic chev"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </div>
+          <Select
+            v-model="sortBy"
+            icon="filter"
+            :placeholder="t('Sort')"
+            :options="sortOptions.map(opt => ({ value: opt.value, label: opt.title }))"
+          />
         </div>
 
         <div
           class="products-toolbar__select"
           style="min-width:200px;"
         >
-          <div
-            class="control control--select"
-            :title="t('Filter by multiple categories')"
-          >
-            <svg
-              class="ic"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <rect
-                x="3"
-                y="3"
-                width="7"
-                height="7"
-              />
-              <rect
-                x="14"
-                y="3"
-                width="7"
-                height="7"
-              />
-              <rect
-                x="3"
-                y="14"
-                width="7"
-                height="7"
-              />
-              <rect
-                x="14"
-                y="14"
-                width="7"
-                height="7"
-              />
-            </svg>
-            <select
-              v-model="categoryFilterMulti"
-              multiple
-              size="1"
-              style="min-height:36px;"
-            >
-              <option
-                v-for="opt in categoryOptions"
-                :key="opt.value"
-                :value="opt.value"
-              >
-                {{ opt.title }}
-              </option>
-            </select>
-          </div>
+          <VSelect
+            v-model="categoryFilterMulti"
+            :items="categoryOptions"
+            item-title="title"
+            item-value="value"
+            :label="t('Filter by multiple categories')"
+            multiple
+            chips
+            closable-chips
+            hide-details
+            density="compact"
+            variant="outlined"
+          />
         </div>
 
         <div
@@ -1162,36 +1094,13 @@ function goPage(p: number | '…') {
           style="gap: 8px; align-items: center;"
         >
           <span>{{ t('Rows per page') }}:</span>
-          <div
-            class="control control--select control--sm"
+          <Select
+            :model-value="String(itemsPerPage)"
+            :options="[10, 25, 50, 100].map(n => ({ value: String(n), label: String(n) }))"
+            size="sm"
             style="width: 84px;"
-          >
-            <select v-model.number="itemsPerPage">
-              <option :value="10">
-                10
-              </option>
-              <option :value="25">
-                25
-              </option>
-              <option :value="50">
-                50
-              </option>
-              <option :value="100">
-                100
-              </option>
-            </select>
-            <svg
-              class="chev"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </div>
+            @update:model-value="itemsPerPage = Number($event)"
+          />
         </div>
         <span class="pagination__spacer" />
         <span class="muted">
@@ -1386,31 +1295,12 @@ function goPage(p: number | '…') {
 
             <div class="field">
               <label class="field__label">{{ t('Category') }}</label>
-              <div class="control control--select">
-                <select v-model="form.category_id">
-                  <option :value="null">
-                    {{ t('Choose category') }}
-                  </option>
-                  <option
-                    v-for="opt in categoryOptions"
-                    :key="opt.value"
-                    :value="opt.value"
-                  >
-                    {{ opt.title }}
-                  </option>
-                </select>
-                <svg
-                  class="ic chev"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </div>
+              <Select
+                :model-value="form.category_id == null ? '' : String(form.category_id)"
+                :placeholder="t('Choose category')"
+                :options="categoryOptions.map(opt => ({ value: String(opt.value), label: opt.title }))"
+                @update:model-value="form.category_id = $event ? Number($event) : null"
+              />
             </div>
 
             <div

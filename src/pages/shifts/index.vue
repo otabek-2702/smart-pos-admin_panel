@@ -226,7 +226,8 @@ const itemsPerPage = ref(24)
 const shiftSummary = ref({
   activeCount: 0,
   awaitingCount: 0,
-  cashToReceive: 0,
+  expectedHandover: 0,
+  reconciledCount: 0,
   netVariance: 0,
 })
 const cashierDirectory = ref<{ value: string, label: string }[]>([])
@@ -269,7 +270,7 @@ async function loadShifts(options: { preserve?: boolean } = {}) {
   if (!options.preserve) {
     shifts.value = []
     totalShifts.value = 0
-    shiftSummary.value = { activeCount: 0, awaitingCount: 0, cashToReceive: 0, netVariance: 0 }
+    shiftSummary.value = { activeCount: 0, awaitingCount: 0, expectedHandover: 0, reconciledCount: 0, netVariance: 0 }
   }
   try {
     const res = await axios.get('/shifts', {
@@ -302,7 +303,10 @@ async function loadShifts(options: { preserve?: boolean } = {}) {
     shiftSummary.value = {
       activeCount: Number(summary.active_count) || 0,
       awaitingCount: Number(summary.awaiting_count) || 0,
-      cashToReceive: Number(summary.cash_to_receive) || 0,
+      // New API exposes every tender; retain cash_to_receive only as a safe
+      // fallback while old deployments are upgraded.
+      expectedHandover: Number(summary.total_expected_to_receive ?? summary.expected_handover ?? summary.cash_to_receive) || 0,
+      reconciledCount: Number(summary.reconciled_count) || 0,
       netVariance: Number(summary.net_variance) || 0,
     }
     lastUpdated.value = Date.now()
@@ -313,7 +317,7 @@ async function loadShifts(options: { preserve?: boolean } = {}) {
     if (requestId === shiftsRequestId) {
       shifts.value = []
       totalShifts.value = 0
-      shiftSummary.value = { activeCount: 0, awaitingCount: 0, cashToReceive: 0, netVariance: 0 }
+      shiftSummary.value = { activeCount: 0, awaitingCount: 0, expectedHandover: 0, reconciledCount: 0, netVariance: 0 }
       loadError.value = true
       notify(t('Failed to load shifts'), 'error')
     }
@@ -458,7 +462,8 @@ const filtered = computed<ShiftV3[]>(() => shifts.value)
 const pageCount = computed(() => Math.max(1, Math.ceil(totalShifts.value / itemsPerPage.value)))
 const activeCount = computed(() => shiftSummary.value.activeCount)
 const awaitingCount = computed(() => shiftSummary.value.awaitingCount)
-const cashToReceive = computed(() => shiftSummary.value.cashToReceive)
+const expectedHandover = computed(() => shiftSummary.value.expectedHandover)
+const reconciledCount = computed(() => shiftSummary.value.reconciledCount)
 const netVariance = computed(() => shiftSummary.value.netVariance)
 
 /* ============================================================
@@ -710,39 +715,39 @@ function gotoReport(_s: ShiftV3) {
       <template v-else>
         <Kpi
           :data="{
-            label: t('Active now'),
+            label: t('Open shifts'),
             value: activeCount,
             tone: 'info',
             icon: 'clock',
-            sub: t('live shifts'),
+            sub: t('cashiers currently working'),
           }"
         />
         <Kpi
           :data="{
-            label: t('Awaiting cash'),
+            label: t('Awaiting handover'),
             value: awaitingCount,
             tone: 'warning',
             icon: 'wallet',
-            sub: t('to reconcile'),
+            sub: t('manager confirmation needed'),
           }"
         />
         <Kpi
           :data="{
-            label: t('Cash to receive'),
-            value: cashToReceive,
+            label: t('Expected handover'),
+            value: expectedHandover,
             money: true,
             tone: 'primary',
             icon: 'coins',
-            sub: `${t('across')} ${awaitingCount} ${t('shifts')}`,
+            sub: t('cash, card and digital payments'),
           }"
         />
         <Kpi
           :data="{
-            label: t('Net variance'),
-            value: (netVariance >= 0 ? '+' : '−') + Fmt.abbr(Math.abs(netVariance)),
-            tone: netVariance < 0 ? 'error' : 'success',
-            icon: 'trend',
-            sub: t('in current results'),
+            label: t('Reconciled shifts'),
+            value: reconciledCount,
+            tone: 'success',
+            icon: 'check',
+            sub: t('completed manager handovers'),
           }"
         />
       </template>

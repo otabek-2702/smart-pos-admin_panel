@@ -5,6 +5,7 @@
    ============================================================ */
 import axios from '@/plugins/axios'
 import { buildCsv } from '@/utils/csv'
+import Select from '@/components/design/Select.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -508,6 +509,9 @@ const statusOptions: { value: '' | 'ACTIVE' | 'ENDED' | 'COMPLETED' | 'ABANDONED
   { value: 'COMPLETED' },
   { value: 'ABANDONED' },
 ]
+const cashierSelectOptions = computed(() => cashiers.value.map(c => ({ value: String(c.id), label: fullName(c) })))
+const statusSelectOptions = computed(() => statusOptions.filter(o => o.value).map(o => ({ value: o.value, label: t(`shift_status_${o.value}`) })))
+const templateSelectOptions = computed(() => templates.value.map(tpl => ({ value: String(tpl.id), label: templateName(tpl) })))
 
 // ============================================================
 // Modal ergonomics: ESC to close + focus trap.
@@ -731,56 +735,34 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
       <div class="toolbar">
         <!-- Cashier select -->
         <div style="flex:1 1 200px; min-width:0;">
-          <div class="control control--select">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);flex:0 0 18px;">
-              <circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
-            </svg>
-            <select v-model="cashierId" :style="{ color: cashierId ? 'var(--text)' : 'var(--text-tertiary)' }">
-              <option value="">
-                {{ t('All cashiers') }}
-              </option>
-              <option v-for="c in cashiers" :key="c.id" :value="c.id" style="color:var(--text);">
-                {{ fullName(c) }}
-              </option>
-            </select>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chev"><polyline points="6 9 12 15 18 9" /></svg>
-          </div>
+          <Select
+            :model-value="cashierId === '' ? '' : String(cashierId)"
+            icon="user"
+            :placeholder="t('All cashiers')"
+            :options="cashierSelectOptions"
+            @update:model-value="cashierId = $event ? Number($event) : ''"
+          />
         </div>
 
         <!-- Status select -->
         <div style="flex:1 1 190px; min-width:0;">
-          <div class="control control--select">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);flex:0 0 18px;">
-              <polygon points="4 4 20 4 14 12 14 19 10 21 10 12 4 4" />
-            </svg>
-            <select v-model="statusF" :style="{ color: statusF ? 'var(--text)' : 'var(--text-tertiary)' }">
-              <option value="">
-                {{ t('All statuses') }}
-              </option>
-              <option v-for="o in statusOptions" :key="o.value" :value="o.value" style="color:var(--text);">
-                {{ t(`shift_status_${o.value}`) }}
-              </option>
-            </select>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chev"><polyline points="6 9 12 15 18 9" /></svg>
-          </div>
+          <Select
+            v-model="statusF"
+            icon="filter"
+            :placeholder="t('All statuses')"
+            :options="statusSelectOptions"
+          />
         </div>
 
         <!-- Shift template select -->
         <div style="flex:1 1 190px; min-width:0;">
-          <div class="control control--select">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);flex:0 0 18px;">
-              <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-            <select v-model="templateId" :style="{ color: templateId ? 'var(--text)' : 'var(--text-tertiary)' }">
-              <option :value="''">
-                {{ t('All templates') }}
-              </option>
-              <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id" style="color:var(--text);">
-                {{ templateName(tpl) }}
-              </option>
-            </select>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chev"><polyline points="6 9 12 15 18 9" /></svg>
-          </div>
+          <Select
+            :model-value="templateId === '' ? '' : String(templateId)"
+            icon="calendar"
+            :placeholder="t('All templates')"
+            :options="templateSelectOptions"
+            @update:model-value="templateId = $event ? Number($event) : ''"
+          />
         </div>
 
         <!-- Staff role toggle (which roles populate the cashier dropdown) -->

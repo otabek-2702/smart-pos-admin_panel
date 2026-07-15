@@ -819,36 +819,13 @@ function clearAllFilters() {
           style="gap: 8px; align-items: center;"
         >
           <span>{{ t('Rows per page') }}:</span>
-          <div
-            class="control control--select control--sm"
+          <Select
+            :model-value="String(itemsPerPage)"
+            :options="[10, 25, 50, 100].map(n => ({ value: String(n), label: String(n) }))"
+            size="sm"
             style="width: 84px;"
-          >
-            <select v-model.number="itemsPerPage">
-              <option :value="10">
-                10
-              </option>
-              <option :value="25">
-                25
-              </option>
-              <option :value="50">
-                50
-              </option>
-              <option :value="100">
-                100
-              </option>
-            </select>
-            <svg
-              class="chev"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </div>
+            @update:model-value="itemsPerPage = Number($event)"
+          />
         </div>
         <span class="pagination__spacer" />
         <span class="muted">

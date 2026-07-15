@@ -6,6 +6,7 @@
    Decision #4 (v3): total formatted via Intl.NumberFormat (comma sep).
    ============================================================ */
 import DesignIcon from './DesignIcon.vue'
+import Select from './Select.vue'
 import { cx } from './utils'
 
 interface Props {
@@ -60,10 +61,10 @@ function goPage(n: number) {
   emit('page', n)
 }
 
-function onPpChange(e: Event) {
-  const v = Number((e.target as HTMLSelectElement).value)
-  if (!Number.isNaN(v))
-    emit('per-page', v)
+function onPpChange(v: string) {
+  const n = Number(v)
+  if (!Number.isNaN(n))
+    emit('per-page', n)
 }
 </script>
 
@@ -77,20 +78,14 @@ function onPpChange(e: Event) {
       style="gap: 8px;"
     >
       <span>{{ t('Rows per page') }}:</span>
-      <select
-        class="pp-native"
-        :value="String(perPage)"
+      <Select
+        :model-value="String(perPage)"
+        :options="perPageOptions.map(n => ({ value: String(n), label: String(n) }))"
         :aria-label="t('Rows per page')"
-        @change="onPpChange"
-      >
-        <option
-          v-for="n in perPageOptions"
-          :key="n"
-          :value="String(n)"
-        >
-          {{ n }}
-        </option>
-      </select>
+        size="sm"
+        style="width: 82px;"
+        @update:model-value="onPpChange"
+      />
     </div>
     <div class="pagination__spacer" />
     <span class="num">{{ rangeStart }}–{{ rangeEnd }} {{ t('of') }} {{ fmtTotal(total) }}</span>
@@ -146,22 +141,4 @@ function onPpChange(e: Event) {
   align-items: center;
 }
 
-/* Compact native <select> for perPage (~72px wide). Inherits page font/theme. */
-.pp-native {
-  width: 72px;
-  height: 32px;
-  padding: 0 8px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-  appearance: auto;
-}
-.pp-native:focus {
-  outline: 2px solid rgba(var(--v-theme-primary, 99 102 241), 0.4);
-  outline-offset: 1px;
-}
 </style>

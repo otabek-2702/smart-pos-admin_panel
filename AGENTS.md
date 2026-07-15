@@ -69,8 +69,10 @@ primitives, Pinia, Axios, CASL, vue-i18n, Sonner, and file-based routing.
 
 The current backend repository referenced by the newest project notes is
 `C:\Users\Jason\Desktop\Projects\alpha_pos_server`. Older docs referring to
-`alpha_pos` are stale. Do not modify the backend unless it is explicitly in
-scope.
+`alpha_pos` are stale. Backend code is owned by the backend developer: never
+modify it directly. When a backend change is needed, send the backend developer
+a precise request, wait for their implementation and confirmation, then review
+and integrate the delivered change.
 
 ## Runtime architecture
 

@@ -28,6 +28,17 @@ const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 const route = useRoute()
+
+const supplierReferenceLabels: Record<string, string> = {
+  PurchaseOrder: 'ref_PurchaseOrder',
+  TreasuryPayment: 'ref_TreasuryPayment',
+  CashboxExpense: 'ref_CashboxExpense',
+}
+
+function supplierReferenceLabel(type: string): string {
+  const key = supplierReferenceLabels[type]
+  return key ? t(key) : type
+}
 const router = useRouter()
 
 const supplierId = computed(() => String(route.params.id))
@@ -1066,7 +1077,7 @@ function backToList() {
             class="cell-muted"
             style="font-size:12px;"
           >
-            {{ t(`supplier_ref_type_${row.reference_type}`, row.reference_type) }} #{{ row.reference_id }}
+            {{ supplierReferenceLabel(row.reference_type) }} #{{ row.reference_id }}
           </span>
           <span v-else class="cell-muted">—</span>
         </template>

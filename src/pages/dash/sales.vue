@@ -15,7 +15,10 @@ import { buildDateParams } from '@/composables/useBusinessDay'
 import { formatWindow } from '@/composables/useWindowLabel'
 import type { Tone } from '@/components/design/utils'
 // MOCK_DASH dropped — real BE data only. /dashboard/sales endpoint pending (BACKEND_TODO item 11).
-export interface ChannelDay { day: string; hall: number; delivery: number; pickup: number }
+export interface ChannelDay {
+  label: string
+  values: { hall: number; delivery: number; pickup: number }
+}
 
 /* ============================================================
    ALPHA POS — Sales & Revenue Dashboard (v3 port)

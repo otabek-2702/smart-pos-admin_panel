@@ -125,7 +125,7 @@ export default defineComponent({
         { class: ['layout-wrapper', ...layoutClasses.value(windowWidth.value, windowScrollY.value)] },
         [
 
-          verticalNavWrapper ? h(verticalNavWrapper as any, verticalNavWrapperProps, { default: () => verticalNav }) : verticalNav,
+          verticalNavWrapper ? h(verticalNavWrapper as any, verticalNavWrapperProps as any, { default: () => verticalNav }) : verticalNav,
           h(
             'div',
             { class: 'layout-content-wrapper' },

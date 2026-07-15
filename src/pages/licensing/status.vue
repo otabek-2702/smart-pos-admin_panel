@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { licensingApi } from '@/plugins/axios'
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, te } = useI18n({ useScope: 'global' })
 const { formatDate } = useFormatters()
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 
@@ -36,6 +36,11 @@ const statusDescription: Record<string, string> = {
   SUSPENDED: 'License has been suspended by the vendor. Contact your POS vendor to restore service.',
   EXPIRED: 'Subscription has expired. Contact your POS vendor to renew.',
   GRACE: 'License is in a grace period after a failed heartbeat. Will reactivate on next successful check-in.',
+}
+
+function licenseStatusLabel(status: string): string {
+  const key = `license_status_${status}`
+  return te(key) ? t(key) : status
 }
 </script>
 
@@ -94,7 +99,7 @@ const statusDescription: Record<string, string> = {
               start
               :icon="state.is_blocked ? 'bx-x-circle' : 'bx-check-circle'"
             />
-            {{ state.status }}
+            {{ licenseStatusLabel(state.status) }}
           </VChip>
           <VChip
             v-if="state.is_blocked"

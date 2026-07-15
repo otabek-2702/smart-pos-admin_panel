@@ -24,7 +24,7 @@ interface Tab {
 }
 
 const TAB_ITEMS: Tab[] = [
-  { id: 'dashboard', label: 'Home', icon: 'dashboard', to: '/dashboard' },
+  { id: 'dashboard', label: 'Home', icon: 'dashboard', to: '/' },
   { id: 'orders', label: 'Orders', icon: 'receipt', to: '/orders' },
   { id: 'shifts', label: 'Shifts', icon: 'clock', to: '/shifts-analytics' },
   { id: 'ai', label: 'AI', icon: 'ai', to: '/ai-assistant' },
@@ -51,7 +51,10 @@ function onTap(e: MouseEvent, tab: Tab) {
 </script>
 
 <template>
-  <nav class="mobile-tabbar">
+  <nav
+    class="mobile-tabbar"
+    :aria-label="t('Navigation')"
+  >
     <template
       v-for="tab in TAB_ITEMS"
       :key="tab.id"
@@ -61,6 +64,8 @@ function onTap(e: MouseEvent, tab: Tab) {
         type="button"
         class="mtab"
         :class="{ 'is-active': isActive(tab) }"
+        aria-controls="primary-navigation"
+        :aria-expanded="!!drawerOpen"
         @click="onTap($event, tab)"
       >
         <span class="mtab__icon"><DesignIcon :name="tab.icon" :size="22" /></span>
@@ -71,6 +76,7 @@ function onTap(e: MouseEvent, tab: Tab) {
         :href="tab.to"
         class="mtab"
         :class="{ 'is-active': isActive(tab) }"
+        :aria-current="isActive(tab) ? 'page' : undefined"
         @click="onTap($event, tab)"
       >
         <span class="mtab__icon"><DesignIcon :name="tab.icon" :size="22" /></span>

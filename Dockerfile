@@ -18,11 +18,13 @@ COPY . .
 
 # VITE_* env are baked into the bundle at build time. Pass them via build-arg.
 ARG VITE_API_HOST=""
+ARG VITE_ALLOWED_API_HOSTS=""
 ARG VITE_SENTRY_DSN=""
 ARG VITE_SENTRY_TRACES_RATE="0.1"
 ARG VITE_SENTRY_REPLAY_RATE="0"
 ARG VITE_SENTRY_PII="false"
 ENV VITE_API_HOST=$VITE_API_HOST \
+    VITE_ALLOWED_API_HOSTS=$VITE_ALLOWED_API_HOSTS \
     VITE_SENTRY_DSN=$VITE_SENTRY_DSN \
     VITE_SENTRY_TRACES_RATE=$VITE_SENTRY_TRACES_RATE \
     VITE_SENTRY_REPLAY_RATE=$VITE_SENTRY_REPLAY_RATE \
@@ -47,6 +49,6 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://127.0.0.1/ || exit 1
+    CMD wget --quiet --tries=1 --spider http://127.0.0.1/_panel_healthz || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

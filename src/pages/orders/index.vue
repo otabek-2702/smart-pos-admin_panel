@@ -24,10 +24,12 @@ import StateFill from '@/components/design/StateFill.vue'
 import DateRangePicker from '@/components/design/DateRangePicker.vue'
 import OrdersInsights from '@/components/design/OrdersInsights.vue'
 import PaymentBreakdown from '@/components/design/PaymentBreakdown.vue'
+import { buildCsv } from '@/utils/csv'
 
 const { t } = useI18n({ useScope: 'global' })
 const { notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
+const route = useRoute()
 
 // ---- state ----
 const orders = ref<any[]>([])
@@ -39,7 +41,7 @@ const page = ref(1)
 const itemsPerPage = ref(10)
 const statusFilter = ref<string[]>([])
 const paymentFilter = ref<string | undefined>(undefined)
-const search = ref('')
+const search = ref(String(route.query.id ?? route.query.search ?? ''))
 const dateRange = ref<{ from: string, to: string, preset?: string, fromTime?: string, toTime?: string }>({ from: '', to: '', preset: 'all' })
 const dateFrom = computed({ get: () => dateRange.value.from, set: v => dateRange.value = { ...dateRange.value, from: v } })
 const dateTo = computed({ get: () => dateRange.value.to, set: v => dateRange.value = { ...dateRange.value, to: v } })
@@ -90,8 +92,11 @@ function closeConfirm() {
 }
 
 const debouncedSearch = useDebounceFn(() => {
-  page.value = 1
-  loadOrders()
+  if (page.value !== 1)
+    page.value = 1
+  else
+    void loadOrders()
+  void loadStats()
 }, 400)
 
 const orderStatuses = ['OPEN', 'PREPARING', 'READY', 'COMPLETED', 'CANCELED']
@@ -112,7 +117,11 @@ function tone(v: string | undefined) {
 }
 
 // ---- load ----
+let ordersRequestId = 0
+let statsRequestId = 0
+
 async function loadOrders() {
+  const requestId = ++ordersRequestId
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
@@ -136,19 +145,27 @@ async function loadOrders() {
       params.product_ids = productFilter.value.join(',')
     const res = await axios.get('/orders', { params })
     const d = res.data?.data
+    if (requestId !== ordersRequestId)
+      return
 
     orders.value = d?.orders ?? []
     totalOrders.value = d?.pagination?.total_orders ?? orders.value.length
   }
   catch {
+    if (requestId !== ordersRequestId)
+      return
+    orders.value = []
+    totalOrders.value = 0
     notify(t('Failed to load orders'), 'error')
   }
   finally {
-    loading.value = false
+    if (requestId === ordersRequestId)
+      loading.value = false
   }
 }
 
 async function loadStats() {
+  const requestId = ++statsRequestId
   try {
     const params: any = buildDateParams({
       from: dateFrom.value, to: dateTo.value,
@@ -157,11 +174,19 @@ async function loadStats() {
     if (cashierFilter.value) params.cashier_id = cashierFilter.value
     if (categoryFilter.value.length) params.category_ids = categoryFilter.value.join(',')
     if (productFilter.value.length) params.product_ids = productFilter.value.join(',')
+    if (statusFilter.value.length) params.statuses = statusFilter.value.join(',')
+    if (paymentFilter.value) params.payment_status = paymentFilter.value
+    if (search.value.trim()) params.search = search.value.trim()
+    if (orderTypeFilter.value) params.order_type = orderTypeFilter.value
     const res = await axios.get('/orders/stats', { params })
-
+    if (requestId !== statsRequestId)
+      return
     stats.value = res.data?.data ?? res.data
   }
-  catch { /* ignore */ }
+  catch {
+    if (requestId === statsRequestId)
+      stats.value = null
+  }
 }
 
 async function loadCashiers() {
@@ -219,11 +244,21 @@ onMounted(() => {
 
 watch([page, itemsPerPage], loadOrders)
 watch([statusFilter, paymentFilter, dateRange, orderTypeFilter, cashierFilter, categoryFilter, productFilter], () => {
-  page.value = 1
-  loadOrders()
-  loadStats()
+  if (page.value !== 1)
+    page.value = 1
+  else
+    void loadOrders()
+  void loadStats()
 })
 watch(search, () => debouncedSearch())
+watch(
+  () => route.query.id ?? route.query.search,
+  value => {
+    const next = String(value ?? '')
+    if (next !== search.value)
+      search.value = next
+  },
+)
 
 // ---- actions ----
 async function markPaid(order: any) {
@@ -374,11 +409,10 @@ function onBulkExport() {
     ['Payment', o => o.payment_method ?? ''],
     ['Items', o => o.items_count ?? (o.items?.length ?? '')],
   ]
-  const head = cols.map(c => `"${c[0]}"`).join(',')
-  const body = rows.map(o =>
-    cols.map(c => `"${String(c[1](o) ?? '').replace(/"/g, '""')}"`).join(','),
-  ).join('\n')
-  const csv = `﻿${head}\n${body}\n`
+  const csv = buildCsv([
+    cols.map(column => column[0]),
+    ...rows.map(order => cols.map(column => column[1](order))),
+  ], { alwaysQuote: true })
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

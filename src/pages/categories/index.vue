@@ -88,7 +88,12 @@ const itemsPerPage = ref(10)
 // Manual drag-reorder is only meaningful when the list is shown in its stored
 // sort_order. Any other sort makes the visual order not match sort_order, so we
 // disable dragging to avoid saving a misleading order.
-const manualSort = computed(() => sortBy.value === 'sort_order')
+const manualSort = computed(() =>
+  sortBy.value === 'sort_order'
+  && !search.value.trim()
+  && !statusFilter.value
+  && !includeDeleted.value,
+)
 
 // Dialog
 const dialogOpen = ref(false)
@@ -184,7 +189,12 @@ const draggedIndex = ref<number | null>(null)
 const dragOverIndex = ref<number | null>(null)
 
 // Debounced search
-const debouncedSearch = useDebounceFn(() => { page.value = 1; loadCategories() }, 400)
+const debouncedSearch = useDebounceFn(() => {
+  if (page.value !== 1)
+    page.value = 1
+  else
+    void loadCategories()
+}, 400)
 
 // ---- helpers ----
 // Deterministic fallback palette. Most seeded categories have an empty
@@ -207,7 +217,10 @@ function cardColor(cat: any): string {
 }
 
 // ---- load ----
+let categoriesRequestId = 0
+
 async function loadCategories() {
+  const requestId = ++categoriesRequestId
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
@@ -226,16 +239,24 @@ async function loadCategories() {
     // When the manual/stored order is requested, keep the client-side
     // sort_order guard (BE already orders by it, this is belt-and-braces). For
     // any other sort, trust the server order untouched.
+    if (requestId !== categoriesRequestId)
+      return
+
     categories.value = manualSort.value
       ? list.sort((a: any, b: any) => a.sort_order - b.sort_order)
       : list
     totalCategories.value = d?.pagination?.total_categories ?? d?.pagination?.total ?? categories.value.length
   }
   catch {
+    if (requestId !== categoriesRequestId)
+      return
+    categories.value = []
+    totalCategories.value = 0
     notify(t('Failed to load categories'), 'error')
   }
   finally {
-    loading.value = false
+    if (requestId === categoriesRequestId)
+      loading.value = false
   }
 }
 
@@ -255,7 +276,12 @@ onMounted(() => {
 
 watch(search, debouncedSearch)
 watch([page, itemsPerPage], loadCategories)
-watch([statusFilter, includeDeleted, sortBy], () => { page.value = 1; loadCategories() })
+watch([statusFilter, includeDeleted, sortBy], () => {
+  if (page.value !== 1)
+    page.value = 1
+  else
+    void loadCategories()
+})
 
 // ---- drag & drop ----
 function onDragStart(e: DragEvent, index: number) {
@@ -298,12 +324,17 @@ function onDragEnd() {
 }
 
 async function saveOrder(items: any[]) {
+  const pageOffset = (page.value - 1) * itemsPerPage.value
   try {
     await axios.post('/categories/reorder', {
-      orders: items.map((cat, idx) => ({ id: cat.id, sort_order: idx })),
+      orders: items.map((cat, idx) => ({ id: cat.id, sort_order: pageOffset + idx })),
     })
+    notify(t('Category order updated'))
   }
-  catch { /* ignore */ }
+  catch (e: any) {
+    notify(e?.response?.data?.message ?? t('Failed to update category order'), 'error')
+    await loadCategories()
+  }
 }
 
 // ---- quick status toggle (per-card, no modal) ----

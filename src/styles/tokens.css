@@ -58,7 +58,7 @@
   /* Text */
   --text: #0F1722;
   --text-secondary: #586172;
-  --text-tertiary: #8A929E;
+  --text-tertiary: #6B7280;
   --text-disabled: #B4BAC4;
   --text-on-accent: #FFFFFF;
 
@@ -102,7 +102,7 @@
   --chart-cash: #15935A;      /* cash */
   --chart-card: #3A5BDB;      /* card */
   --chart-grid: #EAEDF1;
-  --chart-axis: #9AA2AE;
+  --chart-axis: #687385;
   --chart-track: #EEF1F5;     /* unfilled bar / donut track */
   --chart-target: #8A929E;    /* target / reference line */
   --chord-ribbon: #8A93A3;    /* affinity chord ribbon */
@@ -147,7 +147,7 @@
 
   --text: #E8EBF1;
   --text-secondary: #9AA4B2;
-  --text-tertiary: #6B7585;
+  --text-tertiary: #8994A5;
   --text-disabled: #4B5563;
   --text-on-accent: #FFFFFF;
 
@@ -188,7 +188,7 @@
   --chart-cash: #36C07E;
   --chart-card: #6E8BFF;
   --chart-grid: #232B38;
-  --chart-axis: #5B6572;
+  --chart-axis: #8C96A6;
   --chart-track: #222A36;
   --chart-target: #6B7585;
   --chord-ribbon: #5B6678;

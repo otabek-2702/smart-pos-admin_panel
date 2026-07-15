@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getCurrentApiHost, setApiHost } from '@/plugins/axios'
+import { getCurrentApiHost, setApiHost, validateApiHost } from '@/plugins/axios'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -10,6 +10,13 @@ const probeResult = ref<'ok' | 'fail' | null>(null)
 const probeMessage = ref('')
 
 const current = computed(() => getCurrentApiHost() || t('(relative — vite proxy / nginx)'))
+const hostValidation = computed(() => validateApiHost(input.value))
+const hostInvalid = computed(() => !hostValidation.value.valid)
+
+watch(input, () => {
+  probeResult.value = null
+  probeMessage.value = ''
+})
 
 function open() {
   input.value = getCurrentApiHost()
@@ -23,13 +30,25 @@ function clear() {
 }
 
 async function probe() {
+  if (hostInvalid.value) {
+    probeResult.value = 'fail'
+    probeMessage.value = t('Error')
+
+    return
+  }
+
   probing.value = true
   probeResult.value = null
   probeMessage.value = ''
+
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), 10_000)
+
   try {
-    const host = input.value.trim().replace(/\/+$/, '')
+    const host = hostValidation.value.normalized
     const url = `${host || ''}/healthz`
-    const res = await fetch(url, { method: 'GET' })
+    const res = await fetch(url, { method: 'GET', signal: controller.signal })
+
     if (res.ok) {
       probeResult.value = 'ok'
       probeMessage.value = `${res.status} ${res.statusText}`
@@ -41,15 +60,20 @@ async function probe() {
   }
   catch (e: any) {
     probeResult.value = 'fail'
-    probeMessage.value = e?.message ?? 'Network error'
+    probeMessage.value = e?.name === 'AbortError' ? t('Error') : (e?.message ?? t('Error'))
   }
   finally {
+    window.clearTimeout(timer)
     probing.value = false
   }
 }
 
 function save() {
-  setApiHost(input.value)
+  if (hostInvalid.value)
+    return
+
+  setApiHost(hostValidation.value.normalized)
+
   // Full reload so every module re-reads localStorage and axios picks up
   // the new baseURL on first request, not after lazy interceptor fire.
   window.location.reload()
@@ -90,6 +114,8 @@ function quickPreset(host: string) {
             :hint="t('No trailing slash. Leave empty to fall back to the build default / vite proxy.')"
             persistent-hint
             autofocus
+            :error="hostInvalid"
+            :error-messages="hostInvalid ? [`${t('Base URL')}: ${t('Error')}`] : []"
           />
 
           <div class="d-flex flex-wrap gap-2 mt-3">
@@ -144,6 +170,7 @@ function quickPreset(host: string) {
             variant="tonal"
             prepend-icon="bx-link"
             :loading="probing"
+            :disabled="hostInvalid"
             @click="probe"
           >
             {{ t('Test') }}
@@ -157,6 +184,7 @@ function quickPreset(host: string) {
           </VBtn>
           <VBtn
             color="primary"
+            :disabled="hostInvalid"
             @click="save"
           >
             {{ t('Save & reload') }}

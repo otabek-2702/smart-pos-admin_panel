@@ -15,9 +15,8 @@
    public URL are cached per-table-id so subsequent clicks don't
    re-hit the backend.
 
-   QR PNG generation: there is no qrcode lib in the bundle, so we
-   delegate to api.qrserver.com (open, no key, no rate-limit on small
-   admin volumes). Easy to swap later — keep the URL behind one fn.
+   QR PNG generation stays in the browser so menu tokens are never
+   disclosed to an external image-generation service.
    ============================================================ */
 import type { DataTableColumn } from '@/components/design/DataTable.vue'
 import axios, { notificationsApi } from '@/plugins/axios'
@@ -33,6 +32,7 @@ import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import Switch from '@/components/design/Switch.vue'
+import { createQrDataUrl } from '@/utils/qrCode'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -67,6 +67,9 @@ const statusFilter = ref<string>('')
 // Token cache keyed by table.id
 const tokenCache = ref<Record<number, { token: string; menu_url_suffix: string }>>({})
 const tokenBusyId = ref<number | null>(null)
+
+const qrImageCache = ref<Record<string, string>>({})
+const qrImagePromises = new Map<string, Promise<string>>()
 
 // Create / Edit modal
 const dialogOpen = ref(false)
@@ -111,11 +114,9 @@ const STATUS_TONE: Record<string, 'success' | 'warning' | 'error' | 'neutral' | 
 }
 
 // ============================================================
-// QR PNG URL — delegate to api.qrserver.com so we don't ship a
-// 30 KB qrcode lib for an admin-only screen. menu_url_suffix is
-// already a complete relative URL ("/m/<token>"); we resolve it
-// against window.location.origin so the printed QR works on the
-// same host the admin is browsing from.
+// menu_url_suffix is already a complete relative URL ("/m/<token>");
+// resolve it against the current host so printed codes point to the
+// same public frontend the administrator is using.
 // ============================================================
 function resolveMenuUrl(suffix: string): string {
   if (!suffix) return ''
@@ -124,10 +125,8 @@ function resolveMenuUrl(suffix: string): string {
   return origin + (suffix.startsWith('/') ? suffix : `/${suffix}`)
 }
 
-function qrPngUrl(menuUrl: string, size = 320): string {
-  if (!menuUrl) return ''
-  // qrserver.com — free, no key, simple GET
-  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=4&data=${encodeURIComponent(menuUrl)}`
+function qrImageKey(row: TableRow, size: number): string {
+  return `${row.id}:${size}`
 }
 
 // ============================================================
@@ -204,10 +203,34 @@ async function fetchToken(row: TableRow): Promise<{ token: string; menu_url_suff
   }
 }
 
-async function mintQr(row: TableRow) {
-  const tok = await fetchToken(row)
-  if (tok)
-    notify(t('qr_mint_btn'))
+async function ensureQrImage(row: TableRow, size = 320): Promise<string> {
+  const key = qrImageKey(row, size)
+  const cached = qrImageCache.value[key]
+
+  if (cached)
+    return cached
+
+  const inFlight = qrImagePromises.get(key)
+
+  if (inFlight)
+    return inFlight
+
+  const generation = (async () => {
+    const tok = await fetchToken(row)
+
+    if (!tok)
+      return ''
+
+    const dataUrl = await createQrDataUrl(resolveMenuUrl(tok.menu_url_suffix), size)
+
+    qrImageCache.value = { ...qrImageCache.value, [key]: dataUrl }
+
+    return dataUrl
+  })().finally(() => qrImagePromises.delete(key))
+
+  qrImagePromises.set(key, generation)
+
+  return generation
 }
 
 async function copyMenuUrl(row: TableRow) {
@@ -224,25 +247,34 @@ async function copyMenuUrl(row: TableRow) {
 }
 
 async function downloadQr(row: TableRow) {
-  const tok = await fetchToken(row)
-  if (!tok) return
-  const url = qrPngUrl(resolveMenuUrl(tok.menu_url_suffix), 512)
-  const a = document.createElement('a')
+  try {
+    const url = await ensureQrImage(row, 512)
 
-  a.href = url
-  a.download = `qr-table-${row.number || row.id}.png`
-  a.target = '_blank'
-  a.rel = 'noopener'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
+    if (!url)
+      return
+
+    const a = document.createElement('a')
+
+    a.href = url
+    a.download = `qr-table-${row.number || row.id}.png`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+  catch {
+    notify(t('Error'), 'error')
+  }
 }
 
 function openQrModal(row: TableRow) {
   qrTarget.value = row
   qrDialog.value = true
-  qrLoading.value = !tokenCache.value[row.id]
-  fetchToken(row).finally(() => { qrLoading.value = false })
+  qrLoading.value = !qrImageCache.value[qrImageKey(row, 320)]
+
+  ensureQrImage(row).catch(() => notify(t('Error'), 'error')).finally(() => {
+    if (qrTarget.value?.id === row.id)
+      qrLoading.value = false
+  })
 }
 
 // ============================================================
@@ -447,7 +479,12 @@ const tablePagination = computed(() => ({
 
 // Reveal token (used inside expanded row)
 async function revealToken(row: TableRow) {
-  await fetchToken(row)
+  try {
+    await ensureQrImage(row)
+  }
+  catch {
+    notify(t('Error'), 'error')
+  }
 }
 
 // ESC handler — close whichever modal is open, top-most first
@@ -465,7 +502,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 // Convenience — resolved QR url for the open modal
 const qrTokenInfo = computed(() => (qrTarget.value ? tokenCache.value[qrTarget.value.id] : null))
 const qrMenuUrl = computed(() => qrTokenInfo.value ? resolveMenuUrl(qrTokenInfo.value.menu_url_suffix) : '')
-const qrImgUrl = computed(() => qrMenuUrl.value ? qrPngUrl(qrMenuUrl.value, 320) : '')
+const qrImgUrl = computed(() => qrTarget.value ? qrImageCache.value[qrImageKey(qrTarget.value, 320)] ?? '' : '')
 </script>
 
 <template>
@@ -579,7 +616,7 @@ const qrImgUrl = computed(() => qrMenuUrl.value ? qrPngUrl(qrMenuUrl.value, 320)
 
         <template #cell.status="{ row }">
           <Badge
-            :tone="STATUS_TONE[row.status] || 'neutral'"
+            :tone="row.status ? (STATUS_TONE[row.status] || 'neutral') : 'neutral'"
             dot
           >
             {{ row.status ? t(`table_status_${row.status}`) : '—' }}
@@ -627,8 +664,8 @@ const qrImgUrl = computed(() => qrMenuUrl.value ? qrPngUrl(qrMenuUrl.value, 320)
                 class="kpi__icon qr-thumb"
               >
                 <img
-                  v-if="tokenCache[row.id]"
-                  :src="qrPngUrl(resolveMenuUrl(tokenCache[row.id].menu_url_suffix), 96)"
+                  v-if="qrImageCache[qrImageKey(row, 320)]"
+                  :src="qrImageCache[qrImageKey(row, 320)]"
                   :alt="t('qr_image_alt')"
                   style="width:100%;height:100%;object-fit:contain;"
                 >

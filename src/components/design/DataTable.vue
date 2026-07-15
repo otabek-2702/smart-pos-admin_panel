@@ -175,8 +175,10 @@ watch(
 function goPage(n: number) {
   if (n < 1 || n > totalPages.value)
     return
-  if (isPagControlled.value)
+  if (isPagControlled.value) {
+    clearSel()
     props.pagination!.onPage?.(n)
+  }
   else
     internalPage.value = n
   emit('page', n)
@@ -184,6 +186,7 @@ function goPage(n: number) {
 
 function setPp(n: number) {
   if (isPagControlled.value) {
+    clearSel()
     props.pagination!.onPerPage?.(n)
   }
   else {
@@ -212,8 +215,11 @@ const allOnPageSelected = computed(() => {
   const rows = pageRows.value
   return rows.length > 0 && rows.every(r => selection.value.has(idOf(r)))
 })
+const selectedOnPageCount = computed(() =>
+  pageRows.value.reduce((count, row) => count + (selection.value.has(idOf(row)) ? 1 : 0), 0),
+)
 const someSelected = computed(() =>
-  selection.value.size > 0 && !allOnPageSelected.value,
+  selectedOnPageCount.value > 0 && selectedOnPageCount.value < pageRows.value.length,
 )
 
 function toggleAll() {
@@ -240,6 +246,21 @@ function clearSel() {
 
 const selectedRows = computed<R[]>(() =>
   props.rows.filter(r => selection.value.has(idOf(r))),
+)
+
+// Server-paginated tables only have row data for the visible page. Never keep
+// stale IDs after filters or data refreshes: bulk-action slots receive rows,
+// and retaining an ID without its row can target the wrong/empty selection.
+watch(
+  () => props.rows.map(idOf),
+  (ids) => {
+    if (!isPagControlled.value || selection.value.size === 0)
+      return
+    const visible = new Set(ids)
+    const next = new Set([...selection.value].filter(id => visible.has(id)))
+    if (next.size !== selection.value.size)
+      emitSelection(next)
+  },
 )
 
 /* ---------- expand (always internal) ---------- */
@@ -334,7 +355,12 @@ function skeletonWidth(c: number) {
 </script>
 
 <template>
-  <div>
+  <div :aria-busy="loading ? 'true' : undefined">
+    <span
+      v-if="loading"
+      class="visually-hidden"
+      role="status"
+    >{{ t('Loading') }}</span>
     <!-- Bulk action bar -->
     <div
       v-if="isSelectable && selection.size > 0"
@@ -343,6 +369,7 @@ function skeletonWidth(c: number) {
       <Checkbox
         :model-value="allOnPageSelected"
         :indeterminate="someSelected"
+        :aria-label="t('Select')"
         @update:model-value="toggleAll"
       />
       <span class="bulkbar__count">{{ t('{count} selected', { count: selection.size }) }}</span>
@@ -362,7 +389,10 @@ function skeletonWidth(c: number) {
     </div>
 
     <div class="tablewrap">
-      <table class="dtable">
+      <table
+        class="dtable"
+        :aria-busy="loading ? 'true' : undefined"
+      >
         <thead>
           <tr>
             <th
@@ -372,10 +402,12 @@ function skeletonWidth(c: number) {
             <th
               v-if="isSelectable"
               style="width: 44px;"
+              scope="col"
             >
               <Checkbox
                 :model-value="allOnPageSelected"
                 :indeterminate="someSelected"
+                :aria-label="t('Select')"
                 @update:model-value="toggleAll"
               />
             </th>
@@ -384,18 +416,28 @@ function skeletonWidth(c: number) {
               :key="c.key"
               :class="thClass(c)"
               :style="thStyle(c)"
-              @click="c.sortable && toggleSort(c.key)"
+              scope="col"
+              :aria-sort="c.sortable && currentSort.key === c.key
+                ? (currentSort.dir === 'asc' ? 'ascending' : 'descending')
+                : undefined"
             >
-              {{ c.label }}
-              <span
+              <button
                 v-if="c.sortable"
-                :class="cx('sort-ic', currentSort.key === c.key && 'is-active')"
+                type="button"
+                class="table-sort"
+                @click="toggleSort(c.key)"
               >
-                <DesignIcon
-                  :name="currentSort.key === c.key ? (currentSort.dir === 'asc' ? 'sortup' : 'sortdown') : 'sort'"
-                  :size="13"
-                />
-              </span>
+                <span>{{ c.label }}</span>
+                <span :class="cx('sort-ic', currentSort.key === c.key && 'is-active')">
+                  <DesignIcon
+                    :name="currentSort.key === c.key ? (currentSort.dir === 'asc' ? 'sortup' : 'sortdown') : 'sort'"
+                    :size="13"
+                  />
+                </span>
+              </button>
+              <template v-else>
+                {{ c.label }}
+              </template>
             </th>
             <th
               v-if="hasRowActions"
@@ -475,7 +517,10 @@ function skeletonWidth(c: number) {
             <tr
               :class="cx(selection.has(idOf(r)) && 'is-selected')"
               :style="rowStyle()"
+              :tabindex="hasOnRowClick ? 0 : undefined"
               @click="emitRowClick(r)"
+              @keydown.enter.self="emitRowClick(r)"
+              @keydown.space.self.prevent="emitRowClick(r)"
             >
               <td
                 v-if="expandable"
@@ -483,7 +528,9 @@ function skeletonWidth(c: number) {
               >
                 <button
                   class="iconaction"
-                  :title="t('Expand')"
+                  :title="expanded.has(idOf(r)) ? t('close') : t('Expand')"
+                  :aria-label="expanded.has(idOf(r)) ? t('close') : t('Expand')"
+                  :aria-expanded="expanded.has(idOf(r))"
                   @click.stop="toggleExpand(idOf(r))"
                 >
                   <DesignIcon
@@ -499,6 +546,7 @@ function skeletonWidth(c: number) {
               <td v-if="isSelectable">
                 <Checkbox
                   :model-value="selection.has(idOf(r))"
+                  :aria-label="`${t('Select')} ${idOf(r)}`"
                   @update:model-value="toggleOne(idOf(r))"
                 />
               </td>

@@ -28,6 +28,9 @@ interface OrdersStats {
   unpaid_orders?: number
 }
 const ordersStats = ref<OrdersStats>({})
+const operationsLoading = ref(false)
+const operationsError = ref(false)
+let operationsRequestId = 0
 
 async function loadOrderStats(): Promise<void> {
   try {
@@ -53,6 +56,14 @@ const FUNNEL_TONE: Record<string, string> = {
 }
 
 async function loadOperations(): Promise<void> {
+  const requestId = ++operationsRequestId
+  operationsLoading.value = true
+  operationsError.value = false
+  // A range change must not leave the previous range visible while loading.
+  funnelData.value = []
+  ordersByHour.value = []
+  prepByCategory.value = []
+  tableGrid.value = []
   try {
     // Follow the hub's date picker. This used to be called with NO params, so the
     // backend fell back to today's business day — the tab re-fetched on every range
@@ -64,6 +75,8 @@ async function loadOperations(): Promise<void> {
       : buildDateParams({ ...businessPreset('30d') })
     const res = await axiosIns.get('/dashboard/operations', { params })
     const d = res?.data?.data ?? {}
+    if (requestId !== operationsRequestId)
+      return
     // Funnel: BE { status, count } → FE { label, value, color }
     if (Array.isArray(d.funnel)) {
       funnelData.value = d.funnel.map((r: any) => ({
@@ -77,8 +90,8 @@ async function loadOperations(): Promise<void> {
     // don't paint 14 empty bars; let the empty-state card explain.
     if (Array.isArray(d.ordersByHour)) {
       const max = Math.max(0, ...d.ordersByHour.map((h: any) => Number(h.orders) || 0))
-      if (max > 0) {
-        ordersByHour.value = d.ordersByHour.map((h: any) => {
+      ordersByHour.value = max > 0
+        ? d.ordersByHour.map((h: any) => {
           const orders = Number(h.orders) || 0
           return {
             hour: Number(h.hour) || 0,
@@ -87,7 +100,7 @@ async function loadOperations(): Promise<void> {
             peak: orders === max,
           }
         })
-      }
+        : []
     }
     // Prep-by-category: shape from BE matches FE (label, mins, target, orders).
     if (Array.isArray(d.prepByCategory)) {
@@ -110,7 +123,14 @@ async function loadOperations(): Promise<void> {
         }))
     }
   }
-  catch { /* leave empty arrays; empty-state card renders */ }
+  catch {
+    if (requestId === operationsRequestId)
+      operationsError.value = true
+  }
+  finally {
+    if (requestId === operationsRequestId)
+      operationsLoading.value = false
+  }
 }
 
 onMounted(() => {
@@ -122,7 +142,6 @@ onMounted(() => {
 // The "live" counters (loadOrderStats) stay pinned to today on purpose.
 const { range: sharedRange } = useDashboardData()
 watch(sharedRange, () => {
-  void loadOrderStats()
   void loadOperations()
 })
 
@@ -312,12 +331,13 @@ const liveValues = liveCounts.value.map((_c, i) => useCountUp(() => liveCounts.v
 
     <!-- Empty-state explainer rendered when none of the BE-item-17 datasets have shipped yet.
          Keeps the page from looking broken behind the live counts strip. -->
-    <Card v-if="!funnelData.length && !ordersByHour.length && !prepByCategory.length && !tableGrid.length">
+    <Card v-if="!operationsLoading && !funnelData.length && !ordersByHour.length && !prepByCategory.length && !tableGrid.length">
       <div class="card__body">
         <StateFill
-          icon="bx-time-five"
-          :title="t('Live operations data is coming soon')"
-          :sub="t('Detailed funnel, kitchen prep times and table occupancy unlock when the backend operations endpoint ships. Live counts above already update from real orders.')"
+          :error="operationsError"
+          :icon="operationsError ? 'bx-error-circle' : 'bx-bar-chart-alt-2'"
+          :title="operationsError ? t('Failed to load operations data') : t('No operations data for this window')"
+          :sub="operationsError ? t('Check your connection and try again.') : windowLabel"
         />
       </div>
     </Card>
@@ -327,7 +347,7 @@ const liveValues = liveCounts.value.map((_c, i) => useCountUp(() => liveCounts.v
       <Card v-if="funnelData.length">
         <div class="card__head">
           <div class="card__head-text">
-            <div class="kpi__label">{{ t('Order pipeline · today') }}</div>
+            <div class="kpi__label">{{ t('Order pipeline') }} · {{ windowLabel }}</div>
           </div>
         </div>
         <div class="card__body">

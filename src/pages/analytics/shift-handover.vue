@@ -23,43 +23,57 @@ const data = ref<any>(null)
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 const exporting = ref(false)
+const loadedShiftId = ref<number | null>(null)
+let reportRequestId = 0
 
 async function load() {
   loadError.value = null
-  if (!shiftIdInput.value) {
+  const requestedShiftId = Number(shiftIdInput.value)
+  if (!Number.isInteger(requestedShiftId) || requestedShiftId <= 0) {
     data.value = null
+    loadedShiftId.value = null
     return
   }
+  const requestId = ++reportRequestId
   loading.value = true
+  data.value = null
+  loadedShiftId.value = null
   try {
-    const res = await axios.get(`/analytics/shifts/${shiftIdInput.value}/report`)
+    const res = await axios.get(`/analytics/shifts/${requestedShiftId}/report`)
+    if (requestId !== reportRequestId)
+      return
     data.value = res.data?.data ?? res.data
-    router.replace({ query: { ...route.query, shift: String(shiftIdInput.value) } })
+    loadedShiftId.value = Number(data.value?.shift?.id) || requestedShiftId
+    router.replace({ query: { ...route.query, shift: String(requestedShiftId) } })
   }
   catch (e: any) {
+    if (requestId !== reportRequestId)
+      return
     const msg = e?.response?.data?.message ?? t('Failed to load')
     notify(msg, 'error')
     loadError.value = msg
     data.value = null
   }
   finally {
-    loading.value = false
+    if (requestId === reportRequestId)
+      loading.value = false
   }
 }
 
 async function doExport() {
-  if (!shiftIdInput.value || exporting.value) return
+  if (!loadedShiftId.value || exporting.value) return
+  const shiftId = loadedShiftId.value
   exporting.value = true
   try {
     const res = await axios.get(
-      `/analytics/shifts/${shiftIdInput.value}/report/export`,
+      `/analytics/shifts/${shiftId}/report/export`,
       { responseType: 'blob' },
     )
     const blob = new Blob([res.data], { type: res.headers?.['content-type'] || 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `shift-${shiftIdInput.value}-handover.csv`
+    a.download = `shift-${shiftId}-handover.csv`
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -75,7 +89,6 @@ async function doExport() {
 }
 
 onMounted(load)
-watch(shiftIdInput, load)
 
 const shift = computed<any>(() => data.value?.shift)
 const receipts = computed<any[]>(() => data.value?.receipts ?? [])
@@ -403,7 +416,6 @@ function shiftDurationLabel(): string {
               v-model.number="shiftIdInput"
               type="number"
               :placeholder="t('Enter shift id')"
-              :disabled="loading"
               @keydown.enter="load"
             >
           </div>
@@ -480,7 +492,7 @@ function shiftDurationLabel(): string {
                 <span class="badge badge--dot" :class="`t-${tone(shift.status)}`">{{ shift.status ? t(`shift_status_${shift.status}`) : '—' }}</span>
               </div>
               <div class="muted" style="font-size:13px;margin-top:2px;">
-                {{ t('Shift') }} {{ t('id_prefix') }}{{ shiftIdInput }} · {{ formatDate(shift.start_time) }} —
+                {{ t('Shift') }} {{ t('id_prefix') }}{{ loadedShiftId }} · {{ formatDate(shift.start_time) }} —
                 {{ shift.end_time ? formatDate(shift.end_time) : t('in progress') }} ·
                 {{ shiftDurationLabel() }}
               </div>

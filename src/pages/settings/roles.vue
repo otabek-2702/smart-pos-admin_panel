@@ -889,11 +889,18 @@ onBeforeUnmount(() => {
                 border-bottom: 1px solid var(--border-soft);
                 cursor: pointer;
               "
+              role="button"
+              :tabindex="draftIsWildcard ? -1 : 0"
+              :aria-pressed="draftPerms.has(p.key) || draftIsWildcard"
               @click="toggleDraft(p.key)"
+              @keydown.enter.self="toggleDraft(p.key)"
+              @keydown.space.self.prevent="toggleDraft(p.key)"
             >
               <Checkbox
                 :model-value="draftPerms.has(p.key) || draftIsWildcard"
                 :disabled="draftIsWildcard"
+                :aria-label="labelOf(p)"
+                @update:model-value="toggleDraft(p.key)"
               />
               <div style="flex: 1; min-width: 0;">
                 <div

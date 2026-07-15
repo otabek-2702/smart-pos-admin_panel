@@ -604,7 +604,7 @@ function firstWord(s: string): string {
           icon="share"
           :title="fetchFailed ? t('Affinity data not available yet') : t('No pairings in this window')"
           :sub="fetchFailed
-            ? t('Backend endpoint /analytics/products/affinity is pending')
+            ? t('Could not load affinity data. Check your connection and try again.')
             : t('Once orders contain multiple products, pairings will appear here')"
         />
 

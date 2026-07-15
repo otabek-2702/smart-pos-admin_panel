@@ -15,13 +15,18 @@
 import { onBeforeUnmount, onMounted } from 'vue'
 import { cx } from './utils'
 import DesignIcon from './DesignIcon.vue'
+import { designId } from './ids'
 import { useBusinessDay } from '@/composables/useBusinessDay'
+import { useNotify } from '@/composables/useNotify'
 
 const { t } = useI18n({ useScope: 'global' })
 const biz = useBusinessDay()
+const { notify } = useNotify()
 
 const root = ref<HTMLElement | null>(null)
 const open = ref(false)
+const saving = ref(false)
+const menuId = designId('operating-hours')
 
 // Local mirrors so typing doesn't fire a PUT on every keystroke mid-edit;
 // commit on change. Kept in sync when the composable hydrates from the backend.
@@ -33,12 +38,26 @@ watch(biz.start, v => (dayStart.value = v))
 watch(biz.open, v => (workOpen.value = v))
 watch(biz.close, v => (workClose.value = v))
 
-function commit() {
-  biz.save({
-    business_day_start: dayStart.value,
-    business_open: workOpen.value,
-    business_close: workClose.value,
-  })
+async function commit() {
+  if (saving.value) return
+  saving.value = true
+  try {
+    await biz.save({
+      business_day_start: dayStart.value,
+      business_open: workOpen.value,
+      business_close: workClose.value,
+    })
+    notify(t('Settings saved'), 'success')
+  }
+  catch {
+    dayStart.value = biz.start.value
+    workOpen.value = biz.open.value
+    workClose.value = biz.close.value
+    notify(t('Request failed. Please try again.'), 'error')
+  }
+  finally {
+    saving.value = false
+  }
 }
 
 function toggle() {
@@ -69,13 +88,21 @@ onBeforeUnmount(() => {
     <button
       :class="cx('iconbtn', open && 'is-active')"
       :title="t('Operating hours')"
+      :aria-label="t('Operating hours')"
+      aria-haspopup="dialog"
+      :aria-expanded="open"
+      :aria-controls="menuId"
       @click="toggle"
     >
       <DesignIcon name="sliders" :size="18" />
     </button>
     <div
       v-if="open"
+      :id="menuId"
       class="card setmenu"
+      role="dialog"
+      :aria-label="t('Operating hours')"
+      :aria-busy="saving"
     >
       <div class="setmenu__title">
         {{ t('Operating hours') }}
@@ -95,6 +122,8 @@ onBeforeUnmount(() => {
             v-model="dayStart"
             type="time"
             class="control control--sm setmenu__time"
+            :disabled="saving"
+            :aria-label="t('Business day starts at')"
             @change="commit"
           >
         </div>
@@ -116,6 +145,8 @@ onBeforeUnmount(() => {
             v-model="workOpen"
             type="time"
             class="control control--sm setmenu__time"
+            :disabled="saving"
+            :aria-label="`${t('Working hours')} ${t('From')}`"
             @change="commit"
           >
           <span style="color: var(--text-tertiary);">–</span>
@@ -123,6 +154,8 @@ onBeforeUnmount(() => {
             v-model="workClose"
             type="time"
             class="control control--sm setmenu__time"
+            :disabled="saving"
+            :aria-label="`${t('Working hours')} ${t('To')}`"
             @change="commit"
           >
         </div>

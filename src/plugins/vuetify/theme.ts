@@ -41,7 +41,7 @@ const theme: VuetifyOptions['theme'] = {
 
         // Text scale
         'text-secondary': '#586172',
-        'text-tertiary': '#8A929E',
+        'text-tertiary': '#6B7280',
         'text-disabled': '#B4BAC4',
 
         // Primary tints
@@ -73,7 +73,7 @@ const theme: VuetifyOptions['theme'] = {
         'chart-cash': '#15935A',
         'chart-card': '#3A5BDB',
         'chart-grid': '#EAEDF1',
-        'chart-axis': '#9AA2AE',
+        'chart-axis': '#687385',
         'chart-track': '#EEF1F5',
         'chart-target': '#8A929E',
 
@@ -143,7 +143,7 @@ const theme: VuetifyOptions['theme'] = {
         'border-strong': '#323C4C',
 
         'text-secondary': '#9AA4B2',
-        'text-tertiary': '#6B7585',
+        'text-tertiary': '#8994A5',
         'text-disabled': '#4B5563',
 
         'primary-hover': '#819AFF',
@@ -172,7 +172,7 @@ const theme: VuetifyOptions['theme'] = {
         'chart-cash': '#36C07E',
         'chart-card': '#6E8BFF',
         'chart-grid': '#232B38',
-        'chart-axis': '#5B6572',
+        'chart-axis': '#8C96A6',
         'chart-track': '#222A36',
         'chart-target': '#6B7585',
 

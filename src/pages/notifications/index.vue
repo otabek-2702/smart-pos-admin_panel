@@ -109,6 +109,16 @@ const tplPreviewContext = ref('{}')
 const tplPreviewResult = ref<string>('')
 const tplPreviewLoading = ref(false)
 
+const templateLanguageItems = computed(() => ['uz', 'ru', 'en'].map(value => ({
+  value,
+  title: t(`ntpl_lang_${value}`),
+})))
+
+function templateLanguageLabel(value: string): string {
+  const key = `ntpl_lang_${value}`
+  return te(key) ? t(key) : value
+}
+
 function openTemplateEditor(tpl: any) {
   tplEditing.value = tpl
   tplForm.value = {
@@ -387,7 +397,7 @@ const statusColor: Record<string, string> = {
               >
                 <VListItemTitle>{{ tpl.name }}</VListItemTitle>
                 <VListItemSubtitle class="text-caption">
-                  {{ te(`notif_type_${tpl.notification_type}`) ? t(`notif_type_${tpl.notification_type}`) : tpl.notification_type }} · {{ tpl.language }}
+                  {{ te(`notif_type_${tpl.notification_type}`) ? t(`notif_type_${tpl.notification_type}`) : tpl.notification_type }} · {{ templateLanguageLabel(tpl.language) }}
                 </VListItemSubtitle>
                 <template #append>
                   <VBtn
@@ -474,7 +484,7 @@ const statusColor: Record<string, string> = {
             v-if="tplEditing"
             class="text-caption text-disabled mb-3"
           >
-            {{ tplEditing.notification_type }} · {{ tplEditing.language }}
+            {{ tplEditing.notification_type }} · {{ templateLanguageLabel(tplEditing.language) }}
           </div>
           <VRow>
             <VCol cols="12" md="6">
@@ -492,7 +502,9 @@ const statusColor: Record<string, string> = {
                 <VCol cols="6">
                   <VSelect
                     v-model="tplForm.language"
-                    :items="['uz', 'ru', 'en']"
+                    :items="templateLanguageItems"
+                    item-title="title"
+                    item-value="value"
                     :label="t('Language')"
                     density="compact"
                   />

@@ -17,6 +17,7 @@ import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
 import Switch from '@/components/design/Switch.vue'
+import { buildCsv } from '@/utils/csv'
 
 const { t } = useI18n({ useScope: 'global' })
 const { notify } = useNotify()
@@ -374,10 +375,6 @@ const activeFilterChips = computed<FilterChip[]>(() => {
 })
 
 // ---- CSV export (respects current filters, walks all pages) ----
-function csvCell(v: any): string {
-  return `"${String(v ?? '').replace(/"/g, '""')}"`
-}
-
 async function exportCsv() {
   if (exporting.value)
     return
@@ -415,13 +412,17 @@ async function exportCsv() {
       [t('stock_levels_pending_out'), r => formatQty(r.pending_out_quantity)],
       [t('Last Movement'), r => (r.last_movement_at ? formatDateShort(r.last_movement_at) : '')],
     ]
-    const head = cols.map(c => csvCell(c[0])).join(',')
-    const body = rows.map(r => cols.map(c => csvCell(c[1](r))).join(',')).join('\n')
-    const csv = `﻿${head}\n${body}\n`
+
+    const csv = buildCsv([
+      cols.map(c => c[0]),
+      ...rows.map(r => cols.map(c => c[1](r))),
+    ], { alwaysQuote: true })
+
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     const stamp = new Date().toISOString().slice(0, 10)
+
     a.href = url
     a.download = `stock-levels-${stamp}.csv`
     document.body.appendChild(a)

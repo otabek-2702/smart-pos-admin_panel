@@ -135,7 +135,7 @@ const handleNavScroll = (evt: Event) => {
           :is="resolveNavItemComponent(item)"
           v-for="(item, index) in navItems"
           :key="index"
-          :item="item"
+          :item="item as any"
         />
       </PerfectScrollbar>
     </slot>

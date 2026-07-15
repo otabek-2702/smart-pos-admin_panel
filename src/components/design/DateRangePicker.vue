@@ -10,6 +10,7 @@
    value: { from, to, preset?, mode?, fromTime?, toTime? }
    ============================================================ */
 import DesignIcon from './DesignIcon.vue'
+import { designId } from './ids'
 import TimeRange from './TimeRange.vue'
 import { cx } from './utils'
 import { businessToday, useBusinessDay } from '@/composables/useBusinessDay'
@@ -42,8 +43,12 @@ const emit = defineEmits<{
   (e: 'change', v: DateRangeValue): void
 }>()
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, locale } = useI18n({ useScope: 'global' })
 const biz = useBusinessDay()
+const pickerId = designId('date-range')
+const dialogId = `${pickerId}-dialog`
+const dateTabId = `${pickerId}-date-tab`
+const timeTabId = `${pickerId}-time-tab`
 
 const current = computed<DateRangeValue>(() => props.modelValue ?? props.value ?? { from: '', to: '', preset: 'all' })
 
@@ -108,7 +113,20 @@ const TIME_PRESETS = computed<{ key: string, label: string, from: string, to: st
 ])
 
 function fmtShort(d: Date): string {
-  return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getFullYear()}`
+  return new Intl.DateTimeFormat(String(locale.value), {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(d)
+}
+
+function fmtLong(d: Date): string {
+  return new Intl.DateTimeFormat(String(locale.value), {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(d)
 }
 
 function matchPreset(from: Date | null, to: Date | null, today: Date): string | null {
@@ -121,9 +139,10 @@ function matchPreset(from: Date | null, to: Date | null, today: Date): string | 
   return null
 }
 
-const today = businessToday()
+const today = ref(businessToday())
 const open = ref(false)
 const root = ref<HTMLElement | null>(null)
+const triggerRef = ref<HTMLButtonElement | null>(null)
 
 const mode = ref<'date' | 'time'>((current.value.mode as any) || 'date')
 const from = ref<Date | null>(parseYmd(current.value.from))
@@ -131,13 +150,24 @@ const to = ref<Date | null>(parseYmd(current.value.to))
 const fromTime = ref<string>(current.value.fromTime || '')
 const toTime = ref<string>(current.value.toTime || '')
 const hover = ref<Date | null>(null)
+const focusedDate = ref<Date>(from.value || to.value || today.value)
 const view = ref<Date>(
   from.value ? new Date(from.value.getFullYear(), from.value.getMonth(), 1)
-    : new Date(today.getFullYear(), today.getMonth(), 1),
+    : new Date(today.value.getFullYear(), today.value.getMonth(), 1),
 )
+
+function refreshToday() {
+  // Reading the computed ref makes this refresh when the configured business
+  // cutover changes; opening also refreshes it after a midnight boundary.
+  void biz.start.value
+  today.value = businessToday()
+}
+
+watch(biz.start, refreshToday)
 
 watch(open, (v) => {
   if (v) {
+    refreshToday()
     const vf = parseYmd(current.value.from)
     const vt = parseYmd(current.value.to)
     from.value = vf
@@ -146,9 +176,10 @@ watch(open, (v) => {
     mode.value = (current.value.mode as any) || 'date'
     fromTime.value = current.value.fromTime || ''
     toTime.value = current.value.toTime || ''
+    focusedDate.value = vf || vt || today.value
     view.value = vf
       ? new Date(vf.getFullYear(), vf.getMonth(), 1)
-      : new Date(today.getFullYear(), today.getMonth(), 1)
+      : new Date(today.value.getFullYear(), today.value.getMonth(), 1)
   }
 })
 
@@ -162,12 +193,28 @@ function onDocPointer(e: PointerEvent) {
   open.value = false
 }
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') open.value = false
+  if (e.key === 'Escape' && open.value) {
+    e.preventDefault()
+    closePicker(true)
+  }
+}
+
+function closePicker(restoreFocus = false) {
+  open.value = false
+  if (restoreFocus)
+    nextTick(() => triggerRef.value?.focus())
+}
+
+function onTriggerKey(e: KeyboardEvent) {
+  if (e.key !== 'ArrowDown') return
+  e.preventDefault()
+  if (!open.value) open.value = true
+  nextTick(() => focusDay(focusedDate.value))
 }
 
 // Anchor position — popover is Teleported to <body> to escape sibling-card
 // stacking contexts, so we compute its (fixed) left/top from the trigger rect.
-const popPos = ref<{ left: number; top: number; maxHeight: number } | null>(null)
+const popPos = ref<{ left: number; top: number; width: number; maxHeight: number } | null>(null)
 
 function measure() {
   const el = root.value
@@ -176,14 +223,29 @@ function measure() {
   const gap = 6
   const vw = window.innerWidth
   const vh = window.innerHeight
-  const popW = 360
+  const isMobile = vw <= 768
+  const popW = Math.min(480, vw - 16)
+  if (isMobile) {
+    popPos.value = {
+      left: 12,
+      top: 12,
+      width: Math.max(0, vw - 24),
+      maxHeight: Math.max(120, vh - 86),
+    }
+    return
+  }
   const wantRight = props.align === 'right'
   const left = wantRight
     ? Math.max(8, Math.min(rect.right - popW, vw - popW - 8))
     : Math.max(8, Math.min(rect.left, vw - popW - 8))
-  const top = Math.min(rect.bottom + gap, vh - 12)
-  const maxHeight = Math.max(240, vh - top - 12)
-  popPos.value = { left, top, maxHeight }
+  const below = vh - rect.bottom - gap - 12
+  const above = rect.top - gap - 12
+  const openAbove = below < 420 && above > below
+  const maxHeight = Math.max(120, openAbove ? above : below)
+  const top = openAbove
+    ? Math.max(12, rect.top - gap - Math.min(520, maxHeight))
+    : rect.bottom + gap
+  popPos.value = { left, top, width: popW, maxHeight }
 }
 
 watch(open, (v) => {
@@ -234,30 +296,32 @@ function emitCombined(dateFrom: Date | null, dateTo: Date | null, preset?: strin
   emitChange({
     from: dateFrom ? ymd(dateFrom) : '',
     to: tval ? ymd(tval) : '',
-    preset: preset ?? matchPreset(dateFrom, tval, today) ?? undefined,
+    preset: preset ?? matchPreset(dateFrom, tval, today.value) ?? undefined,
+    mode: mode.value,
     fromTime: fromTime.value,
     toTime: toTime.value,
   })
 }
 
 function applyPreset(key: PresetKey) {
-  const [a, b] = presetRange(key, today)
+  refreshToday()
+  const [a, b] = presetRange(key, today.value)
   from.value = a; to.value = b; hover.value = null
   if (a) view.value = new Date(a.getFullYear(), a.getMonth(), 1)
   emitCombined(a, b, key)
-  open.value = false
+  closePicker(true)
 }
 
 function apply() {
   emitCombined(from.value, to.value || from.value)
-  open.value = false
+  closePicker(true)
 }
 
 function applyTime() {
   const vf = parseYmd(current.value.from) || from.value
   const vt = parseYmd(current.value.to) || to.value
   emitCombined(vf, vt)
-  open.value = false
+  closePicker(true)
 }
 
 function applyTimePreset(p: { from: string, to: string }) {
@@ -274,8 +338,8 @@ function clearTime() {
 
 const valFrom = computed(() => parseYmd(current.value.from))
 const valTo = computed(() => parseYmd(current.value.to))
-const activePreset = computed(() => matchPreset(valFrom.value, valTo.value, today))
-const draftActive = computed(() => matchPreset(from.value, to.value, today))
+const activePreset = computed(() => matchPreset(valFrom.value, valTo.value, today.value))
+const draftActive = computed(() => matchPreset(from.value, to.value, today.value))
 
 const triggerLabel = computed(() => {
   let base: string
@@ -337,12 +401,11 @@ function buildCells(month: Date): Cell[] {
   return cells
 }
 
-const todayT = today.getTime()
-const maxT = todayT // disable future days
+const maxT = computed(() => today.value.getTime()) // disable future days
 
 function cellClass(d: Date): string {
   const tt = d.getTime()
-  const disabled = tt > maxT
+  const disabled = tt > maxT.value
   const isFrom = !!(from.value && sameDay(d, from.value))
   const fromT = from.value ? from.value.getTime() : null
   const toT = to.value ? to.value.getTime() : null
@@ -356,7 +419,7 @@ function cellClass(d: Date): string {
   return cx(
     'drp-cell',
     disabled && 'is-disabled',
-    sameDay(d, today) && 'is-today',
+    sameDay(d, today.value) && 'is-today',
     inRange && 'in-range',
     isEdge && 'is-edge',
     isFrom && !single && 'is-start',
@@ -366,23 +429,92 @@ function cellClass(d: Date): string {
 }
 
 function cellDisabled(d: Date): boolean {
-  return d.getTime() > maxT
+  return d.getTime() > maxT.value
 }
 
-function gotoPrev() { view.value = addMonths(view.value, -1) }
-function gotoNext() { view.value = addMonths(view.value, 1) }
+function cellSelected(d: Date): boolean {
+  if (!from.value) return false
+  const end = to.value || from.value
+  const tt = d.getTime()
+  return tt >= from.value.getTime() && tt <= end.getTime()
+}
+
+function shiftMonthDate(d: Date, amount: number): Date {
+  const first = new Date(d.getFullYear(), d.getMonth() + amount, 1)
+  const lastDay = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
+  return new Date(first.getFullYear(), first.getMonth(), Math.min(d.getDate(), lastDay))
+}
+
+async function focusDay(target: Date) {
+  const next = target.getTime() > maxT.value ? new Date(today.value) : target
+  focusedDate.value = next
+  view.value = new Date(next.getFullYear(), next.getMonth(), 1)
+  await nextTick()
+  popRef.value
+    ?.querySelector<HTMLButtonElement>(`[data-date="${ymd(next)}"]`)
+    ?.focus()
+}
+
+function onDayKey(e: KeyboardEvent, d: Date) {
+  let target: Date | null = null
+  if (e.key === 'ArrowLeft') target = addDays(d, -1)
+  else if (e.key === 'ArrowRight') target = addDays(d, 1)
+  else if (e.key === 'ArrowUp') target = addDays(d, -7)
+  else if (e.key === 'ArrowDown') target = addDays(d, 7)
+  else if (e.key === 'Home') target = addDays(d, -((d.getDay() + 6) % 7))
+  else if (e.key === 'End') target = addDays(d, 6 - ((d.getDay() + 6) % 7))
+  else if (e.key === 'PageUp') target = shiftMonthDate(d, -1)
+  else if (e.key === 'PageDown') target = shiftMonthDate(d, 1)
+  if (!target) return
+  e.preventDefault()
+  void focusDay(target)
+}
+
+function setViewMonth(amount: number) {
+  const next = addMonths(view.value, amount)
+  const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate()
+  view.value = next
+  focusedDate.value = new Date(
+    next.getFullYear(),
+    next.getMonth(),
+    Math.min(focusedDate.value.getDate(), lastDay),
+  )
+}
+function gotoPrev() { setViewMonth(-1) }
+const canGotoNext = computed(() =>
+  addMonths(view.value, 1).getTime()
+  <= new Date(today.value.getFullYear(), today.value.getMonth(), 1).getTime(),
+)
+function gotoNext() {
+  if (canGotoNext.value) setViewMonth(1)
+}
 
 function setMode(m: 'date' | 'time') {
   mode.value = m
+}
+
+function onModeKey(e: KeyboardEvent) {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+  e.preventDefault()
+  mode.value = mode.value === 'date' ? 'time' : 'date'
+  nextTick(() => {
+    const id = mode.value === 'date' ? dateTabId : timeTabId
+    document.getElementById(id)?.focus()
+  })
 }
 </script>
 
 <template>
   <div ref="root" :class="cx('drp', size === 'sm' && 'drp--sm')">
     <button
+      ref="triggerRef"
       type="button"
       :class="cx('drp-trigger', hasValue && 'has-value', open && 'is-open')"
+      aria-haspopup="dialog"
+      :aria-expanded="open"
+      :aria-controls="dialogId"
       @click="open = !open"
+      @keydown="onTriggerKey"
     >
       <DesignIcon name="calendar" :size="17" />
       <span class="drp-trigger__label">{{ triggerLabel }}</span>
@@ -392,26 +524,51 @@ function setMode(m: 'date' | 'time') {
     <Teleport to="body">
     <div
       v-if="open"
+      :id="dialogId"
       ref="popRef"
       :class="cx('drp-pop', 'drp-pop--col', 'drp-pop--fixed', align === 'right' && 'drp-pop--right')"
-      :style="popPos ? { left: popPos.left + 'px', top: popPos.top + 'px', maxHeight: popPos.maxHeight + 'px' } : undefined"
+      role="dialog"
+      :aria-label="t('Date range')"
+      :style="popPos ? {
+        left: popPos.left + 'px',
+        top: popPos.top + 'px',
+        width: popPos.width + 'px',
+        maxHeight: popPos.maxHeight + 'px',
+        right: 'auto',
+        bottom: 'auto',
+      } : undefined"
     >
       <div v-if="enableTime" class="drp-modebar">
-        <div class="seg" style="width: 100%;">
+        <div
+          class="seg"
+          style="width: 100%;"
+          role="tablist"
+          :aria-label="t('Date range')"
+        >
           <button
+            :id="dateTabId"
             type="button"
             :class="cx('seg__btn', mode === 'date' && 'is-active')"
             style="flex: 1;"
+            role="tab"
+            :aria-selected="mode === 'date'"
+            :tabindex="mode === 'date' ? 0 : -1"
             @click="setMode('date')"
+            @keydown="onModeKey"
           >
             <DesignIcon name="calendar" :size="15" />
             {{ t('Date range') }}
           </button>
           <button
+            :id="timeTabId"
             type="button"
             :class="cx('seg__btn', mode === 'time' && 'is-active')"
             style="flex: 1;"
+            role="tab"
+            :aria-selected="mode === 'time'"
+            :tabindex="mode === 'time' ? 0 : -1"
             @click="setMode('time')"
+            @keydown="onModeKey"
           >
             <DesignIcon name="clock" :size="15" />
             {{ t('Time of day') }}
@@ -419,13 +576,19 @@ function setMode(m: 'date' | 'time') {
         </div>
       </div>
 
-      <div v-if="mode === 'date'" class="drp-body">
+      <div
+        v-if="mode === 'date'"
+        class="drp-body"
+        role="tabpanel"
+        :aria-labelledby="enableTime ? dateTabId : undefined"
+      >
         <div class="drp-presets">
           <button
             v-for="p in PRESETS"
             :key="p.key"
             type="button"
             :class="cx('drp-preset', draftActive === p.key && 'is-active')"
+            :aria-pressed="draftActive === p.key"
             @click="applyPreset(p.key)"
           >
             {{ t(p.label) }}
@@ -434,13 +597,26 @@ function setMode(m: 'date' | 'time') {
 
         <div class="drp-cal">
           <div class="drp-cal__head">
-            <button type="button" class="drp-nav" :title="t('Previous month')" @click="gotoPrev">
+            <button
+              type="button"
+              class="drp-nav"
+              :title="t('Previous month')"
+              :aria-label="t('Previous month')"
+              @click="gotoPrev"
+            >
               <DesignIcon name="chevleft" :size="17" />
             </button>
             <div class="drp-cal__titles">
               <span>{{ t(MONTHS[view.getMonth()]) }} {{ view.getFullYear() }}</span>
             </div>
-            <button type="button" class="drp-nav" :title="t('Next month')" @click="gotoNext">
+            <button
+              type="button"
+              class="drp-nav"
+              :title="t('Next month')"
+              :aria-label="t('Next month')"
+              :disabled="!canGotoNext"
+              @click="gotoNext"
+            >
               <DesignIcon name="chevright" :size="17" />
             </button>
           </div>
@@ -448,17 +624,38 @@ function setMode(m: 'date' | 'time') {
           <div class="drp-months" @mouseleave="hover = null">
             <div class="drp-month">
               <div class="drp-wd">
-                <span v-for="w in WD" :key="w">{{ t(`wd_${w}`) }}</span>
+                <span
+                  v-for="w in WD"
+                  :key="w"
+                  role="columnheader"
+                >{{ t(`wd_${w}`) }}</span>
               </div>
-              <div class="drp-grid">
+              <div
+                class="drp-grid"
+                role="grid"
+                :aria-label="`${t(MONTHS[view.getMonth()])} ${view.getFullYear()}`"
+              >
                 <template v-for="(c, i) in buildCells(view)" :key="i">
-                  <span v-if="!c.date" class="drp-cell is-empty" />
+                  <span
+                    v-if="!c.date"
+                    class="drp-cell is-empty"
+                    role="gridcell"
+                    aria-hidden="true"
+                  />
                   <button
                     v-else
                     type="button"
                     :class="cellClass(c.date)"
                     :disabled="cellDisabled(c.date)"
+                    role="gridcell"
+                    :data-date="ymd(c.date)"
+                    :aria-label="fmtLong(c.date)"
+                    :aria-selected="cellSelected(c.date)"
+                    :aria-current="sameDay(c.date, today) ? 'date' : undefined"
+                    :tabindex="sameDay(c.date, focusedDate) ? 0 : -1"
                     @click="pick(c.date)"
+                    @focus="focusedDate = c.date"
+                    @keydown="onDayKey($event, c.date)"
                     @mouseenter="hover = c.date"
                   >
                     <span class="drp-num">{{ c.date.getDate() }}</span>
@@ -474,7 +671,7 @@ function setMode(m: 'date' | 'time') {
               <button v-if="from || to" type="button" class="drp-clear" @click="clear">
                 {{ t('Clear') }}
               </button>
-              <button type="button" class="btn btn--ghost btn--sm" @click="open = false">
+              <button type="button" class="btn btn--ghost btn--sm" @click="closePicker(true)">
                 {{ t('Cancel') }}
               </button>
               <button
@@ -490,7 +687,12 @@ function setMode(m: 'date' | 'time') {
         </div>
       </div>
 
-      <div v-else class="drp-time">
+      <div
+        v-else
+        class="drp-time"
+        role="tabpanel"
+        :aria-labelledby="enableTime ? timeTabId : undefined"
+      >
         <div class="drp-time__label">
           {{ t('Filter by time of day') }}
         </div>
@@ -500,6 +702,7 @@ function setMode(m: 'date' | 'time') {
             :key="p.key"
             type="button"
             :class="cx('drp-timechip', fromTime === p.from && toTime === p.to && 'is-active')"
+            :aria-pressed="fromTime === p.from && toTime === p.to"
             @click="applyTimePreset(p)"
           >
             {{ t(p.label) }}
@@ -520,7 +723,7 @@ function setMode(m: 'date' | 'time') {
             <button v-if="fromTime || toTime" type="button" class="drp-clear" @click="clearTime">
               {{ t('Clear') }}
             </button>
-            <button type="button" class="btn btn--ghost btn--sm" @click="open = false">
+            <button type="button" class="btn btn--ghost btn--sm" @click="closePicker(true)">
               {{ t('Cancel') }}
             </button>
             <button

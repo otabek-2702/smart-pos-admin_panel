@@ -69,6 +69,8 @@ const display = computed(() =>
   border-radius: 999px;
   box-shadow: var(--shadow-lg);
   max-width: 92vw;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 .bulkbar__count {
   display: inline-flex;
@@ -92,6 +94,9 @@ const display = computed(() =>
   font-size: 13px;
   font-weight: 500;
   opacity: 0.92;
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .bulkbar__actions {
   display: inline-flex;
@@ -124,7 +129,8 @@ const display = computed(() =>
 .bulkbar__close {
   background: transparent;
   border: 0;
-  color: rgba(255, 255, 255, 0.7);
+  color: inherit;
+  opacity: 0.7;
   padding: 4px;
   border-radius: 6px;
   cursor: pointer;
@@ -132,7 +138,8 @@ const display = computed(() =>
   place-items: center;
 }
 .bulkbar__close:hover {
-  color: var(--surface);
+  color: inherit;
+  opacity: 1;
   background: rgba(255, 255, 255, 0.12);
 }
 [data-theme="dark"] .bulkbar {
@@ -149,6 +156,13 @@ const display = computed(() =>
 }
 [data-theme="dark"] .bulkbar__actions :deep(button:hover) {
   background: var(--surface-inset);
+}
+@media (max-width: 768px) {
+  .bulkbar {
+    bottom: calc(var(--tabbar-h, 62px) + env(safe-area-inset-bottom, 0px) + 12px);
+    max-width: calc(100vw - 24px);
+  }
+  .bulkbar__label { max-width: 14ch; }
 }
 .bulk-enter-active,
 .bulk-leave-active {

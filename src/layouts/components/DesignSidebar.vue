@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
+import { useMediaQuery } from '@vueuse/core'
 import DesignIcon from '@/components/design/DesignIcon.vue'
-import SidebarLiveWidget from '@/components/design/SidebarLiveWidget.vue'
+import { routeLabelForPath } from '@/navigation/routeLabels'
 import { useNavCountsStore } from '@/stores/navCounts'
 
 /* ============================================================
@@ -21,12 +22,21 @@ interface NavItem {
 }
 type NavEntry = NavSection | NavItem
 
-defineProps<{ collapsed?: boolean, open?: boolean }>()
+const props = defineProps<{ collapsed?: boolean, open?: boolean }>()
 const emit = defineEmits<{ (e: 'nav-go'): void, (e: 'close'): void }>()
 
 const { t } = useI18n({ useScope: 'global' })
 const router = useRouter()
 const route = useRoute()
+const isMobile = useMediaQuery('(max-width: 768px)')
+const drawerHidden = computed(() => isMobile.value && !props.open)
+const closeButton = ref<HTMLButtonElement | null>(null)
+
+function focusClose() {
+  closeButton.value?.focus()
+}
+
+defineExpose({ focusClose })
 
 const navStore = useNavCountsStore()
 const { counts } = storeToRefs(navStore)
@@ -54,7 +64,7 @@ const NAV: NavEntry[] = [
   { type: 'item', id: 'orders', label: 'Orders', icon: 'receipt', to: '/orders' },
   { type: 'item', id: 'places', label: 'Places & Tables', icon: 'table', to: '/places' },
   { type: 'item', id: 'discounts', label: 'Discounts', icon: 'tag', to: '/discounts' },
-  { type: 'item', id: 'cash', label: 'Cash Register', icon: 'register', to: '/cashbox/categories' },
+  { type: 'item', id: 'cash', label: 'Cashbox Expense Categories', icon: 'register', to: '/cashbox/categories' },
   { type: 'item', id: 'treasury', label: 'Treasury', icon: 'store', to: '/treasury' },
   { type: 'item', id: 'loyalty', label: 'Loyalty', icon: 'gift', to: '/loyalty' },
   { type: 'item', id: 'sessions', label: 'Sessions', icon: 'lock', to: '/sessions' },
@@ -64,12 +74,12 @@ const NAV: NavEntry[] = [
   { type: 'item', id: 'salaries', label: 'Salaries', icon: 'coins', to: '/hr-salaries' },
   { type: 'item', id: 'hr-cash', label: 'HR Cash', icon: 'wallet', to: '/hr-cash' },
   { type: 'item', id: 'hr-documents', label: 'HR Documents', icon: 'receipt', to: '/hr-documents' },
-  { type: 'item', id: 'hr-events', label: 'Events', icon: 'flag', to: '/hr-events' },
+  { type: 'item', id: 'hr-events', label: 'Employment Events', icon: 'flag', to: '/hr-events' },
   { type: 'item', id: 'hr-expense-categories', label: 'Expense Categories', icon: 'grid', to: '/hr-expense-categories' },
   { type: 'item', id: 'hr-goals', label: 'Goals', icon: 'target', to: '/hr-goals' },
   { type: 'item', id: 'hr-leave-balances', label: 'Leave Balances', icon: 'clock', to: '/hr-leave-balances' },
   { type: 'item', id: 'hr-leave-types', label: 'Leave Types', icon: 'clock', to: '/hr-leave-types' },
-  { type: 'item', id: 'hr-reviews', label: 'Reviews', icon: 'star', to: '/hr-reviews' },
+  { type: 'item', id: 'hr-reviews', label: 'Performance Reviews', icon: 'star', to: '/hr-reviews' },
   { type: 'item', id: 'shift-templates', label: 'Shift Templates', icon: 'clock', to: '/shift-templates' },
   { type: 'section', label: 'Stock' },
   { type: 'item', id: 'stock-alerts', label: 'Stock Alerts', icon: 'alert', to: '/stock/alerts' },
@@ -87,6 +97,10 @@ const NAV: NavEntry[] = [
 
 function isItem(n: NavEntry): n is NavItem {
   return n.type === 'item'
+}
+
+function navLabel(item: NavItem): string {
+  return routeLabelForPath(item.to) || item.label
 }
 
 function isActive(item: NavItem): boolean {
@@ -109,15 +123,16 @@ function onNavClick(e: MouseEvent, item: NavItem) {
   emit('nav-go')
 }
 
-function onWidgetGo() {
-  if (route.path !== '/dashboard')
-    router.push('/dashboard')
-  emit('nav-go')
-}
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ 'is-collapsed': collapsed, 'is-open': open }">
+  <aside
+    id="primary-navigation"
+    class="sidebar"
+    :class="{ 'is-collapsed': collapsed, 'is-open': open }"
+    :aria-hidden="drawerHidden ? 'true' : undefined"
+    :inert="drawerHidden ? true : undefined"
+  >
     <div class="sidebar__brand">
       <div class="sidebar__logo">
         <DesignIcon name="store" :size="19" :weight="2" />
@@ -126,15 +141,20 @@ function onWidgetGo() {
         {{ t('Alpha POS') }}
       </div>
       <button
+        ref="closeButton"
         class="sidebar__close"
         :title="t('Close')"
+        :aria-label="t('Close')"
         @click="emit('close')"
       >
         <DesignIcon name="close" :size="18" />
       </button>
     </div>
 
-    <nav class="sidebar__nav">
+    <nav
+      class="sidebar__nav"
+      :aria-label="t('Navigation')"
+    >
       <template v-for="(n, i) in NAV" :key="i">
         <template v-if="n.type === 'section'">
           <div v-if="!collapsed" class="nav-section">
@@ -147,13 +167,14 @@ function onWidgetGo() {
             :href="n.to"
             class="nav-item"
             :class="{ 'is-active': isActive(n) }"
-            :title="collapsed ? t(n.label) : ''"
+            :title="collapsed ? t(navLabel(n)) : ''"
+            :aria-current="isActive(n) ? 'page' : undefined"
             @click="onNavClick($event, n)"
           >
             <span class="nav-item__icon">
               <DesignIcon :name="n.icon" :size="20" />
             </span>
-            <span v-if="!collapsed" style="flex:1;">{{ t(n.label) }}</span>
+            <span v-if="!collapsed" style="flex:1;">{{ t(navLabel(n)) }}</span>
             <span v-if="!collapsed && (n.badge || badgeFor(n.id))" class="nav-item__badge">{{ badgeFor(n.id) ?? n.badge }}</span>
           </a>
         </template>

@@ -22,6 +22,7 @@ import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import Switch from '@/components/design/Switch.vue'
 import { fmtNum } from '@/components/design/utils/format'
+import { buildCsv } from '@/utils/csv'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -396,6 +397,7 @@ function exportCsv() {
 
     return
   }
+
   const cols: Array<[string, (e: any) => any]> = [
     [t('Name'), e => `${e.user?.first_name ?? ''} ${e.user?.last_name ?? ''}`.trim()],
     [t('Email'), e => e.user?.email ?? ''],
@@ -408,14 +410,16 @@ function exportCsv() {
     [t('Hire Date'), e => e.hire_date ?? ''],
     [t('Status'), e => (e.is_active ? t('Active') : t('Inactive'))],
   ]
-  const head = cols.map(c => `"${c[0]}"`).join(',')
-  const body = rows.map(e =>
-    cols.map(c => `"${String(c[1](e) ?? '').replace(/"/g, '""')}"`).join(','),
-  ).join('\n')
-  const csv = `﻿${head}\n${body}\n`
+
+  const csv = buildCsv([
+    cols.map(c => c[0]),
+    ...rows.map(e => cols.map(c => c[1](e))),
+  ], { alwaysQuote: true })
+
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
+
   a.href = url
   a.download = `employees-${new Date().toISOString().slice(0, 10)}.csv`
   document.body.appendChild(a)

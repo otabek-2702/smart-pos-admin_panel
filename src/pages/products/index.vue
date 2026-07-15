@@ -26,7 +26,6 @@ const selection = useTableSelection<number>(() => products.value.map(p => p.id))
 const page = ref(1)
 const itemsPerPage = ref(10)
 const search = ref('')
-const categoryFilter = ref<number | undefined>(undefined)
 const categoryFilterMulti = ref<number[]>([])
 const sortBy = ref<string>('')
 const includeDeleted = ref(false)
@@ -156,14 +155,15 @@ const kpiDeleted = computed(() => ({
 }))
 
 // ---- load ----
+let productsRequestId = 0
+
 async function loadProducts() {
+  const requestId = ++productsRequestId
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
     if (search.value)
       params.search = search.value
-    if (categoryFilter.value)
-      params.category_ids = categoryFilter.value
     if (categoryFilterMulti.value.length > 0)
       params.category_ids = categoryFilterMulti.value.join(',')
     if (sortBy.value)
@@ -175,15 +175,22 @@ async function loadProducts() {
 
     const res = await axios.get('/products', { params })
     const d = res.data?.data
+    if (requestId !== productsRequestId)
+      return
 
     products.value = d?.products ?? []
     totalProducts.value = d?.pagination?.total_products ?? products.value.length
   }
   catch {
+    if (requestId !== productsRequestId)
+      return
+    products.value = []
+    totalProducts.value = 0
     notify(t('Failed to load products'), 'error')
   }
   finally {
-    loading.value = false
+    if (requestId === productsRequestId)
+      loading.value = false
   }
 }
 
@@ -218,45 +225,52 @@ function onKeydown(e: KeyboardEvent) {
     tryCloseDialog()
 }
 
-watch(page, () => { selection.clear(); loadProducts() })
+watch(page, () => { selection.clear(); void loadProducts() })
 watch(itemsPerPage, () => {
-  page.value = 1
   selection.clear()
-  loadProducts()
+  if (page.value !== 1)
+    page.value = 1
+  else
+    void loadProducts()
 })
 
 const debouncedSearch = useDebounceFn(() => {
-  page.value = 1
   selection.clear()
-  loadProducts()
+  if (page.value !== 1)
+    page.value = 1
+  else
+    void loadProducts()
 }, 400)
 
 watch(search, debouncedSearch)
 
-watch(categoryFilter, () => {
-  page.value = 1
-  selection.clear()
-  loadProducts()
-})
-
 watch(categoryFilterMulti, () => {
-  page.value = 1
-  loadProducts()
+  selection.clear()
+  if (page.value !== 1)
+    page.value = 1
+  else
+    void loadProducts()
 }, { deep: true })
 
 watch(sortBy, () => {
-  page.value = 1
-  loadProducts()
+  if (page.value !== 1)
+    page.value = 1
+  else
+    void loadProducts()
 })
 
 watch(includeDeleted, () => {
-  page.value = 1
-  loadProducts()
+  if (page.value !== 1)
+    page.value = 1
+  else
+    void loadProducts()
 })
 
 watch(popularFirst, () => {
-  page.value = 1
-  loadProducts()
+  if (page.value !== 1)
+    page.value = 1
+  else
+    void loadProducts()
 })
 
 // ---- dirty tracking ----
@@ -440,15 +454,6 @@ const activeFilters = computed(() => {
   const list: { k: string, label: string, val: string, clear: () => void }[] = []
   if (search.value)
     list.push({ k: 'q', label: t('Search'), val: search.value, clear: () => { search.value = '' } })
-  if (categoryFilter.value) {
-    const cat = categoriesList.value.find((c: any) => c.id === categoryFilter.value)
-    list.push({
-      k: 'c',
-      label: t('Category'),
-      val: cat?.name ?? String(categoryFilter.value),
-      clear: () => { categoryFilter.value = undefined },
-    })
-  }
   if (categoryFilterMulti.value.length > 0) {
     const names = categoryFilterMulti.value
       .map((id: number) => categoriesList.value.find((c: any) => c.id === id)?.name ?? String(id))
@@ -490,7 +495,6 @@ const activeFilters = computed(() => {
 
 function clearAll() {
   search.value = ''
-  categoryFilter.value = undefined
   categoryFilterMulti.value = []
   sortBy.value = ''
   includeDeleted.value = false
@@ -632,51 +636,6 @@ function goPage(p: number | '…') {
               type="text"
               :placeholder="t('Search')"
             >
-          </div>
-        </div>
-
-        <div
-          class="products-toolbar__select"
-          style="width:220px;"
-        >
-          <div class="control control--select">
-            <svg
-              class="ic"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-            </svg>
-            <select
-              v-model="categoryFilter"
-              :value="categoryFilter"
-            >
-              <option :value="undefined">
-                {{ t('All Categories') }}
-              </option>
-              <option
-                v-for="opt in categoryOptions"
-                :key="opt.value"
-                :value="opt.value"
-              >
-                {{ opt.title }}
-              </option>
-            </select>
-            <svg
-              class="ic chev"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
           </div>
         </div>
 

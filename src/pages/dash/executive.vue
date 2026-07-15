@@ -49,6 +49,17 @@ interface LiveOrder {
   status: 'PREPARING' | 'READY' | 'COMPLETED'
   _new?: boolean
 }
+interface HeroKpiData {
+  label: string
+  value: number | string
+  money: boolean
+  unit?: string
+  delta: number | null
+  icon: string
+  tone: Tone
+  spark?: number[]
+  sub?: string
+}
 interface DashData {
   monthRevenue: number
   monthOrders: number
@@ -73,14 +84,14 @@ const loading = ref(true)
 // Delta vs. previous period is BE-dependent; until /dashboard ships period-over-period
 // fields, we render null deltas (HeroKpi's Delta component hides on null). Previously this
 // emitted hardcoded +12.4/+8.1/+3.9/+1.6/+4.2 over zero data — green pills next to 0 UZS.
-const heroKpis = computed(() => {
+const heroKpis = computed<HeroKpiData[]>(() => {
   const D = data.value
   if (!D) return []
   // Repeat rate ("Qaytish darajasi") is hidden until BE ships it — the existing path zero-filled the field,
   // which rendered "0%" + green "+4.2%" pill on every dashboard for every restaurant. Same for Gross Margin
   // if BE hasn't shipped sales endpoint yet (we only show it when > 0). Revenue / Orders / AOV stay always
   // since /dashboard (range) is guaranteed to return them.
-  const rows: Array<Record<string, unknown>> = [
+  const rows: HeroKpiData[] = [
     { label: t('Revenue'), value: D.monthRevenue, money: true, unit: 'UZS', delta: null, icon: 'wallet', tone: 'primary' as Tone, spark: D.revenue30.slice(-14) },
     { label: t('Orders'), value: D.monthOrders, money: false, delta: null, icon: 'receipt', tone: 'info' as Tone, spark: D.orders30.slice(-14) },
     { label: t('Avg Order Value'), value: D.avgAov, money: true, unit: 'UZS', delta: null, icon: 'trend', tone: 'success' as Tone, spark: D.aov30.slice(-14) },

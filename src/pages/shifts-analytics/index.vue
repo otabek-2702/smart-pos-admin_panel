@@ -4,6 +4,7 @@
    Ported 1:1 from .tmp-design-bundle/project/pages/Shifts.jsx
    ============================================================ */
 import axios from '@/plugins/axios'
+import { buildCsv } from '@/utils/csv'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -50,14 +51,16 @@ function fmtDuration(min: number | null | undefined): string {
   const total = Math.max(0, Math.floor(Number(min)))
   const h = Math.floor(total / 60)
   const m = total % 60
-  return h ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`
+  return h
+    ? `${h} ${t('time_hour_short')} ${String(m).padStart(2, '0')} ${t('time_minute_short')}`
+    : `${m} ${t('time_minute_short')}`
 }
 function fmtPrep(sec: number | null | undefined): string {
   if (sec === null || sec === undefined) return '—'
   const n = Number(sec)
   if (!Number.isFinite(n) || n <= 0) return '—'
-  if (n < 60) return `${Math.round(n)}s`
-  return `${Math.floor(n / 60)}m ${String(Math.round(n % 60)).padStart(2, '0')}s`
+  if (n < 60) return `${Math.round(n)} ${t('time_second_short')}`
+  return `${Math.floor(n / 60)} ${t('time_minute_short')} ${String(Math.round(n % 60)).padStart(2, '0')} ${t('time_second_short')}`
 }
 function fmtPeak(p: any): string {
   if (!p || p.hour === undefined || p.hour === null) return '—'
@@ -404,12 +407,14 @@ function exportShifts() {
     notify(t('Nothing to export'), 'warning')
     return
   }
+
   const header = ['id', 'cashier', 'start', 'end', 'orders', 'gross', 'net', 'cash_collected', 'expenses', 'state']
-  const csv = [header.join(',')]
-  for (const s of rows) {
-    csv.push([
+
+  const csv = buildCsv([
+    header,
+    ...rows.map(s => [
       s.id,
-      JSON.stringify(fullName(s.user)),
+      fullName(s.user),
       s.start_time || '',
       s.end_time || '',
       num(s.total_orders),
@@ -418,11 +423,13 @@ function exportShifts() {
       num(s.cash_collected),
       num(s.expenses_total),
       shiftState(s),
-    ].join(','))
-  }
-  const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    ]),
+  ])
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
+
   a.href = url
   a.download = `shifts-${new Date().toISOString().slice(0, 10)}.csv`
   document.body.appendChild(a)
@@ -714,7 +721,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
           {{ summary.netVariance > 0 ? '+' : summary.netVariance < 0 ? '−' : '' }}{{ fmtAbbr(varCounted) }}
         </div>
         <div class="kpi__foot">
-          <span class="kpi__subtext">{{ t('reconciled today') }}</span>
+          <span class="kpi__subtext">{{ t('in current results') }}</span>
         </div>
       </div>
     </div>

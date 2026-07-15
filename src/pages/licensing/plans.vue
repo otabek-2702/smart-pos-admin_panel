@@ -22,7 +22,6 @@ import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Segmented from '@/components/design/Segmented.vue'
 import Select from '@/components/design/Select.vue'
-import StatusBadge from '@/components/design/StatusBadge.vue'
 import { fmtNum, NB } from '@/components/design/utils/format'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -351,7 +350,7 @@ const showLowBalance = computed(() => !!licenseState.value?.warn)
 const columns: DataTableColumn<any>[] = [
   { key: 'name', label: t('plan_name'), sortable: true },
   { key: 'description', label: t('plan_description'), sortable: false },
-  { key: 'price', label: t('plan_price'), sortable: true, align: 'end' },
+  { key: 'price', label: t('plan_price'), sortable: true, align: 'right' },
   { key: 'period_days', label: t('plan_period_label'), sortable: true },
   { key: 'status', label: t('Status'), sortable: true },
   { key: 'is_current', label: t('license_current_status'), sortable: false },
@@ -567,10 +566,11 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 
         <template #cell.status="{ row }">
           <!-- BE plan has no categorical `status` — only `is_active: bool`. -->
-          <StatusBadge
+          <Badge
             :tone="STATUS_TONE[row.is_active ? 'ACTIVE' : 'INACTIVE'] || 'neutral'"
-            :label="t(`plan_status_${row.is_active ? 'ACTIVE' : 'INACTIVE'}`)"
-          />
+          >
+            {{ t(`plan_status_${row.is_active ? 'ACTIVE' : 'INACTIVE'}`) }}
+          </Badge>
         </template>
 
         <template #cell.is_current="{ row }">
@@ -657,10 +657,11 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             class="row"
             style="gap:14px; align-items:center; margin-bottom: var(--sp-3);"
           >
-            <StatusBadge
+            <Badge
               :tone="LICENSE_TONE[licenseState.status] || 'neutral'"
-              :label="t(`license_status_${licenseState.status}`)"
-            />
+            >
+              {{ t(`license_status_${licenseState.status}`) }}
+            </Badge>
             <Badge
               v-if="licenseState.is_blocked"
               tone="error"

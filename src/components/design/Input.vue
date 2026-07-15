@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import DesignIcon from './DesignIcon.vue'
+import { fieldContextKey } from './fieldContext'
+import { designId } from './ids'
 import { cx } from './utils'
 
 interface Props {
@@ -19,6 +21,25 @@ const emit = defineEmits<{
 
 defineOptions({ inheritAttrs: false })
 
+const attrs = useAttrs()
+const field = inject(fieldContextKey, null)
+
+const errorId = designId('input-error')
+
+const describedBy = computed(() => {
+  const ids = [attrs['aria-describedby'], field?.descriptionId.value]
+  if (typeof props.error === 'string' && props.error && !field?.descriptionId.value)
+    ids.push(errorId)
+  return ids.filter(Boolean).join(' ') || undefined
+})
+
+const invalid = computed(() => !!props.error || !!field?.invalid.value)
+const accessibleLabel = computed(() => {
+  if (attrs['aria-label']) return String(attrs['aria-label'])
+  if (field?.labelId) return undefined
+  return attrs.placeholder ? String(attrs.placeholder) : undefined
+})
+
 const klass = computed(() =>
   cx('control', props.error && 'is-error', props.disabled && 'is-disabled'),
 )
@@ -36,10 +57,19 @@ function onInput(ev: Event) {
       :size="18"
     />
     <input
+      v-bind="$attrs"
       :value="modelValue ?? ''"
       :disabled="disabled"
-      v-bind="$attrs"
+      :aria-label="accessibleLabel"
+      :aria-labelledby="attrs['aria-label'] ? undefined : field?.labelId"
+      :aria-describedby="describedBy"
+      :aria-invalid="invalid ? 'true' : undefined"
       @input="onInput"
     >
+    <span
+      v-if="typeof error === 'string' && error && !field?.descriptionId.value"
+      :id="errorId"
+      class="visually-hidden"
+    >{{ error }}</span>
   </div>
 </template>

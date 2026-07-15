@@ -5,12 +5,17 @@
 export {}
 declare global {
   const EffectScope: typeof import('vue')['EffectScope']
+  const abbrUZS: typeof import('./src/composables/useCurrency')['abbrUZS']
   const acceptHMRUpdate: typeof import('pinia')['acceptHMRUpdate']
+  const alignSeries: typeof import('./src/composables/useComparison')['alignSeries']
   const armMotion: typeof import('./src/composables/useAlphaMotion')['armMotion']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
   const autoResetRef: typeof import('@vueuse/core')['autoResetRef']
+  const badgeColor: typeof import('./src/composables/useComparison')['badgeColor']
+  const buildDateParams: typeof import('./src/composables/useBusinessDay')['buildDateParams']
   const businessPreset: typeof import('./src/composables/useBusinessDay')['businessPreset']
   const businessToday: typeof import('./src/composables/useBusinessDay')['businessToday']
+  const computeDelta: typeof import('./src/composables/useComparison')['computeDelta']
   const computed: typeof import('vue')['computed']
   const computedAsync: typeof import('@vueuse/core')['computedAsync']
   const computedEager: typeof import('@vueuse/core')['computedEager']
@@ -31,6 +36,7 @@ declare global {
   const createTemplatePromise: typeof import('@vueuse/core')['createTemplatePromise']
   const createUnrefFn: typeof import('@vueuse/core')['createUnrefFn']
   const customRef: typeof import('vue')['customRef']
+  const dayCount: typeof import('./src/composables/useComparison')['dayCount']
   const debouncedRef: typeof import('@vueuse/core')['debouncedRef']
   const debouncedWatch: typeof import('@vueuse/core')['debouncedWatch']
   const defineAsyncComponent: typeof import('vue')['defineAsyncComponent']
@@ -39,11 +45,17 @@ declare global {
   const eagerComputed: typeof import('@vueuse/core')['eagerComputed']
   const effectScope: typeof import('vue')['effectScope']
   const extendRef: typeof import('@vueuse/core')['extendRef']
+  const fmtInt: typeof import('./src/composables/useCurrency')['fmtInt']
+  const fmtPct: typeof import('./src/composables/useCurrency')['fmtPct']
+  const fmtUZS: typeof import('./src/composables/useCurrency')['fmtUZS']
+  const fmtUZSUnit: typeof import('./src/composables/useCurrency')['fmtUZSUnit']
+  const formatWindow: typeof import('./src/composables/useWindowLabel')['formatWindow']
   const getActivePinia: typeof import('pinia')['getActivePinia']
   const getCurrentInstance: typeof import('vue')['getCurrentInstance']
   const getCurrentScope: typeof import('vue')['getCurrentScope']
   const getPrefersReduced: typeof import('./src/composables/useAlphaMotion')['getPrefersReduced']
   const h: typeof import('vue')['h']
+  const hydrateBusinessSettings: typeof import('./src/composables/useBusinessDay')['hydrateBusinessSettings']
   const ignorableWatch: typeof import('@vueuse/core')['ignorableWatch']
   const inject: typeof import('vue')['inject']
   const isDefined: typeof import('@vueuse/core')['isDefined']
@@ -62,6 +74,7 @@ declare global {
   const mapWritableState: typeof import('pinia')['mapWritableState']
   const markRaw: typeof import('vue')['markRaw']
   const nextTick: typeof import('vue')['nextTick']
+  const normalize: typeof import('./src/composables/useComparison')['normalize']
   const onActivated: typeof import('vue')['onActivated']
   const onBeforeMount: typeof import('vue')['onBeforeMount']
   const onBeforeRouteLeave: typeof import('vue-router')['onBeforeRouteLeave']
@@ -83,6 +96,7 @@ declare global {
   const onUpdated: typeof import('vue')['onUpdated']
   const onWatcherCleanup: typeof import('vue')['onWatcherCleanup']
   const pausableWatch: typeof import('@vueuse/core')['pausableWatch']
+  const previousPeriod: typeof import('./src/composables/useComparison')['previousPeriod']
   const provide: typeof import('vue')['provide']
   const reactify: typeof import('@vueuse/core')['reactify']
   const reactifyObject: typeof import('@vueuse/core')['reactifyObject']
@@ -98,11 +112,16 @@ declare global {
   const refThrottled: typeof import('@vueuse/core')['refThrottled']
   const refWithControl: typeof import('@vueuse/core')['refWithControl']
   const replayMotion: typeof import('./src/composables/useAlphaMotion')['replayMotion']
+  const resolveBFromMode: typeof import('./src/composables/useComparison')['resolveBFromMode']
   const resolveComponent: typeof import('vue')['resolveComponent']
   const resolveRef: typeof import('@vueuse/core')['resolveRef']
   const resolveUnref: typeof import('@vueuse/core')['resolveUnref']
+  const samePeriodLastYear: typeof import('./src/composables/useComparison')['samePeriodLastYear']
+  const saveBusinessSettings: typeof import('./src/composables/useBusinessDay')['saveBusinessSettings']
   const setActivePinia: typeof import('pinia')['setActivePinia']
+  const setBusinessClose: typeof import('./src/composables/useBusinessDay')['setBusinessClose']
   const setBusinessDayStart: typeof import('./src/composables/useBusinessDay')['setBusinessDayStart']
+  const setBusinessOpen: typeof import('./src/composables/useBusinessDay')['setBusinessOpen']
   const setMapStoreSuffix: typeof import('pinia')['setMapStoreSuffix']
   const shallowReactive: typeof import('vue')['shallowReactive']
   const shallowReadonly: typeof import('vue')['shallowReadonly']
@@ -127,8 +146,10 @@ declare global {
   const unref: typeof import('vue')['unref']
   const unrefElement: typeof import('@vueuse/core')['unrefElement']
   const until: typeof import('@vueuse/core')['until']
+  const useAIPageContext: typeof import('./src/composables/useAIPageContext')['useAIPageContext']
   const useAbs: typeof import('@vueuse/math')['useAbs']
   const useActiveElement: typeof import('@vueuse/core')['useActiveElement']
+  const useAlphaTheme: typeof import('./src/composables/useAlphaTheme')['useAlphaTheme']
   const useAnimate: typeof import('@vueuse/core')['useAnimate']
   const useApiError: typeof import('./src/composables/useApiError')['useApiError']
   const useArrayDifference: typeof import('@vueuse/core')['useArrayDifference']
@@ -160,12 +181,14 @@ declare global {
   const useClipboard: typeof import('@vueuse/core')['useClipboard']
   const useCloned: typeof import('@vueuse/core')['useCloned']
   const useColorMode: typeof import('@vueuse/core')['useColorMode']
+  const useComparison: typeof import('./src/composables/useComparison')['useComparison']
   const useConfirmDialog: typeof import('@vueuse/core')['useConfirmDialog']
   const useCountUp: typeof import('./src/composables/useAlphaMotion')['useCountUp']
   const useCounter: typeof import('@vueuse/core')['useCounter']
   const useCssModule: typeof import('vue')['useCssModule']
   const useCssVar: typeof import('@vueuse/core')['useCssVar']
   const useCssVars: typeof import('vue')['useCssVars']
+  const useCurrency: typeof import('./src/composables/useCurrency')['useCurrency']
   const useCurrentElement: typeof import('@vueuse/core')['useCurrentElement']
   const useCycleList: typeof import('@vueuse/core')['useCycleList']
   const useDark: typeof import('@vueuse/core')['useDark']
@@ -182,6 +205,7 @@ declare global {
   const useDocumentVisibility: typeof import('@vueuse/core')['useDocumentVisibility']
   const useDraggable: typeof import('@vueuse/core')['useDraggable']
   const useDropZone: typeof import('@vueuse/core')['useDropZone']
+  const useEChartTheme: typeof import('./src/composables/useEChartTheme')['useEChartTheme']
   const useElementBounding: typeof import('@vueuse/core')['useElementBounding']
   const useElementByPoint: typeof import('@vueuse/core')['useElementByPoint']
   const useElementHover: typeof import('@vueuse/core')['useElementHover']
@@ -279,6 +303,7 @@ declare global {
   const useSum: typeof import('@vueuse/math')['useSum']
   const useSupported: typeof import('@vueuse/core')['useSupported']
   const useSwipe: typeof import('@vueuse/core')['useSwipe']
+  const useTableSelection: typeof import('./src/composables/useTableSelection')['useTableSelection']
   const useTemplateRef: typeof import('vue')['useTemplateRef']
   const useTemplateRefsList: typeof import('@vueuse/core')['useTemplateRefsList']
   const useTextDirection: typeof import('@vueuse/core')['useTextDirection']
@@ -335,20 +360,40 @@ declare global {
   export type { Component, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
   // @ts-ignore
+  export type { AIPageContext } from './src/composables/useAIPageContext'
+  import('./src/composables/useAIPageContext')
+  // @ts-ignore
+  export type { AlphaTheme } from './src/composables/useAlphaTheme'
+  import('./src/composables/useAlphaTheme')
+  // @ts-ignore
+  export type { DateParamInput } from './src/composables/useBusinessDay'
+  import('./src/composables/useBusinessDay')
+  // @ts-ignore
+  export type { DeltaDirection, BadgeTone, DeltaResult, AlignedPoint, DateRange } from './src/composables/useComparison'
+  import('./src/composables/useComparison')
+  // @ts-ignore
   export type { DashRange, DashTodayPayload, DashRangePayload, DashSharedPayload } from './src/composables/useDashboardData'
   import('./src/composables/useDashboardData')
+  // @ts-ignore
+  export type { EChartTokens } from './src/composables/useEChartTheme'
+  import('./src/composables/useEChartTheme')
 }
 // for vue template auto import
 import { UnwrapRef } from 'vue'
 declare module 'vue' {
   interface ComponentCustomProperties {
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
+    readonly abbrUZS: UnwrapRef<typeof import('./src/composables/useCurrency')['abbrUZS']>
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
+    readonly alignSeries: UnwrapRef<typeof import('./src/composables/useComparison')['alignSeries']>
     readonly armMotion: UnwrapRef<typeof import('./src/composables/useAlphaMotion')['armMotion']>
     readonly asyncComputed: UnwrapRef<typeof import('@vueuse/core')['asyncComputed']>
     readonly autoResetRef: UnwrapRef<typeof import('@vueuse/core')['autoResetRef']>
+    readonly badgeColor: UnwrapRef<typeof import('./src/composables/useComparison')['badgeColor']>
+    readonly buildDateParams: UnwrapRef<typeof import('./src/composables/useBusinessDay')['buildDateParams']>
     readonly businessPreset: UnwrapRef<typeof import('./src/composables/useBusinessDay')['businessPreset']>
     readonly businessToday: UnwrapRef<typeof import('./src/composables/useBusinessDay')['businessToday']>
+    readonly computeDelta: UnwrapRef<typeof import('./src/composables/useComparison')['computeDelta']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly computedAsync: UnwrapRef<typeof import('@vueuse/core')['computedAsync']>
     readonly computedEager: UnwrapRef<typeof import('@vueuse/core')['computedEager']>
@@ -369,6 +414,7 @@ declare module 'vue' {
     readonly createTemplatePromise: UnwrapRef<typeof import('@vueuse/core')['createTemplatePromise']>
     readonly createUnrefFn: UnwrapRef<typeof import('@vueuse/core')['createUnrefFn']>
     readonly customRef: UnwrapRef<typeof import('vue')['customRef']>
+    readonly dayCount: UnwrapRef<typeof import('./src/composables/useComparison')['dayCount']>
     readonly debouncedRef: UnwrapRef<typeof import('@vueuse/core')['debouncedRef']>
     readonly debouncedWatch: UnwrapRef<typeof import('@vueuse/core')['debouncedWatch']>
     readonly defineAsyncComponent: UnwrapRef<typeof import('vue')['defineAsyncComponent']>
@@ -377,11 +423,17 @@ declare module 'vue' {
     readonly eagerComputed: UnwrapRef<typeof import('@vueuse/core')['eagerComputed']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
+    readonly fmtInt: UnwrapRef<typeof import('./src/composables/useCurrency')['fmtInt']>
+    readonly fmtPct: UnwrapRef<typeof import('./src/composables/useCurrency')['fmtPct']>
+    readonly fmtUZS: UnwrapRef<typeof import('./src/composables/useCurrency')['fmtUZS']>
+    readonly fmtUZSUnit: UnwrapRef<typeof import('./src/composables/useCurrency')['fmtUZSUnit']>
+    readonly formatWindow: UnwrapRef<typeof import('./src/composables/useWindowLabel')['formatWindow']>
     readonly getActivePinia: UnwrapRef<typeof import('pinia')['getActivePinia']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly getPrefersReduced: UnwrapRef<typeof import('./src/composables/useAlphaMotion')['getPrefersReduced']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
+    readonly hydrateBusinessSettings: UnwrapRef<typeof import('./src/composables/useBusinessDay')['hydrateBusinessSettings']>
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly isDefined: UnwrapRef<typeof import('@vueuse/core')['isDefined']>
@@ -400,6 +452,7 @@ declare module 'vue' {
     readonly mapWritableState: UnwrapRef<typeof import('pinia')['mapWritableState']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
+    readonly normalize: UnwrapRef<typeof import('./src/composables/useComparison')['normalize']>
     readonly onActivated: UnwrapRef<typeof import('vue')['onActivated']>
     readonly onBeforeMount: UnwrapRef<typeof import('vue')['onBeforeMount']>
     readonly onBeforeRouteLeave: UnwrapRef<typeof import('vue-router')['onBeforeRouteLeave']>
@@ -421,6 +474,7 @@ declare module 'vue' {
     readonly onUpdated: UnwrapRef<typeof import('vue')['onUpdated']>
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
     readonly pausableWatch: UnwrapRef<typeof import('@vueuse/core')['pausableWatch']>
+    readonly previousPeriod: UnwrapRef<typeof import('./src/composables/useComparison')['previousPeriod']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly reactify: UnwrapRef<typeof import('@vueuse/core')['reactify']>
     readonly reactifyObject: UnwrapRef<typeof import('@vueuse/core')['reactifyObject']>
@@ -436,11 +490,16 @@ declare module 'vue' {
     readonly refThrottled: UnwrapRef<typeof import('@vueuse/core')['refThrottled']>
     readonly refWithControl: UnwrapRef<typeof import('@vueuse/core')['refWithControl']>
     readonly replayMotion: UnwrapRef<typeof import('./src/composables/useAlphaMotion')['replayMotion']>
+    readonly resolveBFromMode: UnwrapRef<typeof import('./src/composables/useComparison')['resolveBFromMode']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
     readonly resolveRef: UnwrapRef<typeof import('@vueuse/core')['resolveRef']>
     readonly resolveUnref: UnwrapRef<typeof import('@vueuse/core')['resolveUnref']>
+    readonly samePeriodLastYear: UnwrapRef<typeof import('./src/composables/useComparison')['samePeriodLastYear']>
+    readonly saveBusinessSettings: UnwrapRef<typeof import('./src/composables/useBusinessDay')['saveBusinessSettings']>
     readonly setActivePinia: UnwrapRef<typeof import('pinia')['setActivePinia']>
+    readonly setBusinessClose: UnwrapRef<typeof import('./src/composables/useBusinessDay')['setBusinessClose']>
     readonly setBusinessDayStart: UnwrapRef<typeof import('./src/composables/useBusinessDay')['setBusinessDayStart']>
+    readonly setBusinessOpen: UnwrapRef<typeof import('./src/composables/useBusinessDay')['setBusinessOpen']>
     readonly setMapStoreSuffix: UnwrapRef<typeof import('pinia')['setMapStoreSuffix']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
@@ -465,8 +524,10 @@ declare module 'vue' {
     readonly unref: UnwrapRef<typeof import('vue')['unref']>
     readonly unrefElement: UnwrapRef<typeof import('@vueuse/core')['unrefElement']>
     readonly until: UnwrapRef<typeof import('@vueuse/core')['until']>
+    readonly useAIPageContext: UnwrapRef<typeof import('./src/composables/useAIPageContext')['useAIPageContext']>
     readonly useAbs: UnwrapRef<typeof import('@vueuse/math')['useAbs']>
     readonly useActiveElement: UnwrapRef<typeof import('@vueuse/core')['useActiveElement']>
+    readonly useAlphaTheme: UnwrapRef<typeof import('./src/composables/useAlphaTheme')['useAlphaTheme']>
     readonly useAnimate: UnwrapRef<typeof import('@vueuse/core')['useAnimate']>
     readonly useApiError: UnwrapRef<typeof import('./src/composables/useApiError')['useApiError']>
     readonly useArrayDifference: UnwrapRef<typeof import('@vueuse/core')['useArrayDifference']>
@@ -498,12 +559,14 @@ declare module 'vue' {
     readonly useClipboard: UnwrapRef<typeof import('@vueuse/core')['useClipboard']>
     readonly useCloned: UnwrapRef<typeof import('@vueuse/core')['useCloned']>
     readonly useColorMode: UnwrapRef<typeof import('@vueuse/core')['useColorMode']>
+    readonly useComparison: UnwrapRef<typeof import('./src/composables/useComparison')['useComparison']>
     readonly useConfirmDialog: UnwrapRef<typeof import('@vueuse/core')['useConfirmDialog']>
     readonly useCountUp: UnwrapRef<typeof import('./src/composables/useAlphaMotion')['useCountUp']>
     readonly useCounter: UnwrapRef<typeof import('@vueuse/core')['useCounter']>
     readonly useCssModule: UnwrapRef<typeof import('vue')['useCssModule']>
     readonly useCssVar: UnwrapRef<typeof import('@vueuse/core')['useCssVar']>
     readonly useCssVars: UnwrapRef<typeof import('vue')['useCssVars']>
+    readonly useCurrency: UnwrapRef<typeof import('./src/composables/useCurrency')['useCurrency']>
     readonly useCurrentElement: UnwrapRef<typeof import('@vueuse/core')['useCurrentElement']>
     readonly useCycleList: UnwrapRef<typeof import('@vueuse/core')['useCycleList']>
     readonly useDark: UnwrapRef<typeof import('@vueuse/core')['useDark']>
@@ -520,6 +583,7 @@ declare module 'vue' {
     readonly useDocumentVisibility: UnwrapRef<typeof import('@vueuse/core')['useDocumentVisibility']>
     readonly useDraggable: UnwrapRef<typeof import('@vueuse/core')['useDraggable']>
     readonly useDropZone: UnwrapRef<typeof import('@vueuse/core')['useDropZone']>
+    readonly useEChartTheme: UnwrapRef<typeof import('./src/composables/useEChartTheme')['useEChartTheme']>
     readonly useElementBounding: UnwrapRef<typeof import('@vueuse/core')['useElementBounding']>
     readonly useElementByPoint: UnwrapRef<typeof import('@vueuse/core')['useElementByPoint']>
     readonly useElementHover: UnwrapRef<typeof import('@vueuse/core')['useElementHover']>
@@ -617,6 +681,7 @@ declare module 'vue' {
     readonly useSum: UnwrapRef<typeof import('@vueuse/math')['useSum']>
     readonly useSupported: UnwrapRef<typeof import('@vueuse/core')['useSupported']>
     readonly useSwipe: UnwrapRef<typeof import('@vueuse/core')['useSwipe']>
+    readonly useTableSelection: UnwrapRef<typeof import('./src/composables/useTableSelection')['useTableSelection']>
     readonly useTemplateRef: UnwrapRef<typeof import('vue')['useTemplateRef']>
     readonly useTemplateRefsList: UnwrapRef<typeof import('@vueuse/core')['useTemplateRefsList']>
     readonly useTextDirection: UnwrapRef<typeof import('@vueuse/core')['useTextDirection']>

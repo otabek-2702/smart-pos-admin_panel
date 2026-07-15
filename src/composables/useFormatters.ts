@@ -2,6 +2,16 @@ import { fmtAbbr, fmtDateTime, fmtNum, useFormatMode } from '@/components/design
 
 export function useFormatters() {
   const { mode } = useFormatMode()
+  const { locale } = useI18n({ useScope: 'global' })
+
+  const dateLocale = computed(() => {
+    if (locale.value === 'ru')
+      return 'ru-RU'
+    if (locale.value === 'uz')
+      return 'uz-UZ'
+    return 'en-GB'
+  })
+
   function formatCurrency(val: number | string): string {
     const n = Math.round(Number(val) || 0)
     if (mode.value === 'short' && Math.abs(n) >= 10000)
@@ -20,7 +30,7 @@ export function useFormatters() {
     if (!val)
       return '—'
 
-    return new Date(val).toLocaleDateString()
+    return new Date(val).toLocaleDateString(dateLocale.value)
   }
 
   return { formatCurrency, formatDate, formatDateShort }

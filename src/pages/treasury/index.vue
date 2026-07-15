@@ -11,6 +11,7 @@ import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import Skeleton from '@/components/design/Skeleton.vue'
+import { buildCsv } from '@/utils/csv'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -126,6 +127,7 @@ function exportCsv() {
 
     return
   }
+
   const cols: Array<[string, (r: any) => any]> = [
     [t('Date'), r => r.created_at],
     [t('Account'), r => t(`treasury_account_${r.account}`)],
@@ -138,11 +140,12 @@ function exportCsv() {
     [t('Reference'), r => (r.reference_type && r.reference_id ? `${r.reference_type} #${r.reference_id}` : '')],
     [t('By'), r => r.performed_by ?? ''],
   ]
-  const head = cols.map(c => `"${c[0]}"`).join(',')
-  const body = rows.map(r =>
-    cols.map(c => `"${String(c[1](r) ?? '').replace(/"/g, '""')}"`).join(','),
-  ).join('\n')
-  const csv = `﻿${head}\n${body}\n`
+
+  const csv = buildCsv([
+    cols.map(c => c[0]),
+    ...rows.map(r => cols.map(c => c[1](r))),
+  ], { alwaysQuote: true })
+
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

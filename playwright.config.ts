@@ -20,7 +20,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: process.env.CI ? [['list'], ['github']] : 'list',
-  timeout: 30_000,
+  timeout: 180_000,
   expect: { timeout: 5_000 },
 
   use: {

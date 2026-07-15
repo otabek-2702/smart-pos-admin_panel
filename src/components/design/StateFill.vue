@@ -21,6 +21,8 @@ withDefaults(defineProps<Props>(), {
     class="statefill"
     :class="{ 'is-error': error }"
     :style="style"
+    :role="error ? 'alert' : 'status'"
+    :aria-live="error ? 'assertive' : 'polite'"
   >
     <div class="statefill__icon">
       <DesignIcon

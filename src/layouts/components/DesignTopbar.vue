@@ -4,6 +4,8 @@ import { storeToRefs } from 'pinia'
 import AnomalyBell from '@/components/design/AnomalyBell.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import SettingsMenu from '@/components/design/SettingsMenu.vue'
+import { useAlphaTheme } from '@/composables/useAlphaTheme'
+import { routeLabelForPath } from '@/navigation/routeLabels'
 import { useAIAssistantStore } from '@/stores/aiAssistant'
 
 /* ============================================================
@@ -30,7 +32,7 @@ defineEmits<{
 
 const route = useRoute()
 const router = useRouter()
-const { t } = useI18n({ useScope: 'global' })
+const { t, locale } = useI18n({ useScope: 'global' })
 
 /* ---------- AI thinking pill (cross-page indicator) ---------- */
 const aiStore = useAIAssistantStore()
@@ -40,57 +42,22 @@ function goAi() {
   router.push('/ai-assistant')
 }
 
-/* ---------- Breadcrumb label (mirror sidebar NAV) ---------- */
-const NAV_LABELS: Record<string, string> = {
-  '/design': 'Design System',
-  '/dashboard': 'Dashboard',
-  '/analytics': 'Analytics',
-  '/analytics/shift-handover': 'Analytics',
-  '/shift-analytics': 'Analytics',
-  '/shifts-analytics': 'Analytics',
-  '/ai-assistant': 'AI Assistant',
-  '/shifts': 'Shifts',
-  '/users': 'Users',
-  '/categories': 'Categories',
-  '/products': 'Products',
-  '/orders': 'Orders',
-  '/places': 'Places & Tables',
-  '/discounts': 'Discounts',
-  '/cashbox': 'Cash Register',
-  '/treasury': 'Treasury',
-  '/loyalty': 'Loyalty',
-  '/hr-employees': 'Employees',
-  '/hr-departments': 'Departments',
-  '/hr-salaries': 'Salaries',
-}
+/* ---------- Breadcrumb and browser-title label ---------- */
+const currentNavLabel = computed(() => routeLabelForPath(route.path))
 
-const currentNavLabel = computed(() => {
-  const p = route.path
-  if (NAV_LABELS[p])
-    return NAV_LABELS[p]
-  const hit = Object.keys(NAV_LABELS)
-    .sort((a, b) => b.length - a.length)
-    .find(k => p === k || p.startsWith(`${k}/`))
-  return hit ? NAV_LABELS[hit] : ''
-})
+watch([currentNavLabel, locale], ([routeLabel]) => {
+  const appName = t('Alpha POS')
+  const pageName = routeLabel ? t(routeLabel) : ''
+
+  document.title = pageName ? `${pageName} · ${appName}` : appName
+}, { immediate: true })
 
 /* ---------- showDate hard-locked off (decision #5 v3) ---------- */
 const showDate = computed(() => false)
 
 /* ---------- Theme (mirrors source onToggleTheme) ---------- */
-const theme = ref(document.documentElement.getAttribute('data-theme') || 'light')
 const vuetifyTheme = useTheme()
-
-onMounted(() => {
-  document.documentElement.setAttribute('data-theme', theme.value)
-})
-
-function toggleTheme() {
-  theme.value = theme.value === 'dark' ? 'light' : 'dark'
-  vuetifyTheme.global.name.value = theme.value
-  document.documentElement.setAttribute('data-theme', theme.value)
-  localStorage.setItem('alphapos-theme', theme.value)
-}
+const { theme, toggleTheme } = useAlphaTheme(vuetifyTheme)
 
 /* ---------- Avatar initials (bare div, no dropdown) ---------- */
 const initials = computed(() => {

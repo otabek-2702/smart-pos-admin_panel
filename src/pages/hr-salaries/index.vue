@@ -18,6 +18,7 @@ import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
+import { buildCsv } from '@/utils/csv'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -32,6 +33,7 @@ const loading = ref(false)
 const page = ref(1)
 const itemsPerPage = ref(20)
 const summary = ref<any>(null)
+const selectedSalaryIds = ref<Set<string | number>>(new Set())
 
 // ---------- filters ----------
 const statusFilter = ref<string>('')
@@ -119,8 +121,18 @@ async function loadSummary() {
 }
 
 onMounted(() => { load(); loadSummary(); loadEmployees() })
-watch([page, itemsPerPage], load)
-watch([statusFilter, periodFilter, employeeFilter], () => { page.value = 1; load(); loadSummary() })
+watch([page, itemsPerPage], () => {
+  selectedSalaryIds.value = new Set()
+  load()
+})
+watch([statusFilter, periodFilter, employeeFilter], () => {
+  selectedSalaryIds.value = new Set()
+  if (page.value !== 1)
+    page.value = 1
+  else
+    load()
+  loadSummary()
+})
 
 // ============================================================
 // Filter options
@@ -325,7 +337,7 @@ async function approveOne(s: any) {
 // ============================================================
 const bulkApproving = ref(false)
 
-async function approveSelected(rows: any[], clear: () => void) {
+async function approveSelected(rows: any[]) {
   const pending = rows.filter((r: any) => r.status === 'PENDING')
   if (!pending.length) {
     notify(t('No pending salaries in selection'), 'warning')
@@ -333,16 +345,17 @@ async function approveSelected(rows: any[], clear: () => void) {
   }
   bulkApproving.value = true
   let ok = 0
+  const failedIds: Array<string | number> = []
   try {
     for (const r of pending) {
       try {
         await axios.post(`/salaries/${r.id}/approve/`)
         ok++
       }
-      catch { /* skip individual failures, keep going */ }
+      catch { failedIds.push(r.id) }
     }
     notify(t('{n} salaries approved', { n: ok }), ok ? 'success' : 'error')
-    clear()
+    selectedSalaryIds.value = new Set(failedIds)
     await Promise.all([load(), loadSummary()])
   }
   finally {
@@ -360,6 +373,7 @@ function exportCsv() {
     notify(t('Nothing to export yet'), 'warning')
     return
   }
+
   const cols: Array<[string, (s: any) => any]> = [
     [t('Employee'), s => employeeName(s)],
     [t('Position'), s => s.employee?.position ?? ''],
@@ -372,15 +386,17 @@ function exportCsv() {
     [t('Payment method'), s => (s.payment_method ? t(`payment_method_${s.payment_method}`) : '')],
     [t('Paid at'), s => s.paid_at ?? ''],
   ]
-  const head = cols.map(c => `"${c[0]}"`).join(',')
-  const body = rows
-    .map((s: any) => cols.map(c => `"${String(c[1](s) ?? '').replace(/"/g, '""')}"`).join(','))
-    .join('\n')
-  const csv = `﻿${head}\n${body}\n`
+
+  const csv = buildCsv([
+    cols.map(c => c[0]),
+    ...rows.map((s: any) => cols.map(c => c[1](s))),
+  ], { alwaysQuote: true })
+
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   const stamp = periodFilter.value || new Date().toISOString().slice(0, 7)
+
   a.href = url
   a.download = `payroll-${stamp}.csv`
   document.body.appendChild(a)
@@ -722,6 +738,7 @@ function employeeName(row: any): string {
       <div class="card__divider" />
 
       <DataTable
+        v-model:selection="selectedSalaryIds"
         :columns="columns"
         :rows="items"
         row-key="id"
@@ -729,14 +746,14 @@ function employeeName(row: any): string {
         :pagination="tablePagination"
         selectable
       >
-        <template #bulk-actions="{ selected, clear }">
+        <template #bulk-actions="{ selected }">
           <Button
             variant="primary"
             icon="check"
             size="sm"
             :loading="bulkApproving"
             :disabled="bulkApproving"
-            @click="approveSelected(selected, clear)"
+            @click="approveSelected(selected)"
           >
             {{ t('Approve selected') }}
           </Button>

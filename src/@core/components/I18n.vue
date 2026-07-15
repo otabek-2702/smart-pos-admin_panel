@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { Anchor } from 'vuetify/lib/components'
 import type { I18nLanguage } from '@layouts/types'
 
 const props = withDefaults(defineProps<Props>(), {
@@ -12,7 +11,7 @@ defineEmits<{
 
 interface Props {
   languages: I18nLanguage[]
-  location?: Anchor
+  location?: any
 }
 
 const { locale } = useI18n({ useScope: 'global' })

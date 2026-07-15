@@ -27,6 +27,9 @@ const popperContentStyles = ref({
 })
 
 const updatePopper = async () => {
+  if (!refPopperContainer.value || !refPopper.value)
+    return
+
   const { x, y } = await computePosition(refPopperContainer.value, refPopper.value, {
     placement: props.popperInlineEnd ? (props.isRtl ? 'left-start' : 'right-start') : 'bottom-start',
     middleware: [

@@ -28,6 +28,7 @@ const mergedStyle = computed<CSSProperties>(() => ({
   <div
     class="skel"
     :style="mergedStyle"
+    aria-hidden="true"
   />
 </template>
 
@@ -47,5 +48,9 @@ const mergedStyle = computed<CSSProperties>(() => ({
 @keyframes shimmer {
   0% { background-position: 100% 0; }
   100% { background-position: 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skel { animation: none; background-position: 50% 0; }
 }
 </style>

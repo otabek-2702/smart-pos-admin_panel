@@ -41,6 +41,8 @@ const props = withDefaults(defineProps<Props>(), {
   grouped: false,
 })
 
+const { t: tr } = useI18n({ useScope: 'global' })
+
 const shown = useShown(80)
 const [boxRef, w] = useWidth()
 const { tip, show, move, hide } = useTip()
@@ -101,7 +103,7 @@ function stackRows(d: Datum) {
   >
     <StateFill
       icon="chart"
-      title="No data"
+      :title="tr('No data')"
       :style="{ height: `${height}px` }"
     />
   </div>

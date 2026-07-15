@@ -10,10 +10,10 @@
     "preview": "vite preview --port 5050 --host 0.0.0.0",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint . -c .eslintrc.js --fix --rulesdir eslint-internal-rules/ --ext .ts,.js,.vue,.tsx,.jsx",
-    "lint:ci": "eslint src/pages src/composables src/plugins src/navigation src/layouts/components src/constants src/types -c .eslintrc.js --rulesdir eslint-internal-rules/ --ext .ts,.js,.vue,.tsx,.jsx --max-warnings 0",
+    "lint:ci": "eslint src/pages src/components src/composables src/plugins src/navigation src/layouts/components src/stores src/router src/utils src/constants src/types src/App.vue src/main.ts -c .eslintrc.js --rulesdir eslint-internal-rules/ --ext .ts,.js,.vue,.tsx,.jsx --max-warnings 0",
     "smoke": "playwright test",
     "smoke:install": "playwright install --with-deps chromium",
-    "ci": "yarn lint:ci && yarn build",
+    "ci": "yarn lint:ci && yarn typecheck && yarn build",
     "build:icons": "tsc -b src/@iconify && node src/@iconify/build-icons.js",
     "postinstall": "npm run build:icons"
   },

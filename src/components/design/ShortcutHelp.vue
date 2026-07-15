@@ -6,10 +6,14 @@
    on Esc or backdrop click.
    ============================================================ */
 import DesignIcon from './DesignIcon.vue'
+import { designId } from './ids'
 
 const { t } = useI18n({ useScope: 'global' })
 
 const open = ref(false)
+const dialogRef = ref<HTMLElement | null>(null)
+const titleId = designId('shortcut-title')
+let previouslyFocused: HTMLElement | null = null
 
 interface Shortcut {
   keys: string[]
@@ -46,6 +50,49 @@ function isEditable(el: Element | null): boolean {
   return tag === 'input' || tag === 'textarea' || tag === 'select' || (el as HTMLElement).isContentEditable
 }
 
+function close() {
+  open.value = false
+}
+
+function trapTab(e: KeyboardEvent) {
+  if (e.key !== 'Tab' || !dialogRef.value) return
+  const items = Array.from(dialogRef.value.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+  )).filter(node => node.offsetParent !== null)
+  if (!items.length) {
+    e.preventDefault()
+    dialogRef.value.focus()
+    return
+  }
+  const first = items[0]
+  const last = items[items.length - 1]
+  const active = document.activeElement as HTMLElement | null
+  if (!active || !dialogRef.value.contains(active)) {
+    e.preventDefault()
+    ;(e.shiftKey ? last : first).focus()
+  }
+  else if (e.shiftKey && active === first) {
+    e.preventDefault()
+    last.focus()
+  }
+  else if (!e.shiftKey && active === last) {
+    e.preventDefault()
+    first.focus()
+  }
+}
+
+watch(open, async (value) => {
+  if (value) {
+    previouslyFocused = document.activeElement as HTMLElement | null
+    await nextTick()
+    dialogRef.value?.querySelector<HTMLButtonElement>('.shk__close')?.focus()
+  }
+  else if (previouslyFocused) {
+    previouslyFocused.focus()
+    previouslyFocused = null
+  }
+})
+
 function onKey(e: KeyboardEvent) {
   // "?" key — depending on layout this comes through as `e.key === '?'` or as
   // `e.key === '/'` with shiftKey true. Accept both. Guard against opening
@@ -53,16 +100,22 @@ function onKey(e: KeyboardEvent) {
   const wantsHelp = (e.key === '?' || (e.key === '/' && e.shiftKey))
   if (wantsHelp && !isEditable(document.activeElement)) {
     e.preventDefault()
-    open.value = !open.value
+    if (open.value) close()
+    else open.value = true
     return
   }
   if (open.value && e.key === 'Escape') {
-    open.value = false
+    close()
+    return
   }
+  if (open.value && e.key === 'Tab') trapTab(e)
 }
 
 onMounted(() => { window.addEventListener('keydown', onKey) })
-onBeforeUnmount(() => { window.removeEventListener('keydown', onKey) })
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKey)
+  if (previouslyFocused) previouslyFocused.focus()
+})
 </script>
 
 <template>
@@ -71,22 +124,28 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey) })
       <div
         v-if="open"
         class="shk-backdrop"
-        @mousedown.self="open = false"
+        @mousedown.self="close"
       >
         <div
+          ref="dialogRef"
           class="shk"
           role="dialog"
           aria-modal="true"
-          :aria-label="t('Keyboard shortcuts')"
+          :aria-labelledby="titleId"
+          tabindex="-1"
         >
           <div class="shk__head">
-            <h3 class="shk__title">
+            <h3
+              :id="titleId"
+              class="shk__title"
+            >
               {{ t('Keyboard shortcuts') }}
             </h3>
             <button
               class="shk__close"
               :title="t('Close')"
-              @click="open = false"
+              :aria-label="t('Close')"
+              @click="close"
             >
               <DesignIcon name="close" :size="16" />
             </button>

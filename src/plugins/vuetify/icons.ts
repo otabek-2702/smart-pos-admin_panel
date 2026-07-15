@@ -41,7 +41,7 @@ const aliases: IconAliases = {
 }
 
 export const iconify: IconSet = {
-  component: (props: IconProps) => h(Icon, props),
+  component: (props: IconProps) => h(Icon as any, props),
 }
 
 export const icons = {

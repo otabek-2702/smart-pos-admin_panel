@@ -49,6 +49,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), { streaming: false })
+const { t } = useI18n({ useScope: 'global' })
 
 const PALETTE = [
   'rgb(var(--v-theme-c1))',
@@ -122,7 +123,10 @@ const donutData = computed(() => {
 const hbarData = computed(() => {
   const c = safeConfig.value
   if (!c?.data?.length) return []
-  return c.data
+  return c.data.map(item => ({
+    name: item.label,
+    value: item.value,
+  }))
 })
 </script>
 
@@ -160,7 +164,7 @@ const hbarData = computed(() => {
     />
   </div>
   <div v-else-if="streaming" class="aichart aichart--placeholder">
-    <span class="aichart__placeholder-label">Generating chart…</span>
+    <span class="aichart__placeholder-label">{{ t('Generating chart…') }}</span>
   </div>
 </template>
 

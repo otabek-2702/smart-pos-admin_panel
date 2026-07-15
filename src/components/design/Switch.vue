@@ -15,7 +15,11 @@ const emit = defineEmits<{
   (e: 'change', v: boolean): void
 }>()
 
-const klass = computed(() => cx('switch', props.modelValue && 'is-on'))
+const klass = computed(() => cx(
+  'switch',
+  props.modelValue && 'is-on',
+  props.disabled && 'is-disabled',
+))
 
 function toggle(ev?: Event) {
   ev?.stopPropagation()
@@ -31,15 +35,21 @@ function toggle(ev?: Event) {
 // with a wrapping <label>. Wire the click ourselves so clicking anywhere in
 // the label (e.g. the label text span) also toggles the switch.
 const rootEl = ref<HTMLElement | null>(null)
+let labelEl: HTMLLabelElement | null = null
+
+function onLabelClick(e: MouseEvent) {
+  const target = e.target as Node | null
+  if (rootEl.value && target && rootEl.value.contains(target)) return
+  toggle(e)
+}
+
 onMounted(() => {
-  const label = rootEl.value?.closest('label') as HTMLLabelElement | null
-  if (!label || (label as any).__swWired) return
-  ;(label as any).__swWired = true
-  label.addEventListener('click', (e) => {
-    const target = e.target as Node | null
-    if (rootEl.value && target && rootEl.value.contains(target)) return
-    toggle()
-  })
+  labelEl = rootEl.value?.closest('label') as HTMLLabelElement | null
+  labelEl?.addEventListener('click', onLabelClick)
+})
+onBeforeUnmount(() => {
+  labelEl?.removeEventListener('click', onLabelClick)
+  labelEl = null
 })
 </script>
 
@@ -50,7 +60,7 @@ onMounted(() => {
     role="switch"
     :aria-checked="modelValue"
     :aria-disabled="disabled"
-    tabindex="0"
+    :tabindex="disabled ? -1 : 0"
     @click="toggle"
     @keydown.space.prevent="toggle"
     @keydown.enter.prevent="toggle"

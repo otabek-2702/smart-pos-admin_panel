@@ -16,7 +16,9 @@ import stockNav from '@/navigation/vertical/stock'
 import systemNav from '@/navigation/vertical/system'
 import analyticsNav from '@/navigation/vertical/analytics'
 import DesignIcon from './DesignIcon.vue'
+import { designId } from './ids'
 import { useTheme } from 'vuetify'
+import { useAlphaTheme } from '@/composables/useAlphaTheme'
 import ability from '@/plugins/casl/ability'
 import { initialAbility } from '@/plugins/casl/ability'
 
@@ -33,6 +35,7 @@ interface NavItem {
 }
 
 interface CmdItem {
+  id: string
   title: string
   group: string
   to?: string
@@ -45,6 +48,10 @@ const open = ref(false)
 const query = ref('')
 const activeIndex = ref(0)
 const inputRef = ref<HTMLInputElement | null>(null)
+const dialogRef = ref<HTMLElement | null>(null)
+const listboxId = designId('command-listbox')
+let previouslyFocused: HTMLElement | null = null
+const { toggleTheme } = useAlphaTheme(vuetifyTheme)
 
 function flattenNav(group: string, nav: any[]): CmdItem[] {
   const out: CmdItem[] = []
@@ -67,6 +74,7 @@ function buildItem(group: string, n: NavItem): CmdItem {
   const iconName = typeof n.icon === 'string' ? n.icon : n.icon?.icon
   const title = t(n.title) || n.title
   return {
+    id: `route:${group}:${n.to || title}`,
     title,
     group,
     to: n.to || '',
@@ -81,13 +89,6 @@ function setLocale(code: string) {
   localStorage.setItem('appLocale', code)
 }
 
-function toggleTheme() {
-  const cur = vuetifyTheme.global.current.value.dark ? 'light' : 'dark'
-  vuetifyTheme.global.name.value = cur
-  try { localStorage.setItem('pos system-theme', cur) }
-  catch { /* noop */ }
-}
-
 function logout() {
   localStorage.removeItem('accessToken')
   localStorage.removeItem('userData')
@@ -98,16 +99,16 @@ function logout() {
 
 function actionsGroup(): CmdItem[] {
   const group = t('Actions')
-  const mkActionItem = (title: string, icon: string, action: () => void): CmdItem => ({
-    title, group, icon, action,
+  const mkActionItem = (id: string, title: string, icon: string, action: () => void): CmdItem => ({
+    id, title, group, icon, action,
     searchKey: `${title} ${group}`.toLowerCase(),
   })
   return [
-    mkActionItem(t('Toggle dark mode'), 'moon', toggleTheme),
-    mkActionItem(t('Switch to O\'zbek'), 'translate', () => setLocale('uz')),
-    mkActionItem(t('Switch to Русский'), 'translate', () => setLocale('ru')),
-    mkActionItem(t('Switch to English'), 'translate', () => setLocale('en')),
-    mkActionItem(t('Sign out'), 'logout', logout),
+    mkActionItem('action:theme', t('Toggle dark mode'), 'moon', toggleTheme),
+    mkActionItem('action:locale:uz', t('Switch to O\'zbek'), 'translate', () => setLocale('uz')),
+    mkActionItem('action:locale:ru', t('Switch to Русский'), 'translate', () => setLocale('ru')),
+    mkActionItem('action:locale:en', t('Switch to English'), 'translate', () => setLocale('en')),
+    mkActionItem('action:logout', t('Sign out'), 'logout', logout),
   ]
 }
 
@@ -139,12 +140,58 @@ const filtered = computed<CmdItem[]>(() => {
 watch(query, () => { activeIndex.value = 0 })
 watch(open, async (v) => {
   if (v) {
+    previouslyFocused = document.activeElement as HTMLElement | null
     query.value = ''
     activeIndex.value = 0
     await nextTick()
     inputRef.value?.focus()
   }
+  else if (previouslyFocused) {
+    previouslyFocused.focus()
+    previouslyFocused = null
+  }
 })
+
+watch(activeIndex, async () => {
+  await nextTick()
+  dialogRef.value
+    ?.querySelector<HTMLElement>(`#${listboxId}-option-${activeIndex.value}`)
+    ?.scrollIntoView({ block: 'nearest' })
+})
+
+function close() {
+  open.value = false
+}
+
+function focusableIn(el: HTMLElement): HTMLElement[] {
+  return Array.from(el.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  )).filter(node => node.offsetParent !== null)
+}
+
+function trapTab(e: KeyboardEvent) {
+  if (e.key !== 'Tab' || !dialogRef.value) return
+  const items = focusableIn(dialogRef.value)
+  if (!items.length) {
+    e.preventDefault()
+    return
+  }
+  const first = items[0]
+  const last = items[items.length - 1]
+  const active = document.activeElement as HTMLElement | null
+  if (!active || !dialogRef.value.contains(active)) {
+    e.preventDefault()
+    ;(e.shiftKey ? last : first).focus()
+  }
+  else if (e.shiftKey && active === first) {
+    e.preventDefault()
+    last.focus()
+  }
+  else if (!e.shiftKey && active === last) {
+    e.preventDefault()
+    first.focus()
+  }
+}
 
 function go(it: CmdItem) {
   open.value = false
@@ -165,7 +212,8 @@ function onGlobalKey(e: KeyboardEvent) {
   }
   if (!open.value)
     return
-  if (e.key === 'Escape') { open.value = false; return }
+  if (e.key === 'Escape') { close(); return }
+  if (e.key === 'Tab') { trapTab(e); return }
   if (e.key === 'ArrowDown') { e.preventDefault(); activeIndex.value = Math.min(filtered.value.length - 1, activeIndex.value + 1); return }
   if (e.key === 'ArrowUp') { e.preventDefault(); activeIndex.value = Math.max(0, activeIndex.value - 1); return }
   if (e.key === 'Enter') { e.preventDefault(); const it = filtered.value[activeIndex.value]; if (it) go(it) }
@@ -176,6 +224,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onGlobalKey)
+  if (previouslyFocused) previouslyFocused.focus()
 })
 </script>
 
@@ -185,9 +234,10 @@ onBeforeUnmount(() => {
       <div
         v-if="open"
         class="cmdk-backdrop"
-        @mousedown.self="open = false"
+        @mousedown.self="close"
       >
         <div
+          ref="dialogRef"
           class="cmdk"
           role="dialog"
           aria-modal="true"
@@ -202,22 +252,38 @@ onBeforeUnmount(() => {
               class="cmdk__input"
               autocomplete="off"
               spellcheck="false"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded="true"
+              :aria-controls="listboxId"
+              :aria-activedescendant="filtered.length ? `${listboxId}-option-${activeIndex}` : undefined"
             >
             <span class="cmdk__hint">Esc</span>
           </div>
-          <div class="cmdk__list">
+          <div
+            :id="listboxId"
+            class="cmdk__list"
+            role="listbox"
+            :aria-label="t('Command palette')"
+          >
             <div
               v-if="!filtered.length"
               class="cmdk__empty"
             >
               {{ t('No matches') }}
             </div>
-            <div
+            <button
               v-for="(it, i) in filtered"
-              :key="`${it.group}-${it.to}`"
+              :id="`${listboxId}-option-${i}`"
+              :key="it.id"
+              type="button"
               class="cmdk__row"
               :class="{ 'is-active': i === activeIndex }"
+              role="option"
+              :aria-selected="i === activeIndex"
+              tabindex="-1"
               @mousemove="activeIndex = i"
+              @focus="activeIndex = i"
               @click="go(it)"
             >
               <span class="cmdk__icon">
@@ -229,7 +295,7 @@ onBeforeUnmount(() => {
               </span>
               <span class="cmdk__title">{{ it.title }}</span>
               <span class="cmdk__group">{{ it.group }}</span>
-            </div>
+            </button>
           </div>
           <div class="cmdk__foot">
             <span><kbd>↑</kbd><kbd>↓</kbd> {{ t('navigate') }}</span>
@@ -299,6 +365,11 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 .cmdk__row {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
   display: flex;
   align-items: center;
   gap: 12px;

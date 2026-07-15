@@ -73,6 +73,7 @@ services:
       args:
         # Empty so the panel uses relative /api/ which nginx proxies → web:8000.
         VITE_API_HOST: ""
+        VITE_ALLOWED_API_HOSTS: ${VITE_ALLOWED_API_HOSTS:-}
         VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
         VITE_SENTRY_TRACES_RATE: ${VITE_SENTRY_TRACES_RATE:-0.1}
         VITE_SENTRY_REPLAY_RATE: ${VITE_SENTRY_REPLAY_RATE:-0}

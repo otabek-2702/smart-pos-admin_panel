@@ -218,8 +218,8 @@ const current = computed(() => DASH_VIEWS.find(v => v.id === view.value) ?? DASH
 // get_today() — same `{ success, data }` envelope. Stored into the
 // shared composable so any sub-dashboard can opt in via
 // `useDashboardData()` without re-fetching.
-async function loadShared(): Promise<void> {
-  await fetchShared({
+async function loadShared(): Promise<boolean> {
+  return fetchShared({
     from: dateRange.value?.from ?? '',
     to: dateRange.value?.to ?? '',
     preset: dateRange.value?.preset,
@@ -289,7 +289,9 @@ function selectView(id: ViewId) {
 async function refresh() {
   localLoading.value = true
   try {
-    await loadShared()
+    const refreshed = await loadShared()
+    if (!refreshed)
+      throw new Error('Dashboard refresh failed')
     toast({
       tone: 'success',
       title: t('Dashboard refreshed'),

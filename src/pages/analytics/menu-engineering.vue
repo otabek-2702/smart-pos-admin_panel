@@ -15,23 +15,27 @@ import DesignIcon from '@/components/design/DesignIcon.vue'
 import Field from '@/components/design/Field.vue'
 import Input from '@/components/design/Input.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
+import { businessToday } from '@/composables/useBusinessDay'
+import { buildCsv } from '@/utils/csv'
 
 const { t } = useI18n({ useScope: 'global' })
 const { formatCurrency } = useFormatters()
 const { notify } = useNotify()
 
 function isoDay(offset = 0) {
-  const d = new Date()
-
-  d.setDate(d.getDate() + offset)
-  return d.toISOString().slice(0, 10)
+  const today = businessToday()
+  const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset, 12)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-const dateFrom = ref(isoDay(-30))
+const dateFrom = ref(isoDay(-29))
 const dateTo = ref(isoDay(0))
 const cogsFraction = ref(0.35)
 const loading = ref(false)
 const data = ref<any>(null)
+const appliedRange = ref({ from: dateFrom.value, to: dateTo.value, cogsFraction: cogsFraction.value })
+let analysisRequestId = 0
 
 const page = ref(1)
 const itemsPerPage = ref(20)
@@ -52,9 +56,9 @@ const cogsFractionStr = computed<string>({
 })
 
 function applyPreset(days: number) {
-  dateFrom.value = isoDay(-days)
+  dateFrom.value = isoDay(-(Math.max(days, 1) - 1))
   dateTo.value = isoDay(0)
-  load()
+  void load()
 }
 
 // Map menu-engineering class → tone (Kpi + Badge use the same Tone union)
@@ -82,20 +86,31 @@ async function load() {
     notify(t('COGS fraction must be between 0.05 and 0.95'), 'error')
     return
   }
+  const requestId = ++analysisRequestId
+  const requested = {
+    from: dateFrom.value,
+    to: dateTo.value,
+    cogsFraction: cogsFraction.value,
+  }
   loading.value = true
   try {
     const res = await axios.get('/analytics/menu-engineering', {
-      params: { from: dateFrom.value, to: dateTo.value, cogs_fraction: cogsFraction.value },
+      params: { from: requested.from, to: requested.to, cogs_fraction: requested.cogsFraction },
     })
-
+    if (requestId !== analysisRequestId)
+      return
     data.value = res.data?.data ?? res.data
+    appliedRange.value = requested
     page.value = 1
   }
   catch (e: any) {
+    if (requestId !== analysisRequestId)
+      return
     notify(e?.response?.data?.message ?? t('Failed to load'), 'error')
   }
   finally {
-    loading.value = false
+    if (requestId === analysisRequestId)
+      loading.value = false
   }
 }
 
@@ -156,7 +171,8 @@ function clearClassFilter() {
   page.value = 1
 }
 
-const subtitle = computed(() => `${dateFrom.value} — ${dateTo.value}`)
+const subtitle = computed(() => `${appliedRange.value.from} — ${appliedRange.value.to}`)
+watch(searchQuery, () => { page.value = 1 })
 
 // Aggregate totals over the currently filtered set — a real operator wants
 // to see the cash impact of whatever slice they're looking at.
@@ -175,10 +191,6 @@ const totals = computed(() => {
 // Client-side CSV export of the current (filtered) rows — no backend export
 // endpoint exists for this report, so we build it from what's on screen.
 const exporting = ref(false)
-function csvCell(v: unknown): string {
-  const s = String(v ?? '')
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-}
 function exportCsv() {
   if (exporting.value)
     return
@@ -192,9 +204,9 @@ function exportCsv() {
       t('Class'), t('Product'), t('Price'), t('Sold'),
       t('Revenue'), t('Margin/unit'), t('Margin %'), t('Profit'),
     ]
-    const lines = [headers.map(csvCell).join(',')]
+    const rows: unknown[][] = [headers]
     for (const i of items.value as any[]) {
-      lines.push([
+      rows.push([
         t(`menu_class_${String(i.class).toUpperCase()}`),
         i.product_name ?? '',
         i.price ?? 0,
@@ -203,15 +215,14 @@ function exportCsv() {
         i.margin_per_unit ?? 0,
         i.margin_pct ?? 0,
         i.profit ?? 0,
-      ].map(csvCell).join(','))
+      ])
     }
-    // BOM so Excel reads UTF-8 (Cyrillic/Uzbek) correctly.
-    const blob = new Blob([`﻿${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8;' })
+    const blob = new Blob([buildCsv(rows)], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
 
     a.href = url
-    a.download = `menu-engineering-${dateFrom.value}_${dateTo.value}.csv`
+    a.download = `menu-engineering-${appliedRange.value.from}_${appliedRange.value.to}.csv`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -280,7 +291,7 @@ function exportCsv() {
           <Button
             variant="secondary"
             size="sm"
-            @click="applyPreset(0)"
+            @click="applyPreset(1)"
           >
             {{ t('Today') }}
           </Button>

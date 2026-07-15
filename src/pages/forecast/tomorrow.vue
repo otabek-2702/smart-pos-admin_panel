@@ -5,7 +5,19 @@ const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 
 const loading = ref(false)
-const data = ref<any>(null)
+interface ForecastItem {
+  product_id: string | number
+  product_name: string
+  suggested_qty?: number
+  predicted_quantity?: number
+  reason?: string
+}
+interface ForecastData {
+  tomorrow?: string
+  reason?: string
+  predictions?: ForecastItem[]
+}
+const data = ref<ForecastData | null>(null)
 const error = ref<string>('')
 
 async function load() {
@@ -29,7 +41,7 @@ async function load() {
 
 onMounted(load)
 
-const predictions = computed(() => data.value?.predictions ?? [])
+const predictions = computed<ForecastItem[]>(() => data.value?.predictions ?? [])
 const reason = computed(() => data.value?.reason)
 const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.suggested_qty ?? p.predicted_quantity ?? 0), 1))
 </script>
@@ -120,7 +132,7 @@ const maxQty = computed(() => Math.max(...predictions.value.map((p: any) => p.su
             <div class="flex-grow-1 forecast-row__bar">
               <VProgressLinear
                 :model-value="(((p.suggested_qty ?? p.predicted_quantity) ?? 0) / maxQty) * 100"
-                :color="(p.suggested_qty ?? p.predicted_quantity) > maxQty * 0.7 ? 'success' : (p.suggested_qty ?? p.predicted_quantity) > maxQty * 0.3 ? 'info' : 'default'"
+                :color="Number(p.suggested_qty ?? p.predicted_quantity ?? 0) > maxQty * 0.7 ? 'success' : Number(p.suggested_qty ?? p.predicted_quantity ?? 0) > maxQty * 0.3 ? 'info' : 'default'"
                 height="8"
                 rounded
               />

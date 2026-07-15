@@ -6,6 +6,7 @@ import DeltaBadge from './DeltaBadge.vue'
 import { computeDelta } from '@/composables/useComparison'
 import { fmtInt, fmtUZS } from '@/composables/useCurrency'
 import type { ProductRow } from '@/types/comparison'
+import { buildCsv } from '@/utils/csv'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -49,13 +50,16 @@ function sortIcon(k: SortKey) { return sortKey.value !== k ? '' : (sortDir.value
 
 function exportCsv() {
   const head = ['Product', 'Category', 'Qty A', 'Qty B', 'Revenue A', 'Revenue B', 'Delta', 'Delta %', 'Share A %']
+
   const lines = filtered.value.map(r => [
     r.name, r.category, r.a_qty, r.b_qty, r.a_revenue, r.b_revenue, r.delta,
     r.delta_pct === null ? 'New' : r.delta_pct, r.share,
   ])
-  const csv = `﻿${[head, ...lines].map(row => row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')}\n`
+
+  const csv = buildCsv([head, ...lines], { alwaysQuote: true })
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
   const a = document.createElement('a')
+
   a.href = url
   a.download = `compare-products-${new Date().toISOString().slice(0, 10)}.csv`
   document.body.appendChild(a)

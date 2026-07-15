@@ -15,8 +15,33 @@ const { t } = useI18n({ useScope: 'global' })
 const { formatCurrency, formatDate } = useFormatters()
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 
+interface CashierPerformance {
+  cashier_id: string | number
+  cashier_name?: string
+  name?: string
+  total_revenue?: number
+  revenue?: number
+  order_count?: number
+  orders?: number
+}
+interface TopProduct {
+  product_id?: string | number
+  id?: string | number
+  product_name?: string
+  name?: string
+  quantity?: number
+  total_quantity?: number
+  total_revenue?: number
+  revenue?: number
+}
+interface InkassaStats {
+  today?: { total_revenue?: number; order_count?: number }
+  cashier_performance?: CashierPerformance[]
+  top_products?: TopProduct[]
+}
+
 const balance = ref<any>(null)
-const stats = ref<any>(null)
+const stats = ref<InkassaStats | null>(null)
 const loading = ref(true)
 
 const historyItems = ref<any[]>([])
@@ -34,6 +59,8 @@ const inkassTypeOptions = ['CASH', 'UZCARD', 'HUMO', 'PAYME']
 const typeFilterOptions = computed(() =>
   inkassTypeOptions.map(v => ({ value: v, label: t(`inkass_type_${v}`) })),
 )
+const cashierPerformance = computed<CashierPerformance[]>(() => stats.value?.cashier_performance ?? [])
+const topProducts = computed<TopProduct[]>(() => stats.value?.top_products ?? [])
 
 const filteredHistoryItems = computed(() => {
   return historyItems.value.filter((row: any) => {
@@ -255,16 +282,16 @@ const pagination = computed<DataTablePagination>(() => ({
 
     <!-- Performance lists -->
     <div
-      v-if="stats?.cashier_performance?.length || stats?.top_products?.length"
+      v-if="cashierPerformance.length || topProducts.length"
       class="grid cols-2 perf-grid"
     >
-      <Card v-if="stats?.cashier_performance?.length">
+      <Card v-if="cashierPerformance.length">
         <div class="card__head">
           <h3 class="card__title">{{ t('Cashier Performance (today)') }}</h3>
         </div>
         <div class="perf-list">
           <div
-            v-for="c in stats.cashier_performance"
+            v-for="c in cashierPerformance"
             :key="c.cashier_id"
             class="perf-row"
           >
@@ -275,18 +302,18 @@ const pagination = computed<DataTablePagination>(() => ({
                 <div class="perf-sub">{{ c.order_count }} {{ t('Orders').toLowerCase() }}</div>
               </div>
             </div>
-            <span class="perf-amount num-tabular">{{ formatCurrency(c.total_revenue) }}</span>
+            <span class="perf-amount num-tabular">{{ formatCurrency(c.total_revenue ?? 0) }}</span>
           </div>
         </div>
       </Card>
 
-      <Card v-if="stats?.top_products?.length">
+      <Card v-if="topProducts.length">
         <div class="card__head">
           <h3 class="card__title">{{ t(`Today's top products`) }}</h3>
         </div>
         <div class="perf-list">
           <div
-            v-for="p in stats.top_products"
+            v-for="p in topProducts"
             :key="p.product_id ?? p.id"
             class="perf-row"
           >
@@ -296,7 +323,7 @@ const pagination = computed<DataTablePagination>(() => ({
                 <div class="perf-sub">{{ p.total_quantity }} {{ t('sold').toLowerCase() }}</div>
               </div>
             </div>
-            <span class="perf-amount num-tabular">{{ formatCurrency(p.total_revenue) }}</span>
+            <span class="perf-amount num-tabular">{{ formatCurrency(p.total_revenue ?? 0) }}</span>
           </div>
         </div>
       </Card>

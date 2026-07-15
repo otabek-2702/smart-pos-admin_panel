@@ -508,7 +508,7 @@ function clearAll() {
   <div class="page">
     <PageHeader
       :title="t('Goods Receiving')"
-      :subtitle="t('Receivings')"
+      :subtitle="t('Record and verify goods received against purchase orders')"
     >
       <template #actions>
         <Button
@@ -673,7 +673,7 @@ function clearAll() {
           <StateFill
             icon="receipt"
             :title="t('No receivings')"
-            :sub="t('Receivings')"
+            :sub="t('Record and verify goods received against purchase orders')"
           >
             <div v-if="hasFilters" style="margin-top: 12px;">
               <Button variant="secondary" @click="clearAll">

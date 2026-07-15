@@ -39,7 +39,7 @@
 @keyframes drp-in { from { opacity: 0; transform: translateY(-6px); } }
 
 /* unified column layout (mode toggle on top) — fixed footprint so toggling Date/Time never resizes the popover */
-.drp-pop--col { flex-direction: column; width: 480px; }
+.drp-pop--col { flex-direction: column; width: min(480px, calc(100vw - 16px)); }
 .drp-modebar { padding: var(--sp-3) var(--sp-3) 0; }
 .drp-body { display: flex; width: 100%; min-height: 384px; }
 
@@ -84,6 +84,11 @@
   display: grid; place-items: center; cursor: pointer; transition: all .13s;
 }
 .drp-nav:hover { background: var(--surface-2); color: var(--text); border-color: var(--border-strong); }
+.drp-nav:disabled { opacity: .45; cursor: not-allowed; }
+.drp-nav:focus-visible,
+.drp-cell:focus-visible,
+.drp-preset:focus-visible,
+.drp-timechip:focus-visible { outline: none; box-shadow: var(--shadow-focus); z-index: 2; }
 
 .drp-months { display: flex; gap: var(--sp-5); }
 .drp-month { width: 100%; }
@@ -140,7 +145,8 @@
 
 /* mobile: single month, drawer-ish width */
 @media (max-width: 768px) {
-  .drp-pop { flex-direction: column; position: fixed; left: var(--sp-3); right: var(--sp-3); top: auto; bottom: calc(var(--tabbar-h, 0px) + var(--sp-3)); }
+  .drp-pop { flex-direction: column; position: fixed; }
+  .drp-pop.drp-pop--fixed { right: auto; bottom: auto; }
   .drp-pop--right { left: var(--sp-3); right: var(--sp-3); }
   .drp-presets { width: auto; flex: none; flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid var(--border); }
   .drp-preset { flex: 1 1 auto; text-align: center; }
@@ -150,4 +156,6 @@
   .drp-months { display: block; }
   .drp-month { width: 100%; }
   .drp-month:last-child { display: none; }
+  .drp-foot { align-items: flex-start; flex-wrap: wrap; }
+  .drp-foot__actions { margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
 }

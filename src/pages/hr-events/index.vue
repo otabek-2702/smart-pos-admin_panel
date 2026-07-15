@@ -518,7 +518,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <template #row-actions="{ row }">
           <IconAction
             icon="clock"
-            tone="info"
+            tone="primary"
             :title="t('hr_event_action_timeline')"
             @click="openTimeline(row)"
           />

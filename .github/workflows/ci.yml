@@ -1,16 +1,17 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 jobs:
   lint-and-build:
-    name: Lint + Build
+    name: Lint + Typecheck + Build
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +27,9 @@ jobs:
 
       - name: Lint (app code only)
         run: yarn lint:ci
+
+      - name: Typecheck
+        run: yarn typecheck
 
       - name: Build
         run: yarn build

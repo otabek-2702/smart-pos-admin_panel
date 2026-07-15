@@ -8,11 +8,15 @@
    exposes a whole-briefing dismiss, not per-bullet read).
    ============================================================ */
 import axiosIns from '@/plugins/axios'
+import { useNotify } from '@/composables/useNotify'
 import DesignIcon from './DesignIcon.vue'
+import { designId } from './ids'
 import { localizeNotify, notifyIcon, resolveNotifyLink } from './utils/notify'
 
 const { t, locale } = useI18n({ useScope: 'global' })
 const router = useRouter()
+const { notify } = useNotify()
+const panelId = designId('notifications')
 
 interface Anomaly {
   id: number
@@ -49,6 +53,8 @@ const briefingDismissed = ref(false)
 const open = ref(false)
 const rootRef = ref<HTMLElement | null>(null)
 let pollTimer: number | null = null
+const marking = ref<Set<string>>(new Set())
+const markingAll = ref(false)
 
 // Briefing items have no server-side per-bullet read flag, so remember which
 // ones the operator has read locally.
@@ -128,9 +134,20 @@ function sevTone(s?: Anomaly['severity']) {
 
 async function markRead(n: Notif) {
   if (n.kind === 'anomaly' && n.ackId != null) {
-    try { await axiosIns.post(`/ai/anomalies/${n.ackId}/ack`) }
-    catch { /* noop */ }
-    anomalies.value = anomalies.value.filter(a => a.id !== n.ackId)
+    if (marking.value.has(n.id)) return
+    marking.value = new Set(marking.value).add(n.id)
+    try {
+      await axiosIns.post(`/ai/anomalies/${n.ackId}/ack`)
+      anomalies.value = anomalies.value.filter(a => a.id !== n.ackId)
+    }
+    catch {
+      notify(t('Request failed. Please try again.'), 'error')
+    }
+    finally {
+      const next = new Set(marking.value)
+      next.delete(n.id)
+      marking.value = next
+    }
   }
   else {
     readSet.value = new Set(readSet.value).add(n.id)
@@ -139,15 +156,27 @@ async function markRead(n: Notif) {
 }
 
 async function markAllRead() {
-  // Ack every anomaly server-side, mark every briefing item read locally.
-  const acks = anomalies.value.map(a =>
-    axiosIns.post(`/ai/anomalies/${a.id}/ack`).catch(() => null))
-  await Promise.all(acks)
-  anomalies.value = []
+  if (markingAll.value) return
+  markingAll.value = true
+  // Remove only acknowledgements confirmed by the server. Failed items stay
+  // visible and unread so the UI never reports a false success.
+  const snapshot = [...anomalies.value]
+  const results = await Promise.allSettled(snapshot.map(a =>
+    axiosIns.post(`/ai/anomalies/${a.id}/ack`)))
+  const succeeded = new Set<number>()
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') succeeded.add(snapshot[index].id)
+  })
+  anomalies.value = anomalies.value.filter(a => !succeeded.has(a.id))
   const next = new Set(readSet.value)
-  for (const n of notifs.value) next.add(n.id)
+  for (const n of notifs.value) {
+    if (n.kind === 'briefing') next.add(n.id)
+  }
   readSet.value = next
   persistRead()
+  if (succeeded.size !== snapshot.length)
+    notify(t('Request failed. Please try again.'), 'error')
+  markingAll.value = false
 }
 
 function goOpen(n: Notif) {
@@ -174,18 +203,29 @@ onBeforeUnmount(() => {
       class="iconbtn anom-trigger"
       :class="{ 'has-critical': hasCritical }"
       :title="unreadCount ? t('{n} unread notifications', { n: unreadCount }) : t('Notifications')"
+      :aria-label="unreadCount ? t('{n} unread notifications', { n: unreadCount }) : t('Notifications')"
+      aria-haspopup="dialog"
+      :aria-expanded="open"
+      :aria-controls="panelId"
       @click="open = !open"
     >
       <DesignIcon name="bell" :size="18" />
       <span v-if="unreadCount" class="anom-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
     </button>
     <Transition name="fade">
-      <div v-if="open" class="anom-panel">
+      <div
+        v-if="open"
+        :id="panelId"
+        class="anom-panel"
+        role="dialog"
+        :aria-label="t('Notifications')"
+      >
         <div class="anom-head">
           <span class="anom-title">{{ t('Notifications') }}</span>
           <button
             v-if="unreadCount"
             class="anom-allread"
+            :disabled="markingAll"
             @click="markAllRead"
           >
             {{ t('Mark all read') }}
@@ -226,6 +266,7 @@ onBeforeUnmount(() => {
                 <button
                   v-if="isUnread(n)"
                   class="anom-chip anom-chip--ghost"
+                  :disabled="marking.has(n.id)"
                   @click="markRead(n)"
                 >
                   <DesignIcon name="check" :size="11" />

@@ -23,6 +23,7 @@ const klass = computed(() =>
     'checkbox',
     props.modelValue && 'is-checked',
     props.indeterminate && 'is-indeterminate',
+    props.disabled && 'is-disabled',
   ),
 )
 
@@ -40,15 +41,21 @@ function toggle(ev?: Event) {
 // it with a wrapping <label>. Wire the click ourselves so clicking anywhere in
 // the label (e.g. the label text span) also toggles the checkbox.
 const rootEl = ref<HTMLElement | null>(null)
+let labelEl: HTMLLabelElement | null = null
+
+function onLabelClick(e: MouseEvent) {
+  const target = e.target as Node | null
+  if (rootEl.value && target && rootEl.value.contains(target)) return
+  toggle(e)
+}
+
 onMounted(() => {
-  const label = rootEl.value?.closest('label') as HTMLLabelElement | null
-  if (!label || (label as any).__cbWired) return
-  ;(label as any).__cbWired = true
-  label.addEventListener('click', (e) => {
-    const target = e.target as Node | null
-    if (rootEl.value && target && rootEl.value.contains(target)) return
-    toggle()
-  })
+  labelEl = rootEl.value?.closest('label') as HTMLLabelElement | null
+  labelEl?.addEventListener('click', onLabelClick)
+})
+onBeforeUnmount(() => {
+  labelEl?.removeEventListener('click', onLabelClick)
+  labelEl = null
 })
 </script>
 
@@ -57,9 +64,9 @@ onMounted(() => {
     ref="rootEl"
     :class="klass"
     role="checkbox"
-    :aria-checked="modelValue"
+    :aria-checked="indeterminate ? 'mixed' : modelValue"
     :aria-disabled="disabled"
-    tabindex="0"
+    :tabindex="disabled ? -1 : 0"
     @click="toggle"
     @keydown.space.prevent="toggle"
     @keydown.enter.prevent="toggle"

@@ -95,37 +95,59 @@ const lastFetchedAt = ref<number | null>(null)
 // own dedicated endpoints (/dashboard/sales, /analytics/products/*, …) when it
 // changes. Kept as a plain object so consumers can watch (r.from, r.to).
 const currentRange = ref<DashRange | null>(null)
+let sharedRequestId = 0
 
 function hasRange(range: DashRange | null | undefined): boolean {
   return !!(range && (range.from || range.to))
 }
 
-async function fetchShared(range: DashRange | null | undefined): Promise<void> {
+function rangeKey(range: DashRange | null | undefined): string {
+  if (!range)
+    return ''
+  return [range.from, range.to, range.preset, range.fromTime, range.toTime].join('|')
+}
+
+async function fetchShared(range: DashRange | null | undefined): Promise<boolean> {
+  const requestId = ++sharedRequestId
+  const nextRange = range ?? null
+  const changedRange = rangeKey(currentRange.value) !== rangeKey(nextRange)
+
   loading.value = true
   error.value = null
-  currentRange.value = range ?? null
+  currentRange.value = nextRange
+  // Never present the previous range's numbers under the newly selected title.
+  if (changedRange)
+    shared.value = null
   try {
     if (hasRange(range)) {
       // /dashboard?from=&to=(&tod_from=&tod_to=&granularity=)
       const params = buildDateParams(range)
       const res = await axiosIns.get('/dashboard', { params })
       const data = res.data?.data ?? res.data ?? {}
+      if (requestId !== sharedRequestId)
+        return false
       shared.value = { ...data, __source: 'range' }
     }
     else {
       const res = await axiosIns.get('/dashboard/today')
       const data = res.data?.data ?? res.data ?? {}
+      if (requestId !== sharedRequestId)
+        return false
       shared.value = { ...data, __source: 'today' }
     }
     lastFetchedAt.value = Date.now()
+    return true
   }
   catch (err) {
+    if (requestId !== sharedRequestId)
+      return false
     error.value = err
-    // Soft-degrade: keep the previous payload so the UI doesn't flash empty.
-    if (!shared.value) shared.value = { __source: hasRange(range) ? 'range' : 'today' }
+    shared.value = null
+    return false
   }
   finally {
-    loading.value = false
+    if (requestId === sharedRequestId)
+      loading.value = false
   }
 }
 

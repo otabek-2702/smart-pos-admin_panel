@@ -628,7 +628,7 @@ const itemFilterOptions = computed(() => [
         <Button
           :variant="actionType === 'cancel' ? 'danger' : 'primary'"
           :loading="actioning"
-          @click="doAction"
+          @click="() => doAction()"
         >
           {{ t('Confirm') }}
         </Button>

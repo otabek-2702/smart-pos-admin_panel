@@ -74,11 +74,12 @@ export async function saveBusinessSettings(patch: {
   business_open?: string
   business_close?: string
 }) {
+  // Persist first. The visible/global values must never claim a setting was
+  // saved when the server rejected or could not receive the update.
+  await axiosIns.put('/app-settings', patch)
   if (patch.business_day_start) setBusinessDayStart(patch.business_day_start)
   if (patch.business_open) setBusinessOpen(patch.business_open)
   if (patch.business_close) setBusinessClose(patch.business_close)
-  try { await axiosIns.put('/app-settings', patch) }
-  catch { /* localStorage already updated; BE retry on next change */ }
 }
 
 function startHourMin(): [number, number] {

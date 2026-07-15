@@ -605,7 +605,7 @@ const shiftColumns = computed<DataTableColumn<any>[]>(() => [
                 <div class="card-subtitle">{{ t('Payment mix') }}</div>
                 <div v-for="(v, k) in (row.money?.payment_mix ?? {})" :key="k" class="cs-row cs-row--sm">
                   <span class="cs-row__label">{{ t(`payment_method_${k}`) }}</span>
-                  <span>{{ formatCurrency(v) }}</span>
+                  <span>{{ formatCurrency(Number(v) || 0) }}</span>
                 </div>
               </div>
               <div class="cs-expand__col">

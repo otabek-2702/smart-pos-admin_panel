@@ -5,8 +5,7 @@
    Decision #13: drop tabs (History/Templates) + DrawerExpense
    + Performance scorecard. KPI strip + filter toolbar + card grid +
    ReceiveCashModal. Preserves real BE calls:
-     GET  /shifts/active            list active shifts
-     GET  /shifts (paginated)       all shifts (history)
+     GET  /shifts                   filtered and paginated shifts
      POST /shifts/{id}/end          end-shift
      POST /shifts/{id}/reconcile    manager handover {actual_cash, notes}
    ============================================================ */
@@ -21,6 +20,7 @@ import Kpi from '@/components/design/Kpi.vue'
 import KpiSkel from '@/components/design/KpiSkel.vue'
 import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
+import Pagination from '@/components/design/Pagination.vue'
 import Select from '@/components/design/Select.vue'
 import Skeleton from '@/components/design/Skeleton.vue'
 import StateFill from '@/components/design/StateFill.vue'
@@ -65,6 +65,7 @@ interface ShiftV3 {
   id: number | string
   raw: ShiftRaw
   status: string
+  cashierId: string
   cashier: string
   initials: string
   start: string
@@ -155,8 +156,8 @@ function durationLabel(startIso?: string, endIso?: string | null): string {
   const h = Math.floor(mins / 60)
   const m = mins % 60
   if (h <= 0)
-    return `${m}m`
-  return `${h}h ${m}m`
+    return `${m} ${t('time_minute_short')}`
+  return `${h} ${t('time_hour_short')} ${m} ${t('time_minute_short')}`
 }
 
 function prepLabel(seconds: number | string | null | undefined): string {
@@ -165,7 +166,7 @@ function prepLabel(seconds: number | string | null | undefined): string {
     return '—'
   const m = Math.floor(n / 60)
   const s = Math.round(n % 60)
-  return `${m}m ${s}s`
+  return `${m} ${t('time_minute_short')} ${s} ${t('time_second_short')}`
 }
 
 function normalize(s: ShiftRaw): ShiftV3 {
@@ -175,6 +176,7 @@ function normalize(s: ShiftRaw): ShiftV3 {
     id: s.id,
     raw: s,
     status: s.status || '',
+    cashierId: s.user?.id === undefined ? '' : String(s.user.id),
     cashier: name,
     initials: initialsOf(name),
     start: s.start_time || '',
@@ -217,6 +219,18 @@ function shiftState(s: ShiftV3): 'active' | 'awaiting' | 'reconciled' {
    ============================================================ */
 const shifts = ref<ShiftV3[]>([])
 const loading = ref(false)
+const loadError = ref(false)
+const totalShifts = ref(0)
+const page = ref(1)
+const itemsPerPage = ref(24)
+const shiftSummary = ref({
+  activeCount: 0,
+  awaitingCount: 0,
+  cashToReceive: 0,
+  netVariance: 0,
+})
+const cashierDirectory = ref<{ value: string, label: string }[]>([])
+let shiftsRequestId = 0
 
 // filters (mirror v3)
 const cashierFilter = ref<string>('')
@@ -225,7 +239,7 @@ const liveOnly = ref(false)
 const dateFrom = ref('')
 const dateTo = ref('')
 
-// sort (client-side; server list is a page snapshot)
+// Sorting is performed by the server before pagination.
 const sortBy = ref<string>('priority')
 const sortOptions = [
   { value: 'priority', label: 'Priority (needs action)' },
@@ -246,47 +260,101 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 const receiving = ref<ShiftV3 | null>(null)
 
 /* ============================================================
-   Load — merge /shifts/active (live) + /shifts (history paginated)
+   Load — server-filtered, server-sorted, paginated shift history
    ============================================================ */
-async function loadShifts() {
+async function loadShifts(options: { preserve?: boolean } = {}) {
+  const requestId = ++shiftsRequestId
   loading.value = true
+  loadError.value = false
+  if (!options.preserve) {
+    shifts.value = []
+    totalShifts.value = 0
+    shiftSummary.value = { activeCount: 0, awaitingCount: 0, cashToReceive: 0, netVariance: 0 }
+  }
   try {
-    const [activeRes, histRes] = await Promise.all([
-      axios.get('/shifts/active').catch(() => ({ data: { data: [] } })),
-      axios.get('/shifts', { params: { page: 1, per_page: 50 } }).catch(() => ({ data: { data: [] } })),
-    ])
+    const res = await axios.get('/shifts', {
+      params: {
+        page: page.value,
+        per_page: itemsPerPage.value,
+        sort: sortBy.value,
+        cashier_id: cashierFilter.value || undefined,
+        status: statusFilter.value || undefined,
+        date_from: dateFrom.value || undefined,
+        date_to: dateTo.value || undefined,
+        live_only: liveOnly.value || undefined,
+      },
+    })
+    if (requestId !== shiftsRequestId)
+      return false
 
-    const aD = activeRes.data?.data ?? activeRes.data
-    const activeList: ShiftRaw[] = Array.isArray(aD) ? aD : (aD?.shifts ?? aD?.items ?? [])
-
-    const hD = histRes.data?.data ?? histRes.data
-    const histList: ShiftRaw[] = hD?.shifts ?? hD?.items ?? (Array.isArray(hD) ? hD : [])
-
-    // de-dup by id; active takes precedence (fresher payload).
-    const seen = new Set<string | number>()
-    const merged: ShiftRaw[] = []
-    for (const s of activeList) {
-      if (s && s.id !== undefined && !seen.has(s.id)) {
-        seen.add(s.id)
-        merged.push(s)
-      }
-    }
-    for (const s of histList) {
-      if (s && s.id !== undefined && !seen.has(s.id)) {
-        seen.add(s.id)
-        merged.push(s)
-      }
+    const data = res.data?.data ?? res.data ?? {}
+    const list: ShiftRaw[] = data?.shifts ?? data?.items ?? (Array.isArray(data) ? data : [])
+    const summary = data?.summary ?? {}
+    const total = Number(data?.pagination?.total ?? list.length) || 0
+    const lastPage = Math.max(1, Math.ceil(total / itemsPerPage.value))
+    if (page.value > lastPage) {
+      page.value = lastPage
+      return false
     }
 
-    shifts.value = merged.map(normalize)
-  }
-  catch {
-    notify(t('Failed to load shifts'), 'error')
-  }
-  finally {
-    loading.value = false
+    shifts.value = list.map(normalize)
+    totalShifts.value = total
+    shiftSummary.value = {
+      activeCount: Number(summary.active_count) || 0,
+      awaitingCount: Number(summary.awaiting_count) || 0,
+      cashToReceive: Number(summary.cash_to_receive) || 0,
+      netVariance: Number(summary.net_variance) || 0,
+    }
     lastUpdated.value = Date.now()
     now.value = Date.now()
+    return true
+  }
+  catch {
+    if (requestId === shiftsRequestId) {
+      shifts.value = []
+      totalShifts.value = 0
+      shiftSummary.value = { activeCount: 0, awaitingCount: 0, cashToReceive: 0, netVariance: 0 }
+      loadError.value = true
+      notify(t('Failed to load shifts'), 'error')
+    }
+    return false
+  }
+  finally {
+    if (requestId === shiftsRequestId)
+      loading.value = false
+  }
+}
+
+async function loadCashierDirectory() {
+  try {
+    const users: any[] = []
+    for (let directoryPage = 1; directoryPage <= 50; directoryPage += 1) {
+      const res = await axios.get('/users', { params: { page: directoryPage, per_page: 100 } })
+      const data = res.data?.data ?? res.data ?? {}
+      const batch: any[] = data?.users ?? data?.items ?? []
+      users.push(...batch)
+
+      const pagination = data?.pagination ?? {}
+      const total = Number(pagination.total_users ?? pagination.total ?? 0)
+      if (batch.length === 0 || pagination.has_next === false || (total > 0 && users.length >= total) || batch.length < 100)
+        break
+    }
+
+    const seen = new Set<string>()
+    cashierDirectory.value = users.flatMap((user) => {
+      if (user?.id === undefined || user?.id === null)
+        return []
+      const value = String(user.id)
+      if (seen.has(value))
+        return []
+      seen.add(value)
+      const name = `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() || user.name || user.username || `#${value}`
+      return [{ value, label: name }]
+    }).sort((a, b) => a.label.localeCompare(b.label))
+  }
+  catch {
+    cashierDirectory.value = []
+    notify(t('Failed to load users'), 'error')
   }
 }
 
@@ -297,7 +365,7 @@ async function refresh() {
     return
   refreshing.value = true
   try {
-    await loadShifts()
+    await loadShifts({ preserve: true })
   }
   finally {
     refreshing.value = false
@@ -305,7 +373,8 @@ async function refresh() {
 }
 
 onMounted(() => {
-  loadShifts()
+  void loadShifts()
+  void loadCashierDirectory()
   // tick the clock so live durations + "updated Nm ago" stay honest
   clockTimer = setInterval(() => { now.value = Date.now() }, 30_000)
   // quietly poll while cashiers are on the floor; pause when the tab is hidden
@@ -326,6 +395,27 @@ onUnmounted(() => {
   if (pollTimer)
     clearInterval(pollTimer)
 })
+
+watch([cashierFilter, statusFilter, liveOnly, dateFrom, dateTo, sortBy], () => {
+  if (page.value !== 1)
+    page.value = 1
+  else
+    void loadShifts()
+})
+
+watch(page, () => {
+  void loadShifts()
+})
+
+function changePerPage(value: number) {
+  if (itemsPerPage.value === value)
+    return
+  itemsPerPage.value = value
+  if (page.value !== 1)
+    page.value = 1
+  else
+    void loadShifts()
+}
 
 const updatedAgo = computed(() => {
   if (!lastUpdated.value)
@@ -349,87 +439,32 @@ function durationFor(s: ShiftV3): string {
    Derived — cashier options + filtered list + KPI metrics
    ============================================================ */
 const cashierOptions = computed(() => {
-  const seen = new Set<string>()
-  const out: { value: string, label: string }[] = []
-  for (const s of shifts.value) {
-    if (s.cashier && s.cashier !== '—' && !seen.has(s.cashier)) {
-      seen.add(s.cashier)
-      out.push({ value: s.cashier, label: s.cashier })
-    }
+  const options = new Map(cashierDirectory.value.map(option => [option.value, option.label]))
+  for (const shift of shifts.value) {
+    if (shift.cashierId && shift.cashier !== '—' && !options.has(shift.cashierId))
+      options.set(shift.cashierId, shift.cashier)
   }
-  return out
+  return [...options].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label))
 })
 
 const statusOptions = [
-  { value: 'Active', label: 'Active' },
-  { value: 'Awaiting cash', label: 'Awaiting cash' },
-  { value: 'Reconciled', label: 'Reconciled' },
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'ENDED,ABANDONED', label: 'Awaiting cash' },
+  { value: 'COMPLETED', label: 'Reconciled' },
 ]
 
-const filtered = computed<ShiftV3[]>(() => {
-  return shifts.value.filter((s) => {
-    if (cashierFilter.value && s.cashier !== cashierFilter.value)
-      return false
-    if (liveOnly.value && !s.live)
-      return false
-    if (statusFilter.value) {
-      const st = shiftState(s)
-      if (statusFilter.value === 'Active' && st !== 'active')
-        return false
-      if (statusFilter.value === 'Awaiting cash' && st !== 'awaiting')
-        return false
-      if (statusFilter.value === 'Reconciled' && st !== 'reconciled')
-        return false
-    }
-    if (dateFrom.value && s.start && new Date(s.start) < new Date(dateFrom.value))
-      return false
-    if (dateTo.value && s.start && new Date(s.start) > new Date(`${dateTo.value}T23:59`))
-      return false
-    return true
-  })
-})
+const filtered = computed<ShiftV3[]>(() => shifts.value)
 
-const activeCount = computed(() => shifts.value.filter(s => shiftState(s) === 'active').length)
-const awaitingList = computed(() => shifts.value.filter(s => shiftState(s) === 'awaiting'))
-const cashToReceive = computed(() => awaitingList.value.reduce((a, s) => a + (s.expectedCash ?? 0), 0))
-const netVariance = computed(() => shifts.value
-  .filter(s => shiftState(s) === 'reconciled' && s.variance !== null)
-  .reduce((a, s) => a + (s.variance ?? 0), 0))
+const pageCount = computed(() => Math.max(1, Math.ceil(totalShifts.value / itemsPerPage.value)))
+const activeCount = computed(() => shiftSummary.value.activeCount)
+const awaitingCount = computed(() => shiftSummary.value.awaitingCount)
+const cashToReceive = computed(() => shiftSummary.value.cashToReceive)
+const netVariance = computed(() => shiftSummary.value.netVariance)
 
 /* ============================================================
-   Sort — default surfaces the cards that need action first
-   (awaiting cash → active → reconciled), then newest.
+   The server sorts before slicing the requested page.
    ============================================================ */
-const statePriority: Record<string, number> = { awaiting: 0, active: 1, reconciled: 2 }
-function startMs(s: ShiftV3): number {
-  if (!s.start)
-    return 0
-  const ms = new Date(s.start).getTime()
-  return Number.isNaN(ms) ? 0 : ms
-}
-const sorted = computed<ShiftV3[]>(() => {
-  const arr = [...filtered.value]
-  switch (sortBy.value) {
-    case 'newest':
-      arr.sort((a, b) => startMs(b) - startMs(a))
-      break
-    case 'oldest':
-      arr.sort((a, b) => startMs(a) - startMs(b))
-      break
-    case 'gross':
-      arr.sort((a, b) => b.gross - a.gross)
-      break
-    case 'cashier':
-      arr.sort((a, b) => a.cashier.localeCompare(b.cashier))
-      break
-    default:
-      arr.sort((a, b) => {
-        const d = statePriority[shiftState(a)] - statePriority[shiftState(b)]
-        return d !== 0 ? d : startMs(b) - startMs(a)
-      })
-  }
-  return arr
-})
+const sorted = computed<ShiftV3[]>(() => filtered.value)
 
 /* ============================================================
    Filter chips
@@ -438,9 +473,19 @@ interface Chip { k: string, label: string, val: string, clear: () => void }
 const activeChips = computed<Chip[]>(() => {
   const out: Chip[] = []
   if (cashierFilter.value)
-    out.push({ k: 'c', label: t('Cashier'), val: cashierFilter.value, clear: () => { cashierFilter.value = '' } })
+    out.push({
+      k: 'c',
+      label: t('Cashier'),
+      val: cashierOptions.value.find(option => option.value === cashierFilter.value)?.label ?? cashierFilter.value,
+      clear: () => { cashierFilter.value = '' },
+    })
   if (statusFilter.value)
-    out.push({ k: 's', label: t('Status'), val: t(statusFilter.value), clear: () => { statusFilter.value = '' } })
+    out.push({
+      k: 's',
+      label: t('Status'),
+      val: t(statusOptions.find(option => option.value === statusFilter.value)?.label ?? statusFilter.value),
+      clear: () => { statusFilter.value = '' },
+    })
   if (liveOnly.value)
     out.push({ k: 'l', label: t('Live only'), val: t('On'), clear: () => { liveOnly.value = false } })
   if (dateFrom.value)
@@ -675,7 +720,7 @@ function gotoReport(_s: ShiftV3) {
         <Kpi
           :data="{
             label: t('Awaiting cash'),
-            value: awaitingList.length,
+            value: awaitingCount,
             tone: 'warning',
             icon: 'wallet',
             sub: t('to reconcile'),
@@ -688,7 +733,7 @@ function gotoReport(_s: ShiftV3) {
             money: true,
             tone: 'primary',
             icon: 'coins',
-            sub: `${t('across')} ${awaitingList.length} ${t('shifts')}`,
+            sub: `${t('across')} ${awaitingCount} ${t('shifts')}`,
           }"
         />
         <Kpi
@@ -697,7 +742,7 @@ function gotoReport(_s: ShiftV3) {
             value: (netVariance >= 0 ? '+' : '−') + Fmt.abbr(Math.abs(netVariance)),
             tone: netVariance < 0 ? 'error' : 'success',
             icon: 'trend',
-            sub: t('reconciled today'),
+            sub: t('in current results'),
           }"
         />
       </template>
@@ -805,7 +850,7 @@ function gotoReport(_s: ShiftV3) {
       <span
         class="tertiary"
         style="font-size: 13px;"
-      >{{ t('Showing') }} {{ sorted.length }} {{ t('of') }} {{ shifts.length }} {{ t('shifts') }}</span>
+      >{{ t('Showing') }} {{ sorted.length }} {{ t('of') }} {{ totalShifts }} {{ t('shifts') }}</span>
     </div>
 
     <!-- skeleton grid -->
@@ -861,14 +906,37 @@ function gotoReport(_s: ShiftV3) {
       </Card>
     </div>
 
+    <!-- error -->
+    <Card v-else-if="loadError">
+      <StateFill
+        icon="alert"
+        error
+        :title="t('Failed to load shifts')"
+        :sub="t('Check your connection and try again.')"
+      >
+        <div style="margin-top: 12px;">
+          <Button
+            variant="secondary"
+            icon="refresh"
+            @click="() => loadShifts()"
+          >
+            {{ t('Retry') }}
+          </Button>
+        </div>
+      </StateFill>
+    </Card>
+
     <!-- empty -->
     <Card v-else-if="filtered.length === 0">
       <StateFill
         icon="clock"
-        :title="t('No shifts match your filters')"
-        :sub="t('Adjust the cashier, status or date range.')"
+        :title="activeChips.length ? t('No shifts match your filters') : t('No shifts found')"
+        :sub="activeChips.length ? t('Adjust the cashier, status or date range.') : ''"
       >
-        <div style="margin-top: 12px;">
+        <div
+          v-if="activeChips.length"
+          style="margin-top: 12px;"
+        >
           <Button
             variant="secondary"
             @click="clearAll"
@@ -1231,6 +1299,18 @@ function gotoReport(_s: ShiftV3) {
         </div>
       </Card>
     </div>
+
+    <Pagination
+      v-if="totalShifts > itemsPerPage"
+      :page="page"
+      :per-page="itemsPerPage"
+      :pages="pageCount"
+      :total="totalShifts"
+      :per-page-options="[12, 24, 48, 96]"
+      style="margin-top: var(--sp-5);"
+      @page="(nextPage: number) => page = nextPage"
+      @per-page="changePerPage"
+    />
 
     <!-- Receive money modal (per-tender blind count) -->
     <Modal

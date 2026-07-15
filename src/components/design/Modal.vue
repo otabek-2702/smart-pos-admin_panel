@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import IconAction from './IconAction.vue'
+import { designId } from './ids'
 
 interface Props {
   open: boolean
@@ -24,8 +25,9 @@ const { t } = useI18n({ useScope: 'global' })
 
 // Unique id for aria-labelledby so screen readers announce the modal's title
 // instead of generically "dialog". Falls back to aria-label when no title prop.
-let _modalId = 0
-const titleId = `modal-title-${++_modalId}`
+const modalId = designId('modal')
+const titleId = `${modalId}-title`
+const subtitleId = `${modalId}-subtitle`
 
 const modalRef = ref<HTMLElement | null>(null)
 let previouslyFocused: HTMLElement | null = null
@@ -67,7 +69,11 @@ function onKey(e: KeyboardEvent) {
   const first = items[0]
   const last = items[items.length - 1]
   const activeEl = document.activeElement as HTMLElement | null
-  if (e.shiftKey && activeEl === first) {
+  if (!activeEl || !modalRef.value.contains(activeEl)) {
+    e.preventDefault()
+    ;(e.shiftKey ? last : first).focus()
+  }
+  else if (e.shiftKey && (activeEl === first || activeEl === modalRef.value)) {
     e.preventDefault(); last.focus()
   }
   else if (!e.shiftKey && activeEl === last) {
@@ -91,21 +97,26 @@ watch(() => props.open, async (open) => {
     previouslyFocused = document.activeElement as HTMLElement | null
     await nextTick()
     if (modalRef.value) {
+      const preferred = modalRef.value.querySelector<HTMLElement>('[autofocus]:not([disabled])')
       const items = focusableIn(modalRef.value)
-      ;(items[0] || modalRef.value).focus()
+      ;(preferred || items[0] || modalRef.value).focus()
     }
   }
   else if (previouslyFocused) {
     previouslyFocused.focus()
     previouslyFocused = null
   }
-})
+}, { immediate: true })
 
 onMounted(() => {
   window.addEventListener('keydown', onKey)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
+  if (previouslyFocused) {
+    previouslyFocused.focus()
+    previouslyFocused = null
+  }
 })
 </script>
 
@@ -124,6 +135,7 @@ onBeforeUnmount(() => {
           aria-modal="true"
           :aria-labelledby="title ? titleId : undefined"
           :aria-label="title ? undefined : t('Dialog')"
+          :aria-describedby="subtitle ? subtitleId : undefined"
           tabindex="-1"
           :style="maxWidthStyle"
         >
@@ -138,6 +150,7 @@ onBeforeUnmount(() => {
               </h3>
               <div
                 v-if="subtitle"
+                :id="subtitleId"
                 class="modal__sub"
               >
                 {{ subtitle }}

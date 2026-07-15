@@ -10,6 +10,8 @@ interface Props {
   from?: string
   to?: string
   disabled?: boolean
+  fromLabel?: string
+  toLabel?: string
 }
 
 withDefaults(defineProps<Props>(), {
@@ -41,6 +43,7 @@ function onTo(v: string) {
       :value="from"
       icon="clock"
       :disabled="disabled"
+      :label="fromLabel || t('From')"
       @update:value="onFrom"
     />
     <span
@@ -50,6 +53,7 @@ function onTo(v: string) {
     <TimeField
       :value="to"
       :disabled="disabled"
+      :label="toLabel || t('To')"
       @update:value="onTo"
     />
   </div>

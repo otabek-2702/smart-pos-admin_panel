@@ -68,7 +68,10 @@ function onPpChange(e: Event) {
 </script>
 
 <template>
-  <div class="pagination">
+  <nav
+    class="pagination"
+    :aria-label="t('Pages')"
+  >
     <div
       class="row"
       style="gap: 8px;"
@@ -77,6 +80,7 @@ function onPpChange(e: Event) {
       <select
         class="pp-native"
         :value="String(perPage)"
+        :aria-label="t('Rows per page')"
         @change="onPpChange"
       >
         <option
@@ -94,6 +98,7 @@ function onPpChange(e: Event) {
       <button
         class="pgbtn"
         :disabled="page <= 1"
+        :aria-label="t('$vuetify.pagination.ariaLabel.previous')"
         @click="goPage(page - 1)"
       >
         <DesignIcon
@@ -113,6 +118,8 @@ function onPpChange(e: Event) {
         <button
           v-else
           :class="cx('pgbtn', n === page && 'is-active')"
+          :aria-label="`${t('$vuetify.pagination.ariaLabel.page')} ${n}`"
+          :aria-current="n === page ? 'page' : undefined"
           @click="goPage(n as number)"
         >
           {{ n }}
@@ -121,6 +128,7 @@ function onPpChange(e: Event) {
       <button
         class="pgbtn"
         :disabled="page >= pages"
+        :aria-label="t('$vuetify.pagination.ariaLabel.next')"
         @click="goPage(page + 1)"
       >
         <DesignIcon
@@ -129,7 +137,7 @@ function onPpChange(e: Event) {
         />
       </button>
     </div>
-  </div>
+  </nav>
 </template>
 
 <style scoped>

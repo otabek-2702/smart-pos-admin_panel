@@ -15,10 +15,17 @@ const statusFilter = ref<string | undefined>(undefined)
 const page = ref(1)
 const itemsPerPage = ref(15)
 const total = ref(0)
+const pageCount = computed(() => Math.max(1, Math.ceil(total.value / itemsPerPage.value)))
+const shiftStatusOptions = computed(() => ['ACTIVE', 'COMPLETED', 'ABANDONED'].map(value => ({
+  value,
+  title: t(`shift_status_${value}`),
+})))
 
 const selectedShiftId = ref<number | null>(null)
+let shiftsRequestId = 0
 
 async function loadShifts() {
+  const requestId = ++shiftsRequestId
   shiftsLoading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
@@ -30,76 +37,84 @@ async function loadShifts() {
       params.status = statusFilter.value
     const res = await axios.get('/shifts', { params })
     const d = res.data?.data ?? res.data
+    if (requestId !== shiftsRequestId)
+      return
 
     shifts.value = d?.shifts ?? d?.items ?? []
     total.value = d?.pagination?.total ?? shifts.value.length
 
-    // Auto-pick latest on first load if nothing selected.
-    if (!selectedShiftId.value && shifts.value.length)
-      selectShift(shifts.value[0])
+    // A filter/page change must never leave an excluded shift in the detail pane.
+    const selected = shifts.value.find((shift: any) => shift.id === selectedShiftId.value)
+    if (selected)
+      await selectShift(selected)
+    else if (shifts.value.length)
+      await selectShift(shifts.value[0])
+    else
+      clearSelectedShift()
   }
   catch {
+    if (requestId !== shiftsRequestId)
+      return
+    shifts.value = []
+    total.value = 0
+    clearSelectedShift()
     notify(t('Failed to load shifts'), 'error')
   }
   finally {
-    shiftsLoading.value = false
+    if (requestId === shiftsRequestId)
+      shiftsLoading.value = false
   }
 }
 
-onMounted(loadShifts)
-watch([page, dateFrom, dateTo, statusFilter], () => {
-  page.value = 1
-  loadShifts()
+onMounted(() => { void loadShifts() })
+watch(page, () => { void loadShifts() })
+watch([dateFrom, dateTo, statusFilter], () => {
+  if (page.value !== 1)
+    page.value = 1
+  else
+    void loadShifts()
 })
 
 // -------------------- selected shift state --------------------
 const selectedShift = ref<any>(null)
 const perf = ref<any>(null)
 const perfLoading = ref(false)
-const topProducts = ref<any[]>([])
-const topLoading = ref(false)
+const topProducts = computed<any[]>(() => Array.isArray(perf.value?.top_products) ? perf.value.top_products : [])
+const topLoading = computed(() => perfLoading.value)
+let performanceRequestId = 0
+
+function clearSelectedShift() {
+  selectedShiftId.value = null
+  selectedShift.value = null
+  perf.value = null
+  performanceRequestId++
+}
 
 async function selectShift(s: any) {
   selectedShiftId.value = s.id
   selectedShift.value = s
-  await Promise.all([loadPerformance(s.id), loadTopProducts(s)])
+  perf.value = null
+  await loadPerformance(s.id)
 }
 
 async function loadPerformance(shiftId: number) {
+  const requestId = ++performanceRequestId
   perfLoading.value = true
   try {
     const res = await axios.get(`/analytics/shifts/${shiftId}`)
-
+    if (requestId !== performanceRequestId || selectedShiftId.value !== shiftId)
+      return
     perf.value = res.data?.data ?? res.data
   }
   catch (e: any) {
+    if (requestId !== performanceRequestId)
+      return
     notify(e?.response?.data?.message ?? t('Failed to load performance'), 'error')
     perf.value = null
   }
   finally {
-    perfLoading.value = false
-  }
-}
-
-async function loadTopProducts(shift: any) {
-  if (!shift?.start_time)
-    return
-  topLoading.value = true
-  try {
-    const start = String(shift.start_time).slice(0, 10)
-    const end = shift.end_time ? String(shift.end_time).slice(0, 10) : start
-    const res = await axios.get('/orders/stats/top-products', {
-      params: { date_from: start, date_to: end, limit: 10 },
-    })
-    const d = res.data?.data ?? res.data
-
-    topProducts.value = d?.products ?? d?.items ?? d ?? []
-  }
-  catch {
-    topProducts.value = []
-  }
-  finally {
-    topLoading.value = false
+    if (requestId === performanceRequestId)
+      perfLoading.value = false
   }
 }
 
@@ -110,7 +125,7 @@ function fmtDuration(seconds: number | null | undefined) {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
 
-  return `${m}m ${s}s`
+  return `${m}${t('time_minute_short')} ${s}${t('time_second_short')}`
 }
 
 function fmtShiftLength(minutes: number | null | undefined) {
@@ -119,7 +134,9 @@ function fmtShiftLength(minutes: number | null | undefined) {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
 
-  return h ? `${h}h ${m}m` : `${m}m`
+  return h
+    ? `${h}${t('time_hour_short')} ${m}${t('time_minute_short')}`
+    : `${m}${t('time_minute_short')}`
 }
 
 // -------------------- cash variance --------------------
@@ -230,7 +247,7 @@ const statusColor: Record<string, string> = {
             />
             <VSelect
               v-model="statusFilter"
-              :items="['ACTIVE', 'COMPLETED', 'ABANDONED']"
+              :items="shiftStatusOptions"
               :placeholder="t('Status')"
               density="compact"
               hide-details
@@ -283,6 +300,15 @@ const statusColor: Record<string, string> = {
               </VListItemTitle>
             </VListItem>
           </VList>
+          <VDivider v-if="pageCount > 1" />
+          <VPagination
+            v-if="pageCount > 1"
+            v-model="page"
+            :length="pageCount"
+            :total-visible="5"
+            density="compact"
+            class="py-2"
+          />
         </VCard>
       </VCol>
 

@@ -9,6 +9,7 @@
      <BarcodeScanner v-model:open="scanOpen" @decoded="onCode" />
    ============================================================ */
 import DesignIcon from './DesignIcon.vue'
+import { designId } from './ids'
 
 interface Props {
   open: boolean
@@ -30,11 +31,15 @@ const emit = defineEmits<{
 const { t } = useI18n({ useScope: 'global' })
 
 const videoRef = ref<HTMLVideoElement | null>(null)
+const dialogRef = ref<HTMLElement | null>(null)
 const error = ref<string | null>(null)
 const lastCode = ref<string>('')
 const controlsRef = ref<{ stop: () => void } | null>(null)
+const titleId = designId('scanner-title')
+let previouslyFocused: HTMLElement | null = null
 
 function close() {
+  stop()
   emit('update:open', false)
 }
 
@@ -61,8 +66,8 @@ async function start() {
       },
     )
   }
-  catch (e: any) {
-    error.value = e?.message || String(e)
+  catch {
+    error.value = t('Request failed. Please try again.')
   }
 }
 
@@ -73,26 +78,62 @@ function stop() {
 }
 
 function onKey(e: KeyboardEvent) {
-  if (props.open && e.key === 'Escape') close()
+  if (!props.open) return
+  if (e.key === 'Escape') {
+    close()
+    return
+  }
+  if (e.key !== 'Tab' || !dialogRef.value) return
+  const items = Array.from(dialogRef.value.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  )).filter(node => node.offsetParent !== null)
+  if (!items.length) {
+    e.preventDefault()
+    dialogRef.value.focus()
+    return
+  }
+  const first = items[0]
+  const last = items[items.length - 1]
+  const active = document.activeElement as HTMLElement | null
+  if (!active || !dialogRef.value.contains(active)) {
+    e.preventDefault()
+    ;(e.shiftKey ? last : first).focus()
+  }
+  else if (e.shiftKey && active === first) {
+    e.preventDefault()
+    last.focus()
+  }
+  else if (!e.shiftKey && active === last) {
+    e.preventDefault()
+    first.focus()
+  }
 }
 
 watch(
   () => props.open,
   async (v) => {
     if (v) {
+      previouslyFocused = document.activeElement as HTMLElement | null
       await nextTick()
+      dialogRef.value?.querySelector<HTMLButtonElement>('.scan-close')?.focus()
       start()
     }
     else {
       stop()
+      if (previouslyFocused) {
+        previouslyFocused.focus()
+        previouslyFocused = null
+      }
     }
   },
+  { immediate: true },
 )
 
 onMounted(() => { window.addEventListener('keydown', onKey) })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
   stop()
+  if (previouslyFocused) previouslyFocused.focus()
 })
 </script>
 
@@ -104,10 +145,25 @@ onBeforeUnmount(() => {
         class="scan-sheet"
         @mousedown.self="close"
       >
-        <div class="scan-frame">
+        <div
+          ref="dialogRef"
+          class="scan-frame"
+          role="dialog"
+          aria-modal="true"
+          :aria-labelledby="titleId"
+          tabindex="-1"
+        >
           <div class="scan-head">
-            <span class="scan-title">{{ t('Scan barcode') }}</span>
-            <button class="scan-close" :title="t('Close')" @click="close">
+            <span
+              :id="titleId"
+              class="scan-title"
+            >{{ t('Scan barcode') }}</span>
+            <button
+              class="scan-close"
+              :title="t('Close')"
+              :aria-label="t('Close')"
+              @click="close"
+            >
               <DesignIcon name="close" :size="18" />
             </button>
           </div>
@@ -118,12 +174,16 @@ onBeforeUnmount(() => {
               autoplay
               playsinline
               muted
+              aria-hidden="true"
             />
             <div class="scan-frame-overlay" />
           </div>
-          <div class="scan-hint">
+          <div
+            class="scan-hint"
+            aria-live="polite"
+          >
             <template v-if="error">
-              <span class="scan-err">{{ error }}</span>
+              <span class="scan-err" role="alert">{{ error }}</span>
             </template>
             <template v-else-if="lastCode">
               <span class="scan-found">{{ t('Code') }}: <code>{{ lastCode }}</code></span>
@@ -153,7 +213,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  color: var(--surface);
+  color: #fff;
 }
 .scan-head {
   display: flex;
@@ -167,7 +227,7 @@ onBeforeUnmount(() => {
 .scan-close {
   background: rgba(255, 255, 255, 0.12);
   border: 0;
-  color: var(--surface);
+  color: #fff;
   padding: 6px 8px;
   border-radius: 8px;
   cursor: pointer;

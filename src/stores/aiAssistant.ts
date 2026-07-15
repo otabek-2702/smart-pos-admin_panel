@@ -136,6 +136,11 @@ function coerceMessage(raw: any): ChatMessage | null {
 }
 
 function coerceDetail(raw: any): RemoteChatDetail | null {
+  // The API wraps the selected conversation as `{ success, chat }`, while
+  // some earlier deployments returned the chat object directly. Accept both;
+  // otherwise a perfectly valid click response is discarded and the history
+  // row looks as though it cannot be opened.
+  raw = raw?.chat ?? raw?.data?.chat ?? raw?.data ?? raw
   if (!raw || (raw.id === undefined || raw.id === null))
     return null
   const msgsRaw = Array.isArray(raw.messages) ? raw.messages : []

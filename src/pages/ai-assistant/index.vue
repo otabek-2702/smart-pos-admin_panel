@@ -468,7 +468,7 @@ function exportChat() {
               </button>
             </div>
             <div class="tertiary" style="font-size: 12px; white-space: nowrap;">
-              {{ isGenerating ? thinkingLabel : t('POS analyst · always-on') }}
+              {{ t('POS analyst · always-on') }}
             </div>
           </div>
         </div>
@@ -588,7 +588,10 @@ function exportChat() {
                 <div class="msg__col">
                   <div class="msg__bubble">
                     <template v-if="m.streaming && !m.content">
-                      <span class="typing"><span /><span /><span /></span>
+                      <span class="msg__thinking">
+                        <DesignIcon name="sparkle" :size="15" />
+                        {{ thinkingLabel }}
+                      </span>
                     </template>
                     <template v-else>
                       <MarkdownMessage :content="m.content" :streaming="!!m.streaming" />
@@ -690,6 +693,22 @@ meta:
   gap: 10px;
 }
 .aithread { position: relative; }
+.msg__thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+.msg__thinking :deep(svg) {
+  color: var(--primary);
+  animation: ai-thinking-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ai-thinking-pulse {
+  50% { opacity: .45; transform: scale(.88); }
+}
 
 /* editable header title */
 .aititle {

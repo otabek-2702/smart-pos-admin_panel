@@ -40,27 +40,6 @@ All five verified end-to-end against prod BE with real data, FE wired + merged t
 
 ## Open
 
-### 23. Filter-consistent order and shift summaries
-**Why:** The admin panel must never show a filtered list alongside KPIs or
-analytics calculated from a different data set.
-
-**Need:**
-- Make `GET /orders/stats` apply every filter supported by `GET /orders`,
-  including the business-day window, status, cashier, payment method, order
-  type, category/product, and search.
-- Make `GET /shifts` global summary/KPIs apply the same date/business-day,
-  cashier, status, and live/closed filters as the returned rows. Pagination and
-  sorting must not alter those global totals.
-- Make shift-analytics top products use only the selected shift's cashier and
-  actual time window, excluding cancelled and unpaid orders.
-
-**Acceptance:** for each view, applying a filter changes the displayed rows,
-the count, and all summary values consistently; clearing the filter restores
-the unfiltered values.
-
-**Status:** requested from Abrorbek 2026-07-15; awaiting implementation and
-commit for frontend verification.
-
 ### 1. Date-filterable dashboard endpoint
 **Why:** FE topbar exposes a date range. Today only `/dashboard/today` exists — single snapshot, no range support.
 

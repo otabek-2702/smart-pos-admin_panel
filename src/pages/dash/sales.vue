@@ -6,6 +6,7 @@ import Card from '@/components/design/Card.vue'
 import Skeleton from '@/components/design/Skeleton.vue'
 import Delta from '@/components/design/Delta.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
+import DonutChart from '@/components/design/DonutChart.vue'
 import LineAreaChart from '@/components/design/LineAreaChart.vue'
 import BarChart from '@/components/design/BarChart.vue'
 import { fmtAbbr, fmtNum } from '@/components/design/utils/format'
@@ -43,9 +44,6 @@ interface DashData {
   expense30: number[]
   previousRevenue: number[]
   dayLabels: string[]
-  HM_DAYS: string[]
-  HM_HOURS: string[]
-  heatMatrix: number[][]
   channelDays: ChannelDay[]
 }
 
@@ -93,20 +91,19 @@ const heroKpis = computed<HeroKpiData[]>(() => {
       spark: revenue30.slice(-14),
     },
     {
-      label: t('Compared with previous {window}', { window: windowLabel.value }),
+      label: t('Change vs previous period'),
       value: hasPrevious ? `${vsPreviousDiff >= 0 ? '+' : ''}${fmtAbbr(vsPreviousDiff)}` : '—',
       unit: hasPrevious ? 'UZS' : '',
       icon: 'trend',
       tone: hasPrevious ? (vsPreviousDiff >= 0 ? 'success' : 'error') : 'neutral',
     },
     {
-      label: t('Highest revenue period'),
+      label: isHourly.value ? t('Peak revenue hour') : t('Peak revenue day'),
       value: revenue30.length ? Math.max(...revenue30) : 0,
       money: true,
       unit: 'UZS',
       icon: 'star',
       tone: 'warning',
-      sub: isHourly.value ? t('single-hour record') : t('single-day record'),
     },
     {
       label: t('Expenses · {window}', { window: windowLabel.value }),
@@ -134,19 +131,23 @@ const bullets = computed<BulletItem[]>(() => [])
 // ---------- Daily orders + revenue bars (sepettakip-style per-day breakdown) ----------
 // Day count comes from channelDays' hall+delivery+pickup sum, revenue from
 // revenue30. Each bar carries the formatted value as a top-label.
-function shortDay(label: string): string {
+function bucketLabel(label: string): string {
   const s = label || ''
-  // Single-day view returns hourly "HH:00" buckets — show them as-is.
-  if (/^\d{1,2}:\d{2}$/.test(s)) return s
-  // BE dayLabels look like "2026-06-09" — surface "09" for compactness.
-  const m = /(\d{2})$/.exec(s)
-  return m ? m[1] : s.slice(-5)
+  if (/^\d{1,2}:\d{2}$/.test(s))
+    return s.padStart(5, '0')
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [year, month, day] = s.split('-').map(Number)
+    return new Intl.DateTimeFormat(String(locale.value), {
+      day: 'numeric', month: 'short',
+    }).format(new Date(year, month - 1, day))
+  }
+  return s
 }
 const ordersByDay = computed(() => {
   const D = data.value
   if (!D || !D.channelDays?.length) return [] as { label: string; value: number }[]
   return D.channelDays.map((d: any) => ({
-    label: shortDay(d.day || d.label || ''),
+    label: bucketLabel(d.label || ''),
     value: (d.values?.hall ?? 0) + (d.values?.delivery ?? 0) + (d.values?.pickup ?? 0),
   }))
 })
@@ -155,8 +156,49 @@ const revenueByDay = computed(() => {
   if (!D) return [] as { label: string; value: number }[]
   const rev = toNumArr(D.revenue30)
   const labels = Array.isArray(D.dayLabels) ? D.dayLabels : []
-  return rev.map((v, i) => ({ label: shortDay(labels[i] || `D${i + 1}`), value: v }))
+  return rev.map((v, i) => ({ label: bucketLabel(labels[i] || ''), value: v }))
 })
+
+const expenseBreakdown = computed(() => {
+  const D = data.value
+  if (!D) return [] as { label: string; value: number }[]
+  const labels = Array.isArray(D.dayLabels) ? D.dayLabels : []
+  return toNumArr(D.expense30)
+    .map((value, index) => ({ label: bucketLabel(labels[index] || ''), value }))
+    .filter(row => row.value > 0)
+    .reverse()
+    .slice(0, 8)
+})
+
+const expenseListTitle = computed(() => isHourly.value
+  ? t('Expense totals by hour')
+  : t('Expense totals by day'))
+
+const ordersChartTitle = computed(() => isHourly.value
+  ? t('Orders by hour')
+  : t('Daily orders'))
+
+const xLabelEvery = computed(() => isHourly.value
+  ? 2
+  : Math.max(1, Math.ceil(ordersByDay.value.length / 12)))
+
+const orderTypeMix = computed(() => {
+  const D = data.value
+  if (!D) return [] as Array<{ label: string; value: number; color: string }>
+  const totals = D.channelDays.reduce((acc, row) => {
+    acc.hall += Number(row.values?.hall) || 0
+    acc.delivery += Number(row.values?.delivery) || 0
+    acc.pickup += Number(row.values?.pickup) || 0
+    return acc
+  }, { hall: 0, delivery: 0, pickup: 0 })
+  return [
+    { label: t('Hall'), value: totals.hall, color: 'rgb(var(--v-theme-c1))' },
+    { label: t('Delivery'), value: totals.delivery, color: 'rgb(var(--v-theme-c3))' },
+    { label: t('Pickup'), value: totals.pickup, color: 'rgb(var(--v-theme-c2))' },
+  ].filter(row => row.value > 0)
+})
+
+const orderTypeTotal = computed(() => orderTypeMix.value.reduce((sum, row) => sum + row.value, 0))
 
 // ---------- Revenue/Expense chart series ----------
 // BE returns Decimal as string. Coerce before passing to LineAreaChart — maxV's
@@ -170,103 +212,6 @@ const chartSeries = computed(() => {
     { key: 'expense', label: t('Expenses'), color: 'rgb(var(--v-theme-chart-expense))', data: toNumArr(D.expense30) },
   ]
 })
-
-// ---------- Heatmap helpers (inline fallback) ----------
-const HEAT_LABEL_W = 42
-const HEAT_GAP = 3
-const HEAT_PAD_T = 22
-const HEAT_CELL_MAX_H = 30
-
-const heatMaxVal = computed(() => {
-  const D = data.value
-  if (!D) return 1
-  let m = 1
-  for (const row of D.heatMatrix) {
-    for (const v of row) if (v > m) m = v
-  }
-  return m
-})
-
-function heatOpacity(v: number): number {
-  if (v === 0) return 0.04
-  return 0.12 + (v / heatMaxVal.value) * 0.88
-}
-
-// Peak (day, hour) computed from real heatMatrix. Headline reads "{Day} at {Hour}
-// peak" instead of the previous hardcoded "Fri & Sat dinner drive volume" line.
-const heatPeak = computed<{ day: string; hour: string } | null>(() => {
-  const D = data.value
-  if (!D?.heatMatrix?.length) return null
-  let best = 0
-  let row = 0
-  let col = 0
-  for (let r = 0; r < D.heatMatrix.length; r++) {
-    const cells = D.heatMatrix[r]
-    if (!cells) continue
-    for (let c = 0; c < cells.length; c++) {
-      const v = Number(cells[c]) || 0
-      if (v > best) { best = v; row = r; col = c }
-    }
-  }
-  if (!best) return null
-  return { day: weekdayLabel(D.HM_DAYS?.[row] || ''), hour: D.HM_HOURS?.[col] || '' }
-})
-
-function weekdayLabel(value: string): string {
-  const key = String(value).trim().toLowerCase().slice(0, 3)
-  const index = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].indexOf(key)
-  if (index < 0) return value
-  // Use a fixed Monday week so names follow the active app locale instead of
-  // leaking English labels returned by analytics.
-  return new Intl.DateTimeFormat(String(locale.value), { weekday: 'short' })
-    .format(new Date(2024, 0, 1 + index))
-}
-
-// ---------- StackedBar helpers (inline fallback) ----------
-interface ChannelSeries {
-  key: 'hall' | 'delivery' | 'pickup'
-  label: string
-  color: string
-}
-
-const channelSeries = computed<ChannelSeries[]>(() => [
-  { key: 'hall', label: t('Hall'), color: 'rgb(var(--v-theme-c1, var(--v-theme-primary)))' },
-  { key: 'delivery', label: t('Delivery'), color: 'rgb(var(--v-theme-c3, var(--v-theme-warning)))' },
-  { key: 'pickup', label: t('Pickup'), color: 'rgb(var(--v-theme-c2, var(--v-theme-success)))' },
-])
-
-const STACK_PAD_L = 46
-const STACK_PAD_R = 12
-const STACK_PAD_T = 14
-const STACK_PAD_B = 30
-const STACK_HEIGHT = 260
-
-const stackTotals = computed(() => {
-  const D = data.value
-  if (!D) return [] as number[]
-  return D.channelDays.map((d: any) => (d.values?.hall ?? 0) + (d.values?.delivery ?? 0) + (d.values?.pickup ?? 0))
-})
-
-const stackMax = computed(() => {
-  const ts = stackTotals.value
-  if (!ts.length) return 1
-  return Math.max(1, ...ts)
-})
-
-function niceTopVal(max: number, n = 4): { top: number; ticks: number[] } {
-  if (max <= 0) return { top: 1, ticks: [0, 1] }
-  const raw = max / n
-  const mag = Math.pow(10, Math.floor(Math.log10(raw)))
-  const norm = raw / mag
-  let step = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10
-  step *= mag
-  const top = Math.ceil(max / step) * step
-  const ticks: number[] = []
-  for (let v = 0; v <= top + 1e-6; v += step) ticks.push(v)
-  return { top, ticks }
-}
-
-const stackNice = computed(() => niceTopVal(stackMax.value, 4))
 
 // ---------- Sparkline (tiny inline SVG, no chart lib) ----------
 function sparkPath(values: number[], w = 96, h = 30): string {
@@ -307,16 +252,25 @@ async function loadDashboard() {
       : { range: r?.preset || '30d' }
     const from = r?.from || ''
     const to = r?.to || ''
-    const start = from ? new Date(`${from}T00:00:00`) : new Date()
-    const end = to ? new Date(`${to}T00:00:00`) : new Date()
-    const span = Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000))
-    const prevTo = new Date(start); prevTo.setDate(prevTo.getDate() - 1)
-    const prevFrom = new Date(prevTo); prevFrom.setDate(prevFrom.getDate() - span)
+    // An unbounded "all time" result has no fair previous period. Do not
+    // accidentally compare it with the day before the browser clock.
+    const canCompare = Boolean(from && to)
+    const start = from ? new Date(`${from}T00:00:00`) : null
+    const end = to ? new Date(`${to}T00:00:00`) : null
+    const span = start && end
+      ? Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000))
+      : 0
+    const prevTo = start ? new Date(start) : null
+    prevTo?.setDate(prevTo.getDate() - 1)
+    const prevFrom = prevTo ? new Date(prevTo) : null
+    prevFrom?.setDate(prevFrom.getDate() - span)
     const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    const prevParams = buildDateParams({ from: iso(prevFrom), to: iso(prevTo), fromTime: r?.fromTime, toTime: r?.toTime })
+    const prevParams = prevFrom && prevTo
+      ? buildDateParams({ from: iso(prevFrom), to: iso(prevTo), fromTime: r?.fromTime, toTime: r?.toTime })
+      : {}
     const [res, prevRes] = await Promise.all([
       axiosIns.get('/dashboard/sales', { params }),
-      axiosIns.get('/dashboard/sales', { params: prevParams }).catch(() => null),
+      canCompare ? axiosIns.get('/dashboard/sales', { params: prevParams }).catch(() => null) : Promise.resolve(null),
     ])
     const raw = res.data?.data ?? res.data
     const previous = prevRes?.data?.data ?? prevRes?.data ?? {}
@@ -325,7 +279,7 @@ async function loadDashboard() {
     // instead of touching N template bindings.
     const channelDays = Array.isArray(raw?.channelDays)
       ? raw.channelDays.map((d: any) => ({
-          label: String(d.day || '').slice(5), // 'MM-DD'
+          label: String(d.day || ''),
           values: {
             hall: Number(d.hall) || 0,
             delivery: Number(d.delivery) || 0,
@@ -457,10 +411,7 @@ onMounted(() => {
       </div>
 
       <!-- Row 2: Revenue vs Expenses chart + Category targets bullets -->
-      <div
-        class="grid"
-        :style="{ gridTemplateColumns: bullets.length ? '1.5fr 1fr' : '1fr' }"
-      >
+      <div class="grid sales-revenue-grid">
         <Card>
           <div class="card__head">
             <div class="card__head-text">
@@ -497,6 +448,41 @@ onMounted(() => {
                 />{{ t('Expenses') }}
               </span>
             </div>
+          </div>
+        </Card>
+
+        <Card class="sales-expense-list">
+          <div class="card__head">
+            <div class="card__head-text">
+              <div class="kpi__label">
+                {{ expenseListTitle }}
+              </div>
+              <h3 class="card__title">
+                {{ t('Expenses') }}
+              </h3>
+            </div>
+          </div>
+          <div class="card__body">
+            <div
+              v-if="expenseBreakdown.length"
+              class="sales-expense-list__rows"
+            >
+              <div
+                v-for="row in expenseBreakdown"
+                :key="row.label"
+                class="sales-expense-list__row"
+              >
+                <span>{{ row.label }}</span>
+                <strong class="mono">{{ formatCurrency(row.value) }}</strong>
+              </div>
+            </div>
+            <p
+              v-else
+              class="muted"
+              style="margin: 4px 0 0; font-size: 13px;"
+            >
+              {{ t('No expenses recorded') }}
+            </p>
           </div>
         </Card>
 
@@ -571,176 +557,32 @@ onMounted(() => {
         </Card>
       </div>
 
-      <!-- Row 3: Heatmap (when sales happen) + StackedBar (by channel) -->
-      <div
-        class="grid"
-        :style="{ gridTemplateColumns: '1.4fr 1fr' }"
-      >
-        <Card>
-          <div class="card__head">
-            <div class="card__head-text">
-              <div class="kpi__label">
-                {{ t('When sales happen') }}
-              </div>
-              <h3 v-if="heatPeak" class="card__insight">
-                {{ t('Peak {day} at {hour}', { day: heatPeak.day, hour: heatPeak.hour }) }}
-              </h3>
+      <!-- The weekly distribution chart was removed: it did not give a reliable, range-aware insight. -->
+      <Card v-if="orderTypeMix.length" class="sales-order-type">
+        <div class="card__head">
+          <div class="card__head-text">
+            <div class="kpi__label">
+              {{ t('Order type mix · {window}', { window: windowLabel }) }}
             </div>
+            <h3 class="card__title">
+              {{ t('Where orders come from') }}
+            </h3>
           </div>
-          <div class="card__body">
-            <!-- Inline Heatmap fallback (replace w/ <Heatmap> in phase 2) -->
-            <div
-              v-if="data"
-              class="sales-heatmap"
-            >
-              <div
-                class="sales-heatmap__hours"
-                :style="{ paddingLeft: `${HEAT_LABEL_W}px`, gap: `${HEAT_GAP}px` }"
-              >
-                <span
-                  v-for="(h, hi) in data.HM_HOURS"
-                  :key="`hh${hi}`"
-                  class="sales-heatmap__hour"
-                >{{ h }}</span>
-              </div>
-              <div
-                v-for="(rLab, ri) in data.HM_DAYS"
-                :key="`hr${ri}`"
-                class="sales-heatmap__row"
-                :style="{ gap: `${HEAT_GAP}px`, marginTop: ri === 0 ? `${HEAT_PAD_T - 16}px` : `${HEAT_GAP}px` }"
-              >
-                <span
-                  class="sales-heatmap__day"
-                  :style="{ width: `${HEAT_LABEL_W - 8}px` }"
-                >{{ weekdayLabel(rLab) }}</span>
-                <div
-                  v-for="(_cLab, ci) in data.HM_HOURS"
-                  :key="`hc${ri}-${ci}`"
-                  class="sales-heatmap__cell"
-                  :style="{
-                    background: `rgba(var(--v-theme-primary-rgb, 58, 91, 219), ${heatOpacity(data.heatMatrix[ri]?.[ci] || 0)})`,
-                    maxHeight: `${HEAT_CELL_MAX_H}px`,
-                  }"
-                    :title="`${weekdayLabel(rLab)} · ${data.HM_HOURS[ci]} — ${fmtNum(data.heatMatrix[ri]?.[ci] || 0)} ${t('orders')}`"
-                />
-              </div>
-              <div
-                class="row"
-                style="gap: 8px; justify-content: flex-end; margin-top: 10px; font-size: 11px; color: rgb(var(--v-theme-text-tertiary));"
-              >
-                <span>{{ t('Less') }}</span>
-                <span
-                  v-for="(o, i) in [0.08, 0.3, 0.55, 0.8, 1]"
-                  :key="`leg${i}`"
-                  :style="{
-                    width: '16px',
-                    height: '12px',
-                    borderRadius: '3px',
-                    background: `rgba(var(--v-theme-primary-rgb, 58, 91, 219), ${o})`,
-                  }"
-                />
-                <span>{{ t('More') }}</span>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          <div class="card__head">
-            <div class="card__head-text">
-              <div class="kpi__label">
-                {{ t('By channel · {window}', { window: windowLabel }) }}
-              </div>
-              <h3 class="card__title">
-                {{ t('Hall vs delivery vs pickup') }}
-              </h3>
-            </div>
-          </div>
-          <div class="card__body">
-            <!-- Inline StackedBar fallback (replace w/ <StackedBar> in phase 2) -->
-            <div
-              v-if="data"
-              class="sales-stack"
-            >
-              <svg
-                :width="'100%'"
-                :height="STACK_HEIGHT"
-                :viewBox="`0 0 ${Math.max(360, data.channelDays.length * 64 + STACK_PAD_L + STACK_PAD_R)} ${STACK_HEIGHT}`"
-                preserveAspectRatio="none"
-                style="display: block;"
-              >
-                <!-- gridlines + y labels -->
-                <g
-                  v-for="(tk, i) in stackNice.ticks"
-                  :key="`gl${i}`"
-                >
-                  <line
-                    :x1="STACK_PAD_L"
-                    :x2="Math.max(360, data.channelDays.length * 64 + STACK_PAD_L + STACK_PAD_R) - STACK_PAD_R"
-                    :y1="STACK_PAD_T + (STACK_HEIGHT - STACK_PAD_T - STACK_PAD_B) - (tk / stackNice.top) * (STACK_HEIGHT - STACK_PAD_T - STACK_PAD_B)"
-                    :y2="STACK_PAD_T + (STACK_HEIGHT - STACK_PAD_T - STACK_PAD_B) - (tk / stackNice.top) * (STACK_HEIGHT - STACK_PAD_T - STACK_PAD_B)"
-                    stroke="rgb(var(--v-theme-chart-grid))"
-                    stroke-width="1"
-                  />
-                  <text
-                    :x="STACK_PAD_L - 8"
-                    :y="STACK_PAD_T + (STACK_HEIGHT - STACK_PAD_T - STACK_PAD_B) - (tk / stackNice.top) * (STACK_HEIGHT - STACK_PAD_T - STACK_PAD_B) + 4"
-                    text-anchor="end"
-                    font-size="11"
-                    fill="rgb(var(--v-theme-chart-axis))"
-                    font-family="var(--font-mono)"
-                  >{{ fmtAbbr(tk) }}</text>
-                </g>
-                <!-- stacked bars -->
-                <g
-                  v-for="(d, i) in data.channelDays"
-                  :key="`sb${i}`"
-                >
-                  <template v-for="(s, si) in channelSeries" :key="`sbs${i}${si}`">
-                    <rect
-                      :x="STACK_PAD_L + (Math.max(360, data.channelDays.length * 64 + STACK_PAD_L + STACK_PAD_R) - STACK_PAD_L - STACK_PAD_R) / data.channelDays.length * i + ((Math.max(360, data.channelDays.length * 64 + STACK_PAD_L + STACK_PAD_R) - STACK_PAD_L - STACK_PAD_R) / data.channelDays.length - Math.min((Math.max(360, data.channelDays.length * 64 + STACK_PAD_L + STACK_PAD_R) - STACK_PAD_L - STACK_PAD_R) / data.channelDays.length * 0.6, 46)) / 2"
-                      :y="STACK_PAD_T + (STACK_HEIGHT - STACK_PAD_T - STACK_PAD_B) - (channelSeries.slice(0, si + 1).reduce((a, ss) => a + (d.values[ss.key] || 0), 0) / stackNice.top) * (STACK_HEIGHT - STACK_PAD_T - STACK_PAD_B)"
-                      :width="Math.min((Math.max(360, data.channelDays.length * 64 + STACK_PAD_L + STACK_PAD_R) - STACK_PAD_L - STACK_PAD_R) / data.channelDays.length * 0.6, 46)"
-                      :height="Math.max(0, ((d.values[s.key] || 0) / stackNice.top) * (STACK_HEIGHT - STACK_PAD_T - STACK_PAD_B))"
-                      :fill="s.color"
-                    >
-                      <title>{{ d.label }} · {{ s.label }} — {{ fmtNum(d.values[s.key] || 0) }}</title>
-                    </rect>
-                  </template>
-                  <text
-                    :x="STACK_PAD_L + (Math.max(360, data.channelDays.length * 64 + STACK_PAD_L + STACK_PAD_R) - STACK_PAD_L - STACK_PAD_R) / data.channelDays.length * i + (Math.max(360, data.channelDays.length * 64 + STACK_PAD_L + STACK_PAD_R) - STACK_PAD_L - STACK_PAD_R) / data.channelDays.length / 2"
-                    :y="STACK_HEIGHT - 10"
-                    text-anchor="middle"
-                    font-size="11"
-                    fill="rgb(var(--v-theme-chart-axis))"
-                  >{{ d.label }}</text>
-                </g>
-              </svg>
-              <div
-                class="chart-legend"
-                style="margin-top: 12px; justify-content: center;"
-              >
-                <span
-                  v-for="s in channelSeries"
-                  :key="s.key"
-                  class="legend-item"
-                >
-                  <span
-                    class="legend-swatch"
-                    :style="{ background: s.color }"
-                  />{{ s.label }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </Card>
-      </div>
+        </div>
+        <div class="card__body">
+          <DonutChart
+            :data="orderTypeMix"
+            :center-label="t('Orders')"
+            :center-value="fmtNum(orderTypeTotal)"
+            :size="208"
+          />
+        </div>
+      </Card>
 
       <!-- Row 4: daily order count + daily revenue bars, labels above each bar. -->
       <div
         v-if="ordersByDay.length || revenueByDay.length"
-        class="grid"
-        :style="{ gridTemplateColumns: '1fr' }"
+        class="grid sales-bottom-grid"
       >
         <Card v-if="ordersByDay.length">
           <div class="card__head">
@@ -749,7 +591,7 @@ onMounted(() => {
                 {{ t('{window} · order count', { window: windowLabel }) }}
               </div>
               <h3 class="card__title">
-                {{ t('Daily orders') }}
+                {{ ordersChartTitle }}
               </h3>
             </div>
           </div>
@@ -761,6 +603,7 @@ onMounted(() => {
               :value-label="t('Orders')"
               :y-format="(v: number) => String(Math.round(v))"
               :label-format="(v: number) => String(Math.round(v))"
+              :x-label-every="xLabelEvery"
             />
           </div>
         </Card>
@@ -783,6 +626,7 @@ onMounted(() => {
               :value-label="t('Revenue')"
               :y-format="fmtAbbr"
               :label-format="fmtAbbr"
+              :x-label-every="xLabelEvery"
             />
           </div>
         </Card>
@@ -945,44 +789,45 @@ onMounted(() => {
   background: rgb(var(--v-theme-warning-weak));
 }
 
-/* Heatmap — inline fallback. */
-.sales-heatmap {
-  display: block;
+/* Range-aware dashboard sections. */
+.sales-revenue-grid {
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, .85fr);
 }
-.sales-heatmap__hours {
+.sales-expense-list__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sales-expense-list__row {
   display: flex;
   align-items: center;
-  margin-bottom: 8px;
-}
-.sales-heatmap__hour {
-  flex: 1;
-  text-align: center;
-  font-size: 10px;
-  color: rgb(var(--v-theme-chart-axis));
-  font-family: var(--font-mono);
-}
-.sales-heatmap__row {
-  display: flex;
-  align-items: center;
-}
-.sales-heatmap__day {
-  text-align: right;
-  padding-right: 8px;
-  font-size: 11px;
-  font-weight: 600;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 38px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgb(var(--v-theme-border));
   color: rgb(var(--v-theme-text-secondary));
-  flex: 0 0 auto;
+  font-size: var(--fs-sm);
 }
-.sales-heatmap__cell {
-  flex: 1;
-  height: 26px;
-  border-radius: 4px;
-  cursor: default;
+.sales-expense-list__row:last-child {
+  border-bottom: 0;
+}
+.sales-expense-list__row strong {
+  color: rgb(var(--v-theme-on-surface));
+  white-space: nowrap;
+}
+.sales-order-type :deep(.donut-row) {
+  justify-content: center;
+}
+.sales-bottom-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-/* StackedBar wrapper. */
-.sales-stack {
-  display: block;
+@media (max-width: 900px) {
+  .sales-revenue-grid,
+  .sales-bottom-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .row {

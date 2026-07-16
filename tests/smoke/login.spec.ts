@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test'
 
-const EMAIL = process.env.PW_EMAIL || 'admin@gmail.com'
-const PASSWORD = process.env.PW_PASSWORD || '123'
+// A route smoke test against a real environment must receive a deliberately
+// provisioned account. Do not ship a guessed/default production credential.
+const EMAIL = process.env.PW_EMAIL
+const PASSWORD = process.env.PW_PASSWORD
 
 /** Top-level nav routes we expect to load without console errors. */
 const NAV_ROUTES = [
@@ -27,6 +29,11 @@ const NAV_ROUTES = [
 
 test.describe('smoke', () => {
   test('login + every top-level nav loads without console errors', async ({ page }) => {
+    if (!EMAIL || !PASSWORD) {
+      test.skip(true, 'Set PW_EMAIL and PW_PASSWORD to run authenticated browser smoke.')
+      return
+    }
+
     // Collect console errors across the whole run; assert at the end.
     const consoleErrors: string[] = []
 
@@ -46,14 +53,18 @@ test.describe('smoke', () => {
     })
     page.on('pageerror', err => consoleErrors.push(`pageerror: ${err.message}`))
 
-    // 1. Login page renders
+    // 1. Login page renders. The app starts in Uzbek, so its visible labels
+    // are localized. Input types and the form submit button remain stable in
+    // every supported language.
     await page.goto('/login')
-    await expect(page.getByLabel(/email/i)).toBeVisible()
+    const email = page.locator('input[type="email"]')
+    const password = page.locator('input[type="password"]')
+    await expect(email).toBeVisible()
 
     // 2. Login
-    await page.getByLabel(/email/i).fill(EMAIL)
-    await page.getByLabel(/parol|password|пароль/i).fill(PASSWORD)
-    await page.getByRole('button', { name: /kirish|login|войти/i }).click()
+    await email.fill(EMAIL)
+    await password.fill(PASSWORD)
+    await page.locator('form button[type="submit"]').click()
 
     // 3. Should land on dashboard
     await page.waitForURL(url => !url.pathname.startsWith('/login'), { timeout: 10_000 })
@@ -65,7 +76,7 @@ test.describe('smoke', () => {
 
       await page.goto(route)
 
-      // Wait for the page to settle — `networkidle` is flaky in Vue 3 dev mode,
+      // Wait for the page to settle — networkidle is flaky in Vue 3 dev mode,
       // so just wait for either a card to appear or 1.5s, whichever comes first.
       await page.waitForLoadState('domcontentloaded')
       await page.waitForTimeout(1500)

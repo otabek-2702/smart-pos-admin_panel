@@ -23,6 +23,8 @@ interface Props {
   labelFormat?: (n: number) => string
   /** Draw a numeric label above every bar (not just the peak). */
   showLabels?: boolean
+  /** Keep dense hourly/date labels legible while retaining every hover target. */
+  xLabelEvery?: number
   loading?: boolean
 }
 
@@ -30,6 +32,7 @@ const props = withDefaults(defineProps<Props>(), {
   height: 240,
   valueLabel: 'Orders',
   showLabels: false,
+  xLabelEvery: 1,
 })
 
 const [elRef, w] = useWidth()
@@ -178,6 +181,7 @@ const tipTitle = computed(() => hover.value !== null ? props.data[hover.value].l
           :fill="d.peak ? 'rgb(var(--v-theme-chart-revenue))' : 'rgb(var(--v-theme-text-secondary))'"
         >{{ (labelFormat || yfmt)(d.value) }}</text>
         <text
+          v-if="i % Math.max(1, xLabelEvery) === 0 || i === data.length - 1"
           :x="padL + band * i + band / 2"
           :y="height - 9"
           text-anchor="middle"

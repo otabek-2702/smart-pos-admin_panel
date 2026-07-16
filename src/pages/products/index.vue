@@ -171,7 +171,11 @@ async function loadProducts() {
       params.order_by = sortBy.value
     if (includeDeleted.value)
       params.include_deleted = true
-    if (!popularFirst.value)
+    // Popular-first is a separate backend ordering. It must be disabled for an
+    // explicit A–Z, price, or date sort; otherwise the backend uses popularity
+    // and only uses order_by as a tie-breaker, which made this control appear
+    // broken.
+    if (!popularFirst.value || sortBy.value)
       params.popular = false
 
     const res = await axios.get('/products', { params })
@@ -254,6 +258,8 @@ watch(categoryFilterMulti, () => {
 }, { deep: true })
 
 watch(sortBy, () => {
+  if (sortBy.value)
+    popularFirst.value = false
   if (page.value !== 1)
     page.value = 1
   else
@@ -273,6 +279,12 @@ watch(popularFirst, () => {
   else
     void loadProducts()
 })
+
+function togglePopularFirst() {
+  popularFirst.value = !popularFirst.value
+  if (popularFirst.value)
+    sortBy.value = ''
+}
 
 // ---- dirty tracking ----
 const initialForm = ref({ name: '', description: '', price: 0, category_id: null as number | null, color: '' })
@@ -688,7 +700,7 @@ function goPage(p: number | '…') {
           class="row"
           style="gap:8px;cursor:pointer;align-items:center;"
           :title="t('Order best-sellers first')"
-          @click="popularFirst = !popularFirst"
+          @click="togglePopularFirst"
         >
           <div
             class="switch"

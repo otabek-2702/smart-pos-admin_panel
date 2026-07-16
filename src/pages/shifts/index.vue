@@ -14,6 +14,7 @@ import Badge from '@/components/design/Badge.vue'
 import Button from '@/components/design/Button.vue'
 import Card from '@/components/design/Card.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
+import DateRangePicker, { type DateRangeValue } from '@/components/design/DateRangePicker.vue'
 import Field from '@/components/design/Field.vue'
 import Input from '@/components/design/Input.vue'
 import Kpi from '@/components/design/Kpi.vue'
@@ -26,6 +27,7 @@ import Skeleton from '@/components/design/Skeleton.vue'
 import StateFill from '@/components/design/StateFill.vue'
 import Switch from '@/components/design/Switch.vue'
 import { Fmt } from '@/components/design/utils/format'
+import { formatWindow } from '@/composables/useWindowLabel'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -237,17 +239,15 @@ let shiftsRequestId = 0
 const cashierFilter = ref<string>('')
 const statusFilter = ref<string>('')
 const liveOnly = ref(false)
-const dateFrom = ref('')
-const dateTo = ref('')
+const dateRange = ref<DateRangeValue>({ from: '', to: '', preset: 'all' })
 
 // Sorting is performed by the server before pagination.
-const sortBy = ref<string>('priority')
+const sortBy = ref<string>('-start_time')
 const sortOptions = [
-  { value: 'priority', label: 'Priority (needs action)' },
-  { value: 'newest', label: 'Newest first' },
-  { value: 'oldest', label: 'Oldest first' },
-  { value: 'gross', label: 'Highest gross' },
-  { value: 'cashier', label: 'Cashier A–Z' },
+  { value: '-start_time', label: 'Newest first' },
+  { value: 'start_time', label: 'Oldest first' },
+  { value: '-total_revenue', label: 'Highest gross' },
+  { value: 'user__first_name', label: 'Cashier A–Z' },
 ]
 
 // live refresh
@@ -277,11 +277,11 @@ async function loadShifts(options: { preserve?: boolean } = {}) {
       params: {
         page: page.value,
         per_page: itemsPerPage.value,
-        sort: sortBy.value,
+        order_by: sortBy.value,
         cashier_id: cashierFilter.value || undefined,
         status: statusFilter.value || undefined,
-        date_from: dateFrom.value || undefined,
-        date_to: dateTo.value || undefined,
+        date_from: dateRange.value.from || undefined,
+        date_to: dateRange.value.to || undefined,
         live_only: liveOnly.value || undefined,
       },
     })
@@ -400,7 +400,7 @@ onUnmounted(() => {
     clearInterval(pollTimer)
 })
 
-watch([cashierFilter, statusFilter, liveOnly, dateFrom, dateTo, sortBy], () => {
+watch([cashierFilter, statusFilter, liveOnly, dateRange, sortBy], () => {
   if (page.value !== 1)
     page.value = 1
   else
@@ -465,6 +465,7 @@ const awaitingCount = computed(() => shiftSummary.value.awaitingCount)
 const expectedHandover = computed(() => shiftSummary.value.expectedHandover)
 const reconciledCount = computed(() => shiftSummary.value.reconciledCount)
 const netVariance = computed(() => shiftSummary.value.netVariance)
+const dateRangeLabel = computed(() => formatWindow(dateRange.value, t))
 
 /* ============================================================
    The server sorts before slicing the requested page.
@@ -493,10 +494,8 @@ const activeChips = computed<Chip[]>(() => {
     })
   if (liveOnly.value)
     out.push({ k: 'l', label: t('Live only'), val: t('On'), clear: () => { liveOnly.value = false } })
-  if (dateFrom.value)
-    out.push({ k: 'f', label: t('From'), val: dateFrom.value, clear: () => { dateFrom.value = '' } })
-  if (dateTo.value)
-    out.push({ k: 't', label: t('To'), val: dateTo.value, clear: () => { dateTo.value = '' } })
+  if (dateRange.value.from || dateRange.value.to)
+    out.push({ k: 'd', label: t('Period'), val: dateRangeLabel.value, clear: () => { dateRange.value = { from: '', to: '', preset: 'all' } } })
   return out
 })
 
@@ -504,8 +503,7 @@ function clearAll() {
   cashierFilter.value = ''
   statusFilter.value = ''
   liveOnly.value = false
-  dateFrom.value = ''
-  dateTo.value = ''
+  dateRange.value = { from: '', to: '', preset: 'all' }
 }
 
 /* ============================================================
@@ -545,27 +543,56 @@ async function endShift(s: ShiftV3) {
 /* ============================================================
    Receive money modal — per-tender blind count
    ============================================================ */
-/* Per-tender BLIND count. The manager counts each tender without seeing the
-   system figure; expected + difference are revealed only once a value is typed.
-   Confirmed amounts post to the SAFE (cash) / BANK (cards + Payme) via the
-   backend's deposit_shift, driven by the `confirmed` map on /reconcile. */
-const TENDERS = ['CASH', 'HUMO', 'UZCARD', 'PAYME'] as const
-type Tender = typeof TENDERS[number]
-const CARD_TENDERS: Tender[] = ['HUMO', 'UZCARD', 'PAYME']
-const TENDER_LABEL: Record<Tender, string> = { CASH: 'Cash', HUMO: 'Humo', UZCARD: 'Uzcard', PAYME: 'Payme' }
+/* Per-tender blind count. The screen is driven by the settlement response, so
+   it keeps working when the backend introduces a new payment method. */
+const STANDARD_TENDERS = ['CASH', 'HUMO', 'UZCARD', 'CARD', 'PAYME'] as const
+type Tender = string
+const TENDER_LABEL: Record<string, string> = {
+  CASH: 'Cash',
+  HUMO: 'Humo',
+  UZCARD: 'Uzcard',
+  CARD: 'Card',
+  PAYME: 'Payme',
+}
+
+function emptyTenderAmounts(): Record<Tender, number> {
+  return Object.fromEntries(STANDARD_TENDERS.map(method => [method, 0]))
+}
+
+function emptyTenderCounts(): Record<Tender, string> {
+  return Object.fromEntries(STANDARD_TENDERS.map(method => [method, '']))
+}
 
 const noteText = ref<string>('')
 const reconBusy = ref(false)
 const settlementLoading = ref(false)
-const expectedByTender = ref<Record<Tender, number>>({ CASH: 0, HUMO: 0, UZCARD: 0, PAYME: 0 })
-const countedByTender = ref<Record<Tender, string>>({ CASH: '', HUMO: '', UZCARD: '', PAYME: '' })
+const settlementReady = ref(false)
+const settlementError = ref(false)
+const settlementMethods = ref<Tender[]>([])
+const expectedByTender = ref<Record<Tender, number>>(emptyTenderAmounts())
+const countedByTender = ref<Record<Tender, string>>(emptyTenderCounts())
+
+const visibleTenders = computed<Tender[]>(() => [
+  // A manager can only count tenders that exist for this particular shift.
+  // Showing every known method lets someone enter a value that the strict
+  // reconciliation endpoint must (rightly) reject/ignore because it has no
+  // corresponding settlement row.
+  ...new Set(['CASH', ...settlementMethods.value]),
+])
+
+function tenderLabel(method: Tender): string {
+  return TENDER_LABEL[method] ? t(TENDER_LABEL[method]) : method
+}
 
 function openReceive(s: ShiftV3) {
   receiving.value = s
   noteText.value = ''
   reconBusy.value = false
-  countedByTender.value = { CASH: '', HUMO: '', UZCARD: '', PAYME: '' }
-  expectedByTender.value = { CASH: 0, HUMO: 0, UZCARD: 0, PAYME: 0 }
+  settlementReady.value = false
+  settlementError.value = false
+  settlementMethods.value = []
+  countedByTender.value = emptyTenderCounts()
+  expectedByTender.value = emptyTenderAmounts()
   void loadSettlement(s.id)
 }
 function closeReceive() {
@@ -574,35 +601,41 @@ function closeReceive() {
   receiving.value = null
 }
 
-// Per-tender expected lives on the shift DETAIL (`settlement[]`); the list row
-// only carries the rolled-up cash figure.
-//
-// CASH is taken from `expected_cash` (Order-level: cash sales − cashbox expenses),
-// NOT from settlement.CASH. Reason: settlement is derived from OrderPayment rows,
-// and a payment path still exists that never writes them — verified on prod shift
-// 47 (cash_collected 8,870,000 vs settlement CASH 6,593,000, expenses 0). Using
-// settlement.CASH would understate the drawer and make an honest cashier look
-// massively over. Card/Payme OrderPayment rows are complete, so settlement is
-// correct for those. Revert CASH to settlement once the backend writes an
-// OrderPayment for every cash sale.
+// Per-tender expected values live on the shift detail (`settlement[]`). CASH is
+// taken from expected_cash until every legacy cash payment path has a matching
+// OrderPayment row; it is the only reliable physical-drawer amount today.
 async function loadSettlement(id: number | string) {
   settlementLoading.value = true
+  settlementReady.value = false
+  settlementError.value = false
   try {
     const res = await axios.get(`/shifts/${id}`)
     const data = res.data?.data ?? res.data ?? {}
     const rows: any[] = data?.settlement ?? []
-    const next: Record<Tender, number> = { CASH: 0, HUMO: 0, UZCARD: 0, PAYME: 0 }
+    const next = emptyTenderAmounts()
+    const methods: Tender[] = []
     for (const r of rows) {
-      const m = String(r?.method ?? '').toUpperCase() as Tender
-      if ((TENDERS as readonly string[]).includes(m))
-        next[m] = Number(r?.expected) || 0
+      const method = String(r?.method ?? '').trim().toUpperCase()
+      if (!method)
+        continue
+      methods.push(method)
+      next[method] = Number(r?.expected) || 0
     }
     const orderLevelCash = Number(data?.expected_cash)
-    if (Number.isFinite(orderLevelCash))
+    if (Number.isFinite(orderLevelCash)) {
       next.CASH = orderLevelCash
+      methods.push('CASH')
+    }
     expectedByTender.value = next
+    settlementMethods.value = [...new Set(methods)]
+    countedByTender.value = Object.fromEntries(
+      [...new Set([...STANDARD_TENDERS, ...methods])].map(method => [method, '']),
+    )
+    settlementReady.value = true
   }
-  catch { /* leave zeros — the blind count still works */ }
+  catch {
+    settlementError.value = true
+  }
   finally {
     settlementLoading.value = false
   }
@@ -636,29 +669,41 @@ function fmtVariance(m: Tender): string {
   return sign + Fmt.money(Math.abs(v))
 }
 
-const anyCounted = computed(() => TENDERS.some(m => countedOf(m) !== null))
-const toSafe = computed(() => countedOf('CASH') ?? 0)
-const toBank = computed(() => CARD_TENDERS.reduce((a, m) => a + (countedOf(m) ?? 0), 0))
-const totalReceived = computed(() => toSafe.value + toBank.value)
+const requiredTenders = computed(() => visibleTenders.value.filter(method => (expectedByTender.value[method] ?? 0) > 0))
+const allExpectedTendersCounted = computed(() => requiredTenders.value.every(method => countedOf(method) !== null))
+const canConfirmSettlement = computed(() => settlementReady.value && !settlementLoading.value && allExpectedTendersCounted.value)
+const totalReceived = computed(() => visibleTenders.value.reduce(
+  (total, method) => total + (countedOf(method) ?? 0),
+  0,
+))
 
 async function confirmReceive() {
-  if (!receiving.value || !anyCounted.value)
+  if (!receiving.value || !canConfirmSettlement.value)
     return
   reconBusy.value = true
   const target = receiving.value
   try {
     const confirmed: Record<string, number> = {}
-    for (const m of TENDERS) confirmed[m] = countedOf(m) ?? 0
-    await axios.post(`/shifts/${target.id}/reconcile`, {
+    // Only submit payment methods the backend created settlement rows for;
+    // passing absent methods causes a strict backend to reject them as unknown.
+    const methodsToConfirm = new Set<Tender>(settlementMethods.value)
+    methodsToConfirm.add('CASH')
+    for (const method of methodsToConfirm)
+      confirmed[method] = countedOf(method) ?? 0
+
+    const res = await axios.post(`/shifts/${target.id}/reconcile`, {
       actual_cash: confirmed.CASH, // BE still requires cash explicitly (back-compat)
-      confirmed, // per-tender → posts cash to SAFE, cards + Payme to BANK
+      confirmed,
       notes: noteText.value,
     })
+    const result = res.data?.data ?? res.data ?? {}
     const v = varianceOf('CASH')
     const tail = v === null || v === 0
       ? t('exact match')
       : (v > 0 ? `${t('over by')} ${Fmt.money(Math.abs(v))}` : `${t('short by')} ${Fmt.money(Math.abs(v))}`)
-    notify(`${t('Money received from')} ${target.cashier} · ${Fmt.money(totalReceived.value)} UZS · ${tail}`)
+    const treasuryPosted = result?.treasury_posting?.status === 'posted'
+    const outcome = treasuryPosted ? t('Added to Safe') : t('Settlement confirmed')
+    notify(`${outcome} · ${target.cashier} · ${Fmt.money(totalReceived.value)} UZS · ${tail}`)
     receiving.value = null
     await loadShifts()
   }
@@ -682,7 +727,7 @@ function gotoReport(_s: ShiftV3) {
   <div class="page">
     <PageHeader
       :title="t('Shifts')"
-      :subtitle="t('Reconcile cashiers and receive end-of-shift cash')"
+      :subtitle="t('Reconcile cashiers and receive end-of-shift settlements')"
     >
       <template #actions>
         <span
@@ -780,22 +825,11 @@ function gotoReport(_s: ShiftV3) {
             :options="sortOptions.map(o => ({ value: o.value, label: t(o.label) }))"
           />
         </div>
-        <div
-          class="row"
-          style="gap: 8px;"
-        >
-          <Input
-            v-model="dateFrom"
-            type="date"
-            style="width: 150px;"
-          />
-          <span class="tertiary">→</span>
-          <Input
-            v-model="dateTo"
-            type="date"
-            style="width: 150px;"
-          />
-        </div>
+        <DateRangePicker
+          v-model="dateRange"
+          :enable-time="false"
+          :placeholder="t('All time')"
+        />
         <div
           class="row"
           style="gap: 10px; margin-left: auto;"
@@ -1317,7 +1351,7 @@ function gotoReport(_s: ShiftV3) {
       @per-page="changePerPage"
     />
 
-    <!-- Receive money modal (per-tender blind count) -->
+    <!-- Receive settlement modal (per-tender blind count) -->
     <Modal
       :open="!!receiving"
       :title="receiving ? `${t('Receive money')} · ${receiving.cashier}` : ''"
@@ -1328,13 +1362,28 @@ function gotoReport(_s: ShiftV3) {
       <template v-if="receiving">
         <!-- Blind count: the system figure stays hidden per tender until counted -->
         <p
+          v-if="settlementLoading"
+          class="tertiary"
+          style="font-size: 13px; margin: 0 0 14px;"
+        >
+          {{ t('Loading') }}
+        </p>
+        <p
+          v-else-if="settlementError"
+          class="tertiary"
+          style="font-size: 13px; margin: 0 0 14px;"
+        >
+          {{ t('Failed to load settlement') }}
+        </p>
+        <p
+          v-else
           class="tertiary"
           style="font-size: 13px; margin: 0 0 14px;"
         >
           {{ t('Count each tender first. The system figure and the difference appear only after you enter an amount.') }}
         </p>
 
-        <div class="rm-grid">
+        <div v-if="settlementReady" class="rm-grid">
           <div class="rm-head">
             <span>{{ t('Payment type') }}</span>
             <span>{{ t('Counted') }}</span>
@@ -1343,7 +1392,7 @@ function gotoReport(_s: ShiftV3) {
           </div>
 
           <div
-            v-for="m in TENDERS"
+            v-for="m in visibleTenders"
             :key="m"
             class="rm-row"
           >
@@ -1353,7 +1402,7 @@ function gotoReport(_s: ShiftV3) {
                 :size="15"
                 :style="{ color: m === 'CASH' ? 'rgb(var(--v-theme-success))' : 'rgb(var(--v-theme-primary))' }"
               />
-              {{ m === 'CASH' ? t('Cash') : TENDER_LABEL[m] }}
+              {{ tenderLabel(m) }}
             </span>
 
             <Input
@@ -1363,7 +1412,7 @@ function gotoReport(_s: ShiftV3) {
             />
 
             <span class="mono rm-right rm-dim">
-              <template v-if="countedOf(m) !== null">{{ Fmt.money(expectedByTender[m]) }}</template>
+              <template v-if="countedOf(m) !== null">{{ Fmt.money(expectedByTender[m] ?? 0) }}</template>
               <span
                 v-else
                 class="tertiary"
@@ -1383,8 +1432,8 @@ function gotoReport(_s: ShiftV3) {
           </div>
         </div>
 
-        <!-- where the money lands -->
-        <div class="rm-totals">
+        <!-- The desired treasury destination; the response confirms the posting. -->
+        <div v-if="settlementReady" class="rm-totals">
           <div
             class="row"
             style="justify-content: space-between; padding: 4px 0;"
@@ -1398,32 +1447,12 @@ function gotoReport(_s: ShiftV3) {
                 :size="15"
                 :style="{ color: 'rgb(var(--v-theme-success))' }"
               />
-              {{ t('To Safe (cash)') }}
+              {{ t('Safe after confirmation') }}
             </span>
             <span
               class="mono"
               style="font-weight: 600; font-size: 13px;"
-            >{{ Fmt.money(toSafe) }}</span>
-          </div>
-          <div
-            class="row"
-            style="justify-content: space-between; padding: 4px 0;"
-          >
-            <span
-              class="row"
-              style="gap: 8px; font-size: 13px; color: rgb(var(--v-theme-text-secondary));"
-            >
-              <DesignIcon
-                name="building"
-                :size="15"
-                :style="{ color: 'rgb(var(--v-theme-primary))' }"
-              />
-              {{ t('To Bank (cards + Payme)') }}
-            </span>
-            <span
-              class="mono"
-              style="font-weight: 600; font-size: 13px;"
-            >{{ Fmt.money(toBank) }}</span>
+            >{{ Fmt.money(totalReceived) }}</span>
           </div>
           <div
             class="hr"
@@ -1448,6 +1477,7 @@ function gotoReport(_s: ShiftV3) {
         </div>
 
         <Field
+          v-if="settlementReady"
           :label="t('Note (optional)')"
           style="margin-top: 16px;"
         >
@@ -1472,10 +1502,10 @@ function gotoReport(_s: ShiftV3) {
           variant="primary"
           icon="check"
           :loading="reconBusy"
-          :disabled="!anyCounted"
+          :disabled="!canConfirmSettlement"
           @click="confirmReceive"
         >
-          {{ t('Confirm & deposit') }}
+          {{ t('Confirm settlement') }}
         </Button>
       </template>
     </Modal>

@@ -8,7 +8,6 @@
    and are lazy-loaded via defineAsyncComponent.
    ============================================================ */
 import { defineAsyncComponent } from 'vue'
-import AIBriefingCard from '@/components/design/AIBriefingCard.vue'
 import { useAIPageContext } from '@/composables/useAIPageContext'
 import Button from '@/components/design/Button.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
@@ -376,6 +375,7 @@ void sharedDash
           v-model="dateRange"
           align="right"
           :placeholder="t('Last 30 days')"
+          :include-all="false"
         />
         <Button
           variant="secondary"
@@ -404,9 +404,6 @@ void sharedDash
         </Button>
       </div>
     </div>
-
-    <!-- Morning briefing — LLM-generated daily digest. Hides itself when dismissed/empty. -->
-    <AIBriefingCard style="margin-bottom: var(--sp-3);" />
 
     <!-- Fetch failed — the shared payload soft-degrades to stale data, so warn the operator. -->
     <div

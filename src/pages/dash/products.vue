@@ -21,11 +21,10 @@ import Treemap from '@/components/design/Treemap.vue'
 import ComboPareto from '@/components/design/ComboPareto.vue'
 import Sparkline from '@/components/design/Sparkline.vue'
 import Affinity from '@/components/design/Affinity.vue'
-import { fmtAbbr } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
 import { useDashboardData } from '@/composables/useDashboardData'
 import { formatWindow } from '@/composables/useWindowLabel'
-import { buildDateParams } from '@/composables/useBusinessDay'
+import { buildDateParams, businessPreset } from '@/composables/useBusinessDay'
 
 const { t } = useI18n({ useScope: 'global' })
 const { formatCurrency } = useFormatters()
@@ -34,10 +33,11 @@ const { formatCurrency } = useFormatters()
 interface CategoryRow { label: string; value: number; units: number; color?: string }
 interface ParetoRow { label: string; value: number }
 interface TrendRow {
+  id: string
   name: string
   units: number
   revenue: number
-  delta: number
+  delta: number | null
   spark: number[]
 }
 interface Overview {
@@ -69,7 +69,8 @@ const heroKpis = computed(() => {
   const o = D.overview
   return [
     {
-      label: t('Menu items'),
+      // This is `distinct_products_sold`, not the static catalog size.
+      label: t('Products sold · {window}', { window: windowLabel.value }),
       value: o.menuItems,
       icon: 'box',
       tone: 'primary' as const,
@@ -90,7 +91,7 @@ const heroKpis = computed(() => {
       tone: 'info' as const,
     },
     {
-      label: t('Menu revenue'),
+      label: t('Menu revenue · {window}', { window: windowLabel.value }),
       value: o.menuRevenue,
       money: true,
       delta: o.menuRevenueDelta,
@@ -139,6 +140,22 @@ const categoryDonut = computed(() =>
   })),
 )
 
+const prepMaxMins = computed(() => Math.max(
+  1,
+  ...(data.value?.prepByCategory || []).map(row => Math.max(row.mins, row.target)),
+))
+
+function prepBarWidth(row: PrepRow): number {
+  const scale = row.target || prepMaxMins.value
+  return Math.min(100, Math.max(0, row.mins / scale * 100))
+}
+
+function prepBarColor(row: PrepRow): string {
+  if (row.target && row.mins > row.target)
+    return 'rgb(var(--v-theme-error))'
+  return 'rgb(var(--v-theme-success))'
+}
+
 /* ---------- BE → FE shape mappers ----------
    Confirmed BE contracts (alpha_pos_server/admins/views/analytics_views.py
    + admins/services/product_analytics_service.py):
@@ -160,15 +177,8 @@ const categoryDonut = computed(() =>
    BE does NOT support `?range=30d` for products — compute the [from, to] window.
 */
 
-function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10)
-}
-
-function rangeDates(days: number): { from: string; to: string } {
-  const to = new Date()
-  const from = new Date(to)
-  from.setDate(to.getDate() - (days - 1))
-  return { from: isoDate(from), to: isoDate(to) }
+function localDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function num(v: unknown): number {
@@ -207,32 +217,66 @@ function mapPareto(raw: any): ParetoRow[] {
   }))
 }
 
-function mapTrends(raw: any, previousRaw?: any): TrendRow[] {
-  const series = Array.isArray(raw?.top_products_trend) ? raw.top_products_trend : []
-  const previous = new Map<string, number>((Array.isArray(previousRaw?.top_products_trend) ? previousRaw.top_products_trend : [])
-    .map((s: any) => [String(s?.product_name ?? ''), num(s?.total_revenue)]))
-  return series.map((s: any) => {
-    const points: any[] = Array.isArray(s?.points) ? s.points : []
-    const spark = points.map(p => num(p?.revenue))
-    const total = num(s?.total_revenue)
-    const units = points.reduce((acc, p) => acc + num(p?.qty), 0)
-    // Compare the selected range with the immediately preceding equal-length
-    // range. Splitting a selected period in half made a four-day selection
-    // compare days 1–2 against days 3–4, which is not a useful KPI.
-    const previousRevenue = previous.get(String(s?.product_name ?? '')) ?? 0
-    const delta = previousRevenue > 0
-      ? Math.round(((total - previousRevenue) / previousRevenue) * 1000) / 10
-      : 0
-    return {
-      name: s?.product_name ?? '—',
-      units,
-      revenue: total,
-      delta,
-      spark,
-    }
-  })
+function rangeDayKeys(raw: any): string[] {
+  const from = String(raw?.range?.from ?? '').slice(0, 10)
+  const to = String(raw?.range?.to ?? '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to))
+    return []
+
+  let cursor = new Date(`${from}T12:00:00`)
+  const end = new Date(`${to}T12:00:00`)
+  const dates: string[] = []
+  for (let index = 0; index < 370 && cursor <= end; index++) {
+    dates.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`)
+    const next = new Date(cursor)
+    next.setDate(next.getDate() + 1)
+    cursor = next
+  }
+  return dates
 }
 
+function trendSeries(raw: any): any[] {
+  return Array.isArray(raw?.top_products_trend) ? raw.top_products_trend : []
+}
+
+function trendSpark(points: any[], dates: string[]): number[] {
+  if (!dates.length)
+    return points.map(point => num(point?.revenue))
+
+  const revenueByDate = new Map<string, number>(
+    points.map(point => [String(point?.date ?? '').slice(0, 10), num(point?.revenue)]),
+  )
+  return dates.map(date => revenueByDate.get(date) ?? 0)
+}
+
+function trendDelta(total: number, previousRevenue: number | undefined): number | null {
+  if (!previousRevenue || previousRevenue <= 0)
+    return null
+
+  return Math.round(((total - previousRevenue) / previousRevenue) * 1000) / 10
+}
+
+function mapTrendRow(series: any, dates: string[], previous: Map<string, number>): TrendRow {
+  const points: any[] = Array.isArray(series?.points) ? series.points : []
+  const id = String(series?.product_id ?? series?.product_name ?? '')
+  const total = num(series?.total_revenue)
+  return {
+    id,
+    name: series?.product_name ?? '—',
+    units: points.reduce((sum, point) => sum + num(point?.qty ?? point?.quantity), 0),
+    revenue: total,
+    delta: trendDelta(total, previous.get(String(series?.product_id ?? ''))),
+    spark: trendSpark(points, dates),
+  }
+}
+
+function mapTrends(raw: any, previousRaw?: any): TrendRow[] {
+  const previous = new Map<string, number>(
+    trendSeries(previousRaw).map(series => [String(series?.product_id ?? ''), num(series?.total_revenue)]),
+  )
+  const dates = rangeDayKeys(raw)
+  return trendSeries(raw).map(series => mapTrendRow(series, dates, previous))
+}
 /* ---------- Loader ---------- */
 async function loadDashboard() {
   loading.value = true
@@ -242,17 +286,19 @@ async function loadDashboard() {
     let to = ''
     const sr = sharedRange.value
     if (sr?.from && sr?.to) { from = sr.from; to = sr.to }
-    else { const d = rangeDates(30); from = d.from; to = d.to }
+    else { const d = businessPreset('30d'); from = d.from; to = d.to }
     // Previous period of same length for delta computation.
     const prev = (() => {
-      const fromD = new Date(from)
-      const toD = new Date(to)
+      // Noon keeps calendar-date arithmetic independent of the browser's UTC
+      // offset, including the cafe's 07:00-to-03:00 business-day boundary.
+      const fromD = new Date(`${from}T12:00:00`)
+      const toD = new Date(`${to}T12:00:00`)
       const span = Math.max(0, Math.round((toD.getTime() - fromD.getTime()) / 86400000))
       const prevTo = new Date(fromD)
       prevTo.setDate(prevTo.getDate() - 1)
       const prevFrom = new Date(prevTo)
       prevFrom.setDate(prevTo.getDate() - span)
-      return { from: isoDate(prevFrom), to: isoDate(prevTo) }
+      return { from: localDate(prevFrom), to: localDate(prevTo) }
     })()
 
     // Same time-of-day filter (Working hours / custom) on the current window;
@@ -268,7 +314,9 @@ async function loadDashboard() {
       // Previous-period overview so we can compute units30dDelta + menuRevenueDelta.
       // Best-effort: if it fails, deltas stay null.
       axiosIns.get('/analytics/products/overview', { params: prevParams }).catch(() => null),
-      axiosIns.get('/analytics/products/trends', { params: { ...prevParams, top_n: 6 } }).catch(() => null),
+      // Ask for a wider prior set so a current top product can still receive
+      // its true previous-period comparison instead of a false 0% change.
+      axiosIns.get('/analytics/products/trends', { params: { ...prevParams, top_n: 50 } }).catch(() => null),
       // The useful category-speed insight used to be isolated on Operations.
       // Keep it with the product/category decisions it informs.
       axiosIns.get('/dashboard/operations', { params: curParams }).catch(() => null),
@@ -281,14 +329,21 @@ async function loadDashboard() {
     const ovPrevRaw = ovPrevRes?.data?.data ?? ovPrevRes?.data ?? null
     const trPrevRaw = trPrevRes?.data?.data ?? trPrevRes?.data ?? null
     const opsRaw = opsRes?.data?.data ?? opsRes?.data ?? null
-    const prepByCategory: PrepRow[] = Array.isArray(opsRaw?.prep_by_category)
-      ? opsRaw.prep_by_category.map((row: any) => ({
-          label: String(row?.category ?? row?.label ?? '—'),
-          mins: num(row?.mins ?? row?.avg_prep_minutes),
-          target: num(row?.target ?? row?.target_minutes),
-          orders: num(row?.orders),
-        })).filter((row: PrepRow) => row.label !== '—')
-      : []
+    // Operations sends camelCase prepByCategory. Keep the snake_case fallback
+    // for an older deployment during a rolling release.
+    const prepRows = Array.isArray(opsRaw?.prepByCategory)
+      ? opsRaw.prepByCategory
+      : Array.isArray(opsRaw?.prep_by_category) ? opsRaw.prep_by_category : []
+    const prepByCategory: PrepRow[] = prepRows.map((row: any) => {
+      const seconds = num(row?.avg_prep_seconds)
+      const minuteValue = row?.mins ?? row?.avg_prep_minutes
+      return {
+        label: String(row?.category ?? row?.label ?? '—'),
+        mins: minuteValue === undefined || minuteValue === null ? seconds / 60 : num(minuteValue),
+        target: num(row?.target ?? row?.target_minutes),
+        orders: num(row?.orders ?? row?.count),
+      }
+    }).filter((row: PrepRow) => row.label !== '—')
 
     const categories = mapCategories(catRaw)
     let deltas: { units: number | null; revenue: number | null } = { units: null, revenue: null }
@@ -476,11 +531,11 @@ onMounted(() => {
             <div class="row between" style="margin-bottom: 5px;">
               <span style="font-size: 13px; font-weight: 600;">{{ row.label }}</span>
               <span class="mono" style="font-size: 12px; font-weight: 700;">
-                {{ row.mins.toFixed(1) }}m<span v-if="row.target"> / {{ row.target }}m</span>
+                {{ row.mins.toFixed(1) }}m<span v-if="row.target"> · {{ t('Target') }} {{ row.target }}m</span><span v-if="row.orders"> · {{ row.orders }} {{ t('Orders') }}</span>
               </span>
             </div>
             <div style="height: 10px; border-radius: 999px; background: rgb(var(--v-theme-chart-track)); overflow: hidden;">
-              <div :style="{ width: `${Math.min(100, row.target ? row.mins / row.target * 100 : 0)}%`, height: '100%', borderRadius: 'inherit', background: row.target && row.mins > row.target ? 'rgb(var(--v-theme-error))' : 'rgb(var(--v-theme-success))' }" />
+              <div :style="{ width: `${prepBarWidth(row)}%`, height: '100%', borderRadius: 'inherit', background: prepBarColor(row) }" />
             </div>
           </div>
         </div>
@@ -541,7 +596,7 @@ onMounted(() => {
                     {{ t('Revenue') }}
                   </th>
                   <th class="num col-delta">
-                    {{ t('Δ') }}
+                    {{ t('Change') }}
                   </th>
                 </tr>
               </thead>
@@ -553,7 +608,7 @@ onMounted(() => {
                 </tr>
                 <tr
                   v-for="p in data?.trends || []"
-                  :key="p.name"
+                  :key="p.id"
                 >
                   <td class="cell-strong">
                     {{ p.name }}
@@ -574,7 +629,8 @@ onMounted(() => {
                     {{ formatCurrency(p.revenue) }}
                   </td>
                   <td class="num">
-                    <Delta :value="p.delta" />
+                    <Delta v-if="p.delta !== null" :value="p.delta" />
+                    <span v-else class="muted" style="font-size: 12px;">{{ t('No prior data') }}</span>
                   </td>
                 </tr>
               </tbody>

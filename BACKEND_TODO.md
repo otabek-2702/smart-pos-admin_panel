@@ -69,6 +69,44 @@ window or an exact multi-day custom interval.
 2026-07-16 (dev-bot message 100). Not verified; frontend must not claim this
 is live until the backend branch is reviewed and tested.
 
+### 25. Selected-range cash-drawer expense list for the Sales dashboard
+**Why:** `/dashboard/sales` exposes only aggregated `expense30` totals. The
+dashboard needs an auditable list of the actual `CashboxExpense` records in
+the selected period; the only current expense-list route is per-shift, which
+would require incomplete N+1 requests. HR expenses are a different entity and
+must not be displayed as drawer expenses.
+
+**Need:** `GET /dashboard/sales/expenses?from=&to=&tod_from=&tod_to=&limit=`
+with the same canonical reporting-window semantics as `/dashboard/sales`.
+Return `{ range: { from, to, start_at, end_at }, total_expense, expenses:
+[{ id, amount, category, comment, created_at, shift_id, cashier_name }],
+pagination }`. Exclude soft-deleted records; sort newest first; make
+`total_expense` reconcile exactly with the Sales dashboard expense total; add
+an endpoint test.
+
+**Status:** Sent to Abrorbek on 2026-07-16 (dev-bot message 101). Not
+verified. Until it ships, the FE can show only clearly labelled aggregated
+expense totals by hour/day, never fabricated individual expense rows.
+
+### 26. Post the confirmed full shift settlement to Safe exactly once
+**Why:** The manager receives every tender at end of shift, not only cash.
+Current `POST /shifts/{id}/reconcile` freezes `ShiftPaymentTotal` confirmation
+rows but does not credit Treasury; older FE wording also incorrectly claimed a
+cash-to-Safe / card-to-Bank deposit. The agreed business rule is that the
+manager-confirmed total of every payment type is added to **Safe**.
+
+**Need:** On a successful reconcile, atomically create an idempotent Safe
+treasury/ledger posting for every confirmed tender (`CASH`, `HUMO`, `UZCARD`,
+`CARD`, `PAYME`, and future methods). Return
+`treasury_posting: { status, account: "SAFE", total, tenders, entry_ids }`.
+Keep per-tender confirmations and the cash-audit record; change Inkassa so it
+cannot credit the same money again. Cover mixed tenders, retry protection,
+zero/absent tenders, and no Bank credit for this flow.
+
+**Status:** Sent to Abrorbek on 2026-07-16 (dev-bot message 102). Not
+verified. The FE handles every returned settlement method dynamically and only
+announces an addition to Safe when the response confirms `treasury_posting`.
+
 ### 1. Date-filterable dashboard endpoint
 **Why:** FE topbar exposes a date range. Today only `/dashboard/today` exists — single snapshot, no range support.
 

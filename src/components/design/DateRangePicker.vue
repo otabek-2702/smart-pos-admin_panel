@@ -31,12 +31,15 @@ interface Props {
   size?: 'sm'
   placeholder?: string
   enableTime?: boolean
+  /** Hide the unbounded preset where the consuming endpoint has no true all-time contract. */
+  includeAll?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   align: 'left',
   placeholder: 'All time',
   enableTime: true,
+  includeAll: true,
 })
 const emit = defineEmits<{
   (e: 'update:modelValue', v: DateRangeValue): void
@@ -104,6 +107,10 @@ const PRESETS: { key: PresetKey, label: string }[] = [
   { key: 'year', label: 'This year' },
   { key: 'all', label: 'All time' },
 ]
+
+const visiblePresets = computed(() => props.includeAll
+  ? PRESETS
+  : PRESETS.filter(preset => preset.key !== 'all'))
 
 // Only two presets: Working hours (from the persisted business_open/close) and
 // Whole day (clears the time-of-day filter). Everything else is Custom.
@@ -584,7 +591,7 @@ function onModeKey(e: KeyboardEvent) {
       >
         <div class="drp-presets">
           <button
-            v-for="p in PRESETS"
+            v-for="p in visiblePresets"
             :key="p.key"
             type="button"
             :class="cx('drp-preset', draftActive === p.key && 'is-active')"

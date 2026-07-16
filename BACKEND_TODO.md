@@ -40,6 +40,35 @@ All five verified end-to-end against prod BE with real data, FE wired + merged t
 
 ## Open
 
+### 24. Canonical 07:00–03:00 reporting window and exact custom datetimes
+**Why:** Alfa POS operates from 07:00 on business date `D` until 03:00 on
+`D+1`. The current backend helper models a 24-hour same-cutover window
+(`business_day_start` → the same time next day), and `tod_from` / `tod_to` is
+repeated for every day in a range. Neither can represent the required default
+window or an exact multi-day custom interval.
+
+**Need:**
+
+- Default date `D`: `[D 07:00, D+1 03:00)`; range `D1..D2`:
+  `[D1 07:00, D2+1 03:00)`. The closed 03:00–07:00 interval must not enter
+  default reporting.
+- Add unambiguous continuous custom datetime parameters (for example
+  `from_at` / `to_at`, ISO-8601) for an exact `[from_at, to_at)` window. Do
+  not use the existing repeated per-day `tod_from` / `tod_to` semantics for
+  this case.
+- Use one canonical helper for every date-driven dashboard/stat/summary:
+  dashboard, sales, operations, product/staff/shift analytics, orders and
+  order stats, shifts, exports, and KPIs.
+- Include effective `start_at` / `end_at` in returned range metadata. Preserve
+  equal-length previous-period comparison (N selected business dates vs the
+  immediately preceding N).
+- Add boundary tests at 06:59, 07:00 and 03:00; a four-day previous-period
+  comparison; and 10 Jul 10:00 → 11 Jul 22:00 custom selection.
+
+**Status:** Sent to Abrorbek for implementation and production deployment on
+2026-07-16 (dev-bot message 100). Not verified; frontend must not claim this
+is live until the backend branch is reviewed and tested.
+
 ### 1. Date-filterable dashboard endpoint
 **Why:** FE topbar exposes a date range. Today only `/dashboard/today` exists — single snapshot, no range support.
 

@@ -5,7 +5,9 @@
    ============================================================ */
 import axios from '@/plugins/axios'
 import { buildCsv } from '@/utils/csv'
+import DateRangePicker, { type DateRangeValue } from '@/components/design/DateRangePicker.vue'
 import Select from '@/components/design/Select.vue'
+import { formatWindow } from '@/composables/useWindowLabel'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -95,45 +97,25 @@ function fullName(u: any): string {
 // ============================================================
 // Filters
 // ============================================================
-const dateFrom = ref('')
-const dateTo = ref('')
+const dateRange = ref<DateRangeValue>({ from: '', to: '', preset: 'all' })
 const cashierId = ref<number | ''>('')
 // status uses BE Shift.Status enum directly: ACTIVE | ENDED | COMPLETED | ABANDONED
 const statusF = ref<'' | 'ACTIVE' | 'ENDED' | 'COMPLETED' | 'ABANDONED'>('')
-const templateId = ref<number | ''>('')
-const staffRole = ref<'CASHIER' | 'MANAGER' | 'ALL'>('CASHIER')
 const liveOnly = ref(false)
 
 const cashiers = ref<any[]>([])
-const templates = ref<any[]>([])
 
 async function loadCashiers() {
   try {
-    const params: any = { per_page: 200 }
-    if (staffRole.value !== 'ALL') params.role = staffRole.value
-    const res = await axios.get('/users', { params })
+    // The role control was removed from this toolbar. Fetch all staff once so
+    // the cashier filter can still find every shift owner.
+    const res = await axios.get('/users', { params: { per_page: 200 } })
     const d = res.data?.data ?? res.data
     cashiers.value = d?.users ?? []
   }
   catch {
     cashiers.value = []
   }
-}
-
-async function loadTemplates() {
-  try {
-    const res = await axios.get('/shift-templates', { params: { per_page: 200 } })
-    const d = res.data?.data ?? res.data
-    templates.value = Array.isArray(d) ? d : (d?.shift_templates ?? d?.templates ?? d?.items ?? [])
-  }
-  catch {
-    templates.value = []
-  }
-}
-
-function templateName(tpl: any): string {
-  if (!tpl || typeof tpl !== 'object') return '—'
-  return tpl.name || `#${tpl.id}`
 }
 
 // ============================================================
@@ -145,19 +127,12 @@ const loading = ref(true)
 async function loadShifts() {
   loading.value = true
   try {
-    // client-side swap if from > to to avoid a confusing empty result
-    if (dateFrom.value && dateTo.value && dateFrom.value > dateTo.value) {
-      const tmp = dateFrom.value
-      dateFrom.value = dateTo.value
-      dateTo.value = tmp
-      notify(t('Swapped date range (from was after to)'), 'warning')
-    }
     const params: any = { page: 1, per_page: 100 }
-    if (dateFrom.value) params.date_from = dateFrom.value
-    if (dateTo.value) params.date_to = dateTo.value
+    if (dateRange.value.from) params.date_from = dateRange.value.from
+    if (dateRange.value.to) params.date_to = dateRange.value.to
     if (cashierId.value) params.user_id = cashierId.value
     if (statusF.value) params.status = statusF.value
-    if (templateId.value) params.shift_template_id = templateId.value
+    if (liveOnly.value) params.live_only = true
 
     const res = await axios.get('/shifts', { params })
     const d = res.data?.data ?? res.data
@@ -172,9 +147,8 @@ async function loadShifts() {
   }
 }
 
-onMounted(() => { loadCashiers(); loadTemplates(); loadShifts() })
-watch([dateFrom, dateTo, cashierId, statusF, templateId], () => { loadShifts() })
-watch(staffRole, () => { loadCashiers() })
+onMounted(() => { loadCashiers(); loadShifts() })
+watch([dateRange, cashierId, statusF, liveOnly], () => { loadShifts() })
 
 // ============================================================
 // Shape & derived helpers
@@ -193,6 +167,27 @@ function expectedCash(s: any): number {
   if (s.reconciliation?.expected_cash !== undefined && s.reconciliation?.expected_cash !== null)
     return num(s.reconciliation.expected_cash)
   return num(s.cash_collected)
+}
+function expectedSettlement(s: any): number {
+  const rows = Array.isArray(s?.settlement) ? s.settlement : []
+  if (rows.length) {
+    return rows.reduce(
+      (total: number, row: any) => total + num(row?.expected),
+      0,
+    )
+  }
+  // List rows deliberately omit settlement details to avoid N+1 queries. The
+  // gross paid total is the only all-tender figure available until the manager
+  // opens the settlement modal, which fetches the authoritative breakdown.
+  return num(s.total_revenue)
+}
+function confirmedSettlement(s: any): number | null {
+  const rows = Array.isArray(s?.settlement) ? s.settlement : []
+  if (!rows.length) return null
+  return rows.reduce(
+    (total: number, row: any) => total + num(row?.confirmed),
+    0,
+  )
 }
 function reportedCash(s: any): number {
   const r = s.reconciliation || {}
@@ -270,9 +265,6 @@ const filtered = computed(() => {
     // liveOnly is a UI shortcut for status === ACTIVE
     if (liveOnly.value && s.status !== 'ACTIVE') return false
     // status filter is delegated to BE; no client-side narrowing here.
-    if (templateId.value && s.shift_template?.id !== templateId.value) return false
-    if (dateFrom.value && s.start_time && new Date(s.start_time) < new Date(dateFrom.value)) return false
-    if (dateTo.value && s.start_time && new Date(s.start_time) > new Date(`${dateTo.value}T23:59`)) return false
     return true
   })
 })
@@ -283,15 +275,15 @@ const filtered = computed(() => {
 const summary = computed(() => {
   let active = 0
   let awaiting = 0
-  let cashToReceive = 0
+  let settlementToReceive = 0
   let netVariance = 0
   for (const s of shifts.value) {
     const st = shiftState(s)
     if (st === 'active') active++
-    else if (st === 'awaiting') { awaiting++; cashToReceive += expectedCash(s) }
+    else if (st === 'awaiting') { awaiting++; settlementToReceive += expectedSettlement(s) }
     else if (st === 'reconciled') netVariance += varianceOf(s)
   }
-  return { active, awaiting, cashToReceive, netVariance }
+  return { active, awaiting, settlementToReceive, netVariance }
 })
 
 // ============================================================
@@ -304,51 +296,141 @@ const activeFilters = computed(() => {
     arr.push({ k: 'c', label: t('Cashier'), val: u ? fullName(u) : `#${cashierId.value}`, clear: () => (cashierId.value = '') })
   }
   if (statusF.value) arr.push({ k: 's', label: t('Status'), val: t(`shift_status_${statusF.value}`), clear: () => (statusF.value = '') })
-  if (templateId.value) {
-    const tpl = templates.value.find((x: any) => x.id === templateId.value)
-    arr.push({ k: 'tpl', label: t('Template'), val: tpl ? templateName(tpl) : `#${templateId.value}`, clear: () => (templateId.value = '') })
-  }
   if (liveOnly.value) arr.push({ k: 'l', label: t('Live only'), val: t('On'), clear: () => (liveOnly.value = false) })
-  if (dateFrom.value) arr.push({ k: 'f', label: t('Date from'), val: dateFrom.value, clear: () => (dateFrom.value = '') })
-  if (dateTo.value) arr.push({ k: 't', label: t('Date to'), val: dateTo.value, clear: () => (dateTo.value = '') })
+  if (dateRange.value.from || dateRange.value.to) {
+    arr.push({
+      k: 'd',
+      label: t('Period'),
+      val: formatWindow(dateRange.value, t),
+      clear: () => { dateRange.value = { from: '', to: '', preset: 'all' } },
+    })
+  }
   return arr
 })
 function clearAllFilters() {
   cashierId.value = ''
   statusF.value = ''
-  templateId.value = ''
   liveOnly.value = false
-  dateFrom.value = ''
-  dateTo.value = ''
+  dateRange.value = { from: '', to: '', preset: 'all' }
 }
 
 // ============================================================
-// Receive-cash modal
+// Receive-money modal — per-tender settlement
 // ============================================================
 const receiving = ref<any | null>(null)
-const counted = ref('')
 const note = ref('')
 const busy = ref(false)
 
-const countedParsed = computed<number | null>(() => {
-  if (counted.value === '' || counted.value === null) return null
-  const stripped = String(counted.value).replace(/[^\d-]/g, '')
+type Tender = string
+const STANDARD_TENDERS = ['CASH', 'HUMO', 'UZCARD', 'CARD', 'PAYME'] as const
+const TENDER_LABEL: Record<string, string> = {
+  CASH: 'Cash',
+  HUMO: 'Humo',
+  UZCARD: 'Uzcard',
+  CARD: 'Card',
+  PAYME: 'Payme',
+}
+
+function emptyTenderAmounts(): Record<Tender, number> {
+  return Object.fromEntries(STANDARD_TENDERS.map(method => [method, 0]))
+}
+function emptyTenderCounts(): Record<Tender, string> {
+  return Object.fromEntries(STANDARD_TENDERS.map(method => [method, '']))
+}
+
+const settlementLoading = ref(false)
+const settlementReady = ref(false)
+const settlementError = ref(false)
+const settlementMethods = ref<Tender[]>([])
+const expectedByTender = ref<Record<Tender, number>>(emptyTenderAmounts())
+const countedByTender = ref<Record<Tender, string>>(emptyTenderCounts())
+let settlementRequestId = 0
+
+// Do not render empty/unrelated payment inputs. A manager can only confirm
+// methods that the backend created for this exact shift (plus the cash audit).
+const visibleTenders = computed<Tender[]>(() => [
+  ...new Set(['CASH', ...settlementMethods.value]),
+])
+const requiredTenders = computed(() => visibleTenders.value.filter(method => (expectedByTender.value[method] ?? 0) > 0))
+
+function tenderLabel(method: Tender): string {
+  return TENDER_LABEL[method] ? t(TENDER_LABEL[method]) : method
+}
+function parseAmount(v: string | undefined): number | null {
+  if (v === '' || v === null || v === undefined) return null
+  const stripped = String(v).replace(/[^\d-]/g, '')
   if (stripped === '' || stripped === '-') return null
   const n = Number(stripped)
   return Number.isFinite(n) ? n : null
-})
-const liveVariance = computed<number | null>(() => {
-  if (countedParsed.value === null || !receiving.value) return null
-  return countedParsed.value - expectedCash(receiving.value)
-})
+}
+function countedOf(method: Tender): number | null {
+  return parseAmount(countedByTender.value[method])
+}
+function tenderVariance(method: Tender): number | null {
+  const counted = countedOf(method)
+  return counted === null ? null : counted - (expectedByTender.value[method] ?? 0)
+}
+const allExpectedTendersCounted = computed(() => requiredTenders.value.every(method => countedOf(method) !== null))
+const canConfirmSettlement = computed(() => settlementReady.value && !settlementLoading.value && allExpectedTendersCounted.value)
+const totalReceived = computed(() => visibleTenders.value.reduce(
+  (total, method) => total + (countedOf(method) ?? 0),
+  0,
+))
+
+async function loadSettlement(id: number | string) {
+  const requestId = ++settlementRequestId
+  settlementLoading.value = true
+  settlementReady.value = false
+  settlementError.value = false
+  try {
+    const res = await axios.get(`/shifts/${id}`)
+    if (requestId !== settlementRequestId) return
+    const data = res.data?.data ?? res.data ?? {}
+    const rows: any[] = Array.isArray(data?.settlement) ? data.settlement : []
+    const next = emptyTenderAmounts()
+    const methods: Tender[] = []
+    for (const row of rows) {
+      const method = String(row?.method ?? '').trim().toUpperCase()
+      if (!method) continue
+      methods.push(method)
+      next[method] = num(row?.expected)
+    }
+    const orderLevelCash = Number(data?.expected_cash)
+    if (Number.isFinite(orderLevelCash)) {
+      next.CASH = orderLevelCash
+      methods.push('CASH')
+    }
+    expectedByTender.value = next
+    settlementMethods.value = [...new Set(methods)]
+    countedByTender.value = Object.fromEntries(
+      [...new Set([...STANDARD_TENDERS, ...methods])].map(method => [method, '']),
+    )
+    settlementReady.value = true
+  }
+  catch {
+    if (requestId === settlementRequestId)
+      settlementError.value = true
+  }
+  finally {
+    if (requestId === settlementRequestId)
+      settlementLoading.value = false
+  }
+}
 
 function openReceive(s: any) {
   receiving.value = s
-  counted.value = ''
   note.value = ''
+  busy.value = false
+  settlementReady.value = false
+  settlementError.value = false
+  settlementMethods.value = []
+  expectedByTender.value = emptyTenderAmounts()
+  countedByTender.value = emptyTenderCounts()
+  void loadSettlement(s.id)
 }
 function closeReceive() {
   if (busy.value) return
+  settlementRequestId++
   receiving.value = null
 }
 
@@ -440,62 +522,50 @@ function exportShifts() {
 }
 
 async function confirmReceive() {
-  if (!receiving.value || countedParsed.value === null) return
+  if (!receiving.value || !canConfirmSettlement.value) return
   busy.value = true
   const s = receiving.value
-  const variance = liveVariance.value ?? 0
-  let success = false
-  let endpointMissing = false
   try {
-    // POST to backend reconciliation endpoint — BE expects `actual_cash` + `notes`
-    // (it recomputes variance server-side and ignores any client-sent variance).
-    await axios.post(`/shifts/${s.id}/reconcile`, {
-      actual_cash: countedParsed.value,
+    const confirmed: Record<string, number> = {}
+    const methodsToConfirm = new Set<Tender>(settlementMethods.value)
+    methodsToConfirm.add('CASH')
+    for (const method of methodsToConfirm)
+      confirmed[method] = countedOf(method) ?? 0
+
+    const res = await axios.post(`/shifts/${s.id}/reconcile`, {
+      // The backend still requires this cash audit field alongside the
+      // full per-tender confirmation map.
+      actual_cash: confirmed.CASH,
+      confirmed,
       notes: note.value || undefined,
     })
-    success = true
-    notify(`${t('Cash received from')} ${fullName(s.user)} · ${fmtMoney(countedParsed.value!)} UZS`, variance === 0 ? 'success' : variance > 0 ? 'info' : 'warning')
+    const result = res.data?.data ?? res.data ?? {}
+    const cashVariance = tenderVariance('CASH')
+    const tail = cashVariance === null || cashVariance === 0
+      ? t('exact match')
+      : cashVariance > 0
+        ? `${t('over by')} ${fmtMoney(Math.abs(cashVariance))}`
+        : `${t('short by')} ${fmtMoney(Math.abs(cashVariance))}`
+    const postedToSafe = result?.treasury_posting?.status === 'posted'
+    const outcome = postedToSafe ? t('Added to Safe') : t('Settlement confirmed')
+    notify(`${outcome} · ${fullName(s.user)} · ${fmtMoney(totalReceived.value)} UZS · ${tail}`, postedToSafe ? 'success' : 'info')
+    receiving.value = null
+    await loadShifts()
   }
   catch (e: any) {
     const status = e?.response?.status
     const beMsg = e?.response?.data?.message || ''
-    if (status === 404) {
-      // Treat as a graceful fallback — endpoint not deployed yet.
-      endpointMissing = true
-      notify(`${t('Recorded locally — backend endpoint not available')} (${fmtMoney(countedParsed.value!)} UZS)`, 'warning')
-    }
-    else if (status === 400 && /ended/i.test(beMsg) && s.status !== 'ENDED') {
+    if (status === 400 && /ended/i.test(beMsg) && s.status !== 'ENDED') {
       notify(t('Shift must be ended before reconciling'), 'error')
     }
     else {
-      // Real backend error — surface as error and do NOT optimistically update.
-      const msg = beMsg || e?.message || t('Failed to record cash handover')
+      const msg = beMsg || e?.message || t('Failed to record settlement')
       notify(msg, 'error')
     }
   }
-  // Only flip the card locally when we actually succeeded (or when BE is missing).
-  if (success || endpointMissing) {
-    shifts.value = shifts.value.map((x: any) => x.id === s.id
-      ? {
-          ...x,
-          reconciliation: {
-            ...(x.reconciliation || {}),
-            // Mirror BE reconciliation shape: actual_cash + difference + reconciled_by {id,name}.
-            counted_cash: countedParsed.value,
-            actual_cash: countedParsed.value,
-            expected_cash: expectedCash(x),
-            variance,
-            difference: variance,
-            reconciled_by: { id: 0, name: 'Manager' },
-            reported_by_user: { first_name: 'Manager' },
-            notes: note.value || undefined,
-            created_at: new Date().toISOString(),
-          },
-        }
-      : x)
-    receiving.value = null
+  finally {
+    busy.value = false
   }
-  busy.value = false
 }
 
 // ============================================================
@@ -511,7 +581,6 @@ const statusOptions: { value: '' | 'ACTIVE' | 'ENDED' | 'COMPLETED' | 'ABANDONED
 ]
 const cashierSelectOptions = computed(() => cashiers.value.map(c => ({ value: String(c.id), label: fullName(c) })))
 const statusSelectOptions = computed(() => statusOptions.filter(o => o.value).map(o => ({ value: o.value, label: t(`shift_status_${o.value}`) })))
-const templateSelectOptions = computed(() => templates.value.map(tpl => ({ value: String(tpl.id), label: templateName(tpl) })))
 
 // ============================================================
 // Modal ergonomics: ESC to close + focus trap.
@@ -576,6 +645,11 @@ watch(receiving, async (val) => {
     document.removeEventListener('keydown', onReceiveKey)
   }
 })
+watch(settlementReady, async ready => {
+  if (!ready || !receiving.value) return
+  await nextTick()
+  receiveModalEl.value?.querySelector<HTMLInputElement>('.settlement-input')?.focus()
+})
 watch(endingShift, async (val) => {
   if (val) {
     document.addEventListener('keydown', onEndKey)
@@ -611,7 +685,7 @@ function onOverlayMouseUp(e: MouseEvent, closeFn: () => void) {
 // ============================================================
 const activeCounted = useCountUp(() => Number(summary.value.active ?? 0))
 const awaitingCounted = useCountUp(() => Number(summary.value.awaiting ?? 0))
-const cashCounted = useCountUp(() => Number(summary.value.cashToReceive ?? 0))
+const settlementCounted = useCountUp(() => Number(summary.value.settlementToReceive ?? 0))
 const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ?? 0)))
 </script>
 
@@ -624,7 +698,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
           {{ t('Shifts') }}
         </h1>
         <div class="page__subtitle">
-          {{ t('Reconcile cashiers and receive end-of-shift cash') }}
+          {{ t('Reconcile cashiers and receive end-of-shift settlements') }}
         </div>
       </div>
       <div class="page__head-actions">
@@ -666,7 +740,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         </div>
       </div>
 
-      <!-- Awaiting cash -->
+      <!-- Awaiting settlement -->
       <div class="kpi">
         <div class="kpi__top">
           <div class="kpi__icon t-warning">
@@ -675,7 +749,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
             </svg>
           </div>
           <div class="kpi__label">
-            {{ t('Awaiting cash') }}
+            {{ t('Awaiting settlement') }}
           </div>
         </div>
         <div v-if="loading" class="skel" style="width:60px;height:30px;" />
@@ -687,7 +761,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         </div>
       </div>
 
-      <!-- Cash to receive -->
+      <!-- All-tender settlement to receive -->
       <div class="kpi">
         <div class="kpi__top">
           <div class="kpi__icon t-primary">
@@ -696,15 +770,15 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
             </svg>
           </div>
           <div class="kpi__label">
-            {{ t('Cash to receive') }}
+            {{ t('Settlement to receive') }}
           </div>
         </div>
         <div v-if="loading" class="skel" style="width:140px;height:30px;" />
         <div v-else class="kpi__value">
-          {{ fmtAbbr(cashCounted) }}<span class="kpi__unit">UZS</span>
+          {{ fmtAbbr(settlementCounted) }}<span class="kpi__unit">UZS</span>
         </div>
         <div class="kpi__foot">
-          <span class="kpi__subtext">{{ t('across {n} shifts', { n: summary.awaiting }) }}</span>
+          <span class="kpi__subtext">{{ t('All payment types') }} · {{ t('across {n} shifts', { n: summary.awaiting }) }}</span>
         </div>
       </div>
 
@@ -734,7 +808,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
     <div class="card" style="margin-bottom: var(--sp-5);">
       <div class="toolbar">
         <!-- Cashier select -->
-        <div style="flex:1 1 200px; min-width:0;">
+        <div class="shift-filter shift-filter--cashier">
           <Select
             :model-value="cashierId === '' ? '' : String(cashierId)"
             icon="user"
@@ -745,7 +819,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         </div>
 
         <!-- Status select -->
-        <div style="flex:1 1 190px; min-width:0;">
+        <div class="shift-filter shift-filter--status">
           <Select
             v-model="statusF"
             icon="filter"
@@ -754,58 +828,13 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
           />
         </div>
 
-        <!-- Shift template select -->
-        <div style="flex:1 1 190px; min-width:0;">
-          <Select
-            :model-value="templateId === '' ? '' : String(templateId)"
-            icon="calendar"
-            :placeholder="t('All templates')"
-            :options="templateSelectOptions"
-            @update:model-value="templateId = $event ? Number($event) : ''"
-          />
-        </div>
-
-        <!-- Staff role toggle (which roles populate the cashier dropdown) -->
-        <div class="row staff-role-toggle" style="gap:6px;flex:0 0 auto;flex-wrap:wrap;">
-          <button
-            type="button"
-            class="badge"
-            :class="staffRole === 'CASHIER' ? 't-primary' : 't-neutral'"
-            :title="t('Show cashiers only in the staff dropdown')"
-            @click="staffRole = 'CASHIER'"
-          >
-            {{ t('role_CASHIER') }}
-          </button>
-          <button
-            type="button"
-            class="badge"
-            :class="staffRole === 'MANAGER' ? 't-primary' : 't-neutral'"
-            :title="t('Show managers only in the staff dropdown')"
-            @click="staffRole = 'MANAGER'"
-          >
-            {{ t('role_MANAGER') }}
-          </button>
-          <button
-            type="button"
-            class="badge"
-            :class="staffRole === 'ALL' ? 't-primary' : 't-neutral'"
-            :title="t('Show every user who can run a till')"
-            @click="staffRole = 'ALL'"
-          >
-            {{ t('All staff') }}
-          </button>
-        </div>
-
-        <!-- Date range -->
-        <div class="date-range-wrap" style="display:flex; align-items:center; gap:8px; flex:1 1 320px; min-width:0;">
-          <div class="control control--sm" style="flex:1 1 140px; min-width:0;">
-            <input v-model="dateFrom" type="date" :max="dateTo || undefined" :placeholder="t('From')">
-          </div>
-          <span class="tertiary">→</span>
-          <div class="control control--sm" style="flex:1 1 140px; min-width:0;">
-            <input v-model="dateTo" type="date" :min="dateFrom || undefined" :placeholder="t('To')">
-          </div>
-        </div>
+        <!-- The shift API accepts business dates, not arbitrary timestamps. -->
+        <DateRangePicker
+          class="shift-filter--date"
+          v-model="dateRange"
+          :enable-time="false"
+          :placeholder="t('All time')"
+        />
 
         <!-- Live only switch -->
         <div class="row live-only-wrap" style="gap:10px;">
@@ -963,7 +992,9 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         <div style="padding: var(--sp-4) var(--sp-5);flex:1;">
           <div class="row between" style="margin-bottom:10px;">
             <span class="kpi__label">
-              {{ shiftState(s) === 'reconciled' ? t('Cash received') : t('Cash to receive') }}
+              {{ shiftState(s) === 'reconciled'
+                ? (confirmedSettlement(s) !== null ? t('Settlement confirmed') : t('Cash received'))
+                : t('Settlement to receive') }}
             </span>
             <span v-if="shiftState(s) === 'reconciled'">
               <span
@@ -980,7 +1011,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
           </div>
           <div class="row between" style="align-items:flex-end;margin-bottom:12px;">
             <span class="mono shift-hero-amount">
-              {{ fmtMoney(shiftState(s) === 'reconciled' ? reportedCash(s) : expectedCash(s)) }}<span class="tertiary" style="font-size:12px;font-weight:500;"> UZS</span>
+              {{ fmtMoney(shiftState(s) === 'reconciled' ? (confirmedSettlement(s) ?? reportedCash(s)) : expectedSettlement(s)) }}<span class="tertiary" style="font-size:12px;font-weight:500;"> UZS</span>
             </span>
           </div>
 
@@ -1099,7 +1130,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="12" y1="2" x2="12" y2="22" /><path d="M17 6H9a3 3 0 100 6h6a3 3 0 110 6H7" />
               </svg>
-              {{ t('Receive cash') }}
+              {{ t('Receive money') }}
             </button>
             <button class="btn btn--secondary" @click="openReport(s)">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1126,7 +1157,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
       </div>
     </div>
 
-    <!-- Receive-cash modal -->
+    <!-- Receive-money modal -->
     <div
       v-if="receiving"
       class="overlay"
@@ -1138,17 +1169,17 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         class="modal modal--receive"
         role="dialog"
         aria-modal="true"
-        @submit.prevent="countedParsed !== null && !busy && confirmReceive()"
+        @submit.prevent="canConfirmSettlement && !busy && confirmReceive()"
         @mousedown.stop
         @mouseup.stop
       >
         <div class="modal__head">
           <div style="flex:1;min-width:0;">
             <h3 class="modal__title">
-              {{ t('Receive cash') }} · {{ fullName(receiving.user) }}
+              {{ t('Receive money') }} &middot; {{ fullName(receiving.user) }}
             </h3>
             <div class="modal__sub">
-              {{ t('Shift') }} #{{ receiving.id }} · {{ t('count the drawer and confirm the handover') }}
+              {{ t('Shift') }} #{{ receiving.id }} &middot; {{ t('All payment types') }}
             </div>
           </div>
           <button type="button" class="iconaction" :title="t('Close')" @click="closeReceive">
@@ -1156,104 +1187,101 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
           </button>
         </div>
         <div class="modal__body">
-          <!-- expected breakdown -->
-          <div style="background:var(--surface-inset);border:1px solid var(--border);border-radius:var(--r-md);padding:var(--sp-4);margin-bottom:var(--sp-5);">
-            <div class="row between" style="padding:5px 0;">
-              <span class="row" style="gap:8px;color:var(--text-secondary);font-size:13px;">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--success);">
-                  <ellipse cx="12" cy="6" rx="8" ry="3" /><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6" /><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
-                </svg>
-                {{ t('Cash sales') }}
-              </span>
-              <span class="mono" style="font-weight:600;font-size:13px;">{{ fmtMoney(receiving.cash_collected) }}</span>
-            </div>
-            <div v-if="num(receiving.expenses_total) > 0" class="row between" style="padding:5px 0;">
-              <span class="row" style="gap:8px;color:var(--text-secondary);font-size:13px;">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);">
-                  <path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2z" /><line x1="9" y1="7" x2="15" y2="7" /><line x1="9" y1="11" x2="15" y2="11" />
-                </svg>
-                {{ t('Cash expenses paid') }}
-              </span>
-              <span class="mono" style="font-weight:600;font-size:13px;color:var(--text-secondary);">− {{ fmtMoney(receiving.expenses_total) }}</span>
-            </div>
-            <div class="hr" style="margin:8px 0;" />
-            <div class="row between">
-              <span style="font-weight:600;font-size:14px;">{{ t('Expected in drawer') }}</span>
-              <span class="mono" style="font-weight:700;font-size:16px;">
-                {{ fmtMoney(expectedCash(receiving)) }} <span class="tertiary" style="font-size:12px;">UZS</span>
-              </span>
-            </div>
+          <div v-if="settlementLoading" class="settlement-state">
+            {{ t('Loading') }}
           </div>
 
-          <!-- Counted cash input -->
-          <label class="field">
-            <span class="field__label">{{ t('Counted cash (UZS)') }}</span>
-            <div class="control">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-tertiary);flex:0 0 18px;">
-                <rect x="2" y="6" width="20" height="12" rx="2" /><path d="M16 12h2" />
-              </svg>
-              <input v-model="counted" inputmode="numeric" :placeholder="t('e.g. 1 301 000')" autofocus>
-            </div>
-            <span class="field__hint">{{ t('Enter the amount you physically counted from the till.') }}</span>
-          </label>
-
-          <!-- Live variance -->
-          <div
-            class="row between"
-            :style="{
-              marginTop: '14px',
-              padding: '12px 14px',
-              borderRadius: 'var(--r-md)',
-              background: liveVariance === null ? 'var(--surface-2)' : liveVariance === 0 ? 'var(--neutral-weak)' : liveVariance > 0 ? 'var(--success-weak)' : 'var(--error-weak)',
-              border: '1px solid ' + (liveVariance === null ? 'var(--border)' : liveVariance === 0 ? 'var(--neutral-border)' : liveVariance > 0 ? 'var(--success-border)' : 'var(--error-border)'),
-            }"
-          >
-            <span style="font-weight:600;font-size:14px;">{{ t('Variance') }}</span>
-            <span v-if="liveVariance === null" class="tertiary">{{ t('Enter counted amount') }}</span>
-            <span v-else class="row" style="gap:10px;">
-              <span
-                class="mono"
-                :style="{
-                  fontWeight: 700,
-                  fontSize: '16px',
-                  color: liveVariance === 0 ? 'var(--text)' : liveVariance > 0 ? 'var(--success)' : 'var(--error)',
-                }"
-              >
-                {{ liveVariance > 0 ? '+' : liveVariance < 0 ? '−' : '' }}{{ fmtMoney(Math.abs(liveVariance)) }}
-              </span>
-              <span
-                class="badge"
-                :class="{
-                  't-neutral': liveVariance === 0,
-                  't-success': liveVariance > 0,
-                  't-error': liveVariance < 0,
-                }"
-              >
-                {{ liveVariance === 0 ? t('Exact') : liveVariance > 0 ? `${t('Over')} +${fmtNum(Math.abs(liveVariance))}` : `${t('Short')} −${fmtNum(Math.abs(liveVariance))}` }}
-              </span>
-            </span>
+          <div v-else-if="settlementError" class="settlement-state settlement-state--error">
+            <p>{{ t('Failed to load settlement') }}</p>
+            <button
+              type="button"
+              class="btn btn--ghost btn--sm"
+              @click="receiving && loadSettlement(receiving.id)"
+            >
+              {{ t('Retry') }}
+            </button>
           </div>
 
-          <!-- Note -->
-          <label class="field" style="margin-top:16px;">
-            <span class="field__label">{{ t('Note (optional)') }}</span>
-            <textarea v-model="note" class="control" :placeholder="t('Reason for any difference, deposits, etc.')" />
-          </label>
+          <template v-else-if="settlementReady">
+            <p class="settlement-intro">
+              {{ t('Count each tender first. The system figure and the difference appear only after you enter an amount.') }}
+            </p>
+
+            <div class="settlement-grid">
+              <div class="settlement-grid__head">
+                <span>{{ t('Payment type') }}</span>
+                <span>{{ t('Counted') }}</span>
+                <span>{{ t('System expected') }}</span>
+                <span>{{ t('Difference') }}</span>
+              </div>
+
+              <div
+                v-for="method in visibleTenders"
+                :key="method"
+                class="settlement-grid__row"
+              >
+                <div class="settlement-grid__tender">
+                  {{ tenderLabel(method) }}
+                </div>
+                <div class="settlement-grid__input">
+                  <input
+                    v-model="countedByTender[method]"
+                    class="settlement-input"
+                    inputmode="numeric"
+                    :aria-label="`${tenderLabel(method)}: ${t('Counted')}`"
+                    :placeholder="t('Enter counted amount')"
+                  >
+                </div>
+                <div class="settlement-grid__expected" :data-label="t('System expected')">
+                  <span v-if="countedOf(method) !== null" class="mono">
+                    {{ fmtMoney(expectedByTender[method] ?? 0) }}
+                  </span>
+                  <span v-else class="tertiary">&mdash;</span>
+                </div>
+                <div class="settlement-grid__difference" :data-label="t('Difference')">
+                  <template v-if="tenderVariance(method) !== null">
+                    <span
+                      class="settlement-difference"
+                      :class="{
+                        'settlement-difference--exact': tenderVariance(method) === 0,
+                        'settlement-difference--over': (tenderVariance(method) ?? 0) > 0,
+                        'settlement-difference--short': (tenderVariance(method) ?? 0) < 0,
+                      }"
+                    >
+                      {{ tenderVariance(method) === 0 ? t('Exact') : (tenderVariance(method) ?? 0) > 0 ? t('Over') : t('Short') }}
+                      {{ tenderVariance(method) === 0 ? '' : `${(tenderVariance(method) ?? 0) > 0 ? '+' : '-'}${fmtMoney(Math.abs(tenderVariance(method) ?? 0))}` }}
+                    </span>
+                  </template>
+                  <span v-else class="tertiary">&mdash;</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="settlement-total">
+              <div>
+                <div class="settlement-total__label">{{ t('Total received') }}</div>
+                <div class="settlement-total__hint">{{ t('All payment types') }}</div>
+              </div>
+              <strong class="mono">{{ fmtMoney(totalReceived) }} <span>UZS</span></strong>
+            </div>
+
+            <label class="field" style="margin-top:16px;">
+              <span class="field__label">{{ t('Note (optional)') }}</span>
+              <textarea v-model="note" class="control" :placeholder="t('Reason for any difference, deposits, etc.')" />
+            </label>
+          </template>
         </div>
-        <div class="modal__foot">
-          <button type="button" class="btn btn--ghost" :disabled="busy" @click="closeReceive">
-            {{ t('Cancel') }}
-          </button>
+        <div class="modal__foot" style="justify-content:flex-end;">
           <button
             type="submit"
             class="btn btn--primary"
             :class="{ 'is-loading': busy }"
-            :disabled="countedParsed === null || busy"
+            :disabled="!canConfirmSettlement || busy"
           >
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            {{ t('Confirm handover') }}
+            {{ t('Confirm settlement') }}
           </button>
         </div>
       </form>
@@ -1326,6 +1354,37 @@ meta:
 .shift-cards-grid {
   grid-template-columns: repeat(auto-fill, minmax(min(430px, 100%), 1fr));
 }
+/* The toolbar should read as a compact set of filters, not four equal-width
+   fields. Keep the date range flexible without stretching the selects. */
+.shift-filter {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.shift-filter--cashier {
+  flex-basis: 248px;
+  max-width: 280px;
+}
+
+.shift-filter--status {
+  flex-basis: 185px;
+  max-width: 210px;
+}
+
+.drp.shift-filter--date {
+  flex: 0 1 260px;
+  max-width: 290px;
+}
+
+.drp.shift-filter--date .drp-trigger {
+  width: 100%;
+}
+
+.drp.shift-filter--date .drp-trigger__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 @media (max-width: 900px) {
   .shift-cards-grid {
     grid-template-columns: 1fr;
@@ -1354,25 +1413,185 @@ meta:
 
 /* Modals — collapse hard-coded widths on narrow viewports (canonical phone breakpoint 768px) */
 .modal--receive {
-  max-width: 520px;
+  max-width: 680px;
   width: 100%;
 }
 .modal--end {
   max-width: 440px;
   width: 100%;
 }
+
+.settlement-state {
+  display: grid;
+  min-height: 144px;
+  place-items: center;
+  gap: var(--sp-3);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.settlement-state p {
+  margin: 0;
+}
+
+.settlement-state--error {
+  color: var(--error);
+}
+
+.settlement-intro {
+  margin: 0 0 var(--sp-4);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.settlement-grid {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.settlement-grid__head,
+.settlement-grid__row {
+  display: grid;
+  grid-template-columns: minmax(88px, 1fr) minmax(116px, 1.1fr) minmax(96px, 0.9fr) minmax(88px, 0.85fr);
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 10px 12px;
+}
+
+.settlement-grid__head {
+  background: var(--surface-inset);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.settlement-grid__row + .settlement-grid__row {
+  border-top: 1px solid var(--border);
+}
+
+.settlement-grid__tender {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.settlement-grid__expected,
+.settlement-grid__difference {
+  min-width: 0;
+  font-size: 13px;
+  text-align: right;
+}
+
+.settlement-input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  padding: 0 9px;
+}
+
+.settlement-input:focus {
+  border-color: var(--primary);
+  outline: 2px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  outline-offset: 1px;
+}
+
+.settlement-difference {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.settlement-difference--exact { color: var(--text-secondary); }
+.settlement-difference--over { color: var(--success); }
+.settlement-difference--short { color: var(--error); }
+
+.settlement-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-top: var(--sp-4);
+  padding: 12px 14px;
+  border: 1px solid var(--success-border);
+  border-radius: var(--r-md);
+  background: var(--success-weak);
+}
+
+.settlement-total__label {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.settlement-total__hint {
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.settlement-total strong {
+  color: var(--success);
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+.settlement-total strong span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .settlement-grid__head {
+    display: none;
+  }
+
+  .settlement-grid__row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'tender input'
+      'expected difference';
+    gap: 8px 12px;
+  }
+
+  .settlement-grid__tender { grid-area: tender; }
+  .settlement-grid__input { grid-area: input; }
+  .settlement-grid__expected { grid-area: expected; text-align: left; }
+  .settlement-grid__difference { grid-area: difference; }
+
+  .settlement-grid__expected::before,
+  .settlement-grid__difference::before {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--text-tertiary);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .settlement-grid__expected::before,
+  .settlement-grid__difference::before { content: attr(data-label); }
+}
+
 @media (max-width: 768px) {
   .modal--receive,
   .modal--end {
     max-width: 100%;
     margin: var(--sp-3);
-  }
-}
-
-/* Date range — drop to full width on narrow viewports so the two inputs stack cleanly */
-@media (max-width: 900px) {
-  .date-range-wrap {
-    flex: 1 1 100% !important;
   }
 }
 
@@ -1388,15 +1607,14 @@ meta:
   }
 }
 
-/* Toolbar role-toggle + live-only switch — span full width at phone widths so they don't collide */
-@media (max-width: 768px) {
-  .staff-role-toggle,
+@media (max-width: 640px) {
+  .shift-filter--cashier,
+  .shift-filter--status,
+  .drp.shift-filter--date,
   .live-only-wrap {
-    flex: 1 1 100% !important;
-  }
-  .staff-role-toggle .badge {
-    flex: 1 1 auto;
-    justify-content: center;
+    flex: 1 1 100%;
+    max-width: none;
   }
 }
+
 </style>

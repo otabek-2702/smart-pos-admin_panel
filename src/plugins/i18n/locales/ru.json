@@ -1732,6 +1732,7 @@
   "Empty conversation": "Пустая беседа",
   "Delete chat": "Удалить чат",
   "Delete this chat?": "Удалить этот чат?",
+  "Could not delete chat. Please try again.": "Не удалось удалить чат. Повторите попытку.",
   "Rename chat": "Переименовать чат",
   "Suggested for you": "Рекомендуем вам",
   "Jump to latest": "К последнему",

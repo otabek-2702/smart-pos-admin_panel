@@ -260,17 +260,26 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
     return c.id
   }
 
-  function deleteChat(id: string) {
+  async function deleteChat(id: string): Promise<boolean> {
     const c = chats.value.find(x => x.id === id)
-    const next = chats.value.filter(x => x.id !== id)
+    if (!c)
+      return false
 
+    // Server chats must be deleted remotely before their local cache is
+    // changed. Otherwise a failed request looks successful, then the chat
+    // reappears when the history is fetched again.
+    if (c.serverId !== undefined && c.serverId !== null) {
+      const removed = await deleteRemote(c.serverId)
+      if (!removed)
+        return false
+    }
+
+    const next = chats.value.filter(x => x.id !== id)
     chats.value = next
     if (activeId.value === id)
       activeId.value = next[0]?.id ?? null
 
-    // Best-effort remote delete; local removal already happened.
-    if (c?.serverId !== undefined && c.serverId !== null)
-      deleteRemote(c.serverId).catch(() => { /* graceful */ })
+    return true
   }
 
   function renameChat(id: string, title: string) {
@@ -447,9 +456,9 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
    * removed locally and reappeared from the server on the next list fetch. */
   async function deleteRemote(serverId: string | number): Promise<boolean> {
     try {
-      await stockApi.post(`/ai/chats/${serverId}/delete/`)
+      const res = await stockApi.post(`/ai/chats/${serverId}/delete/`)
 
-      return true
+      return res.data?.success !== false
     }
     catch {
       return false

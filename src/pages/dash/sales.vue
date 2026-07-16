@@ -410,7 +410,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Row 2: Revenue vs Expenses chart + Category targets bullets -->
+      <!-- Row 2: Revenue vs expenses + category targets -->
       <div class="grid sales-revenue-grid">
         <Card>
           <div class="card__head">
@@ -448,41 +448,6 @@ onMounted(() => {
                 />{{ t('Expenses') }}
               </span>
             </div>
-          </div>
-        </Card>
-
-        <Card class="sales-expense-list">
-          <div class="card__head">
-            <div class="card__head-text">
-              <div class="kpi__label">
-                {{ expenseListTitle }}
-              </div>
-              <h3 class="card__title">
-                {{ t('Expenses') }}
-              </h3>
-            </div>
-          </div>
-          <div class="card__body">
-            <div
-              v-if="expenseBreakdown.length"
-              class="sales-expense-list__rows"
-            >
-              <div
-                v-for="row in expenseBreakdown"
-                :key="row.label"
-                class="sales-expense-list__row"
-              >
-                <span>{{ row.label }}</span>
-                <strong class="mono">{{ formatCurrency(row.value) }}</strong>
-              </div>
-            </div>
-            <p
-              v-else
-              class="muted"
-              style="margin: 4px 0 0; font-size: 13px;"
-            >
-              {{ t('No expenses recorded') }}
-            </p>
           </div>
         </Card>
 
@@ -557,29 +522,67 @@ onMounted(() => {
         </Card>
       </div>
 
-      <!-- The weekly distribution chart was removed: it did not give a reliable, range-aware insight. -->
-      <Card v-if="orderTypeMix.length" class="sales-order-type">
-        <div class="card__head">
-          <div class="card__head-text">
-            <div class="kpi__label">
-              {{ t('Order type mix · {window}', { window: windowLabel }) }}
+      <!-- Row 3: expense summary + order-type chart. -->
+      <div class="grid sales-expense-grid">
+        <!-- The weekly distribution chart was removed: it did not give a reliable, range-aware insight. -->
+        <Card v-if="orderTypeMix.length" class="sales-order-type">
+          <div class="card__head">
+            <div class="card__head-text">
+              <div class="kpi__label">
+                {{ t('Order type mix · {window}', { window: windowLabel }) }}
+              </div>
+              <h3 class="card__title">
+                {{ t('Where orders come from') }}
+              </h3>
             </div>
-            <h3 class="card__title">
-              {{ t('Where orders come from') }}
-            </h3>
           </div>
-        </div>
-        <div class="card__body">
-          <DonutChart
-            :data="orderTypeMix"
-            :center-label="t('Orders')"
-            :center-value="fmtNum(orderTypeTotal)"
-            :size="208"
-          />
-        </div>
-      </Card>
+          <div class="card__body">
+            <DonutChart
+              :data="orderTypeMix"
+              :center-label="t('Orders')"
+              :center-value="fmtNum(orderTypeTotal)"
+              :size="208"
+            />
+          </div>
+        </Card>
 
-      <!-- Row 4: daily order count + daily revenue bars, labels above each bar. -->
+        <Card class="sales-expense-list">
+          <div class="card__head">
+            <div class="card__head-text">
+              <div class="kpi__label">
+                {{ expenseListTitle }}
+              </div>
+              <h3 class="card__title">
+                {{ t('Expenses') }}
+              </h3>
+            </div>
+          </div>
+          <div class="card__body">
+            <div
+              v-if="expenseBreakdown.length"
+              class="sales-expense-list__rows"
+            >
+              <div
+                v-for="row in expenseBreakdown"
+                :key="row.label"
+                class="sales-expense-list__row"
+              >
+                <span>{{ row.label }}</span>
+                <strong class="mono">{{ formatCurrency(row.value) }}</strong>
+              </div>
+            </div>
+            <p
+              v-else
+              class="muted"
+              style="margin: 4px 0 0; font-size: 13px;"
+            >
+              {{ t('No expenses recorded') }}
+            </p>
+          </div>
+        </Card>
+      </div>
+
+      <!-- Rows 4–5: order count and revenue each have their own row. -->
       <div
         v-if="ordersByDay.length || revenueByDay.length"
         class="grid sales-bottom-grid"
@@ -793,6 +796,9 @@ onMounted(() => {
 .sales-revenue-grid {
   grid-template-columns: minmax(0, 1.45fr) minmax(280px, .85fr);
 }
+.sales-expense-grid {
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, .85fr);
+}
 .sales-expense-list__rows {
   display: flex;
   flex-direction: column;
@@ -820,11 +826,12 @@ onMounted(() => {
   justify-content: center;
 }
 .sales-bottom-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 @media (max-width: 900px) {
   .sales-revenue-grid,
+  .sales-expense-grid,
   .sales-bottom-grid {
     grid-template-columns: 1fr;
   }

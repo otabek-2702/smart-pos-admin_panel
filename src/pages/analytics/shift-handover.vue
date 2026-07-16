@@ -196,43 +196,6 @@ function reconTone(rec: any): string {
 }
 
 // ============================================================
-// Payment mix → donut data (kept logic identical, palette mirrors bundle)
-// ============================================================
-const PAYMENT_COLORS: Record<string, string> = {
-  CASH: 'var(--c1)',
-  UZCARD: 'var(--c2)',
-  HUMO: 'var(--c3)',
-  PAYME: 'var(--c4)',
-  MIXED: 'var(--c5)',
-}
-const PAYMENT_LABELS: Record<string, string> = {
-  CASH: 'Cash',
-  UZCARD: 'Uzcard',
-  HUMO: 'Humo',
-  PAYME: 'Payme',
-  MIXED: 'Mixed',
-}
-const paymentMix = computed(() => {
-  const mix = shift.value?.money?.payment_mix ?? {}
-  return Object.keys(PAYMENT_COLORS)
-    .map(k => ({
-      key: k,
-      label: k === 'CASH' ? t('Cash') : PAYMENT_LABELS[k],
-      value: Number(mix[k] || 0),
-      color: PAYMENT_COLORS[k],
-    }))
-    .filter(s => s.value > 0)
-    .sort((a, b) => b.value - a.value)
-})
-const paymentTotal = computed(() => paymentMix.value.reduce((a, b) => a + b.value, 0))
-const paymentInsight = computed(() => {
-  if (!paymentMix.value.length) return t('No paid orders yet')
-  const total = paymentTotal.value || 1
-  const top = paymentMix.value[0]
-  return t('{name} leads at {pct}%', { name: top.label, pct: Math.round((top.value / total) * 100) })
-})
-
-// ============================================================
 // Orders-by-hour bar data
 // ============================================================
 const byHour = computed<any[]>(() => {
@@ -319,40 +282,9 @@ function barY(v: number): number {
 }
 
 // ============================================================
-// Donut geometry (payment mix) — size 188 per source
-// R = size/2, r = R*0.62, gap 0.018, start at -0.25
-// ============================================================
-const DONUT_SIZE = 188
-const donutHover = ref<number | null>(null)
-const donutArcs = computed(() => {
-  const R = DONUT_SIZE / 2
-  const r = R * 0.62
-  const cx = R
-  const cy = R
-  const gap = 0.018
-  const total = paymentTotal.value || 1
-  let acc = -0.25
-  return paymentMix.value.map((d) => {
-    const frac = d.value / total
-    const a0 = acc * 2 * Math.PI + gap * Math.PI
-    const a1 = (acc + frac) * 2 * Math.PI - gap * Math.PI
-    acc += frac
-    const big = (a1 - a0) > Math.PI ? 1 : 0
-    const p = (ang: number, rad: number) => [cx + rad * Math.cos(ang), cy + rad * Math.sin(ang)]
-    const o0 = p(a0, R)
-    const o1 = p(a1, R)
-    const i1 = p(a1, r)
-    const i0 = p(a0, r)
-    const path = `M${o0[0]} ${o0[1]} A${R} ${R} 0 ${big} 1 ${o1[0]} ${o1[1]} L${i1[0]} ${i1[1]} A${r} ${r} 0 ${big} 0 ${i0[0]} ${i0[1]} Z`
-    return { path, pct: Math.round(frac * 100), d }
-  })
-})
-
-// ============================================================
 // Entrance animations (parity with bundle anim.jsx::useShown)
 // ============================================================
 const barShown = useShown(120)
-const donutShown = useShown(120)
 const hbarShown = useShown(140)
 
 // ============================================================
@@ -360,7 +292,24 @@ const hbarShown = useShown(140)
 // ============================================================
 const revenueT = computed(() => Number(shift.value?.money?.revenue ?? 0))
 const cashT = computed(() => Number(shift.value?.money?.cash ?? 0))
-const cardT = computed(() => Number(shift.value?.money?.card ?? 0))
+function paymentAmount(source: any, method: string): number {
+  const raw = source?.[method] ?? source?.[method.toLowerCase()]
+
+  return Number(raw?.amount ?? raw ?? 0) || 0
+}
+function cardPaymentTotal(money: any): number {
+  const byTender = money?.card_detail ?? money?.payment_mix ?? {}
+  const detailedTotal = ['CARD', 'HUMO', 'UZCARD'].reduce(
+    (total, method) => total + paymentAmount(byTender, method),
+    0,
+  )
+
+  // The current report contract supplies `money.card` as the combined total;
+  // the detail/mix calculation also supports older deployments that expose
+  // Humo, Uzcard, and generic card separately.
+  return detailedTotal || paymentAmount(money, 'CARD')
+}
+const cardT = computed(() => cardPaymentTotal(shift.value?.money))
 const aovT = computed(() => Number(shift.value?.money?.avg_order_value ?? 0))
 const revenueCounted = useCountUp(revenueT)
 const cashCounted = useCountUp(cashT)
@@ -598,76 +547,8 @@ function shiftDurationLabel(): string {
         </div>
       </div>
 
-      <!-- ===== Payment mix donut + Orders by hour bar (cols-2, donut LEFT) ===== -->
-      <div class="grid cols-2" style="margin-bottom:var(--sp-5);">
-        <div class="card">
-          <div class="card__head">
-            <div class="card__head-text">
-              <div class="kpi__label" style="margin-bottom:3px;">
-                {{ t('Payment mix · this shift') }}
-              </div>
-              <h3 class="card__insight">
-                {{ paymentInsight }}
-              </h3>
-              <div class="card__sub">
-                {{ t('Share of collected revenue by method') }}
-              </div>
-            </div>
-          </div>
-          <div class="card__body">
-            <div v-if="!paymentMix.length" class="statefill" :style="`height:${DONUT_SIZE}px;`">
-              <div class="statefill__icon">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 3 v9 l7 4" /></svg>
-              </div>
-              <div class="statefill__title">
-                {{ t('No paid orders yet') }}
-              </div>
-            </div>
-            <div v-else class="row shift-handover__donut-row" style="gap:24px; align-items:center; flex-wrap:wrap;">
-              <div class="shift-handover__donut-wrap" style="position:relative; flex:0 0 auto;">
-                <svg
-                  class="donut-in shift-handover__donut-svg"
-                  :width="DONUT_SIZE"
-                  :height="DONUT_SIZE"
-                  :style="{ opacity: donutShown ? 1 : 0, transform: donutShown ? 'none' : 'rotate(-10deg) scale(.9)' }"
-                >
-                  <path
-                    v-for="(a, i) in donutArcs"
-                    :key="`da${i}`"
-                    :d="a.path"
-                    :fill="a.d.color"
-                    :opacity="donutHover !== null && donutHover !== i ? 0.4 : 1"
-                    :style="`transition: opacity .12s; cursor: default; transform-origin: ${DONUT_SIZE / 2}px ${DONUT_SIZE / 2}px; transform: ${donutHover === i ? 'scale(1.03)' : 'scale(1)'};`"
-                    @mouseenter="donutHover = i"
-                    @mouseleave="donutHover = null"
-                  />
-                  <text :x="DONUT_SIZE / 2" :y="DONUT_SIZE / 2 - 4" class="donut-center donut-center__v" font-size="22">{{ fmtAbbr(paymentTotal) }}</text>
-                  <text :x="DONUT_SIZE / 2" :y="DONUT_SIZE / 2 + 16" class="donut-center donut-center__l" font-size="11">{{ t('Collected') }}</text>
-                </svg>
-              </div>
-              <div class="shift-handover__donut-legend" style="display:flex; flex-direction:column; gap:10px; flex:1; min-width:160px;">
-                <div
-                  v-for="(a, i) in donutArcs"
-                  :key="`dl${i}`"
-                  class="row between"
-                  :style="{ opacity: donutHover !== null && donutHover !== i ? 0.5 : 1, transition: 'opacity .12s' }"
-                  @mouseenter="donutHover = i"
-                  @mouseleave="donutHover = null"
-                >
-                  <span class="legend-item">
-                    <span class="legend-swatch" :style="{ background: a.d.color }" />
-                    {{ a.d.label }}
-                  </span>
-                  <span class="row" style="gap:8px;">
-                    <b class="mono" style="font-size:var(--fs-sm);">{{ fmtAbbr(a.d.value) }}</b>
-                    <span class="tertiary mono" style="font-size:var(--fs-label); width:38px; text-align:right;">{{ a.pct }}%</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
+      <!-- ===== Orders by hour ===== -->
+      <div style="margin-bottom:var(--sp-5);">
         <div class="card">
           <div class="card__head">
             <div class="card__head-text">
@@ -1435,23 +1316,13 @@ function shiftDurationLabel(): string {
     overflow-wrap: anywhere;
   }
 
-  /* Donut chart — center the donut + legend stack, full-width legend */
-  .shift-handover__donut-row {
-    justify-content: center;
-    gap: 16px !important;
-  }
-  .shift-handover__donut-legend {
-    min-width: 0 !important;
-    flex: 1 1 100%;
-  }
-
   /* KPI tags wider so translated labels are not cramped */
   .kpi__label {
     max-width: none;
   }
 }
 
-/* Small phone: tighten further, allow donut to shrink */
+/* Small phone: tighten further. */
 @media (max-width: 420px) {
   /* All cols-4 collapse to single col on tiny screens */
   .shift-handover__kpi-grid,
@@ -1462,15 +1333,6 @@ function shiftDurationLabel(): string {
 
   .shift-handover__summary-kpi {
     flex: 1 1 100%;
-  }
-
-  /* Donut SVG: scale via CSS so it never overflows */
-  .shift-handover__donut-svg {
-    max-inline-size: 100%;
-    block-size: auto;
-  }
-  .shift-handover__donut-wrap {
-    max-inline-size: 100%;
   }
 
   .shift-handover__orders-stat-value {

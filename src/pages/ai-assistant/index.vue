@@ -13,6 +13,7 @@ import DesignIcon from '@/components/design/DesignIcon.vue'
 import Button from '@/components/design/Button.vue'
 import Input from '@/components/design/Input.vue'
 import MarkdownMessage from '@/components/design/MarkdownMessage.vue'
+import Modal from '@/components/design/Modal.vue'
 import { Fmt } from '@/components/design/utils/format'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -298,21 +299,35 @@ function cancelRename() {
   renaming.value = false
 }
 
-// ---- Two-step delete confirm (prevents accidental loss of a conversation) ----
+// ---- Delete confirmation ----
 const confirmDelId = ref<string | null>(null)
-let confirmTimer: number | null = null
+const deletingChat = ref(false)
+const deleteError = ref('')
+const chatToDelete = computed(() => chats.value.find(c => c.id === confirmDelId.value) ?? null)
 function requestDelete(id: string) {
-  if (confirmDelId.value === id) {
-    store.deleteChat(id)
-    confirmDelId.value = null
-    if (confirmTimer) { window.clearTimeout(confirmTimer); confirmTimer = null }
-
-    return
-  }
   confirmDelId.value = id
-  if (confirmTimer)
-    window.clearTimeout(confirmTimer)
-  confirmTimer = window.setTimeout(() => { confirmDelId.value = null }, 3200)
+  deleteError.value = ''
+}
+function closeDelete() {
+  if (deletingChat.value)
+    return
+  confirmDelId.value = null
+  deleteError.value = ''
+}
+async function confirmDelete() {
+  const id = confirmDelId.value
+  if (!id || deletingChat.value)
+    return
+
+  deletingChat.value = true
+  deleteError.value = ''
+  const deleted = await store.deleteChat(id)
+  deletingChat.value = false
+
+  if (deleted)
+    closeDelete()
+  else
+    deleteError.value = t('Could not delete chat. Please try again.')
 }
 
 // ---- Jump to latest (shown when the user has scrolled up off the live tail) ----
@@ -415,11 +430,10 @@ function exportChat() {
           </div>
           <button
             class="histitem__del"
-            :class="{ 'is-confirm': confirmDelId === c.id }"
-            :title="confirmDelId === c.id ? t('Delete this chat?') : t('Delete chat')"
+            :title="t('Delete chat')"
             @click.stop="requestDelete(c.id)"
           >
-            <DesignIcon :name="confirmDelId === c.id ? 'check' : 'trash'" :size="15" />
+            <DesignIcon name="trash" :size="15" />
           </button>
         </div>
       </div>
@@ -678,6 +692,36 @@ function exportChat() {
         </div>
       </div>
     </section>
+
+    <Modal
+      :open="confirmDelId !== null"
+      :title="t('Delete chat')"
+      :subtitle="chatToDelete?.title || t('Delete this chat?')"
+      :width="440"
+      :close-on-backdrop="!deletingChat"
+      :close-on-esc="!deletingChat"
+      @close="closeDelete"
+    >
+      <p style="margin: 0; color: var(--text-secondary);">
+        {{ t('Delete this chat?') }}
+      </p>
+      <p v-if="deleteError" class="ai-delete-error" role="alert">
+        {{ deleteError }}
+      </p>
+      <template #footer>
+        <Button :disabled="deletingChat" @click="closeDelete">
+          {{ t('Cancel') }}
+        </Button>
+        <Button
+          variant="danger"
+          icon="trash"
+          :loading="deletingChat"
+          @click="confirmDelete"
+        >
+          {{ t('Delete') }}
+        </Button>
+      </template>
+    </Modal>
   </div>
 </template>
 
@@ -769,12 +813,10 @@ meta:
 }
 .iconbtn:hover { border-color: var(--text-tertiary); color: var(--text); }
 
-/* keep the two-step delete-confirm button visible + error-tinted */
-:deep(.histitem__del.is-confirm) {
-  display: grid !important;
-  opacity: 1 !important;
-  background: var(--error-weak);
+.ai-delete-error {
+  margin: var(--sp-3) 0 0;
   color: var(--error);
+  font-size: var(--fs-sm);
 }
 
 /* live suggestions in empty state */

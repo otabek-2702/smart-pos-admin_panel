@@ -1838,6 +1838,7 @@
   "Empty conversation": "Empty conversation",
   "Delete chat": "Delete chat",
   "Delete this chat?": "Delete this chat?",
+  "Could not delete chat. Please try again.": "Could not delete chat. Please try again.",
   "Rename chat": "Rename chat",
   "Suggested for you": "Suggested for you",
   "Jump to latest": "Jump to latest",

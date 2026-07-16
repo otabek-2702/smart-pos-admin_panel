@@ -113,16 +113,38 @@ const statusOptions = computed(() => [
 ])
 
 // -------- charts --------
-const paymentMixSeries = computed(() => {
-  const mix = summary.value?.money?.payment_mix_pct ?? {}
+function paymentValue(source: any, method: string): number {
+  const raw = source?.[method] ?? source?.[method.toLowerCase()]
 
-  return [mix.CASH ?? 0, mix.UZCARD ?? 0, mix.HUMO ?? 0, mix.PAYME ?? 0, mix.MIXED ?? 0]
-})
+  return Number(raw?.amount ?? raw ?? 0) || 0
+}
+function canonicalPaymentRows(source: any): { key: 'CASH' | 'CARD' | 'PAYME'; value: number }[] {
+  const card = ['CARD', 'HUMO', 'UZCARD'].reduce(
+    (total, method) => total + paymentValue(source, method),
+    0,
+  )
+
+  return [
+    { key: 'CASH' as const, value: paymentValue(source, 'CASH') },
+    { key: 'CARD' as const, value: card },
+    { key: 'PAYME' as const, value: paymentValue(source, 'PAYME') },
+  ].filter(row => row.value > 0)
+}
+function cardTotal(money: any): number {
+  const detailOrMix = money?.card_detail ?? money?.payment_mix
+
+  return detailOrMix
+    ? (canonicalPaymentRows(detailOrMix).find(row => row.key === 'CARD')?.value ?? 0)
+    : (canonicalPaymentRows(money).find(row => row.key === 'CARD')?.value ?? 0)
+}
+
+const paymentMixRows = computed(() => canonicalPaymentRows(summary.value?.money?.payment_mix_pct))
+const paymentMixSeries = computed(() => paymentMixRows.value.map(row => row.value))
 
 const paymentMixOptions = computed(() => ({
   chart: { type: 'donut', toolbar: { show: false } },
-  labels: [t('payment_method_CASH'), t('payment_method_UZCARD'), t('payment_method_HUMO'), t('payment_method_PAYME'), t('payment_method_MIXED')],
-  colors: ['#22c55e', '#3b82f6', '#f59e0b', '#06b6d4', '#a855f7'],
+  labels: paymentMixRows.value.map(row => t(`payment_method_${row.key}`)),
+  colors: paymentMixRows.value.map(row => ({ CASH: '#22c55e', CARD: '#3b82f6', PAYME: '#06b6d4' }[row.key])),
   legend: { position: 'bottom' },
   dataLabels: { enabled: true, formatter: (v: number) => `${v.toFixed(1)}%` },
 }))
@@ -346,7 +368,7 @@ const shiftColumns = computed<DataTableColumn<any>[]>(() => [
             </div>
             <div class="cs-row">
               <span class="cs-row__label">{{ t('Card') }}</span>
-              <span class="cs-row__val">{{ formatCurrency(summary.money.card) }}</span>
+              <span class="cs-row__val">{{ formatCurrency(cardTotal(summary.money)) }}</span>
             </div>
             <hr class="cs-divider">
             <div class="cs-row">
@@ -363,10 +385,14 @@ const shiftColumns = computed<DataTableColumn<any>[]>(() => [
           <div class="card-pad">
             <div class="card-title">{{ t('Payment Mix') }}</div>
             <VueApexCharts
+              v-if="paymentMixSeries.length"
               :options="paymentMixOptions"
               :series="paymentMixSeries"
               height="240"
             />
+            <div v-else class="statefill">
+              <div class="statefill__title">{{ t('No data') }}</div>
+            </div>
           </div>
         </Card>
         <Card>
@@ -565,7 +591,7 @@ const shiftColumns = computed<DataTableColumn<any>[]>(() => [
             {{ formatCurrency(row.money?.cash ?? 0) }}
           </template>
           <template #cell.card="{ row }">
-            {{ formatCurrency(row.money?.card ?? 0) }}
+            {{ formatCurrency(cardTotal(row.money)) }}
           </template>
           <template #cell.aov="{ row }">
             {{ formatCurrency(row.money?.avg_order_value ?? 0) }}
@@ -603,9 +629,9 @@ const shiftColumns = computed<DataTableColumn<any>[]>(() => [
             <div class="cs-expand">
               <div class="cs-expand__col">
                 <div class="card-subtitle">{{ t('Payment mix') }}</div>
-                <div v-for="(v, k) in (row.money?.payment_mix ?? {})" :key="k" class="cs-row cs-row--sm">
-                  <span class="cs-row__label">{{ t(`payment_method_${k}`) }}</span>
-                  <span>{{ formatCurrency(Number(v) || 0) }}</span>
+                <div v-for="payment in canonicalPaymentRows(row.money?.payment_mix ?? row.money)" :key="payment.key" class="cs-row cs-row--sm">
+                  <span class="cs-row__label">{{ t(`payment_method_${payment.key}`) }}</span>
+                  <span>{{ formatCurrency(payment.value) }}</span>
                 </div>
               </div>
               <div class="cs-expand__col">

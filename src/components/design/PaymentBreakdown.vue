@@ -54,13 +54,30 @@ function nameFor(type: string) {
   return mapped[key] ?? type
 }
 
+// Customer-facing reporting treats every physical/card-network tender as one
+// Card total. Keep Payme, Click, and other distinct methods separate.
+const methods = computed<Method[]>(() => {
+  const grouped = new Map<string, number>()
+
+  for (const method of props.methods ?? []) {
+    const rawType = String(method.type ?? '').toUpperCase()
+    const type = ['CARD', 'HUMO', 'UZCARD'].includes(rawType) ? 'CARD' : rawType
+    const amount = Number(method.amount) || 0
+    if (!type || amount <= 0)
+      continue
+    grouped.set(type, (grouped.get(type) ?? 0) + amount)
+  }
+
+  return Array.from(grouped, ([type, amount]) => ({ type, amount }))
+})
+
 const safeTotal = computed(() => {
   const n = Number(props.total) || 0
   if (n > 0) return n
-  return props.methods.reduce((a, m) => a + (Number(m.amount) || 0), 0) || 1
+  return methods.value.reduce((a, m) => a + (Number(m.amount) || 0), 0) || 1
 })
 
-const mixed = computed(() => (props.methods?.length ?? 0) > 1)
+const mixed = computed(() => methods.value.length > 1)
 
 function pct(amount: number | string) {
   const n = Number(amount) || 0

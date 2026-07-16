@@ -9,10 +9,9 @@
      Clicking a row toggles to undefined when re-clicked.
    - STATUSES uses FE-canonical OPEN/PREPARING/READY/COMPLETED/CANCELED
      (not v3's reduced [PREPARING, READY, COMPLETED, CANCELLED]).
-   - Hours bucket from o.created_at (BE field).
 */
 import Card from '@/components/design/Card.vue'
-import MiniBars from '@/components/design/MiniBars.vue'
+import PaymentBreakdown from '@/components/design/PaymentBreakdown.vue'
 import ProgressRing from '@/components/design/ProgressRing.vue'
 import { cx } from '@/components/design/utils'
 
@@ -25,6 +24,8 @@ interface Props {
   // deriving from the current page's rows. Fall back to page-derived when absent.
   statusCounts?: Record<string, number> | null
   paymentCounts?: Record<string, number> | null
+  paymentMethods?: { type: string; amount: number | string }[]
+  paymentTotal?: number
 }
 
 const props = defineProps<Props>()
@@ -84,23 +85,6 @@ const totals = computed(() => {
   const paidPct = Math.round((paid / total) * 100)
   return { paid, unpaid, total, paidPct }
 })
-
-const hourly = computed(() => {
-  const byHour: Record<number, number> = {}
-  for (const o of (props.orders || [])) {
-    const src = o.created_at ?? o.at
-    if (!src) continue
-    const d = new Date(src)
-    if (isNaN(d.getTime())) continue
-    const h = d.getHours()
-    byHour[h] = (byHour[h] || 0) + 1
-  }
-  const data: number[] = []
-  for (let h = 11; h <= 22; h++) data.push(byHour[h] || 0)
-  return data
-})
-
-const hourLabels = ['11', '', '13', '', '15', '', '17', '', '19', '', '21', '']
 
 function isStatusActive(key: string) {
   return Array.isArray(props.status) && props.status.includes(key)
@@ -184,13 +168,17 @@ function togglePayment(p: string) {
       </div>
     </Card>
 
-    <!-- Hourly mini bars -->
+    <!-- Payment breakdown replaces the unused hourly chart. -->
     <Card class-name="ordersinsights__card">
-      <div class="row between" style="margin-bottom: 8px;">
-        <span class="kpi__label">{{ t('Orders by hour') }}</span>
-        <span class="badge t-neutral">11:00–22:00</span>
+      <div class="kpi__label" style="margin-bottom: 8px;">{{ t('Payment breakdown') }}</div>
+      <PaymentBreakdown
+        v-if="paymentMethods?.length"
+        :methods="paymentMethods"
+        :total="paymentTotal ?? 0"
+      />
+      <div v-else class="statefill">
+        <div class="statefill__title">{{ t('No data') }}</div>
       </div>
-      <MiniBars :data="hourly" :labels="hourLabels" />
     </Card>
   </div>
 </template>

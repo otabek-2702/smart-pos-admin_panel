@@ -656,23 +656,11 @@ function onPaymentToggle(p: string) {
       :payment="paymentFilter"
       :status-counts="stats?.status_counts ?? null"
       :payment-counts="stats?.payment_counts ?? null"
+      :payment-methods="statsPaymentMethods"
+      :payment-total="statsPaymentTotal"
       @status="onStatusToggle"
       @payment="onPaymentToggle"
     />
-
-    <!-- Stats-level payment breakdown (from /orders/stats payment_breakdown) -->
-    <div
-      v-if="statsPaymentMethods.length"
-      class="card stats-paybreak-card"
-    >
-      <div class="stats-paybreak-head">
-        <span class="kpi__label">{{ t('Payment breakdown') }}</span>
-      </div>
-      <PaymentBreakdown
-        :methods="statsPaymentMethods"
-        :total="statsPaymentTotal"
-      />
-    </div>
 
     <!-- Main table card -->
     <div class="card">
@@ -879,7 +867,7 @@ function onPaymentToggle(p: string) {
       </div>
 
       <!-- Active filter chips -->
-      <div v-if="hasFilters" class="toolbar" style="padding-top: 0;">
+      <div v-if="hasFilters" class="toolbar" style="padding-top: var(--sp-3);">
         <div class="chips">
           <span class="tertiary" style="font-size: 13px; margin-right: 2px;">{{ t('Filters') }}:</span>
 
@@ -1490,17 +1478,6 @@ function onPaymentToggle(p: string) {
   .orders-paybreak-wrap { max-width: 100%; }
 }
 
-/* --- Stats-level payment breakdown card --- */
-.stats-paybreak-card {
-  padding: var(--sp-4);
-  margin-block-end: var(--sp-5);
-}
-.stats-paybreak-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-block-end: var(--sp-2);
-}
 </style>
 
 <route lang="yaml">

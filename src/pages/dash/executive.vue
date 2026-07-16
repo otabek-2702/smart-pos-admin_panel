@@ -70,7 +70,8 @@ interface DashData {
   revenue30: number[]
   orders30: number[]
   aov30: number[]
-  lastMonthRev: number[]
+  /** Revenue for the equal-length business-day window immediately before the selected one. */
+  previousPeriodRev: number[]
   dayLabels: string[]
   paymentMix: PaymentSlice[]
   categories: CategoryRow[]
@@ -115,6 +116,33 @@ type MetricKey = 'rev' | 'ord' | 'aov'
 
 const metricKey = ref<MetricKey>('rev')
 const compare = ref(false)
+const comparisonRange = ref<{ from: string; to: string } | null>(null)
+
+/**
+ * Format a date as a local calendar date. Using local noon is intentional:
+ * parsing a bare date through UTC would shift it back one day in Tashkent.
+ */
+function formatComparisonDate(ymd: string): string {
+  const [year, month, day] = String(ymd).split('-').map(Number)
+  if (!year || !month || !day)
+    return String(ymd)
+  return new Intl.DateTimeFormat(String(locale.value), {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, day, 12))
+}
+
+const comparisonLabel = computed(() => {
+  const range = comparisonRange.value
+  if (!range)
+    return t('Previous period')
+  const from = formatComparisonDate(range.from)
+  const to = formatComparisonDate(range.to)
+  return range.from === range.to
+    ? `${t('Previous period')} · ${from}`
+    : `${t('Previous period')} · ${from}–${to}`
+})
 
 const metrics = computed(() => {
   const D = data.value
@@ -135,8 +163,8 @@ const switchSeries = computed(() => {
   if (!m || !D)
     return []
   const base = [{ key: m.key, label: m.label, color: 'rgb(var(--v-theme-chart-revenue))', data: m.data }]
-  if (compare.value && metricKey.value === 'rev' && D.lastMonthRev?.length)
-    base.push({ key: 'cmp', label: t('Previous period'), color: 'rgb(var(--v-theme-chart-target))', data: D.lastMonthRev, dashed: true } as any)
+  if (compare.value && metricKey.value === 'rev' && D.previousPeriodRev?.length)
+    base.push({ key: 'cmp', label: comparisonLabel.value, color: 'rgb(var(--v-theme-chart-target))', data: D.previousPeriodRev, dashed: true } as any)
   return base
 })
 
@@ -215,13 +243,13 @@ const barData = computed(() => {
 })
 
 // ---------- Locale-aware insight string ----------
-// Only render the "Revenue is up X% this month" headline when we can ACTUALLY
-// compute it from BE data (current monthRevenue vs sum of lastMonthRev). Returns
+// Only render the period-over-period headline when we can compute it from BE
+// data (current range revenue vs the immediately preceding equal-length range).
 // null otherwise — template hides the line on null. Previously hardcoded "12%".
 const insightStr = computed<string | null>(() => {
   const D = data.value
   if (!D) return null
-  const last = Array.isArray(D.lastMonthRev) ? D.lastMonthRev.reduce((a, b) => a + (Number(b) || 0), 0) : 0
+  const last = Array.isArray(D.previousPeriodRev) ? D.previousPeriodRev.reduce((a, b) => a + (Number(b) || 0), 0) : 0
   const cur = Number(D.monthRevenue) || 0
   if (!last || !cur) return null
   const pct = Math.round(((cur - last) / last) * 100)
@@ -255,7 +283,8 @@ function emptyDash(): DashData {
     revenue30: Array.from({ length: 30 }, () => 0),
     orders30: Array.from({ length: 30 }, () => 0),
     aov30: Array.from({ length: 30 }, () => 0),
-    lastMonthRev: Array.from({ length: 30 }, () => 0),
+    // A failed comparison request must not render a fake all-zero comparison.
+    previousPeriodRev: [],
     dayLabels: defaultLast30Labels(),
     paymentMix: [],
     categories: [],
@@ -349,7 +378,12 @@ function mapTodayPayload(p: any): DashData {
 }
 
 function isoDateExec(d: Date): string {
-  return d.toISOString().slice(0, 10)
+  // Business dates are local calendar dates. `toISOString()` converts local
+  // midnight to the prior UTC date in Tashkent, skipping the true D-1 period.
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function rangeDatesExec(days: number): { from: string; to: string } {
@@ -359,7 +393,10 @@ function rangeDatesExec(days: number): { from: string; to: string } {
   return { from: isoDateExec(from), to: isoDateExec(to) }
 }
 
+let dashboardRequestId = 0
+
 async function loadDashboard() {
+  const requestId = ++dashboardRequestId
   loading.value = true
   try {
     // Everything on this tab honors the hub's date picker. Both /dashboard
@@ -380,8 +417,12 @@ async function loadDashboard() {
     const span = Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000))
     const previousTo = new Date(start); previousTo.setDate(previousTo.getDate() - 1)
     const previousFrom = new Date(previousTo); previousFrom.setDate(previousFrom.getDate() - span)
+    const previousRange = {
+      from: isoDateExec(previousFrom),
+      to: isoDateExec(previousTo),
+    }
     const previousParams = buildDateParams({
-      from: isoDateExec(previousFrom), to: isoDateExec(previousTo),
+      ...previousRange,
       fromTime: sr?.fromTime, toTime: sr?.toTime,
     })
     const [rangeRes, todayRes, salesRes, previousSalesRes, liveOrdersRes] = await Promise.all([
@@ -393,6 +434,8 @@ async function loadDashboard() {
       // that is not supplied by the API.
       axiosIns.get('/orders', { params: { status: 'PREPARING,READY', per_page: 5, include_items: false } }).catch(() => null),
     ])
+    if (requestId !== dashboardRequestId)
+      return
     const rangePayload = rangeRes.data?.data ?? rangeRes.data ?? {}
     const mapped = mapRangePayload(rangePayload)
     const todayPayload = todayRes?.data?.data ?? todayRes?.data
@@ -407,12 +450,12 @@ async function loadDashboard() {
     const previousSalesPayload = previousSalesRes?.data?.data ?? previousSalesRes?.data
     if (salesPayload) {
       const rev30 = Array.isArray(salesPayload.revenue30) ? salesPayload.revenue30.map(asNum) : []
-      const last30 = Array.isArray(previousSalesPayload?.revenue30) ? previousSalesPayload.revenue30.map(asNum) : []
+      const previousPeriod = Array.isArray(previousSalesPayload?.revenue30) ? previousSalesPayload.revenue30.map(asNum) : []
       const labels = Array.isArray(salesPayload.dayLabels) ? salesPayload.dayLabels.map((s: any) => String(s)) : []
       // Accept whatever length the range yields (was gated to exactly 30, which
       // blanked the chart for any other range).
       if (rev30.length) mapped.revenue30 = rev30
-      if (last30.length) mapped.lastMonthRev = last30
+      if (previousPeriod.length) mapped.previousPeriodRev = previousPeriod
       if (labels.length) mapped.dayLabels = labels
       // The sales endpoint only ships daily REVENUE. Daily order counts come
       // from channelDays (hall+delivery+pickup per day) and daily AOV is
@@ -440,16 +483,21 @@ async function loadDashboard() {
       status: o?.status === 'READY' ? 'READY' : 'PREPARING',
     })).filter((o: LiveOrder) => o.id > 0)
     data.value = mapped
+    comparisonRange.value = previousRange
     feed.value = mapped.liveFeed
   }
   catch (err) {
+    if (requestId !== dashboardRequestId)
+      return
     // Soft-degrade: synthesise an empty/zeroed shape so the page can render
     // skeletons rather than throw.
     data.value = emptyDash()
+    comparisonRange.value = null
     void err
   }
   finally {
-    loading.value = false
+    if (requestId === dashboardRequestId)
+      loading.value = false
   }
 }
 
@@ -630,7 +678,7 @@ void locale
                 >{{ m.label }}</button>
               </div>
               <div
-                v-if="data?.lastMonthRev?.length && metricKey === 'rev'"
+                v-if="data?.previousPeriodRev?.length && metricKey === 'rev'"
                 class="row"
                 style="gap: 10px;"
               >

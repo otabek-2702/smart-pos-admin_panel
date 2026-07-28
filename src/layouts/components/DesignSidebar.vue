@@ -61,6 +61,7 @@ const NAV: NavEntry[] = [
   { type: 'item', id: 'users', label: 'Users', icon: 'users', to: '/users' },
   { type: 'item', id: 'categories', label: 'Categories', icon: 'grid', to: '/categories' },
   { type: 'item', id: 'products', label: 'Products', icon: 'box', to: '/products' },
+  { type: 'item', id: 'product-statistics', label: 'Product sales analytics', icon: 'trend', to: '/analytics/product-statistics' },
   { type: 'item', id: 'orders', label: 'Orders', icon: 'receipt', to: '/orders' },
   { type: 'item', id: 'places', label: 'Places & Tables', icon: 'table', to: '/places' },
   { type: 'item', id: 'discounts', label: 'Discounts', icon: 'tag', to: '/discounts' },

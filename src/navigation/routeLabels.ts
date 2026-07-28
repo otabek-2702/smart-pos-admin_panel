@@ -18,6 +18,7 @@ export const ROUTE_LABELS: Record<string, string> = {
   '/analytics/kitchen-shifts': 'Kitchen Shift Analytics',
   '/analytics/shift-handover': 'Shift Handover Report',
   '/analytics/menu-engineering': 'Menu Engineering',
+  '/analytics/product-statistics': 'Product sales analytics',
   '/analytics/compare': 'Compare Periods',
   '/forecast/tomorrow': 'Demand Forecast',
   '/audit-log': 'Audit Log',

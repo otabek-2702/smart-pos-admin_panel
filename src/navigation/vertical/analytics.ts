@@ -38,6 +38,13 @@ export default [
     subject: 'all',
   },
   {
+    title: 'Product sales analytics',
+    icon: { icon: 'bx-bar-chart-alt-2' },
+    to: 'analytics-product-statistics',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
     title: 'Demand Forecast',
     icon: { icon: 'bx-bulb' },
     to: 'forecast-tomorrow',

@@ -459,6 +459,7 @@ const sortedOrders = computed(() => {
     else if (k === 'total') { av = Number(a.total_amount) || 0; bv = Number(b.total_amount) || 0 }
     else if (k === 'at') { av = new Date(a.created_at).getTime(); bv = new Date(b.created_at).getTime() }
     else if (k === 'status') { av = a.status; bv = b.status }
+    else if (k === 'prep') { av = prepMinutes(a); bv = prepMinutes(b) }
     else { av = (a as any)[k]; bv = (b as any)[k] }
     if (av == null) return 1
     if (bv == null) return -1
@@ -524,6 +525,34 @@ function itemsOf(o: any) {
   return o.items_count ?? o.items?.length ?? '—'
 }
 
+// Match the kitchen analytics target while giving staff an early warning band.
+// Partial minutes round up so an order never appears faster than it was.
+const PREP_FAST_MINUTES = 10
+const PREP_TARGET_MINUTES = 15
+
+function prepMinutes(o: any): number | null {
+  if (!o.created_at || !o.ready_at)
+    return null
+
+  const createdAt = Date.parse(o.created_at)
+  const readyAt = Date.parse(o.ready_at)
+  if (!Number.isFinite(createdAt) || !Number.isFinite(readyAt))
+    return null
+
+  // Synced branches can occasionally report small negative clock skew.
+  return Math.ceil(Math.max(0, readyAt - createdAt) / 60_000)
+}
+
+function prepTone(minutes: number | null): 'success' | 'warning' | 'error' | 'neutral' {
+  if (minutes === null)
+    return 'neutral'
+  if (minutes <= PREP_FAST_MINUTES)
+    return 'success'
+  if (minutes <= PREP_TARGET_MINUTES)
+    return 'warning'
+  return 'error'
+}
+
 // ---- DataTable columns ----
 const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'id', label: t('Order #'), sortable: true },
@@ -532,6 +561,7 @@ const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'customer', label: t('Customer') },
   { key: 'cashier', label: t('Cashier') },
   { key: 'status', label: t('Status'), sortable: true },
+  { key: 'prep', label: t('Prep Time'), sortable: true, align: 'right', width: 112 },
   { key: 'payment', label: t('Payment') },
   { key: 'total', label: t('Total'), sortable: true, align: 'right' },
   { key: 'items', label: t('Items'), align: 'right' },
@@ -990,6 +1020,19 @@ function onPaymentToggle(p: string) {
           <Badge :tone="(tone(o.status) as any)" dot>
             {{ o.status ? t(`order_status_${o.status}`) : '—' }}
           </Badge>
+        </template>
+
+        <!-- Preparation time from order creation until it was marked ready -->
+        <template #cell.prep="{ row: o }">
+          <Badge
+            v-if="prepMinutes(o) !== null"
+            class="prep-time-badge"
+            :tone="prepTone(prepMinutes(o))"
+            :title="`${t('Prep Time')}: ${prepMinutes(o)} ${t('time_minute_short')}`"
+          >
+            <span class="mono">{{ prepMinutes(o) }} {{ t('time_minute_short') }}</span>
+          </Badge>
+          <span v-else class="cell-muted">—</span>
         </template>
 
         <!-- Payment -->
@@ -1461,6 +1504,12 @@ function onPaymentToggle(p: string) {
   text-align: center;
   font-size: 13px;
   color: var(--text-tertiary);
+}
+
+:deep(.prep-time-badge) {
+  min-width: 62px;
+  justify-content: center;
+  font-feature-settings: "tnum" 1;
 }
 
 /* --- Modal mobile safety --- */

@@ -104,6 +104,7 @@ declare global {
   const reactiveComputed: typeof import('@vueuse/core')['reactiveComputed']
   const reactiveOmit: typeof import('@vueuse/core')['reactiveOmit']
   const reactivePick: typeof import('@vueuse/core')['reactivePick']
+  const readUserAccess: typeof import('./src/composables/useUserAccess')['readUserAccess']
   const readonly: typeof import('vue')['readonly']
   const ref: typeof import('vue')['ref']
   const refAutoReset: typeof import('@vueuse/core')['refAutoReset']
@@ -324,6 +325,7 @@ declare global {
   const useTransition: typeof import('@vueuse/core')['useTransition']
   const useTrunc: typeof import('@vueuse/math')['useTrunc']
   const useUrlSearchParams: typeof import('@vueuse/core')['useUrlSearchParams']
+  const useUserAccess: typeof import('./src/composables/useUserAccess')['useUserAccess']
   const useUserMedia: typeof import('@vueuse/core')['useUserMedia']
   const useVModel: typeof import('@vueuse/core')['useVModel']
   const useVModels: typeof import('@vueuse/core')['useVModels']
@@ -372,7 +374,7 @@ declare global {
   export type { DeltaDirection, BadgeTone, DeltaResult, AlignedPoint, DateRange } from './src/composables/useComparison'
   import('./src/composables/useComparison')
   // @ts-ignore
-  export type { DashRange, DashTodayPayload, DashRangePayload, DashSharedPayload } from './src/composables/useDashboardData'
+  export type { DashRange, ReportingRangeMetadata, DashTodayPayload, DashRangePayload, DashSharedPayload } from './src/composables/useDashboardData'
   import('./src/composables/useDashboardData')
   // @ts-ignore
   export type { EChartTokens } from './src/composables/useEChartTheme'
@@ -482,6 +484,7 @@ declare module 'vue' {
     readonly reactiveComputed: UnwrapRef<typeof import('@vueuse/core')['reactiveComputed']>
     readonly reactiveOmit: UnwrapRef<typeof import('@vueuse/core')['reactiveOmit']>
     readonly reactivePick: UnwrapRef<typeof import('@vueuse/core')['reactivePick']>
+    readonly readUserAccess: UnwrapRef<typeof import('./src/composables/useUserAccess')['readUserAccess']>
     readonly readonly: UnwrapRef<typeof import('vue')['readonly']>
     readonly ref: UnwrapRef<typeof import('vue')['ref']>
     readonly refAutoReset: UnwrapRef<typeof import('@vueuse/core')['refAutoReset']>
@@ -702,6 +705,7 @@ declare module 'vue' {
     readonly useTransition: UnwrapRef<typeof import('@vueuse/core')['useTransition']>
     readonly useTrunc: UnwrapRef<typeof import('@vueuse/math')['useTrunc']>
     readonly useUrlSearchParams: UnwrapRef<typeof import('@vueuse/core')['useUrlSearchParams']>
+    readonly useUserAccess: UnwrapRef<typeof import('./src/composables/useUserAccess')['useUserAccess']>
     readonly useUserMedia: UnwrapRef<typeof import('@vueuse/core')['useUserMedia']>
     readonly useVModel: UnwrapRef<typeof import('@vueuse/core')['useVModel']>
     readonly useVModels: UnwrapRef<typeof import('@vueuse/core')['useVModels']>

@@ -8,6 +8,22 @@ import { buildCsv } from '@/utils/csv'
 import DateRangePicker, { type DateRangeValue } from '@/components/design/DateRangePicker.vue'
 import Select from '@/components/design/Select.vue'
 import { formatWindow } from '@/composables/useWindowLabel'
+import { caretAfterDigitCount, formatWholeMoneyInput } from '@/utils/moneyInput'
+import {
+  type SettlementRow,
+  type ShiftSummary,
+  completeAllTendersToReceive,
+  methodIsManagerConfirmed,
+  moneyNumber,
+  outstandingAllTenders,
+  outstandingNoncash,
+  outstandingPhysicalCash,
+  reconciliationSetup,
+  rowRequiresManagerConfirmation,
+  safeSettlementExpected,
+  settlementMethod,
+  settlementRowIsUncounted,
+} from '@/utils/shiftMoney'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -122,6 +138,7 @@ async function loadCashiers() {
 // Shifts data
 // ============================================================
 const shifts = ref<any[]>([])
+const apiSummary = ref<ShiftSummary>({})
 const loading = ref(true)
 
 async function loadShifts() {
@@ -137,10 +154,12 @@ async function loadShifts() {
     const res = await axios.get('/shifts', { params })
     const d = res.data?.data ?? res.data
     shifts.value = Array.isArray(d) ? d : (d?.shifts ?? d?.items ?? [])
+    apiSummary.value = (!Array.isArray(d) && (d?.summary ?? d?.stats)) || {}
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Failed to load shifts'), 'error')
     shifts.value = []
+    apiSummary.value = {}
   }
   finally {
     loading.value = false
@@ -153,12 +172,13 @@ watch([dateRange, cashierId, statusF, liveOnly], () => { loadShifts() })
 // ============================================================
 // Shape & derived helpers
 // ============================================================
-function shiftState(s: any): 'active' | 'awaiting' | 'reconciled' {
+function shiftState(s: any): 'active' | 'awaiting' | 'reconciled' | 'closed' {
   if (s.status === 'ACTIVE') return 'active'
   // BE reconciliation shape: { id, expected_cash, actual_cash, difference, notes, reconciled_by, created_at }.
   // Old keys (counted_cash, reported) kept as soft fallback for any cached/older response.
   if (s.reconciliation && (s.reconciliation.id || s.reconciliation.actual_cash !== undefined || s.reconciliation.counted_cash !== undefined || s.reconciliation.reported !== undefined)) return 'reconciled'
-  return 'awaiting'
+  if (s.status === 'ENDED') return 'awaiting'
+  return 'closed'
 }
 function expectedCash(s: any): number {
   // BE reconciliation carries the authoritative expected_cash (cash_collected - expenses). The list
@@ -168,22 +188,12 @@ function expectedCash(s: any): number {
     return num(s.reconciliation.expected_cash)
   return num(s.cash_collected)
 }
-function expectedSettlement(s: any): number {
-  const rows = Array.isArray(s?.settlement) ? s.settlement : []
-  if (rows.length) {
-    return rows.reduce(
-      (total: number, row: any) => total + num(row?.expected),
-      0,
-    )
-  }
-  // List rows deliberately omit settlement details to avoid N+1 queries. The
-  // gross paid total is the only all-tender figure available until the manager
-  // opens the settlement modal, which fetches the authoritative breakdown.
-  return num(s.total_revenue)
+function expectedSettlement(s: any): number | null {
+  return moneyNumber(completeAllTendersToReceive(s))
 }
 function confirmedSettlement(s: any): number | null {
   const rows = Array.isArray(s?.settlement) ? s.settlement : []
-  if (!rows.length) return null
+  if (!rows.length || rows.some((row: any) => !methodIsManagerConfirmed(row))) return null
   return rows.reduce(
     (total: number, row: any) => total + num(row?.confirmed),
     0,
@@ -273,17 +283,23 @@ const filtered = computed(() => {
 // Summary KPIs
 // ============================================================
 const summary = computed(() => {
-  let active = 0
-  let awaiting = 0
-  let settlementToReceive = 0
   let netVariance = 0
   for (const s of shifts.value) {
     const st = shiftState(s)
-    if (st === 'active') active++
-    else if (st === 'awaiting') { awaiting++; settlementToReceive += expectedSettlement(s) }
-    else if (st === 'reconciled') netVariance += varianceOf(s)
+    if (st === 'reconciled') netVariance += varianceOf(s)
   }
-  return { active, awaiting, settlementToReceive, netVariance }
+
+  const activeRaw = Number(apiSummary.value.live_count)
+  const awaitingRaw = Number(apiSummary.value.awaiting_reconciliation_count)
+
+  return {
+    active: Number.isFinite(activeRaw) ? activeRaw : null,
+    awaiting: Number.isFinite(awaitingRaw) ? awaitingRaw : null,
+    physicalCash: moneyNumber(outstandingPhysicalCash(apiSummary.value)),
+    noncash: moneyNumber(outstandingNoncash(apiSummary.value)),
+    allTenders: moneyNumber(outstandingAllTenders(apiSummary.value)),
+    netVariance,
+  }
 })
 
 // ============================================================
@@ -331,9 +347,6 @@ const TENDER_LABEL: Record<string, string> = {
   PAYME: 'Payme',
 }
 
-function emptyTenderAmounts(): Record<Tender, number> {
-  return Object.fromEntries(STANDARD_TENDERS.map(method => [method, 0]))
-}
 function emptyTenderCounts(): Record<Tender, string> {
   return Object.fromEntries(STANDARD_TENDERS.map(method => [method, '']))
 }
@@ -341,17 +354,25 @@ function emptyTenderCounts(): Record<Tender, string> {
 const settlementLoading = ref(false)
 const settlementReady = ref(false)
 const settlementError = ref(false)
+const settlementDetail = ref<any | null>(null)
 const settlementMethods = ref<Tender[]>([])
-const expectedByTender = ref<Record<Tender, number>>(emptyTenderAmounts())
 const countedByTender = ref<Record<Tender, string>>(emptyTenderCounts())
 let settlementRequestId = 0
 
-// Do not render empty/unrelated payment inputs. A manager can only confirm
-// methods that the backend created for this exact shift (plus the cash audit).
+const settlementSetup = computed(() => reconciliationSetup(settlementDetail.value))
+const settlementRows = computed<SettlementRow[]>(() => settlementSetup.value.rows)
+
+// Render only the exact tender rows returned by the fresh shift detail.
 const visibleTenders = computed<Tender[]>(() => [
-  ...new Set(['CASH', ...settlementMethods.value]),
+  ...new Set(settlementRows.value.flatMap(row => {
+    const method = settlementMethod(row)
+    return method ? [method] : []
+  })),
 ])
-const requiredTenders = computed(() => visibleTenders.value.filter(method => (expectedByTender.value[method] ?? 0) > 0))
+const requiredTenders = computed(() => settlementRows.value.flatMap(row => {
+  const method = settlementMethod(row)
+  return method && rowRequiresManagerConfirmation(row) ? [method] : []
+}))
 
 function tenderLabel(method: Tender): string {
   return TENDER_LABEL[method] ? t(TENDER_LABEL[method]) : method
@@ -366,12 +387,40 @@ function parseAmount(v: string | undefined): number | null {
 function countedOf(method: Tender): number | null {
   return parseAmount(countedByTender.value[method])
 }
+function rowForTender(method: Tender): SettlementRow | null {
+  return settlementRows.value.find(row => settlementMethod(row) === method) ?? null
+}
+function expectedOf(method: Tender): number | null {
+  const row = rowForTender(method)
+  return row ? moneyNumber(safeSettlementExpected(row)) : null
+}
+function cashierCountNote(method: Tender): string | null {
+  const row = rowForTender(method)
+  return row && settlementRowIsUncounted(row) ? t('Cashier count not submitted') : null
+}
+function setCountedAmount(method: Tender, event: Event) {
+  const input = event.target as HTMLInputElement
+  const digitsBeforeCaret = input.value.slice(0, input.selectionStart ?? input.value.length).replace(/\D/g, '').length
+  const formatted = formatWholeMoneyInput(input.value)
+
+  countedByTender.value = { ...countedByTender.value, [method]: formatted }
+  nextTick(() => {
+    const caret = caretAfterDigitCount(formatted, digitsBeforeCaret)
+    input.setSelectionRange(caret, caret)
+  })
+}
 function tenderVariance(method: Tender): number | null {
   const counted = countedOf(method)
-  return counted === null ? null : counted - (expectedByTender.value[method] ?? 0)
+  const expected = expectedOf(method)
+  return counted === null || expected === null ? null : counted - expected
 }
 const allExpectedTendersCounted = computed(() => requiredTenders.value.every(method => countedOf(method) !== null))
-const canConfirmSettlement = computed(() => settlementReady.value && !settlementLoading.value && allExpectedTendersCounted.value)
+const canConfirmSettlement = computed(() => settlementReady.value
+  && settlementSetup.value.ok
+  && !settlementLoading.value
+  && settlementRows.value.length > 0
+  && settlementRows.value.every(row => !!settlementMethod(row))
+  && allExpectedTendersCounted.value)
 const totalReceived = computed(() => visibleTenders.value.reduce(
   (total, method) => total + (countedOf(method) ?? 0),
   0,
@@ -385,22 +434,18 @@ async function loadSettlement(id: number | string) {
   try {
     const res = await axios.get(`/shifts/${id}`)
     if (requestId !== settlementRequestId) return
-    const data = res.data?.data ?? res.data ?? {}
-    const rows: any[] = Array.isArray(data?.settlement) ? data.settlement : []
-    const next = emptyTenderAmounts()
+    const responseData = res.data?.data ?? res.data ?? {}
+    const base = (responseData?.shift && typeof responseData.shift === 'object') ? responseData.shift : responseData
+    const data = { ...(base ?? {}), settlement: responseData?.settlement ?? base?.settlement ?? [] }
+    const setup = reconciliationSetup(data)
+    const rows = setup.rows
     const methods: Tender[] = []
     for (const row of rows) {
-      const method = String(row?.method ?? '').trim().toUpperCase()
+      const method = settlementMethod(row)
       if (!method) continue
       methods.push(method)
-      next[method] = num(row?.expected)
     }
-    const orderLevelCash = Number(data?.expected_cash)
-    if (Number.isFinite(orderLevelCash)) {
-      next.CASH = orderLevelCash
-      methods.push('CASH')
-    }
-    expectedByTender.value = next
+    settlementDetail.value = data
     settlementMethods.value = [...new Set(methods)]
     countedByTender.value = Object.fromEntries(
       [...new Set([...STANDARD_TENDERS, ...methods])].map(method => [method, '']),
@@ -424,7 +469,7 @@ function openReceive(s: any) {
   settlementReady.value = false
   settlementError.value = false
   settlementMethods.value = []
-  expectedByTender.value = emptyTenderAmounts()
+  settlementDetail.value = null
   countedByTender.value = emptyTenderCounts()
   void loadSettlement(s.id)
 }
@@ -432,6 +477,7 @@ function closeReceive() {
   if (busy.value) return
   settlementRequestId++
   receiving.value = null
+  settlementDetail.value = null
 }
 
 const router = useRouter()
@@ -522,15 +568,19 @@ function exportShifts() {
 }
 
 async function confirmReceive() {
-  if (!receiving.value || !canConfirmSettlement.value) return
+  if (busy.value || !receiving.value || !canConfirmSettlement.value) return
   busy.value = true
   const s = receiving.value
   try {
     const confirmed: Record<string, number> = {}
-    const methodsToConfirm = new Set<Tender>(settlementMethods.value)
-    methodsToConfirm.add('CASH')
-    for (const method of methodsToConfirm)
-      confirmed[method] = countedOf(method) ?? 0
+    for (const method of settlementMethods.value) {
+      const counted = countedOf(method)
+      if (counted !== null)
+        confirmed[method] = counted
+    }
+
+    if (confirmed.CASH === undefined)
+      return
 
     const res = await axios.post(`/shifts/${s.id}/reconcile`, {
       // The backend still requires this cash audit field alongside the
@@ -684,8 +734,6 @@ function onOverlayMouseUp(e: MouseEvent, closeFn: () => void) {
 // See src/composables/useDesignMotion.ts and .tmp-design-bundle/app/anim.jsx.
 // ============================================================
 const activeCounted = useCountUp(() => Number(summary.value.active ?? 0))
-const awaitingCounted = useCountUp(() => Number(summary.value.awaiting ?? 0))
-const settlementCounted = useCountUp(() => Number(summary.value.settlementToReceive ?? 0))
 const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ?? 0)))
 </script>
 
@@ -733,7 +781,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         </div>
         <div v-if="loading" class="skel" style="width:60px;height:30px;" />
         <div v-else class="kpi__value">
-          {{ fmtNum(Math.round(activeCounted)) }}
+          {{ summary.active === null ? fmtNum(null) : fmtNum(Math.round(activeCounted)) }}
         </div>
         <div class="kpi__foot">
           <span class="kpi__subtext">{{ t('live shifts') }}</span>
@@ -749,19 +797,19 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
             </svg>
           </div>
           <div class="kpi__label">
-            {{ t('Awaiting settlement') }}
+            {{ t('Outstanding handovers') }}
           </div>
         </div>
         <div v-if="loading" class="skel" style="width:60px;height:30px;" />
         <div v-else class="kpi__value">
-          {{ fmtNum(Math.round(awaitingCounted)) }}
+          {{ fmtNum(summary.awaiting) }}
         </div>
         <div class="kpi__foot">
-          <span class="kpi__subtext">{{ t('to reconcile') }}</span>
+          <span class="kpi__subtext">{{ t('Ended shifts awaiting manager confirmation') }}</span>
         </div>
       </div>
 
-      <!-- All-tender settlement to receive -->
+      <!-- Physical cash to receive -->
       <div class="kpi">
         <div class="kpi__top">
           <div class="kpi__icon t-primary">
@@ -770,15 +818,15 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
             </svg>
           </div>
           <div class="kpi__label">
-            {{ t('Settlement to receive') }}
+            {{ t('Physical cash to receive') }}
           </div>
         </div>
         <div v-if="loading" class="skel" style="width:140px;height:30px;" />
         <div v-else class="kpi__value">
-          {{ fmtAbbr(settlementCounted) }}<span class="kpi__unit">UZS</span>
+          {{ fmtAbbr(summary.physicalCash) }}<span class="kpi__unit">UZS</span>
         </div>
         <div class="kpi__foot">
-          <span class="kpi__subtext">{{ t('All payment types') }} · {{ t('across {n} shifts', { n: summary.awaiting }) }}</span>
+          <span class="kpi__subtext">{{ t('Compare this amount with banknotes in the drawer') }}</span>
         </div>
       </div>
 
@@ -801,6 +849,18 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
         <div class="kpi__foot">
           <span class="kpi__subtext">{{ t('in current results') }}</span>
         </div>
+      </div>
+    </div>
+
+    <div class="settlement-scope-strip">
+      <div>
+        <span>{{ t('Non-cash settlement') }}</span>
+        <strong class="mono">{{ fmtMoney(summary.noncash) }} <small>UZS</small></strong>
+      </div>
+      <div>
+        <span>{{ t('All-tender settlement total') }}</span>
+        <strong class="mono">{{ fmtMoney(summary.allTenders) }} <small>UZS</small></strong>
+        <small>{{ t('All payment types — not a physical cash count') }}</small>
       </div>
     </div>
 
@@ -994,7 +1054,9 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
             <span class="kpi__label">
               {{ shiftState(s) === 'reconciled'
                 ? (confirmedSettlement(s) !== null ? t('Settlement confirmed') : t('Cash received'))
-                : t('Settlement to receive') }}
+                : shiftState(s) === 'awaiting'
+                  ? t('Settlement to receive')
+                  : t('Settlement unavailable') }}
             </span>
             <span v-if="shiftState(s) === 'reconciled'">
               <span
@@ -1011,7 +1073,10 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
           </div>
           <div class="row between" style="align-items:flex-end;margin-bottom:12px;">
             <span class="mono shift-hero-amount">
-              {{ fmtMoney(shiftState(s) === 'reconciled' ? (confirmedSettlement(s) ?? reportedCash(s)) : expectedSettlement(s)) }}<span class="tertiary" style="font-size:12px;font-weight:500;"> UZS</span>
+              <template v-if="shiftState(s) === 'closed'">&mdash;</template>
+              <template v-else>
+                {{ fmtMoney(shiftState(s) === 'reconciled' ? (confirmedSettlement(s) ?? reportedCash(s)) : expectedSettlement(s)) }}<span class="tertiary" style="font-size:12px;font-weight:500;"> UZS</span>
+              </template>
             </span>
           </div>
 
@@ -1139,12 +1204,26 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               {{ t('Report') }}
             </button>
           </template>
-          <template v-else>
+          <template v-else-if="shiftState(s) === 'reconciled'">
             <div class="row" style="gap:7px;flex:1 1 160px;color:var(--success);font-weight:600;font-size:13px;">
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="9" /><polyline points="9 12 11 14 15 10" />
               </svg>
               {{ t('Handover complete') }}
+            </div>
+            <button class="btn btn--ghost" @click="openReport(s)">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 17 9 11 13 15 21 7" /><polyline points="15 7 21 7 21 13" />
+              </svg>
+              {{ t('Report') }}
+            </button>
+          </template>
+          <template v-else>
+            <div class="row tertiary" style="gap:7px;flex:1 1 160px;font-weight:600;font-size:13px;">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9" /><line x1="8" y1="12" x2="16" y2="12" />
+              </svg>
+              {{ t('Settlement unavailable') }}
             </div>
             <button class="btn btn--ghost" @click="openReport(s)">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1203,11 +1282,27 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
           </div>
 
           <template v-else-if="settlementReady">
-            <p class="settlement-intro">
-              {{ t('Count each tender first. The system figure and the difference appear only after you enter an amount.') }}
-            </p>
+            <div
+              v-if="!settlementSetup.ok"
+              class="settlement-contract-block"
+              role="alert"
+            >
+              <strong>{{ t('Backend upgrade required for physical cash') }}</strong>
+              <span>{{ t(`Reconcile setup ${settlementSetup.reason}`) }}</span>
+            </div>
 
-            <div class="settlement-grid">
+            <template v-else>
+              <div class="settlement-hero">
+                <span>{{ t('Physical cash to receive') }}</span>
+                <strong class="mono">{{ fmtMoney(moneyNumber(settlementSetup.cashExpected)) }} UZS</strong>
+                <small>{{ t('Compare this amount with banknotes in the drawer') }}</small>
+              </div>
+
+              <p class="settlement-intro">
+                {{ t('Confirm every returned tender. Do not enter a value that was not physically reviewed.') }}
+              </p>
+
+            <div class="settlement-grid reconcile-table">
               <div class="settlement-grid__head">
                 <span>{{ t('Payment type') }}</span>
                 <span>{{ t('Counted') }}</span>
@@ -1222,19 +1317,21 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               >
                 <div class="settlement-grid__tender">
                   {{ tenderLabel(method) }}
+                  <small v-if="cashierCountNote(method)">{{ cashierCountNote(method) }}</small>
                 </div>
                 <div class="settlement-grid__input">
                   <input
-                    v-model="countedByTender[method]"
+                    :value="countedByTender[method]"
                     class="settlement-input"
                     inputmode="numeric"
                     :aria-label="`${tenderLabel(method)}: ${t('Counted')}`"
                     :placeholder="t('Enter counted amount')"
+                    @input="setCountedAmount(method, $event)"
                   >
                 </div>
                 <div class="settlement-grid__expected" :data-label="t('System expected')">
-                  <span v-if="countedOf(method) !== null" class="mono">
-                    {{ fmtMoney(expectedByTender[method] ?? 0) }}
+                  <span v-if="countedOf(method) !== null && expectedOf(method) !== null" class="mono">
+                    {{ fmtMoney(expectedOf(method)) }}
                   </span>
                   <span v-else class="tertiary">&mdash;</span>
                 </div>
@@ -1252,7 +1349,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
                       {{ tenderVariance(method) === 0 ? '' : `${(tenderVariance(method) ?? 0) > 0 ? '+' : '-'}${fmtMoney(Math.abs(tenderVariance(method) ?? 0))}` }}
                     </span>
                   </template>
-                  <span v-else class="tertiary">&mdash;</span>
+                  <span v-else class="tertiary">{{ countedOf(method) === null && settlementRowIsUncounted(rowForTender(method) ?? {}) ? t('Variance unavailable') : '—' }}</span>
                 </div>
               </div>
             </div>
@@ -1269,6 +1366,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               <span class="field__label">{{ t('Note (optional)') }}</span>
               <textarea v-model="note" class="control" :placeholder="t('Reason for any difference, deposits, etc.')" />
             </label>
+            </template>
           </template>
         </div>
         <div class="modal__foot" style="justify-content:flex-end;">
@@ -1320,10 +1418,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
             {{ t('Once ended, the cashier will no longer be able to take orders and the drawer must be reconciled before the next shift starts.') }}
           </p>
         </div>
-        <div class="modal__foot">
-          <button type="button" class="btn btn--ghost" :disabled="busy" @click="cancelEndShift">
-            {{ t('Cancel') }}
-          </button>
+        <div class="modal__foot" style="justify-content:flex-end;">
           <button type="button" class="btn btn--primary" :disabled="busy" @click="confirmEndShift">
             {{ busy ? t('Ending…') : t('End shift') }}
           </button>
@@ -1350,6 +1445,65 @@ meta:
 </route>
 
 <style scoped>
+.settlement-scope-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+  margin: calc(var(--sp-5) * -1 + var(--sp-3)) 0 var(--sp-5);
+}
+
+.settlement-scope-strip > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px var(--sp-3);
+  align-items: baseline;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.settlement-scope-strip strong { color: var(--text); font-size: 15px; }
+.settlement-scope-strip strong small { color: var(--text-tertiary); font-size: 10px; }
+.settlement-scope-strip > div > small { grid-column: 1 / -1; color: var(--text-tertiary); }
+
+.settlement-contract-block {
+  display: grid;
+  gap: 4px;
+  padding: var(--sp-4);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--r-md);
+  background: var(--warning-weak);
+  color: var(--warning);
+}
+
+.settlement-contract-block span { color: var(--text-secondary); font-size: 13px; }
+
+.settlement-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px var(--sp-3);
+  align-items: baseline;
+  margin-bottom: var(--sp-4);
+  padding: 12px 14px;
+  border: 1px solid var(--success-border);
+  border-radius: var(--r-md);
+  background: var(--success-weak);
+}
+
+.settlement-hero span { color: var(--text); font-weight: 700; }
+.settlement-hero strong { color: var(--success); font-size: 18px; }
+.settlement-hero small { grid-column: 1 / -1; color: var(--text-secondary); }
+
+.settlement-grid__tender small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 500;
+}
 /* Responsive shift cards grid — auto-fill with sensible breakpoints */
 .shift-cards-grid {
   grid-template-columns: repeat(auto-fill, minmax(min(430px, 100%), 1fr));
@@ -1555,6 +1709,8 @@ meta:
 }
 
 @media (max-width: 600px) {
+  .settlement-scope-strip { grid-template-columns: 1fr; }
+
   .settlement-grid__head {
     display: none;
   }
@@ -1616,5 +1772,4 @@ meta:
     max-width: none;
   }
 }
-
 </style>

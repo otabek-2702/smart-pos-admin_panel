@@ -197,6 +197,22 @@ async function loadStats() {
   }
 }
 
+// `payment_counts.UNPAID` is an actionable settlement queue and excludes
+// unpaid OPEN carts. The payment-status chart instead needs a complete
+// paid/unpaid partition of this same filtered population.
+const paymentStatusCounts = computed<Record<string, number> | null>(() => {
+  if (!stats.value)
+    return null
+  const total = Number(stats.value.total_orders)
+  const paid = Number(stats.value.paid_orders)
+  if (!Number.isFinite(total) || !Number.isFinite(paid))
+    return null
+  return {
+    PAID: Math.max(0, paid),
+    UNPAID: Math.max(0, total - paid),
+  }
+})
+
 async function loadCashiers() {
   try {
     const res = await axios.get('/users', { params: { role: 'CASHIER', per_page: 100 } })
@@ -681,7 +697,7 @@ function onPaymentToggle(p: string) {
       :status="statusFilter"
       :payment="paymentFilter"
       :status-counts="stats?.status_counts ?? null"
-      :payment-counts="stats?.payment_counts ?? null"
+      :payment-counts="paymentStatusCounts"
       :payment-methods="statsPaymentMethods"
       :payment-total="statsPaymentTotal"
       @status="onStatusToggle"
@@ -1003,7 +1019,7 @@ function onPaymentToggle(p: string) {
 
         <!-- Customer -->
         <template #cell.customer="{ row: o }">
-          <span class="cell-muted">{{ o.user?.name ?? '—' }}</span>
+          <span class="cell-muted">{{ o.customer?.name ?? o.phone_number ?? '—' }}</span>
         </template>
 
         <!-- Cashier -->

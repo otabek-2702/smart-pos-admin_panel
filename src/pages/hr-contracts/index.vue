@@ -14,6 +14,7 @@ import Field from '@/components/design/Field.vue'
 import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
 import Modal from '@/components/design/Modal.vue'
+import MoneyInput from '@/components/design/MoneyInput.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 
@@ -719,10 +720,8 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
           </Field>
 
           <Field :label="t('Salary')">
-            <Input
-              v-model.number="form.salary_amount"
-              type="number"
-              step="1"
+            <MoneyInput
+              v-model="form.salary_amount"
               :placeholder="t('contract_salary_placeholder')"
             />
           </Field>
@@ -900,10 +899,8 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
           :label="t('New Salary')"
           class="span-2"
         >
-          <Input
-            v-model.number="renewForm.new_salary"
-            type="number"
-            step="1"
+          <MoneyInput
+            v-model="renewForm.new_salary"
           />
         </Field>
       </div>

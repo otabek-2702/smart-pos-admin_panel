@@ -94,7 +94,9 @@ const { t } = useI18n({ useScope: 'global' })
 
 /* ---------- helpers ---------- */
 function idOf(r: R): string | number {
-  return r[props.rowKey] as string | number
+  return props.rowKey
+    .split('.')
+    .reduce<any>((value, key) => value?.[key], r) as string | number
 }
 
 /* ---------- sort (controlled / uncontrolled) ---------- */

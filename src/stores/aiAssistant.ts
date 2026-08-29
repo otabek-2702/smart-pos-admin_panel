@@ -24,6 +24,7 @@
    ============================================================ */
 import { defineStore } from 'pinia'
 import { stockApi } from '@/plugins/axios'
+import i18n from '@/plugins/i18n'
 
 const STORE_KEY = 'alphapos-ai-chats-v1'
 const NOTIFY_KEY = 'alphapos-ai-notify-v1'
@@ -59,6 +60,37 @@ function uid(): string {
 }
 function nowTs(): number {
   return Date.now()
+}
+
+function translateAI(key: string): string {
+  return String((i18n.global as any).t(key))
+}
+
+function aiErrorText(payload: any): string {
+  const error = typeof payload?.error === 'string' ? payload.error : ''
+  const source = typeof payload?.error_source === 'string' ? payload.error_source : ''
+  let key = 'ai_error_generic'
+
+  if (error === 'rate_limited')
+    key = 'ai_error_burst_limit'
+  else if (error === 'quota_exceeded')
+    key = 'ai_error_provider_rate_limit'
+  else if (error === 'no_api_key')
+    key = 'ai_error_not_configured'
+  else if (error === 'provider_configuration_error')
+    key = 'ai_error_credentials'
+  else if (error === 'invalid_query')
+    key = 'ai_error_invalid_query'
+  else if (error === 'query_too_long')
+    key = 'ai_error_query_too_long'
+  else if (error === 'invalid_request')
+    key = 'ai_error_invalid_request'
+  else if (error === 'internal_error' && source === 'ai_provider')
+    key = 'ai_error_provider_failure'
+  else if (error === 'internal_error')
+    key = 'ai_error_internal'
+
+  return translateAI(key)
 }
 
 function loadChats(): Chat[] {
@@ -623,15 +655,21 @@ export const useAIAssistantStore = defineStore('aiAssistant', () => {
         payload.conversation_id = conversationId
 
       const res = await stockApi.post('/ai/query/', payload)
-      const reply = res.data?.response || 'No response'
+      const body = res.data ?? {}
+      if (body?.success === false) {
+        const failure = new Error('AI request failed')
+        ;(failure as any).aiPayload = body
+        throw failure
+      }
+      const reply = typeof body?.response === 'string' && body.response.trim()
+        ? body.response
+        : translateAI('No response')
 
       streamWords(convoId!, aMsg.id, reply)
     }
     catch (e: any) {
-      const code = e?.response?.data?.error
-      const friendly = (code === 'llm_sdk_missing' || code === 'llm_key_missing')
-        ? 'AI service unavailable. The LLM key is not configured.'
-        : (e?.response?.data?.message || code || 'Request failed. Please try again.')
+      const body = e?.aiPayload ?? e?.response?.data
+      const friendly = aiErrorText(body)
 
       chats.value = chats.value.map(c => c.id !== convoId
         ? c

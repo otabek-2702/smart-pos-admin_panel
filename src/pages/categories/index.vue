@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import axios from '@/plugins/axios'
 import Badge from '@/components/design/Badge.vue'
-import BulkActionBar from '@/components/design/BulkActionBar.vue'
 import Button from '@/components/design/Button.vue'
 import Card from '@/components/design/Card.vue'
-import Checkbox from '@/components/design/Checkbox.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import Field from '@/components/design/Field.vue'
 import IconAction from '@/components/design/IconAction.vue'
@@ -14,64 +12,8 @@ import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import Switch from '@/components/design/Switch.vue'
-import { useTableSelection } from '@/composables/useTableSelection'
 
 const { t } = useI18n({ useScope: 'global' })
-const selection = useTableSelection<number>(() => categories.value.map((c: any) => c.id))
-const bulkBusy = ref(false)
-
-async function bulkDelete() {
-  const ids = Array.from(selection.selected.value)
-  if (!ids.length) return
-  if (!confirm(t('Delete {n} categories?', { n: ids.length }))) return
-  bulkBusy.value = true
-  try {
-    await axios.post('/categories/bulk-delete', { ids })
-    selection.clear()
-    await loadCategories()
-    const { toast: sonner } = await import('vue-sonner')
-    sonner.success(t('Deleted {n} categories', { n: ids.length }), {
-      duration: 7000,
-      action: {
-        label: t('Undo'),
-        onClick: async () => {
-          try {
-            await axios.post('/categories/bulk-restore', { ids })
-            notify(t('Restored {n} categories', { n: ids.length }))
-            await loadCategories()
-          }
-          catch (e: any) {
-            notify(e?.response?.data?.message ?? t('Error restoring categories'), 'error')
-          }
-        },
-      },
-    })
-  }
-  catch (e: any) {
-    notify(e?.response?.data?.message ?? t('Error deleting categories'), 'error')
-  }
-  finally {
-    bulkBusy.value = false
-  }
-}
-
-async function bulkRestore() {
-  const ids = Array.from(selection.selected.value)
-  if (!ids.length) return
-  bulkBusy.value = true
-  try {
-    await axios.post('/categories/bulk-restore', { ids })
-    notify(t('Restored {n} categories', { n: ids.length }))
-    selection.clear()
-    await loadCategories()
-  }
-  catch (e: any) {
-    notify(e?.response?.data?.message ?? t('Error restoring categories'), 'error')
-  }
-  finally {
-    bulkBusy.value = false
-  }
-}
 
 // ---- state ----
 const categories = ref<any[]>([])
@@ -162,27 +104,24 @@ function applyIntensity(hex: string, alpha: number) {
   )
 }
 
-// When base color or intensity changes, update form.color
-watch([() => baseColor.value, intensity], ([hex, a]) => {
-  if (colorMode.value === 'pick' && hex)
-    form.value.color = applyIntensity(hex, a)
-})
+function setPickedColor(color: string | null) {
+  if (!color)
+    return
+  baseColor.value = color
+  colorMode.value = 'pick'
+  form.value.color = applyIntensity(color, intensity.value)
+}
 
-// Sync colorMode with form.color
-watch(colorMode, mode => {
-  if (mode === 'none') {
-    form.value.color = ''
-  }
-  else if (!form.value.color) {
-    baseColor.value = '#e74c3c'
-    form.value.color = applyIntensity(baseColor.value, intensity.value)
-  }
-})
+function setIntensity(value: number) {
+  intensity.value = value
+  if (colorMode.value === 'pick' && baseColor.value)
+    form.value.color = applyIntensity(baseColor.value, value)
+}
 
-watch(() => form.value.color, val => {
-  if (val && colorMode.value === 'none')
-    colorMode.value = 'pick'
-})
+function clearColor() {
+  colorMode.value = 'none'
+  form.value.color = ''
+}
 
 // Drag state
 const draggedIndex = ref<number | null>(null)
@@ -197,23 +136,8 @@ const debouncedSearch = useDebounceFn(() => {
 }, 400)
 
 // ---- helpers ----
-// Deterministic fallback palette. Most seeded categories have an empty
-// `colors` array from BE, which previously rendered every card as the same dead
-// grey blob. Derive a stable hue from the category name/id so each card gets a
-// consistent, distinct colour until an explicit colour is set.
-const CARD_PALETTE = [
-  '#3b5adb', '#e8590c', '#2f9e44', '#e03131', '#9c36b5',
-  '#1098ad', '#f08c00', '#c2255c', '#5f3dc4', '#66a80f',
-]
 function cardColor(cat: any): string {
-  const explicit = cat.colors?.[0]
-  if (explicit)
-    return explicit
-  const key = String(cat.name ?? cat.id ?? '')
-  let hash = 0
-  for (let i = 0; i < key.length; i++)
-    hash = (hash * 31 + key.charCodeAt(i)) >>> 0
-  return CARD_PALETTE[hash % CARD_PALETTE.length]
+  return cat.colors?.[0] || 'var(--surface-inset)'
 }
 
 // ---- load ----
@@ -412,7 +336,7 @@ async function saveCategory() {
     const payload = {
       name: form.value.name,
       description: form.value.description,
-      colors: [form.value.color],
+      colors: form.value.color ? [form.value.color] : [],
       status: form.value.status,
       sort_order: editingCategory.value?.sort_order ?? categories.value.length,
     }
@@ -452,17 +376,6 @@ async function deleteCategory() {
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error deleting category'), 'error')
-  }
-}
-
-// ---- helpers / formatters ----
-async function copySlug(slug: string) {
-  try {
-    await navigator.clipboard.writeText(slug)
-    notify(t('Slug copied'))
-  }
-  catch {
-    notify(t('Error'), 'error')
   }
 }
 
@@ -705,7 +618,6 @@ function clearAllFilters() {
             :class="{
               'is-dragging': draggedIndex === index,
               'is-drag-over': dragOverIndex === index && draggedIndex !== index,
-              'is-selected': selection.isSelected(cat.id),
               'no-drag': !manualSort,
             }"
             :draggable="manualSort"
@@ -716,13 +628,6 @@ function clearAllFilters() {
             @dragend="onDragEnd"
             @click="openEdit(cat)"
           >
-            <!-- Bulk-select checkbox; clicking it never opens the edit modal. -->
-            <div
-              class="category-card__select"
-              @click.stop="selection.toggle(cat.id, $event)"
-            >
-              <Checkbox :model-value="selection.isSelected(cat.id)" />
-            </div>
             <div
               class="category-card__stripe"
               :style="{ background: cardColor(cat) }"
@@ -992,39 +897,6 @@ function clearAllFilters() {
           </label>
         </Field>
 
-        <!-- Slug (read-only, edit mode only) -->
-        <Field
-          v-if="editingCategory && editingCategory.slug"
-          :label="t('Slug')"
-          class="span-2"
-        >
-          <div
-            class="row"
-            style="gap:8px;align-items:center;"
-          >
-            <div
-              class="control is-disabled"
-              style="flex:1;"
-            >
-              <DesignIcon
-                name="tag"
-                :size="16"
-              />
-              <input
-                :value="editingCategory.slug"
-                disabled
-                class="mono"
-              >
-            </div>
-            <IconAction
-              icon="copy"
-              tone="primary"
-              :title="t('Copy slug')"
-              @click="copySlug(editingCategory.slug)"
-            />
-          </div>
-        </Field>
-
         <!-- Color picker -->
         <Field
           :label="t('Color')"
@@ -1047,11 +919,12 @@ function clearAllFilters() {
                 />
               </template>
               <VColorPicker
-                v-model="baseColor"
+                :model-value="baseColor"
                 mode="hex"
                 :modes="['hex']"
                 show-swatches
                 elevation="0"
+                @update:model-value="setPickedColor($event)"
               />
             </VMenu>
             <span
@@ -1068,7 +941,7 @@ function clearAllFilters() {
               v-if="form.color"
               icon="close"
               :title="t('Clear')"
-              @click="form.color = ''; colorMode = 'none'"
+              @click="clearColor"
             />
           </div>
         </Field>
@@ -1090,7 +963,7 @@ function clearAllFilters() {
               class="intensity-btn"
               :class="{ 'intensity-btn--active': intensity === opt.value }"
               :style="{ backgroundColor: applyIntensity(baseColor, opt.value) }"
-              @click="intensity = opt.value"
+              @click="setIntensity(opt.value)"
             >
               {{ opt.label }}
             </button>
@@ -1187,30 +1060,6 @@ function clearAllFilters() {
       {{ snackbarMsg }}
     </VSnackbar>
 
-    <!-- Floating bulk-action bar. -->
-    <BulkActionBar
-      :count="selection.count.value"
-      @clear="selection.clear()"
-    >
-      <button
-        v-if="includeDeleted"
-        type="button"
-        :disabled="bulkBusy"
-        @click="bulkRestore"
-      >
-        <DesignIcon name="restore" :size="14" />
-        {{ t('Restore') }}
-      </button>
-      <button
-        type="button"
-        class="is-danger"
-        :disabled="bulkBusy"
-        @click="bulkDelete"
-      >
-        <DesignIcon name="trash" :size="14" />
-        {{ t('Delete') }}
-      </button>
-    </BulkActionBar>
   </div>
 </template>
 
@@ -1236,32 +1085,6 @@ function clearAllFilters() {
 .category-card:hover {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
   transform: translateY(-3px);
-}
-
-.category-card.is-selected {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 1px var(--primary);
-}
-
-.category-card__select {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 2;
-  padding: 4px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(4px);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.12s ease;
-}
-.category-card:hover .category-card__select,
-.category-card.is-selected .category-card__select {
-  opacity: 1;
-}
-[data-theme="dark"] .category-card__select {
-  background: rgba(22, 27, 36, 0.92);
 }
 
 .category-card:active {

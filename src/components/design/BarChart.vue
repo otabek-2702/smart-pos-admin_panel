@@ -5,6 +5,7 @@ import { useWidth } from './utils/useWidth'
 import Skeleton from './Skeleton.vue'
 import StateFill from './StateFill.vue'
 import ChartTip from './ChartTip.vue'
+import { formatMonthCodeLabel } from '@/utils/monthLabels'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -111,7 +112,11 @@ const tipRows = computed(() => {
   }]
 })
 
-const tipTitle = computed(() => hover.value !== null ? props.data[hover.value].label : '')
+function displayLabel(label: string): string {
+  return formatMonthCodeLabel(label, t)
+}
+
+const tipTitle = computed(() => hover.value !== null ? displayLabel(props.data[hover.value].label) : '')
 </script>
 
 <template>
@@ -187,7 +192,7 @@ const tipTitle = computed(() => hover.value !== null ? props.data[hover.value].l
           text-anchor="middle"
           font-size="11"
           fill="rgb(var(--v-theme-chart-axis))"
-        >{{ d.label }}</text>
+        >{{ displayLabel(d.label) }}</text>
         <rect
           :x="padL + band * i"
           :y="padT"

@@ -203,7 +203,7 @@ const rewardLabel = computed(() => (settings.value?.reward_description || '').tr
 </script>
 
 <template>
-  <div>
+  <div class="page">
     <div class="page-head">
       <div style="min-width:0;">
         <h1 class="page-head__title">

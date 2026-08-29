@@ -8,6 +8,7 @@ import NavBarI18n from '@/layouts/components/NavBarI18n.vue'
 import { useAlphaTheme } from '@/composables/useAlphaTheme'
 import { routeLabelForPath } from '@/navigation/routeLabels'
 import { useAIAssistantStore } from '@/stores/aiAssistant'
+import { useUserAccess } from '@/composables/useUserAccess'
 
 /* ============================================================
    Alpha POS — Design Topbar (v3, decision #5)
@@ -21,19 +22,22 @@ import { useAIAssistantStore } from '@/stores/aiAssistant'
      localStorage.userData.first_name[0] + last_name[0]
    ============================================================ */
 
-const props = withDefaults(
+withDefaults(
   defineProps<{ dateRange?: string }>(),
   { dateRange: '14d' },
 )
 
 defineEmits<{
-  (e: 'toggle-sidebar'): void
+  (e: 'toggleSidebar'): void
   (e: 'update:dateRange', value: string): void
 }>()
 
 const route = useRoute()
 const router = useRouter()
 const { t, locale } = useI18n({ useScope: 'global' })
+const { isWarehouse, hasPermission } = useUserAccess()
+const showAiTools = computed(() => !isWarehouse.value || hasPermission('reports.view'))
+const showSettings = computed(() => !isWarehouse.value)
 
 /* ---------- AI thinking pill (cross-page indicator) ---------- */
 const aiStore = useAIAssistantStore()
@@ -77,8 +81,6 @@ const initials = computed(() => {
   }
 })
 
-// Silence unused-prop warning (props.dateRange is reserved for future use).
-void props
 </script>
 
 <template>
@@ -86,7 +88,7 @@ void props
     <button
       class="iconbtn"
       :title="t('Toggle sidebar')"
-      @click="$emit('toggle-sidebar')"
+      @click="$emit('toggleSidebar')"
     >
       <DesignIcon name="layout" :size="18" />
     </button>
@@ -101,7 +103,7 @@ void props
 
     <!-- AI thinking pill (shown when generation is running on another page) -->
     <button
-      v-if="showAiPill"
+      v-if="showAiPill && showAiTools"
       class="ai-pill"
       :title="t('AI is generating a reply — click to view')"
       @click="goAi"
@@ -114,10 +116,10 @@ void props
     <template v-if="showDate" />
 
     <!-- Anomaly bell — polls /ai/anomalies, opens dropdown w/ ack buttons. -->
-    <AnomalyBell />
+    <AnomalyBell v-if="showAiTools" />
 
     <!-- Settings menu (gear popover) — decision #5 v3 -->
-    <SettingsMenu />
+    <SettingsMenu v-if="showSettings" />
 
     <NavBarI18n />
 

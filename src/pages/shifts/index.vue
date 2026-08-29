@@ -28,9 +28,11 @@ import StateFill from '@/components/design/StateFill.vue'
 import Switch from '@/components/design/Switch.vue'
 import { Fmt } from '@/components/design/utils/format'
 import { formatWindow } from '@/composables/useWindowLabel'
+import { formatWholeMoneyInput, parseWholeMoneyInput } from '@/utils/moneyInput'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
+const router = useRouter()
 
 /* ============================================================
    Types — normalised v3 shape (mirrors window.DB.shiftsList items
@@ -205,7 +207,7 @@ function normalize(s: ShiftRaw): ShiftV3 {
   }
 }
 
-function shiftState(s: ShiftV3): 'active' | 'awaiting' | 'reconciled' {
+function shiftState(s: ShiftV3): 'active' | 'awaiting' | 'reconciled' | 'abandoned' {
   const st = (s.status || '').toUpperCase()
   if (st === 'OPEN' || st === 'ACTIVE' || s.live)
     return 'active'
@@ -213,7 +215,7 @@ function shiftState(s: ShiftV3): 'active' | 'awaiting' | 'reconciled' {
     return 'awaiting'
   if (st === 'CLOSED' || st === 'COMPLETED' || st === 'RECONCILED' || s.reported)
     return 'reconciled'
-  return 'awaiting'
+  return 'abandoned'
 }
 
 /* ============================================================
@@ -453,7 +455,8 @@ const cashierOptions = computed(() => {
 
 const statusOptions = [
   { value: 'ACTIVE', label: 'Active' },
-  { value: 'ENDED,ABANDONED', label: 'Awaiting cash' },
+  { value: 'ENDED', label: 'Awaiting cash' },
+  { value: 'ABANDONED', label: 'shift_status_ABANDONED' },
   { value: 'COMPLETED', label: 'Reconciled' },
 ]
 
@@ -547,6 +550,7 @@ async function endShift(s: ShiftV3) {
    it keeps working when the backend introduces a new payment method. */
 const STANDARD_TENDERS = ['CASH', 'HUMO', 'UZCARD', 'CARD', 'PAYME'] as const
 type Tender = string
+const AUTO_CONFIRMED_TENDERS = new Set<Tender>(['HUMO', 'UZCARD'])
 const TENDER_LABEL: Record<string, string> = {
   CASH: 'Cash',
   HUMO: 'Humo',
@@ -573,10 +577,9 @@ const expectedByTender = ref<Record<Tender, number>>(emptyTenderAmounts())
 const countedByTender = ref<Record<Tender, string>>(emptyTenderCounts())
 
 const visibleTenders = computed<Tender[]>(() => [
-  // A manager can only count tenders that exist for this particular shift.
-  // Showing every known method lets someone enter a value that the strict
-  // reconciliation endpoint must (rightly) reject/ignore because it has no
-  // corresponding settlement row.
+  ...new Set(['CASH', ...settlementMethods.value.filter(method => !AUTO_CONFIRMED_TENDERS.has(method))]),
+])
+const settlementTenders = computed<Tender[]>(() => [
   ...new Set(['CASH', ...settlementMethods.value]),
 ])
 
@@ -641,17 +644,18 @@ async function loadSettlement(id: number | string) {
   }
 }
 
-function parseAmount(v: string): number | null {
-  if (v === '' || v === null || v === undefined)
-    return null
-  const cleaned = String(v).replace(/[^\d-]/g, '')
-  if (cleaned === '' || cleaned === '-')
-    return null
-  const n = Number(cleaned)
-  return Number.isNaN(n) ? null : n
-}
 function countedOf(m: Tender): number | null {
-  return parseAmount(countedByTender.value[m])
+  return parseWholeMoneyInput(countedByTender.value[m])
+}
+function confirmedAmount(m: Tender): number {
+  if (AUTO_CONFIRMED_TENDERS.has(m))
+    // Refund-only tender totals can be negative. The backend records that
+    // signed reversal itself, but manager-confirmed values must be non-negative.
+    return Math.max(0, expectedByTender.value[m] ?? 0)
+  return countedOf(m) ?? 0
+}
+function setCountedAmount(m: Tender, value: string) {
+  countedByTender.value[m] = formatWholeMoneyInput(value)
 }
 function varianceOf(m: Tender): number | null {
   const c = countedOf(m)
@@ -672,8 +676,8 @@ function fmtVariance(m: Tender): string {
 const requiredTenders = computed(() => visibleTenders.value.filter(method => (expectedByTender.value[method] ?? 0) > 0))
 const allExpectedTendersCounted = computed(() => requiredTenders.value.every(method => countedOf(method) !== null))
 const canConfirmSettlement = computed(() => settlementReady.value && !settlementLoading.value && allExpectedTendersCounted.value)
-const totalReceived = computed(() => visibleTenders.value.reduce(
-  (total, method) => total + (countedOf(method) ?? 0),
+const totalReceived = computed(() => settlementTenders.value.reduce(
+  (total, method) => total + confirmedAmount(method),
   0,
 ))
 
@@ -689,7 +693,7 @@ async function confirmReceive() {
     const methodsToConfirm = new Set<Tender>(settlementMethods.value)
     methodsToConfirm.add('CASH')
     for (const method of methodsToConfirm)
-      confirmed[method] = countedOf(method) ?? 0
+      confirmed[method] = confirmedAmount(method)
 
     const res = await axios.post(`/shifts/${target.id}/reconcile`, {
       actual_cash: confirmed.CASH, // BE still requires cash explicitly (back-compat)
@@ -701,9 +705,15 @@ async function confirmReceive() {
     const tail = v === null || v === 0
       ? t('exact match')
       : (v > 0 ? `${t('over by')} ${Fmt.money(Math.abs(v))}` : `${t('short by')} ${Fmt.money(Math.abs(v))}`)
-    const treasuryPosted = result?.treasury_posting?.status === 'posted'
-    const outcome = treasuryPosted ? t('Added to Safe') : t('Settlement confirmed')
-    notify(`${outcome} · ${target.cashier} · ${Fmt.money(totalReceived.value)} UZS · ${tail}`)
+    const treasuryPosting = result?.treasury_posting
+    const safeDelta = Number(treasuryPosting?.total)
+    const treasuryPosted = treasuryPosting?.status === 'posted' && treasuryPosting?.account === 'SAFE'
+    const depositedAmount = Number.isFinite(safeDelta) ? safeDelta : totalReceived.value
+    const outcome = treasuryPosted
+      ? (depositedAmount < 0 ? t('Safe adjusted') : t('Added to Safe'))
+      : t('Settlement confirmed')
+    const outcomeAmount = treasuryPosted ? depositedAmount : totalReceived.value
+    notify(`${outcome} · ${target.cashier} · ${Fmt.money(outcomeAmount)} UZS · ${tail}`)
     receiving.value = null
     await loadShifts()
   }
@@ -715,11 +725,8 @@ async function confirmReceive() {
   }
 }
 
-/* ============================================================
-   Live-report stub (placeholder; design has no analytics page yet)
-   ============================================================ */
-function gotoReport(_s: ShiftV3) {
-  notify(t('Report coming soon'), 'info')
+function gotoReport(s: ShiftV3) {
+  router.push({ path: '/analytics/shift-handover', query: { shift: String(s.id) } })
 }
 </script>
 
@@ -1035,7 +1042,7 @@ function gotoReport(_s: ShiftV3) {
             {{ t('AWAITING CASH') }}
           </Badge>
           <Badge
-            v-else
+            v-else-if="shiftState(s) === 'reconciled'"
             tone="neutral"
           >
             <DesignIcon
@@ -1043,6 +1050,13 @@ function gotoReport(_s: ShiftV3) {
               :size="13"
             />
             {{ t('RECONCILED') }}
+          </Badge>
+          <Badge
+            v-else
+            tone="neutral"
+            dot
+          >
+            {{ t('shift_status_ABANDONED') }}
           </Badge>
         </div>
 
@@ -1136,7 +1150,7 @@ function gotoReport(_s: ShiftV3) {
             style="justify-content: space-between; margin-bottom: 10px;"
           >
             <span class="kpi__label">
-              {{ shiftState(s) === 'reconciled' ? t('Cash received') : t('Cash to receive') }}
+              {{ shiftState(s) === 'reconciled' ? t('Cash received') : (shiftState(s) === 'abandoned' ? t('shift_status_ABANDONED') : t('Cash to receive')) }}
             </span>
             <template v-if="shiftState(s) === 'reconciled'">
               <Badge
@@ -1154,13 +1168,16 @@ function gotoReport(_s: ShiftV3) {
             style="justify-content: space-between; align-items: flex-end; margin-bottom: 12px;"
           >
             <span
-              class="mono"
-              style="font-size: 26px; font-weight: 700; letter-spacing: -0.03em;"
-            >
-              {{ Fmt.money(shiftState(s) === 'reconciled' ? (s.reported ?? 0) : (s.expectedCash ?? 0)) }}<span
+            class="mono"
+            style="font-size: 26px; font-weight: 700; letter-spacing: -0.03em;"
+          >
+              <template v-if="shiftState(s) === 'abandoned'">—</template>
+              <template v-else>
+                {{ Fmt.money(shiftState(s) === 'reconciled' ? (s.reported ?? 0) : (s.expectedCash ?? 0)) }}<span
                 class="tertiary"
                 style="font-size: 12px; font-weight: 500;"
               > UZS</span>
+              </template>
             </span>
           </div>
 
@@ -1267,10 +1284,6 @@ function gotoReport(_s: ShiftV3) {
               class="mono"
               style="color: rgb(var(--v-theme-text-secondary));"
             >{{ Fmt.abbr(s.avgTicket) }}</b></span>
-            <span>{{ t('Items') }} <b
-              class="mono"
-              style="color: rgb(var(--v-theme-text-secondary));"
-            >{{ s.items }}</b></span>
             <span>{{ t('Avg prep') }} <b style="color: rgb(var(--v-theme-text-secondary));">{{ s.avgPrep }}</b></span>
             <span>{{ t('Peak') }} <b style="color: rgb(var(--v-theme-text-secondary));">{{ s.peak }}</b></span>
           </div>
@@ -1316,7 +1329,7 @@ function gotoReport(_s: ShiftV3) {
               {{ t('Report') }}
             </Button>
           </template>
-          <template v-else>
+          <template v-else-if="shiftState(s) === 'reconciled'">
             <div
               class="row"
               style="gap: 7px; flex: 1; color: rgb(var(--v-theme-success)); font-weight: 600; font-size: 13px;"
@@ -1326,6 +1339,25 @@ function gotoReport(_s: ShiftV3) {
                 :size="17"
               />
               {{ t('Handover complete') }}
+            </div>
+            <Button
+              variant="ghost"
+              icon="chart"
+              @click="gotoReport(s)"
+            >
+              {{ t('Report') }}
+            </Button>
+          </template>
+          <template v-else>
+            <div
+              class="row"
+              style="gap: 7px; flex: 1; color: rgb(var(--v-theme-text-secondary)); font-weight: 600; font-size: 13px;"
+            >
+              <DesignIcon
+                name="close"
+                :size="17"
+              />
+              {{ t('shift_status_ABANDONED') }}
             </div>
             <Button
               variant="ghost"
@@ -1356,7 +1388,7 @@ function gotoReport(_s: ShiftV3) {
       :open="!!receiving"
       :title="receiving ? `${t('Receive money')} · ${receiving.cashier}` : ''"
       :subtitle="receiving ? `${t('Shift')} #${receiving.id} · ${t('count each tender and confirm the handover')}` : ''"
-      :width="620"
+      :width="760"
       @close="closeReceive"
     >
       <template v-if="receiving">
@@ -1406,9 +1438,12 @@ function gotoReport(_s: ShiftV3) {
             </span>
 
             <Input
-              v-model="countedByTender[m]"
+              :model-value="countedByTender[m]"
               inputmode="numeric"
+              autocomplete="off"
+              spellcheck="false"
               :placeholder="t('Count…')"
+              @update:model-value="setCountedAmount(m, $event)"
             />
 
             <span class="mono rm-right rm-dim">

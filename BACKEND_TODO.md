@@ -65,9 +65,13 @@ window or an exact multi-day custom interval.
 - Add boundary tests at 06:59, 07:00 and 03:00; a four-day previous-period
   comparison; and 10 Jul 10:00 → 11 Jul 22:00 custom selection.
 
-**Status:** Sent to Abrorbek for implementation and production deployment on
-2026-07-16 (dev-bot message 100). Not verified; frontend must not claim this
-is live until the backend branch is reviewed and tested.
+**Status:** Partially verified on 2026-07-19 against server `b6a53c1` and core `d56e0a3`.
+The canonical 07:00 to 03:00 business window, exact ISO `from_at`/`to_at` aliases,
+resolved metadata, and equal-duration previous periods are live across the main
+dashboard, sales, orders, shifts, product, staff, and operations paths. The FE sends
+clock selections as one continuous ISO interval and consumes the server prior window.
+Legacy `/orders/stats/*` subroutes and `/analytics/comparison` still lack the full
+exact-ISO contract; Compare Periods time controls are disabled until it is extended.
 
 ### 25. Selected-range cash-drawer expense list for the Sales dashboard
 **Why:** `/dashboard/sales` exposes only aggregated `expense30` totals. The
@@ -84,9 +88,10 @@ pagination }`. Exclude soft-deleted records; sort newest first; make
 `total_expense` reconcile exactly with the Sales dashboard expense total; add
 an endpoint test.
 
-**Status:** Sent to Abrorbek on 2026-07-16 (dev-bot message 101). Not
-verified. Until it ships, the FE can show only clearly labelled aggregated
-expense totals by hour/day, never fabricated individual expense rows.
+**Status:** Verified on 2026-07-19 against server `b6a53c1`. The route returns
+selected-window metadata, reconciled `total_expense`, newest-first itemized drawer
+records, and pagination. FE now uses it in Sales with a distinct unavailable state;
+the aggregate series remains only in the chart and KPI.
 
 ### 26. Post the confirmed full shift settlement to Safe exactly once
 **Why:** The manager receives every tender at end of shift, not only cash.
@@ -103,9 +108,39 @@ Keep per-tender confirmations and the cash-audit record; change Inkassa so it
 cannot credit the same money again. Cover mixed tenders, retry protection,
 zero/absent tenders, and no Bank credit for this flow.
 
-**Status:** Sent to Abrorbek on 2026-07-16 (dev-bot message 102). Not
-verified. The FE handles every returned settlement method dynamically and only
-announces an addition to Safe when the response confirms `treasury_posting`.
+**Status:** Verified on 2026-07-19 against server `88760c2` / core `96dd072`.
+The first confirmation returns 201 and an exact retry returns 200 with the same
+idempotent Safe posting. FE submits the full tender map, reuses an idempotency key
+for retries, only claims a Safe deposit when `treasury_posting` confirms SAFE, and
+uses the server-posted total rather than a client-derived total.
+
+### 27. Customer directory, editable names, and loyalty linkage
+**Why:** The admin panel needs a real customer view. Orders can expose a
+linked customer when one already exists, but normal admin orders currently
+store only a phone number. Loyalty accounts are phone-keyed and return no
+customer name, so the FE must not invent or pretend to persist client data.
+
+**Need:**
+
+- `GET /api/admins/customers?search=&page=&per_page=`: branch-scoped,
+  paginated customers with `{ id, name, phone_number, created_at, updated_at }`
+  and a total.
+- `PATCH /api/admins/customers/{id}`: edit at least `name`, return the
+  updated customer, and validate editable fields safely.
+- Extend the loyalty account list, detail, and redeem responses under
+  `/api/admins/notifications/loyalty/` with nullable `customer_id` and
+  `customer_name`, resolved only by normalized phone against a
+  branch-authorized `base.Customer`. Do not create or guess a customer from
+  a phone-only loyalty account.
+- When an admin order submits both a phone and a non-empty customer name,
+  resolve/create the matching customer. Never replace an existing non-empty
+  name with blank input.
+- Add tests for customer match/no-match, blank names, normalized duplicate
+  phones, branch isolation, and edit validation.
+
+**Status:** Sent to Abrorbek on 2026-07-19 (dev-bot message 110). Not
+verified. The FE can show client names from Orders today; a customer directory,
+Loyalty names, and editable customer data wait for this contract.
 
 ### 1. Date-filterable dashboard endpoint
 **Why:** FE topbar exposes a date range. Today only `/dashboard/today` exists — single snapshot, no range support.

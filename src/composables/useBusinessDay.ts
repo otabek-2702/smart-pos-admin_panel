@@ -1,15 +1,16 @@
 /**
  * Business-day + operating-hours settings — single source of truth.
  *
- * Restaurants run overnight shifts past midnight. Each "business day" starts at
- * `business_day_start` (default 03:00 local): sales after midnight count toward
- * the previous day until this time. "Working hours" is the operating window
- * (`business_open`..`business_close`, default 09:00..23:00) used by the date
- * picker's time-of-day filter.
+ * Restaurants run an overnight service. Reporting is canonically fixed to
+ * 07:00 on business date D through 03:00 on D+1, with the 03:00–07:00 gap
+ * excluded. "Working hours" is a separate UI setting used as a convenient
+ * exact-interval preset in the date picker.
  *
- * All three values are owned by the backend (`AppSettings`, exposed at
- * GET/PUT /api/admins/app-settings). We hydrate on login and persist on change,
- * with a localStorage mirror so presets work offline / before the first fetch.
+ * The operating-hour values are owned by the backend (`AppSettings`, exposed
+ * at GET/PUT /api/admins/app-settings). We hydrate them on login and persist
+ * changes with a localStorage mirror so the convenience preset works offline /
+ * before the first fetch. The legacy business-day-start value is retained for
+ * settings compatibility only; it no longer changes reporting windows.
  *
  * NOTE: this replaces the old two-key split (`businessDayStart` here vs
  * `alphapos-daystart` in SettingsMenu) — everything now reads these refs.
@@ -84,21 +85,33 @@ export async function saveBusinessSettings(patch: {
   if (patch.business_close) setBusinessClose(patch.business_close)
 }
 
-function startHourMin(): [number, number] {
-  const [h, m] = _start.value.split(':').map(Number)
-  return [Number.isFinite(h) ? h : 3, Number.isFinite(m) ? m : 0]
+const REPORTING_TIME_ZONE = 'Asia/Tashkent'
+const REPORTING_CLOSE_HOUR = 3
+
+function tashkentDateParts(now: Date): { year: number, month: number, day: number, hour: number } {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: REPORTING_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now)
+  const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find(part => part.type === type)?.value || 0)
+
+  return { year: value('year'), month: value('month'), day: value('day'), hour: value('hour') }
 }
 
 /**
- * Today as a BUSINESS calendar date (YYYY-MM-DD).
- * If wall-clock < day-start, returns yesterday.
- * Example: at 02:30 w/ start=03:00 → returns yesterday's date.
+ * Today as a BUSINESS calendar date (YYYY-MM-DD) in Asia/Tashkent.
+ * Before the 03:00 close it is yesterday's operating date. During the
+ * 03:00–07:00 quiet gap it is already the upcoming calendar date, matching
+ * the server's canonical reporting window.
  */
 export function businessToday(now: Date = new Date()): Date {
-  const [h, m] = startHourMin()
-  const d = new Date(now)
-  d.setHours(0, 0, 0, 0)
-  if (now.getHours() < h || (now.getHours() === h && now.getMinutes() < m))
+  const local = tashkentDateParts(now)
+  const d = new Date(local.year, local.month - 1, local.day)
+  if (local.hour < REPORTING_CLOSE_HOUR)
     d.setDate(d.getDate() - 1)
   return d
 }
@@ -139,19 +152,31 @@ export function businessPreset(key: string): { from: string, to: string } {
 }
 
 /**
- * Build request params from a picker value. The backend already offsets each
- * bare date to its business-day window (business_day_start), so we send bare
- * dates PLUS an optional time-of-day filter and a granularity hint:
- *   - tod_from/tod_to (HH:MM): only include this slice of EACH day. Omitted =
- *     whole day. ("Working hours" sends business_open..business_close.)
- *   - granularity: 'hour' for a single business-day (→ hourly chart), else 'day'.
- * `orders:true` swaps the date param names to date_from/date_to.
+ * Build request params from a picker value. Bare dates are expanded by the
+ * backend to canonical business-day windows. A clock pair is instead sent as
+ * one exact continuous Asia/Tashkent ISO interval (`from_at`/`to_at`), never as
+ * the old repeated-per-day `tod_*` filter. `orders:true` swaps bare date keys.
  */
 export interface DateParamInput {
   from?: string
   to?: string
   fromTime?: string
   toTime?: string
+  fromAt?: string
+  toAt?: string
+}
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
+
+function addCalendarDay(isoDate: string): string {
+  const [year, month, day] = isoDate.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  date.setDate(date.getDate() + 1)
+  return ymd(date)
+}
+
+function exactTimestamp(isoDate: string, hhmm: string): string {
+  return `${isoDate}T${hhmm}:00+05:00`
 }
 export function buildDateParams(
   range: DateParamInput | null | undefined,
@@ -159,14 +184,31 @@ export function buildDateParams(
 ): Record<string, string> {
   const p: Record<string, string> = {}
   if (!range) return p
+  const fromAt = range.fromAt?.trim()
+  const toAt = range.toAt?.trim()
+  if (fromAt && toAt) {
+    p.from_at = fromAt
+    p.to_at = toAt
+    return p
+  }
+  if (range.from && range.to && TIME_RE.test(range.fromTime || '') && TIME_RE.test(range.toTime || '')) {
+    const startTime = range.fromTime as string
+    const endTime = range.toTime as string
+    // An overnight rollover is only implied when the user selected one
+    // calendar date. For a multi-day interval, an earlier clock time on the
+    // chosen end date is still a valid continuous range and must not extend
+    // it by another day.
+    const endDate = range.from === range.to && endTime <= startTime
+      ? addCalendarDay(range.to)
+      : range.to
+    p.from_at = exactTimestamp(range.from, startTime)
+    p.to_at = exactTimestamp(endDate, endTime)
+    return p
+  }
   const fromKey = opts.orders ? 'date_from' : 'from'
   const toKey = opts.orders ? 'date_to' : 'to'
   if (range.from) p[fromKey] = range.from
   if (range.to) p[toKey] = range.to
-  if (range.fromTime && range.toTime) {
-    p.tod_from = range.fromTime
-    p.tod_to = range.toTime
-  }
   if (range.from && range.to)
     p.granularity = range.from === range.to ? 'hour' : 'day'
   return p

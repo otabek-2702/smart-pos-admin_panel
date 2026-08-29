@@ -7,6 +7,8 @@ import { armMotion, replayMotion } from '@/composables/useAlphaMotion'
 import axiosIns from '@/plugins/axios'
 import { hydrateBusinessSettings, setBusinessDayStart } from '@/composables/useBusinessDay'
 import { getStoredUserData } from '@/utils/storage'
+import { readUserAccess } from '@/composables/useUserAccess'
+import { warehousePathAllowed } from '@/navigation/access'
 
 // Hydrate business_day_start from /auth-me at app boot for users who logged
 // in BEFORE the BE started exposing the field. Cached userData from those
@@ -18,7 +20,8 @@ function hydrateBusinessDayStart() {
   // Operating-hours settings (day-start + working open/close) are owned by the
   // backend at /app-settings; pull all three on every authenticated boot so the
   // working-hours window reflects the server, not just the cached day-start.
-  void hydrateBusinessSettings()
+  if (!readUserAccess().isWarehouse)
+    void hydrateBusinessSettings()
   // Skip if we already have a cached value to avoid a request on every reload.
   // Login + Settings update keep this localStorage key fresh.
   try {
@@ -55,11 +58,27 @@ const router = createRouter({
     {
       path: '/',
       redirect: to => isUserLoggedIn()
-        ? { name: 'index', query: to.query }
+        ? (readUserAccess().isWarehouse
+            ? { path: '/warehouse', query: to.query }
+            : { name: 'index', query: to.query })
         : { name: 'login', query: to.query },
     },
     // Old /dashboard snapshot page is hidden — redirect anyone landing on it to the hub.
     { path: '/dashboard', redirect: '/' },
+    // One canonical shift-money reconciliation surface. The read-only handover
+    // report remains a separate file-based route; it does not post settlement.
+    {
+      path: '/shifts',
+      redirect: to => ({ path: '/shifts-analytics', query: to.query, hash: to.hash }),
+    },
+    {
+      path: '/shift-analytics',
+      redirect: to => ({ path: '/shifts-analytics', query: to.query, hash: to.hash }),
+    },
+    {
+      path: '/hr-attendance',
+      redirect: to => ({ path: '/audit', query: { ...to.query, tab: 'attendance' }, hash: to.hash }),
+    },
     ...setupLayouts(routes),
   ],
 })
@@ -77,6 +96,25 @@ router.afterEach(() => {
 
 router.beforeEach(to => {
   const isLoggedIn = isUserLoggedIn()
+
+  if (isLoggedIn) {
+    const access = readUserAccess()
+    const required = Array.isArray(to.meta.anyPermission)
+      ? to.meta.anyPermission.map(String)
+      : []
+
+    if (required.length && !access.hasAny(required))
+      return { name: 'not-authorized' }
+
+    // Warehouse routes intentionally bypass the legacy manage/all CASL meta;
+    // their allowed surface is permission-mapped here and secured again by BE.
+    if (access.isWarehouse) {
+      if (warehousePathAllowed(to.path, access))
+        return true
+
+      return { name: 'not-authorized' }
+    }
+  }
 
   if (canNavigate(to)) {
     if (to.meta.redirectIfLoggedIn && isLoggedIn)

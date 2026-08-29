@@ -21,6 +21,8 @@ import { useTheme } from 'vuetify'
 import { useAlphaTheme } from '@/composables/useAlphaTheme'
 import ability from '@/plugins/casl/ability'
 import { initialAbility } from '@/plugins/casl/ability'
+import { readUserAccess } from '@/composables/useUserAccess'
+import { warehousePathAllowed } from '@/navigation/access'
 
 const { t, locale } = useI18n({ useScope: 'global' })
 const router = useRouter()
@@ -112,15 +114,34 @@ function actionsGroup(): CmdItem[] {
   ]
 }
 
-const items = computed<CmdItem[]>(() => [
-  ...actionsGroup(),
-  ...flattenNav(t('Dashboard'), dashboardNav as any),
-  ...flattenNav(t('Management'), managementNav as any),
-  ...flattenNav(t('HR'), hrNav as any),
-  ...flattenNav(t('Stock'), stockNav as any),
-  ...flattenNav(t('Analytics'), analyticsNav as any),
-  ...flattenNav(t('Settings'), systemNav as any),
-])
+const items = computed<CmdItem[]>(() => {
+  const actions = actionsGroup()
+  const routes = [
+    ...flattenNav(t('Dashboard'), dashboardNav as any),
+    ...flattenNav(t('Management'), managementNav as any),
+    ...flattenNav(t('HR'), hrNav as any),
+    ...flattenNav(t('Stock'), stockNav as any),
+    ...flattenNav(t('Analytics'), analyticsNav as any),
+    ...flattenNav(t('Settings'), systemNav as any),
+  ]
+  const access = readUserAccess()
+  if (!access.isWarehouse)
+    return [...actions, ...routes]
+
+  const allowedRoutes = routes.filter(item => {
+    if (!item.to) return false
+    try {
+      const path = router.resolve({ name: item.to }).path
+
+      return warehousePathAllowed(path, access)
+    }
+    catch {
+      return false
+    }
+  })
+
+  return [...actions, ...allowedRoutes]
+})
 
 const filtered = computed<CmdItem[]>(() => {
   const q = query.value.trim().toLowerCase()

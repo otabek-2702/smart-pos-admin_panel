@@ -15,10 +15,12 @@ import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
 import Kpi from '@/components/design/Kpi.vue'
 import Modal from '@/components/design/Modal.vue'
+import MoneyInput from '@/components/design/MoneyInput.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
 import { buildCsv } from '@/utils/csv'
+import { formatMonthNumber } from '@/utils/monthLabels'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -584,22 +586,6 @@ async function generate() {
 }
 
 // ============================================================
-// Numeric v-model adapters for base/bonus/deduction inputs
-// ============================================================
-const baseInputStr = computed({
-  get: () => String(baseInput.value ?? 0),
-  set: (v: string) => { baseInput.value = Number(v) || 0 },
-})
-const newBonusAmountStr = computed({
-  get: () => String(newBonus.value.amount ?? 0),
-  set: (v: string) => { newBonus.value.amount = Number(v) || 0 },
-})
-const newDeductionAmountStr = computed({
-  get: () => String(newDeduction.value.amount ?? 0),
-  set: (v: string) => { newDeduction.value.amount = Number(v) || 0 },
-})
-
-// ============================================================
 // ESC handler
 // ============================================================
 function onKeydown(e: KeyboardEvent) {
@@ -615,7 +601,8 @@ onMounted(() => { window.addEventListener('keydown', onKeydown) })
 onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
 
 function fmtPeriod(row: any): string {
-  return `${row.period_year}-${String(row.period_month).padStart(2, '0')}`
+  return formatMonthNumber(row.period_month, t, row.period_year)
+    ?? `${row.period_year}-${String(row.period_month).padStart(2, '0')}`
 }
 
 function employeeName(row: any): string {
@@ -934,10 +921,8 @@ function employeeName(row: any): string {
         </div>
         <div class="sal-row">
           <div class="sal-row__input">
-            <Input
-              v-model="baseInputStr"
-              type="number"
-              min="0"
+            <MoneyInput
+              v-model="baseInput"
               :disabled="isPaid"
             />
           </div>
@@ -999,10 +984,8 @@ function employeeName(row: any): string {
         </ul>
         <div class="sal-row sal-row--add">
           <div class="sal-row__amount">
-            <Input
-              v-model="newBonusAmountStr"
-              type="number"
-              min="0"
+            <MoneyInput
+              v-model="newBonus.amount"
               :placeholder="t('Amount')"
               :disabled="isPaid"
             />
@@ -1071,10 +1054,8 @@ function employeeName(row: any): string {
         </ul>
         <div class="sal-row sal-row--add">
           <div class="sal-row__amount">
-            <Input
-              v-model="newDeductionAmountStr"
-              type="number"
-              min="0"
+            <MoneyInput
+              v-model="newDeduction.amount"
               :placeholder="t('Amount')"
               :disabled="isPaid"
             />

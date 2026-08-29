@@ -47,6 +47,7 @@ const rangesDiffer = computed(() => props.daysA !== props.daysB)
         <DateRangePicker
           :model-value="aRange"
           align="left"
+          :enable-time="false"
           @update:model-value="emit('update:aRange', $event)"
         />
       </div>
@@ -58,6 +59,7 @@ const rangesDiffer = computed(() => props.daysA !== props.daysB)
         <DateRangePicker
           :model-value="bRange"
           align="left"
+          :enable-time="false"
           :class="{ 'is-locked': mode !== 'custom' }"
           @update:model-value="emit('update:bRange', $event)"
         />

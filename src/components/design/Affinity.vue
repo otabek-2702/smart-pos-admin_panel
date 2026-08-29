@@ -25,11 +25,12 @@ import Skeleton from './Skeleton.vue'
 import StateFill from './StateFill.vue'
 import { cx } from './utils'
 import { fmtAbbr, fmtMoney, fmtNum, fmtPct } from './utils/format'
+import { buildDateParams, businessPreset, type DateParamInput } from '@/composables/useBusinessDay'
 
 interface Props {
   loading?: boolean
-  /** Optional [from, to] window override (yyyy-MM-dd). Defaults to last 30d. */
-  range?: { from: string; to: string } | null
+  /** Optional canonical reporting-window override. Defaults to the last 30 business dates. */
+  range?: DateParamInput | null
   /** Localized label of the active window, so the title stops hardcoding "30 days". */
   windowLabel?: string
 }
@@ -66,15 +67,8 @@ const fetching = ref(true)
 const fetchFailed = ref(false)
 
 /* ---------- BE wiring ---------- */
-function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10)
-}
-
-function defaultRange(): { from: string; to: string } {
-  const to = new Date()
-  const from = new Date(to)
-  from.setDate(to.getDate() - 29)
-  return { from: isoDate(from), to: isoDate(to) }
+function defaultRange(): DateParamInput {
+  return businessPreset('30d')
 }
 
 function num(v: unknown): number {
@@ -133,8 +127,9 @@ async function loadAffinity() {
   fetchFailed.value = false
   try {
     const range = props.range || defaultRange()
+    const params = { ...buildDateParams(range), limit: 10 }
     const res = await axiosIns.get('/analytics/products/affinity', {
-      params: { from: range.from, to: range.to, limit: 10 },
+      params,
     })
     const raw = res.data?.data ?? res.data
     data.value = mapAffinity(raw)

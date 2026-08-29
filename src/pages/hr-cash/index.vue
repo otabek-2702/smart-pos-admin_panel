@@ -16,6 +16,7 @@ import Field from '@/components/design/Field.vue'
 import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
 import Kpi from '@/components/design/Kpi.vue'
+import MoneyInput from '@/components/design/MoneyInput.vue'
 import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
@@ -544,13 +545,11 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             class="span-2"
             :error="errors.amount"
           >
-            <Input
+            <MoneyInput
               v-model="form.amount"
               icon="dollar"
-              type="number"
               :error="!!errors.amount"
               placeholder="0"
-              inputmode="numeric"
             />
           </Field>
 
@@ -626,13 +625,11 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             :error="errors.amount"
             :hint="stats ? t('hr_cash_current_balance') + ': ' + fmtMoney(stats?.current_balance ?? stats?.balance ?? 0) + ' ' + t('currency_short') : undefined"
           >
-            <Input
+            <MoneyInput
               v-model="form.amount"
               icon="dollar"
-              type="number"
               :error="!!errors.amount"
               placeholder="0"
-              inputmode="numeric"
             />
           </Field>
 

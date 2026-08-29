@@ -4,6 +4,7 @@ import { useMediaQuery } from '@vueuse/core'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import { routeLabelForPath } from '@/navigation/routeLabels'
 import { useNavCountsStore } from '@/stores/navCounts'
+import { useUserAccess } from '@/composables/useUserAccess'
 
 /* ============================================================
    Alpha POS — Design Sidebar
@@ -19,15 +20,41 @@ interface NavItem {
   icon: string
   to: string
   badge?: string
+  anyPermission?: string[]
 }
 type NavEntry = NavSection | NavItem
 
-const props = defineProps<{ collapsed?: boolean, open?: boolean }>()
-const emit = defineEmits<{ (e: 'nav-go'): void, (e: 'close'): void }>()
+const props = defineProps<{ collapsed?: boolean; open?: boolean }>()
+const emit = defineEmits<{ (e: 'navGo'): void; (e: 'close'): void }>()
+
+const WAREHOUSE_WORKSPACE_PERMISSIONS = [
+  'stock.catalog.view',
+  'stock.level.view',
+  'stock.batch.view',
+  'stock.supplier.view',
+  'stock.purchase.view',
+  'stock.receiving.create',
+  'stock.receiving.update_draft',
+  'stock.receiving.complete',
+  'stock.transfer.view',
+  'stock.transfer.create',
+  'stock.count.view',
+  'stock.count.create',
+  'stock.count.record',
+  'stock.adjustment.request',
+]
+
+const OPERATIONAL_AUDIT_PERMISSIONS = [
+  'attendance.view',
+  'discipline.rule.view',
+  'discipline.case.view',
+  'prep.audit.view',
+]
 
 const { t } = useI18n({ useScope: 'global' })
 const router = useRouter()
 const route = useRoute()
+const { isWarehouse, hasAnyPermission } = useUserAccess()
 const isMobile = useMediaQuery('(max-width: 768px)')
 const drawerHidden = computed(() => isMobile.value && !props.open)
 const closeButton = ref<HTMLButtonElement | null>(null)
@@ -40,7 +67,11 @@ defineExpose({ focusClose })
 
 const navStore = useNavCountsStore()
 const { counts } = storeToRefs(navStore)
-onMounted(() => navStore.start())
+
+onMounted(() => {
+  if (!isWarehouse.value)
+    navStore.start()
+})
 onBeforeUnmount(() => navStore.stop())
 
 function badgeFor(id: string): string | undefined {
@@ -69,7 +100,9 @@ const NAV: NavEntry[] = [
   { type: 'item', id: 'treasury', label: 'Treasury', icon: 'store', to: '/treasury' },
   { type: 'item', id: 'loyalty', label: 'Loyalty', icon: 'gift', to: '/loyalty' },
   { type: 'item', id: 'sessions', label: 'Sessions', icon: 'lock', to: '/sessions' },
+  { type: 'item', id: 'warehouse', label: 'Warehouse operations', icon: 'package', to: '/warehouse', anyPermission: WAREHOUSE_WORKSPACE_PERMISSIONS },
   { type: 'section', label: 'HR' },
+  { type: 'item', id: 'operational-audit', label: 'Operational Audit', icon: 'flag', to: '/audit', anyPermission: OPERATIONAL_AUDIT_PERMISSIONS },
   { type: 'item', id: 'employees', label: 'Employees', icon: 'employee', to: '/hr-employees' },
   { type: 'item', id: 'departments', label: 'Departments', icon: 'dept', to: '/hr-departments' },
   { type: 'item', id: 'salaries', label: 'Salaries', icon: 'coins', to: '/hr-salaries' },
@@ -96,6 +129,36 @@ const NAV: NavEntry[] = [
   { type: 'item', id: 'notification-types', label: 'Notification Types', icon: 'bell', to: '/notification-types' },
 ]
 
+const WAREHOUSE_NAV: NavEntry[] = [
+  { type: 'item', id: 'warehouse', label: 'Warehouse operations', icon: 'package', to: '/warehouse' },
+  { type: 'section', label: 'Stock' },
+  { type: 'item', id: 'stock-items', label: 'Stock Items', icon: 'box', to: '/stock/items', anyPermission: ['stock.catalog.view'] },
+  { type: 'item', id: 'stock-levels', label: 'Stock Levels', icon: 'bars', to: '/stock/levels', anyPermission: ['stock.level.view'] },
+  { type: 'item', id: 'stock-batches', label: 'Batches', icon: 'package', to: '/stock/batches', anyPermission: ['stock.batch.view'] },
+  { type: 'item', id: 'stock-suppliers', label: 'Suppliers', icon: 'building', to: '/stock/suppliers', anyPermission: ['stock.supplier.view'] },
+  { type: 'item', id: 'stock-purchase-orders', label: 'Purchase Orders', icon: 'receipt', to: '/stock/purchase-orders', anyPermission: ['stock.purchase.view'] },
+  { type: 'item', id: 'stock-receiving', label: 'Receiving', icon: 'inbox', to: '/stock/receiving', anyPermission: ['stock.purchase.view'] },
+  { type: 'item', id: 'stock-counts', label: 'Stock Counts', icon: 'list', to: '/stock/counts', anyPermission: ['stock.count.view'] },
+  { type: 'item', id: 'stock-adjustment-requests', label: 'Stock adjustment requests', icon: 'sliders', to: '/stock/adjustment-requests', anyPermission: ['stock.adjustment.request'] },
+  { type: 'item', id: 'stock-transfers', label: 'Transfers', icon: 'share', to: '/stock/transfers', anyPermission: ['stock.transfer.view'] },
+  { type: 'section', label: 'HR' },
+  { type: 'item', id: 'operational-audit', label: 'Operational Audit', icon: 'flag', to: '/audit', anyPermission: ['attendance.view', 'discipline.rule.view', 'discipline.case.view', 'prep.audit.view'] },
+]
+
+const visibleNav = computed<NavEntry[]>(() => {
+  const source = isWarehouse.value ? WAREHOUSE_NAV : NAV
+  const allowed = source.filter(entry => entry.type === 'section' || !entry.anyPermission?.length || hasAnyPermission(entry.anyPermission))
+
+  return allowed.filter((entry, index) => {
+    if (entry.type !== 'section')
+      return true
+
+    const next = allowed[index + 1]
+
+    return !!next && next.type === 'item'
+  })
+})
+
 function isItem(n: NavEntry): n is NavItem {
   return n.type === 'item'
 }
@@ -108,12 +171,6 @@ function isActive(item: NavItem): boolean {
   return route.path === item.to || route.path.startsWith(`${item.to}/`)
 }
 
-function go(item: NavItem) {
-  if (!isActive(item))
-    router.push(item.to)
-  emit('nav-go')
-}
-
 function onNavClick(e: MouseEvent, item: NavItem) {
   // Honor modifier / middle clicks — let the browser open in new tab/window via the anchor's href.
   if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button === 1)
@@ -121,9 +178,8 @@ function onNavClick(e: MouseEvent, item: NavItem) {
   e.preventDefault()
   if (!isActive(item))
     router.push(item.to)
-  emit('nav-go')
+  emit('navGo')
 }
-
 </script>
 
 <template>
@@ -156,7 +212,7 @@ function onNavClick(e: MouseEvent, item: NavItem) {
       class="sidebar__nav"
       :aria-label="t('Navigation')"
     >
-      <template v-for="(n, i) in NAV" :key="i">
+      <template v-for="(n, i) in visibleNav" :key="i">
         <template v-if="n.type === 'section'">
           <div v-if="!collapsed" class="nav-section">
             {{ t(n.label) }}

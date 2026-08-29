@@ -23,22 +23,28 @@ import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
 import Kpi from '@/components/design/Kpi.vue'
 import Modal from '@/components/design/Modal.vue'
+import MoneyInput from '@/components/design/MoneyInput.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import Switch from '@/components/design/Switch.vue'
 import StateFill from '@/components/design/StateFill.vue'
+import { useUserAccess } from '@/composables/useUserAccess'
 
 const { t } = useI18n({ useScope: 'global' })
 const route = useRoute()
 const router = useRouter()
 const { notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
+const { hasPermission, isAdministrator } = useUserAccess()
+const canManageStock = computed(() => hasPermission('stock.manage'))
+const canAdministerLevels = computed(() => isAdministrator.value)
 
 // ---- ids ----
 const itemId = computed(() => String(route.params.id ?? ''))
 
 // ---- state ----
 const item = ref<any>(null)
+const isBatchTracked = computed(() => item.value?.track_batches === true)
 const levels = ref<any[]>([])
 const levelsSummary = ref<{ total_quantity?: number, total_reserved?: number, total_available?: number }>({})
 const transactions = ref<any[]>([])
@@ -283,7 +289,7 @@ const editForm = ref<any>({})
 const editErrors = ref<Record<string, string>>({})
 
 function openEdit() {
-  if (!item.value) return
+  if (!canManageStock.value || !item.value) return
   editForm.value = {
     name: item.value.name ?? '',
     sku: item.value.sku ?? '',
@@ -317,7 +323,7 @@ function validateEdit(): boolean {
 }
 
 async function saveEdit() {
-  if (!validateEdit()) return
+  if (!canManageStock.value || !validateEdit()) return
   saving.value = true
   try {
     const payload: any = {
@@ -355,12 +361,18 @@ async function saveEdit() {
 
 // ---- deactivate ----
 function openDelete() {
+  if (!canManageStock.value)
+    return
+
   deleteOpen.value = true
 }
 const stockOnHand = computed(() => Number(levelsSummary.value.total_quantity ?? 0))
 const canDeactivate = computed(() => stockOnHand.value <= 0)
 
 async function confirmDelete() {
+  if (!canManageStock.value)
+    return
+
   deleting.value = true
   try {
     await stockApi.delete(`/items/${itemId.value}/`)
@@ -383,6 +395,9 @@ const adjForm = ref<{ location_id: string, quantity: string, movement_type: stri
 const adjErrors = ref<Record<string, string>>({})
 
 function openAdjust() {
+  if (!canAdministerLevels.value || isBatchTracked.value)
+    return
+
   adjForm.value = { location_id: locationOptions.value[0]?.value ?? '', quantity: '', movement_type: 'ADJUSTMENT_PLUS', notes: '' }
   adjErrors.value = {}
   adjustOpen.value = true
@@ -396,9 +411,20 @@ function validateAdj(requireType = true): boolean {
   return Object.keys(errs).length === 0
 }
 async function submitAdjust() {
-  if (!validateAdj(true)) return
+  if (!canAdministerLevels.value || !validateAdj(true)) return
   adjusting.value = true
   try {
+    const itemResponse = await stockApi.get(`/items/${itemId.value}/`)
+    const latestItemData = itemResponse.data?.data ?? itemResponse.data
+    const latestItem = latestItemData?.item ?? latestItemData
+    if (latestItem?.track_batches === true) {
+      item.value = latestItem
+      adjustOpen.value = false
+      notify(t('stock_adjust_batch_tracked_blocked'), 'error')
+
+      return
+    }
+
     await stockApi.post('/adjust/', {
       stock_item_id: Number(itemId.value),
       location_id: Number(adjForm.value.location_id),
@@ -419,12 +445,15 @@ async function submitAdjust() {
 }
 
 function openReserve() {
+  if (!canAdministerLevels.value)
+    return
+
   adjForm.value = { location_id: locationOptions.value[0]?.value ?? '', quantity: '', movement_type: 'RESERVATION', notes: '' }
   adjErrors.value = {}
   reserveOpen.value = true
 }
 async function submitReserve() {
-  if (!validateAdj(false)) return
+  if (!canAdministerLevels.value || !validateAdj(false)) return
   reserving.value = true
   try {
     await stockApi.post('/reserve/', {
@@ -446,12 +475,15 @@ async function submitReserve() {
 }
 
 function openRelease() {
+  if (!canAdministerLevels.value)
+    return
+
   adjForm.value = { location_id: locationOptions.value[0]?.value ?? '', quantity: '', movement_type: 'RESERVATION_RELEASE', notes: '' }
   adjErrors.value = {}
   releaseOpen.value = true
 }
 async function submitRelease() {
-  if (!validateAdj(false)) return
+  if (!canAdministerLevels.value || !validateAdj(false)) return
   releasing.value = true
   try {
     await stockApi.post('/release-reservation/', {
@@ -497,14 +529,17 @@ const levelsSkeletonRows = computed(() => 3)
           {{ t('item_drill_back') }}
         </Button>
         <Button
+          v-if="canAdministerLevels"
           variant="secondary"
           icon="sliders"
-          :disabled="!item"
+          :disabled="!item || isBatchTracked"
+          :title="isBatchTracked ? t('stock_adjust_batch_tracked_blocked') : undefined"
           @click="openAdjust"
         >
           {{ t('item_drill_adjust') }}
         </Button>
         <Button
+          v-if="canAdministerLevels"
           variant="secondary"
           icon="lock"
           :disabled="!item"
@@ -513,6 +548,7 @@ const levelsSkeletonRows = computed(() => 3)
           {{ t('item_drill_reserve') }}
         </Button>
         <Button
+          v-if="canAdministerLevels"
           variant="secondary"
           icon="play"
           :disabled="!item"
@@ -521,6 +557,7 @@ const levelsSkeletonRows = computed(() => 3)
           {{ t('item_drill_release') }}
         </Button>
         <Button
+          v-if="canManageStock"
           variant="primary"
           icon="pencil"
           :disabled="!item"
@@ -529,6 +566,7 @@ const levelsSkeletonRows = computed(() => 3)
           {{ t('Edit') }}
         </Button>
         <IconAction
+          v-if="canManageStock"
           icon="trash"
           tone="danger"
           :title="t('Delete')"
@@ -537,6 +575,15 @@ const levelsSkeletonRows = computed(() => 3)
         />
       </template>
     </PageHeader>
+
+    <div
+      v-if="canAdministerLevels && isBatchTracked"
+      class="inline-alert"
+      role="note"
+    >
+      <DesignIcon name="alert" :size="18" />
+      <span>{{ t('stock_adjust_batch_tracked_blocked') }}</span>
+    </div>
 
     <!-- KPI strip -->
     <div class="grid cols-4 kpi-strip" style="margin-bottom: var(--sp-5);">
@@ -844,6 +891,7 @@ const levelsSkeletonRows = computed(() => 3)
 
     <!-- Edit modal -->
     <Modal
+      v-if="canManageStock"
       :open="editOpen"
       :title="t('Edit')"
       :width="720"
@@ -891,7 +939,10 @@ const levelsSkeletonRows = computed(() => 3)
           <Input v-model="editForm.reorder_point" type="number" step="any" />
         </Field>
         <Field :label="t('Cost Price')">
-          <Input v-model="editForm.cost_price" type="number" step="any" />
+          <MoneyInput
+            :model-value="Number(editForm.cost_price) || 0"
+            @update:model-value="value => editForm.cost_price = value ? String(value) : ''"
+          />
         </Field>
         <Field :label="t('Default expiry (days)')">
           <Input v-model="editForm.default_expiry_days" type="number" step="1" />
@@ -928,9 +979,6 @@ const levelsSkeletonRows = computed(() => 3)
       </div>
 
       <template #footer>
-        <Button variant="ghost" @click="editOpen = false">
-          {{ t('Cancel') }}
-        </Button>
         <Button variant="primary" :loading="saving" @click="saveEdit">
           {{ t('Save') }}
         </Button>
@@ -939,6 +987,7 @@ const levelsSkeletonRows = computed(() => 3)
 
     <!-- Delete (deactivate) confirm modal -->
     <Modal
+      v-if="canManageStock"
       :open="deleteOpen"
       :title="t('item_drill_deactivate_confirm')"
       :width="480"
@@ -953,9 +1002,6 @@ const levelsSkeletonRows = computed(() => 3)
       </div>
 
       <template #footer>
-        <Button variant="ghost" @click="deleteOpen = false">
-          {{ t('Cancel') }}
-        </Button>
         <Button variant="danger" :loading="deleting" :disabled="!canDeactivate" @click="confirmDelete">
           {{ t('Delete') }}
         </Button>
@@ -964,6 +1010,7 @@ const levelsSkeletonRows = computed(() => 3)
 
     <!-- Adjust stock modal -->
     <Modal
+      v-if="canAdministerLevels"
       :open="adjustOpen"
       :title="t('item_drill_adjust')"
       :width="520"
@@ -994,9 +1041,6 @@ const levelsSkeletonRows = computed(() => 3)
       </div>
 
       <template #footer>
-        <Button variant="ghost" @click="adjustOpen = false">
-          {{ t('Cancel') }}
-        </Button>
         <Button variant="primary" :loading="adjusting" @click="submitAdjust">
           {{ t('Save') }}
         </Button>
@@ -1005,6 +1049,7 @@ const levelsSkeletonRows = computed(() => 3)
 
     <!-- Reserve stock modal -->
     <Modal
+      v-if="canAdministerLevels"
       :open="reserveOpen"
       :title="t('item_drill_reserve')"
       :width="520"
@@ -1028,9 +1073,6 @@ const levelsSkeletonRows = computed(() => 3)
       </div>
 
       <template #footer>
-        <Button variant="ghost" @click="reserveOpen = false">
-          {{ t('Cancel') }}
-        </Button>
         <Button variant="primary" :loading="reserving" @click="submitReserve">
           {{ t('Save') }}
         </Button>
@@ -1039,6 +1081,7 @@ const levelsSkeletonRows = computed(() => 3)
 
     <!-- Release reservation modal -->
     <Modal
+      v-if="canAdministerLevels"
       :open="releaseOpen"
       :title="t('item_drill_release')"
       :width="520"
@@ -1062,9 +1105,6 @@ const levelsSkeletonRows = computed(() => 3)
       </div>
 
       <template #footer>
-        <Button variant="ghost" @click="releaseOpen = false">
-          {{ t('Cancel') }}
-        </Button>
         <Button variant="primary" :loading="releasing" @click="submitRelease">
           {{ t('Save') }}
         </Button>
@@ -1074,6 +1114,24 @@ const levelsSkeletonRows = computed(() => 3)
 </template>
 
 <style scoped>
+.inline-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: var(--sp-4);
+  padding: 10px 12px;
+  border: 1px solid rgb(var(--v-theme-warning-border));
+  border-radius: var(--r-md);
+  color: rgb(var(--v-theme-warning-strong));
+  background: rgb(var(--v-theme-warning-weak));
+  font-size: 13px;
+}
+
+.inline-alert span {
+  flex: 1;
+  min-width: 0;
+}
+
 .filter-control {
   flex: 1 1 180px;
   min-width: 160px;
@@ -1132,4 +1190,6 @@ const levelsSkeletonRows = computed(() => 3)
 meta:
   action: manage
   subject: all
+  anyPermission:
+    - stock.catalog.view
 </route>

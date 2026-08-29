@@ -19,6 +19,7 @@ import MixDonutPair from '@/components/analytics/compare/MixDonutPair.vue'
 import DeltaHeatmap from '@/components/analytics/compare/DeltaHeatmap.vue'
 import ComparisonTable from '@/components/analytics/compare/ComparisonTable.vue'
 import { resolveBFromMode } from '@/composables/useComparison'
+import { businessPreset } from '@/composables/useBusinessDay'
 import { getComparisonMock } from '@/mocks/comparisonMock'
 import type { CompareMode, ComparisonParams, ComparisonResponse, Granularity, MoverRow } from '@/types/comparison'
 
@@ -27,12 +28,8 @@ const route = useRoute()
 const router = useRouter()
 
 // ---------- helpers ----------
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 function monthToDate(): DateRangeValue {
-  const now = new Date()
-  return { from: ymd(new Date(now.getFullYear(), now.getMonth(), 1)), to: ymd(now), preset: 'month' }
+  return { ...businessPreset('month'), preset: 'month' }
 }
 function toRange(v: DateRangeValue): { start: string, end: string } {
   return { start: v.from, end: v.to }

@@ -23,10 +23,23 @@ export interface DashRange {
   from: string
   to: string
   preset?: string
-  // Time-of-day filter (Working hours / custom) + granularity flow through to
-  // every sub-dashboard via buildDateParams. Empty time = whole day.
+  // Exact interval bounds. When both are present, buildDateParams sends an
+  // unambiguous continuous from_at/to_at pair rather than a daily time filter.
   fromTime?: string
   toTime?: string
+  fromAt?: string
+  toAt?: string
+}
+
+export interface ReportingRangeMetadata {
+  from?: string
+  to?: string
+  start_at?: string
+  end_at?: string
+  mode?: 'business' | 'custom' | string
+  timezone?: string
+  days?: number
+  granularity?: 'hour' | 'day' | string
 }
 
 // Today payload shape (subset — only the fields FE consumes today).
@@ -66,7 +79,7 @@ export interface DashTodayPayload {
 
 // Range payload shape (subset — only the fields FE consumes today).
 export interface DashRangePayload {
-  range?: { from: string; to: string }
+  range?: ReportingRangeMetadata
   revenue?: string | number
   paid_orders?: number
   orders?: number
@@ -91,6 +104,7 @@ const shared = ref<DashSharedPayload | null>(null)
 const loading = ref(false)
 const error = ref<unknown>(null)
 const lastFetchedAt = ref<number | null>(null)
+const resolvedRange = ref<ReportingRangeMetadata | null>(null)
 // Latest range the hub picked. Sub-dashboards watch this and re-fetch their
 // own dedicated endpoints (/dashboard/sales, /analytics/products/*, …) when it
 // changes. Kept as a plain object so consumers can watch (r.from, r.to).
@@ -104,7 +118,7 @@ function hasRange(range: DashRange | null | undefined): boolean {
 function rangeKey(range: DashRange | null | undefined): string {
   if (!range)
     return ''
-  return [range.from, range.to, range.preset, range.fromTime, range.toTime].join('|')
+  return [range.from, range.to, range.preset, range.fromTime, range.toTime, range.fromAt, range.toAt].join('|')
 }
 
 async function fetchShared(range: DashRange | null | undefined): Promise<boolean> {
@@ -116,8 +130,10 @@ async function fetchShared(range: DashRange | null | undefined): Promise<boolean
   error.value = null
   currentRange.value = nextRange
   // Never present the previous range's numbers under the newly selected title.
-  if (changedRange)
+  if (changedRange) {
     shared.value = null
+    resolvedRange.value = null
+  }
   try {
     if (hasRange(range)) {
       // /dashboard?from=&to=(&tod_from=&tod_to=&granularity=)
@@ -127,6 +143,7 @@ async function fetchShared(range: DashRange | null | undefined): Promise<boolean
       if (requestId !== sharedRequestId)
         return false
       shared.value = { ...data, __source: 'range' }
+      resolvedRange.value = data?.range ?? data?.filters ?? null
     }
     else {
       const res = await axiosIns.get('/dashboard/today')
@@ -134,6 +151,7 @@ async function fetchShared(range: DashRange | null | undefined): Promise<boolean
       if (requestId !== sharedRequestId)
         return false
       shared.value = { ...data, __source: 'today' }
+      resolvedRange.value = data?.range ?? data?.filters ?? null
     }
     lastFetchedAt.value = Date.now()
     return true
@@ -143,6 +161,7 @@ async function fetchShared(range: DashRange | null | undefined): Promise<boolean
       return false
     error.value = err
     shared.value = null
+    resolvedRange.value = null
     return false
   }
   finally {
@@ -158,6 +177,7 @@ export function useDashboardData() {
     error: computed(() => error.value),
     lastFetchedAt: computed(() => lastFetchedAt.value),
     range: computed(() => currentRange.value),
+    resolvedRange: computed(() => resolvedRange.value),
     fetchShared,
     hasRange,
   }

@@ -3,9 +3,9 @@
    ALPHA POS — DateRangePicker (reusable, v3 single-pane)
    1:1 port of .tmp-handoff-v3/pos-admin-panel/project/app/datepicker.jsx
    - Single MonthGrid (prev/next nav)
-   - presetRange uses raw today (no businessToday)
+   - date presets use the canonical Asia/Tashkent business date
    - 'mode' state: 'date' | 'time' with segctl
-   - TIME_PRESETS + Custom TimeRange
+   - exact interval bounds + Custom TimeRange
    - Click-outside uses pointerdown-capture (Teleport-safe)
    value: { from, to, preset?, mode?, fromTime?, toTime? }
    ============================================================ */
@@ -112,8 +112,9 @@ const visiblePresets = computed(() => props.includeAll
   ? PRESETS
   : PRESETS.filter(preset => preset.key !== 'all'))
 
-// Only two presets: Working hours (from the persisted business_open/close) and
-// Whole day (clears the time-of-day filter). Everything else is Custom.
+// Only two presets: operating-hour bounds and whole business day. A clock pair
+// is an exact interval from the first selected date to the final selected date,
+// not a repeated per-day filter.
 const TIME_PRESETS = computed<{ key: string, label: string, from: string, to: string }[]>(() => [
   { key: 'open', label: 'Working hours', from: biz.open.value, to: biz.close.value },
   { key: 'allday', label: 'Whole day', from: '', to: '' },
@@ -151,7 +152,7 @@ const open = ref(false)
 const root = ref<HTMLElement | null>(null)
 const triggerRef = ref<HTMLButtonElement | null>(null)
 
-const mode = ref<'date' | 'time'>((current.value.mode as any) || 'date')
+const mode = ref<'date' | 'time'>(props.enableTime ? ((current.value.mode as any) || 'date') : 'date')
 const from = ref<Date | null>(parseYmd(current.value.from))
 const to = ref<Date | null>(parseYmd(current.value.to))
 const fromTime = ref<string>(current.value.fromTime || '')
@@ -164,13 +165,8 @@ const view = ref<Date>(
 )
 
 function refreshToday() {
-  // Reading the computed ref makes this refresh when the configured business
-  // cutover changes; opening also refreshes it after a midnight boundary.
-  void biz.start.value
   today.value = businessToday()
 }
-
-watch(biz.start, refreshToday)
 
 watch(open, (v) => {
   if (v) {
@@ -180,7 +176,7 @@ watch(open, (v) => {
     from.value = vf
     to.value = vt
     hover.value = null
-    mode.value = (current.value.mode as any) || 'date'
+    mode.value = props.enableTime ? ((current.value.mode as any) || 'date') : 'date'
     fromTime.value = current.value.fromTime || ''
     toTime.value = current.value.toTime || ''
     focusedDate.value = vf || vt || today.value
@@ -295,18 +291,18 @@ function emitChange(v: DateRangeValue) {
   emit('change', v)
 }
 
-/* Date range and time-of-day always travel together — either Apply button
-   emits the full combined value so a picked date preset keeps the chosen
-   time-of-day filter (and vice-versa). Whole day = empty fromTime/toTime. */
+/* Date range and exact clock bounds travel together. Whole business day has
+   empty clock fields so the server resolves its canonical 07:00→03:00 window. */
 function emitCombined(dateFrom: Date | null, dateTo: Date | null, preset?: string) {
   const tval = dateTo || dateFrom
+  const hasExactTime = !!(dateFrom && tval && fromTime.value && toTime.value)
   emitChange({
     from: dateFrom ? ymd(dateFrom) : '',
     to: tval ? ymd(tval) : '',
     preset: preset ?? matchPreset(dateFrom, tval, today.value) ?? undefined,
     mode: mode.value,
-    fromTime: fromTime.value,
-    toTime: toTime.value,
+    fromTime: hasExactTime ? fromTime.value : '',
+    toTime: hasExactTime ? toTime.value : '',
   })
 }
 
@@ -314,6 +310,7 @@ function applyPreset(key: PresetKey) {
   refreshToday()
   const [a, b] = presetRange(key, today.value)
   from.value = a; to.value = b; hover.value = null
+  if (!a) clearTime()
   if (a) view.value = new Date(a.getFullYear(), a.getMonth(), 1)
   emitCombined(a, b, key)
   closePicker(true)
@@ -327,6 +324,7 @@ function apply() {
 function applyTime() {
   const vf = parseYmd(current.value.from) || from.value
   const vt = parseYmd(current.value.to) || to.value
+  if (!vf) return
   emitCombined(vf, vt)
   closePicker(true)
 }
@@ -338,6 +336,7 @@ function applyTimePreset(p: { from: string, to: string }) {
 
 function clear() {
   from.value = null; to.value = null; hover.value = null
+  clearTime()
 }
 function clearTime() {
   fromTime.value = ''; toTime.value = ''
@@ -347,6 +346,13 @@ const valFrom = computed(() => parseYmd(current.value.from))
 const valTo = computed(() => parseYmd(current.value.to))
 const activePreset = computed(() => matchPreset(valFrom.value, valTo.value, today.value))
 const draftActive = computed(() => matchPreset(from.value, to.value, today.value))
+const hasDraftDate = computed(() => !!from.value)
+const hasPartialTime = computed(() => Boolean(fromTime.value) !== Boolean(toTime.value))
+const canApplyTime = computed(() => hasDraftDate.value && !hasPartialTime.value)
+
+function rangeEndForTime(dateFrom: Date, dateTo: Date, startTime: string, endTime: string): Date {
+  return sameDay(dateFrom, dateTo) && endTime <= startTime ? addDays(dateTo, 1) : dateTo
+}
 
 const triggerLabel = computed(() => {
   let base: string
@@ -365,19 +371,17 @@ const triggerLabel = computed(() => {
   else {
     base = t(props.placeholder)
   }
-  // Append the time-of-day filter when one is active (Working hours / custom).
+  // Exact interval mode must show both date-times, including an overnight end.
   const tf = current.value.fromTime
   const tt = current.value.toTime
-  if (tf && tt) {
-    const tp = TIME_PRESETS.value.find(x => x.from === tf && x.to === tt)
-    base += ` · ${tp ? t(tp.label) : `${tf}–${tt}`}`
+  if (tf && tt && valFrom.value && valTo.value) {
+    const end = rangeEndForTime(valFrom.value, valTo.value, tf, tt)
+    base = `${fmtShort(valFrom.value)} ${tf} – ${fmtShort(end)} ${tt}`
   }
   return base
 })
 
-const hasValue = computed(() => !!(
-  valFrom.value || valTo.value || (current.value.fromTime && current.value.toTime)
-))
+const hasValue = computed(() => !!(valFrom.value || valTo.value))
 
 const draftLabel = computed(() => {
   if (from.value && to.value)
@@ -578,7 +582,7 @@ function onModeKey(e: KeyboardEvent) {
             @keydown="onModeKey"
           >
             <DesignIcon name="clock" :size="15" />
-            {{ t('Time of day') }}
+            {{ t('Time interval') }}
           </button>
         </div>
       </div>
@@ -701,8 +705,16 @@ function onModeKey(e: KeyboardEvent) {
         :aria-labelledby="enableTime ? timeTabId : undefined"
       >
         <div class="drp-time__label">
-          {{ t('Filter by time of day') }}
+          {{ t('Set an exact time interval') }}
         </div>
+        <p
+          v-if="!hasDraftDate"
+          class="drp-time__hint"
+          role="status"
+          style="margin: 0; color: rgb(var(--v-theme-text-secondary)); font-size: var(--fs-sm); line-height: 1.45;"
+        >
+          {{ t('Choose a date range before setting a time interval.') }}
+        </p>
         <div class="drp-time__chips">
           <button
             v-for="p in TIME_PRESETS"
@@ -710,6 +722,7 @@ function onModeKey(e: KeyboardEvent) {
             type="button"
             :class="cx('drp-timechip', fromTime === p.from && toTime === p.to && 'is-active')"
             :aria-pressed="fromTime === p.from && toTime === p.to"
+            :disabled="!hasDraftDate"
             @click="applyTimePreset(p)"
           >
             {{ t(p.label) }}
@@ -720,6 +733,7 @@ function onModeKey(e: KeyboardEvent) {
           <TimeRange
             :from="fromTime"
             :to="toTime"
+            :disabled="!hasDraftDate"
             @update:from="(v: string) => fromTime = v"
             @update:to="(v: string) => toTime = v"
           />
@@ -736,6 +750,7 @@ function onModeKey(e: KeyboardEvent) {
             <button
               type="button"
               class="btn btn--primary btn--sm"
+              :disabled="!canApplyTime"
               @click="applyTime"
             >
               {{ t('Apply') }}

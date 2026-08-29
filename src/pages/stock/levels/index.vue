@@ -18,10 +18,13 @@ import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
 import Switch from '@/components/design/Switch.vue'
 import { buildCsv } from '@/utils/csv'
+import { useUserAccess } from '@/composables/useUserAccess'
 
 const { t } = useI18n({ useScope: 'global' })
 const { notify } = useNotify()
 const { formatDateShort } = useFormatters()
+const { isAdministrator } = useUserAccess()
+const canAdministerLevels = computed(() => isAdministrator.value)
 
 // ---- state ----
 const levels = ref<any[]>([])
@@ -250,6 +253,9 @@ const actionMaxHint = computed(() => {
 })
 
 function openAction(mode: Mode, level: any) {
+  if (!canAdministerLevels.value)
+    return
+
   actionMode.value = mode
   actionLevel.value = level
   actionForm.value = {
@@ -272,7 +278,7 @@ function fillMax() {
 }
 
 async function doAction() {
-  if (!actionLevel.value)
+  if (!canAdministerLevels.value || !actionLevel.value)
     return
   const qty = Number(actionForm.value.quantity)
   if (!actionForm.value.quantity || Number.isNaN(qty) || qty === 0) {
@@ -586,7 +592,7 @@ async function exportCsv() {
           <span class="cell-muted nowrap">{{ row.last_movement_at ? formatDateShort(row.last_movement_at) : '—' }}</span>
         </template>
 
-        <template #row-actions="{ row }">
+        <template v-if="canAdministerLevels" #row-actions="{ row }">
           <IconAction
             icon="edit"
             tone="primary"
@@ -626,6 +632,7 @@ async function exportCsv() {
 
     <!-- Adjust / reserve / release modal -->
     <Modal
+      v-if="canAdministerLevels"
       :open="actionMode !== null"
       :width="560"
       :title="actionTitle"
@@ -885,4 +892,6 @@ name: stock-levels
 meta:
   action: manage
   subject: all
+  anyPermission:
+    - stock.level.view
 </route>

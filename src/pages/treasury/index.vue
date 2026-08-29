@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import axios from '@/plugins/axios'
+import axios, { cashboxApi } from '@/plugins/axios'
 import Badge from '@/components/design/Badge.vue'
 import Button from '@/components/design/Button.vue'
 import DataTable, { type DataTableColumn } from '@/components/design/DataTable.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import Field from '@/components/design/Field.vue'
-import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
+import MoneyInput from '@/components/design/MoneyInput.vue'
 import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import Skeleton from '@/components/design/Skeleton.vue'
-import { buildCsv } from '@/utils/csv'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -117,49 +116,6 @@ function clearClientFilters() {
   dateTo.value = ''
 }
 
-// Export the currently visible (filtered) ledger rows to CSV — the standard
-// hand-off accountants expect. Uses the same UTF-8 BOM + quoting convention as
-// the Orders export so Excel opens Cyrillic correctly.
-function exportCsv() {
-  const rows = filteredTxns.value
-  if (!rows.length) {
-    notify(t('Nothing to export yet'), 'warning')
-
-    return
-  }
-
-  const cols: Array<[string, (r: any) => any]> = [
-    [t('Date'), r => r.created_at],
-    [t('Account'), r => t(`treasury_account_${r.account}`)],
-    [t('Type'), r => t(`treasury_txn_${r.type}`)],
-    [t('Amount'), r => r.delta],
-    [t('Fee'), r => r.fee ?? 0],
-    [t('Balance after'), r => r.balance_after],
-    [t('Category'), r => r.category ?? ''],
-    [t('Description'), r => r.description ?? ''],
-    [t('Reference'), r => (r.reference_type && r.reference_id ? `${r.reference_type} #${r.reference_id}` : '')],
-    [t('By'), r => r.performed_by ?? ''],
-  ]
-
-  const csv = buildCsv([
-    cols.map(c => c[0]),
-    ...rows.map(r => cols.map(c => c[1](r))),
-  ], { alwaysQuote: true })
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  const stamp = new Date().toISOString().slice(0, 10)
-
-  a.href = url
-  a.download = `treasury-${stamp}.csv`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-  notify(t('Exported {n} transactions', { n: rows.length }), 'success')
-}
-
 const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'created_at', label: t('Date'), width: 160 },
   { key: 'account', label: t('Account'), width: 100 },
@@ -168,28 +124,8 @@ const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'balance_after', label: t('Balance after'), align: 'right' },
   { key: 'category', label: t('Category') },
   { key: 'description', label: t('Description') },
-  { key: 'reference', label: t('Reference'), width: 160 },
   { key: 'performed_by', label: t('By') },
 ])
-
-const router = useRouter()
-
-function gotoReference(refType: string | undefined | null, refId: string | number | undefined | null) {
-  if (!refType || !refId)
-    return
-  const kind = String(refType).toLowerCase()
-  if (kind.includes('inkassa'))
-    router.push(`/inkassa/${refId}`)
-  else if (kind.includes('shift'))
-    router.push(`/shifts/${refId}`)
-}
-
-function referenceLabel(refType: string) {
-  const key = `treasury_ref_${String(refType).toUpperCase()}`
-  const tr = t(key)
-  // fallback to the raw enum if no translation found
-  return tr === key ? String(refType) : tr
-}
 
 async function loadHistory() {
   loading.value = true
@@ -291,12 +227,49 @@ async function doTransfer() {
 // -------- expense dialog --------
 const expenseDialog = ref(false)
 const expenseSaving = ref(false)
-const expenseForm = ref({ account: 'SAFE', amount: 0, fee: 0, category: '', description: '' })
+const expenseForm = ref({ account: 'SAFE', amount: 0, fee: 0, categoryId: '', description: '' })
+const expenseCategories = ref<Array<{ id: number; name: string; sort_order?: number }>>([])
+const expenseCategoriesLoading = ref(false)
+const expenseCategoriesError = ref('')
+
+const expenseCategoryOptions = computed(() => expenseCategories.value.map(category => ({
+  value: String(category.id),
+  label: category.name,
+})))
+const selectedExpenseCategory = computed(() => expenseCategories.value.find(category =>
+  String(category.id) === expenseForm.value.categoryId,
+))
+const isBankExpense = computed(() => expenseForm.value.account === 'BANK')
+
+async function loadExpenseCategories() {
+  expenseCategoriesLoading.value = true
+  expenseCategoriesError.value = ''
+  try {
+    const res = await cashboxApi.get('/categories/')
+    const data = res.data?.data ?? res.data
+    expenseCategories.value = (Array.isArray(data) ? data : data?.categories ?? data?.items ?? [])
+      .slice()
+      .sort((a: any, b: any) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))
+  }
+  catch (error: any) {
+    expenseCategories.value = []
+    expenseCategoriesError.value = error?.response?.data?.message ?? t('Failed to load expense categories')
+  }
+  finally {
+    expenseCategoriesLoading.value = false
+  }
+}
 
 function openExpense() {
-  expenseForm.value = { account: 'SAFE', amount: 0, fee: 0, category: '', description: '' }
+  expenseForm.value = { account: 'SAFE', amount: 0, fee: 0, categoryId: '', description: '' }
   expenseDialog.value = true
+  void loadExpenseCategories()
 }
+
+watch(() => expenseForm.value.account, account => {
+  if (account !== 'BANK')
+    expenseForm.value.fee = 0
+})
 
 // The backend debits amount + fee from the chosen account, so preview the true
 // outflow and guard against overspending before the request is sent — mirrors
@@ -305,7 +278,7 @@ const expenseAccountBalance = computed(() =>
   Number(accounts.value?.[expenseForm.value.account]?.balance ?? 0),
 )
 const expenseTotalOut = computed(() =>
-  Math.max(0, Number(expenseForm.value.amount || 0) + Number(expenseForm.value.fee || 0)),
+  Math.max(0, Number(expenseForm.value.amount || 0) + (isBankExpense.value ? Number(expenseForm.value.fee || 0) : 0)),
 )
 const expenseInsufficient = computed(() =>
   expenseTotalOut.value > 0 && expenseTotalOut.value > expenseAccountBalance.value,
@@ -320,6 +293,11 @@ async function doExpense() {
 
     return
   }
+  if (!selectedExpenseCategory.value) {
+    notify(t('Expense category is required'), 'error')
+
+    return
+  }
   if (expenseInsufficient.value) {
     notify(t('Insufficient balance: available {bal}', { bal: formatCurrency(expenseAccountBalance.value) }), 'error')
 
@@ -327,7 +305,17 @@ async function doExpense() {
   }
   expenseSaving.value = true
   try {
-    await axios.post('/treasury/expense', expenseForm.value)
+    await axios.post('/treasury/expense', {
+      account: expenseForm.value.account,
+      amount: Number(expenseForm.value.amount),
+      fee: isBankExpense.value ? Number(expenseForm.value.fee || 0) : 0,
+      // Current servers ignore this forward-compatible field and persist the
+      // name below. The category id lets the backend make the relationship
+      // authoritative without another frontend migration.
+      category_id: selectedExpenseCategory.value.id,
+      category: selectedExpenseCategory.value.name,
+      description: expenseForm.value.description,
+    })
     notify(t('Expense recorded'))
     expenseDialog.value = false
     await Promise.all([loadAccounts(), loadHistory()])
@@ -463,14 +451,6 @@ function deltaDisplay(t_: any) {
           </Button>
           <Button
             variant="secondary"
-            icon="download"
-            :disabled="!filteredTxns.length"
-            @click="exportCsv"
-          >
-            {{ t('Export CSV') }}
-          </Button>
-          <Button
-            variant="secondary"
             icon="refresh"
             @click="openTransfer"
           >
@@ -569,30 +549,8 @@ function deltaDisplay(t_: any) {
           </div>
         </template>
 
-        <template #cell.reference="{ row }">
-          <a
-            v-if="row.reference_type && row.reference_id"
-            href="#"
-            class="treasury-ref-link"
-            @click.prevent="gotoReference(row.reference_type, row.reference_id)"
-          >
-            {{ referenceLabel(row.reference_type) }} #{{ row.reference_id }}
-          </a>
-          <span v-else class="cell-muted">{{ t('em_dash') }}</span>
-        </template>
-
         <template #cell.performed_by="{ row }">
           <span :class="row.performed_by ? '' : 'cell-muted'">{{ row.performed_by || t('em_dash') }}</span>
-        </template>
-
-        <template #row-actions="{ row }">
-          <IconAction
-            v-if="row.reference_type && row.reference_id"
-            icon="chevright"
-            tone="primary"
-            :title="t('Open reference')"
-            @click.stop="gotoReference(row.reference_type, row.reference_id)"
-          />
         </template>
       </DataTable>
     </div>
@@ -632,10 +590,8 @@ function deltaDisplay(t_: any) {
           :label="t('Amount')"
           :error="transferInsufficient ? t('Insufficient balance: available {bal}', { bal: formatCurrency(transferSourceBalance) }) : ''"
         >
-          <Input
+          <MoneyInput
             v-model="transferForm.amount"
-            type="number"
-            min="0"
             :error="transferInsufficient"
             autofocus
           />
@@ -644,10 +600,8 @@ function deltaDisplay(t_: any) {
           :label="t('Fee')"
           :hint="t('Bank fee hint')"
         >
-          <Input
+          <MoneyInput
             v-model="transferForm.fee"
-            type="number"
-            min="0"
           />
         </Field>
         <div style="grid-column: span 2;">
@@ -664,13 +618,6 @@ function deltaDisplay(t_: any) {
       </div>
 
       <template #footer>
-        <Button
-          variant="ghost"
-          :disabled="transferSaving"
-          @click="transferDialog = false"
-        >
-          {{ t('Cancel') }}
-        </Button>
         <Button
           variant="primary"
           icon="exchange"
@@ -702,31 +649,35 @@ function deltaDisplay(t_: any) {
           :label="t('Amount')"
           :error="expenseInsufficient ? t('Insufficient balance: available {bal}', { bal: formatCurrency(expenseAccountBalance) }) : ''"
         >
-          <Input
+          <MoneyInput
             v-model="expenseForm.amount"
-            type="number"
-            min="0"
             :error="expenseInsufficient"
             autofocus
           />
         </Field>
-        <div style="grid-column: span 2;">
+        <div
+          v-if="isBankExpense"
+          style="grid-column: span 2;"
+        >
           <Field
             :label="t('Fee / commission (optional)')"
             :hint="t('Expense fee hint')"
           >
-            <Input
+            <MoneyInput
               v-model="expenseForm.fee"
-              type="number"
-              min="0"
             />
           </Field>
         </div>
         <div style="grid-column: span 2;">
-          <Field :label="t('Category')">
-            <Input
-              v-model="expenseForm.category"
-              :placeholder="t('Expense category placeholder')"
+          <Field
+            :label="t('Category')"
+            :error="expenseCategoriesError || (!expenseCategoriesLoading && !expenseCategoryOptions.length ? t('No expense categories available') : '')"
+          >
+            <Select
+              v-model="expenseForm.categoryId"
+              :options="expenseCategoryOptions"
+              :placeholder="expenseCategoriesLoading ? t('Loading') : t('Select category')"
+              :disabled="expenseCategoriesLoading || !expenseCategoryOptions.length"
             />
           </Field>
         </div>
@@ -755,17 +706,10 @@ function deltaDisplay(t_: any) {
 
       <template #footer>
         <Button
-          variant="ghost"
-          :disabled="expenseSaving"
-          @click="expenseDialog = false"
-        >
-          {{ t('Cancel') }}
-        </Button>
-        <Button
           variant="danger"
           icon="minus"
           :loading="expenseSaving"
-          :disabled="expenseSaving || expenseInsufficient"
+          :disabled="expenseSaving || expenseInsufficient || !selectedExpenseCategory"
           @click="doExpense"
         >
           {{ t('Record Expense') }}

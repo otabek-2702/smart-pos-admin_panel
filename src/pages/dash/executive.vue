@@ -14,7 +14,7 @@ import BarChart from '@/components/design/BarChart.vue'
 import { fmtAbbr, fmtNum } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
 import { useDashboardData } from '@/composables/useDashboardData'
-import { buildDateParams } from '@/composables/useBusinessDay'
+import { buildDateParams, businessPreset } from '@/composables/useBusinessDay'
 import type { Tone } from '@/components/design/utils'
 
 /* ============================================================
@@ -87,7 +87,23 @@ const loading = ref(true)
 // emitted hardcoded +12.4/+8.1/+3.9/+1.6/+4.2 over zero data — green pills next to 0 UZS.
 const heroKpis = computed<HeroKpiData[]>(() => {
   const D = data.value
-  if (!D) return []
+  if (!D)
+    return []
+
+  const bucketOrders = D.orders30.map(value => Number(value) || 0)
+  const derivedOrderTotal = bucketOrders.reduce((sum, value) => sum + value, 0)
+  const totalOrders = derivedOrderTotal > 0 ? derivedOrderTotal : (Number(D.monthOrders) || 0)
+  const bucketCount = Math.max(D.dayLabels.length, bucketOrders.length)
+  // A total without its time buckets cannot honestly be labelled "per day" or
+  // "per hour". This happens only when the optional sales breakdown is
+  // unavailable, while the range dashboard itself still returns an order total.
+  const averageOrders = bucketCount > 0
+    ? new Intl.NumberFormat(String(locale.value), {
+        maximumFractionDigits: 1,
+      }).format(totalOrders / bucketCount)
+    : null
+  const hourlyBuckets = /^\d{1,2}:\d{2}$/.test(String(D.dayLabels[0] ?? ''))
+
   // Repeat rate ("Qaytish darajasi") is hidden until BE ships it — the existing path zero-filled the field,
   // which rendered "0%" + green "+4.2%" pill on every dashboard for every restaurant. Same for Gross Margin
   // if BE hasn't shipped sales endpoint yet (we only show it when > 0). Revenue / Orders / AOV stay always
@@ -97,6 +113,18 @@ const heroKpis = computed<HeroKpiData[]>(() => {
     { label: t('Orders'), value: D.monthOrders, money: false, delta: null, icon: 'receipt', tone: 'info' as Tone, spark: D.orders30.slice(-14) },
     { label: t('Avg Order Value'), value: D.avgAov, money: true, unit: 'UZS', delta: null, icon: 'trend', tone: 'success' as Tone, spark: D.aov30.slice(-14) },
   ]
+  if (averageOrders !== null) {
+    rows.splice(2, 0, {
+      label: hourlyBuckets ? t('Average orders per hour') : t('Average orders per day'),
+      value: averageOrders,
+      money: false,
+      delta: null,
+      icon: 'bars',
+      tone: 'info' as Tone,
+      sub: `${t('Total Orders')}: ${fmtNum(totalOrders)}`,
+    })
+  }
+
   if (D.grossMargin > 0)
     rows.push({ label: t('Gross Margin'), value: `${D.grossMargin}%`, money: false, delta: null, icon: 'coins', tone: 'warning' as Tone, sub: t('of revenue') })
   if (D.repeatRate > 0)
@@ -377,22 +405,6 @@ function mapTodayPayload(p: any): DashData {
   return d
 }
 
-function isoDateExec(d: Date): string {
-  // Business dates are local calendar dates. `toISOString()` converts local
-  // midnight to the prior UTC date in Tashkent, skipping the true D-1 period.
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function rangeDatesExec(days: number): { from: string; to: string } {
-  const to = new Date()
-  const from = new Date(to)
-  from.setDate(to.getDate() - (days - 1))
-  return { from: isoDateExec(from), to: isoDateExec(to) }
-}
-
 let dashboardRequestId = 0
 
 async function loadDashboard() {
@@ -406,33 +418,15 @@ async function loadDashboard() {
     // picker changes. Falls back to last-30d only when the hub hasn't set a
     // range yet. /dashboard/sales accepts from&to and returns variable-length
     // arrays aligned to dayLabels (verified: 30d→30, 7d→7, 1d→1).
-    let from = ''
-    let to = ''
     const sr = sharedRange.value
-    if (sr?.from && sr?.to) { from = sr.from; to = sr.to }
-    else { const d = rangeDatesExec(30); from = d.from; to = d.to }
-    const params = buildDateParams({ from, to, fromTime: sr?.fromTime, toTime: sr?.toTime })
-    const start = new Date(`${from}T00:00:00`)
-    const end = new Date(`${to}T00:00:00`)
-    const span = Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000))
-    const previousTo = new Date(start); previousTo.setDate(previousTo.getDate() - 1)
-    const previousFrom = new Date(previousTo); previousFrom.setDate(previousFrom.getDate() - span)
-    const previousRange = {
-      from: isoDateExec(previousFrom),
-      to: isoDateExec(previousTo),
-    }
-    const previousParams = buildDateParams({
-      ...previousRange,
-      fromTime: sr?.fromTime, toTime: sr?.toTime,
-    })
-    const [rangeRes, todayRes, salesRes, previousSalesRes, liveOrdersRes] = await Promise.all([
+    const range = sr?.from && sr?.to
+      ? sr
+      : businessPreset('30d')
+    const params = buildDateParams(range)
+    const [rangeRes, todayRes, salesRes] = await Promise.all([
       axiosIns.get('/dashboard', { params }),
       axiosIns.get('/dashboard/today').catch(() => null),
       axiosIns.get('/dashboard/sales', { params }).catch(() => null),
-      axiosIns.get('/dashboard/sales', { params: previousParams }).catch(() => null),
-      // Use the real Orders contract instead of relying on a dashboard field
-      // that is not supplied by the API.
-      axiosIns.get('/orders', { params: { status: 'PREPARING,READY', per_page: 5, include_items: false } }).catch(() => null),
     ])
     if (requestId !== dashboardRequestId)
       return
@@ -447,10 +441,11 @@ async function loadDashboard() {
         mapped.categories = todayMapped.categories
     }
     const salesPayload = salesRes?.data?.data ?? salesRes?.data
-    const previousSalesPayload = previousSalesRes?.data?.data ?? previousSalesRes?.data
     if (salesPayload) {
       const rev30 = Array.isArray(salesPayload.revenue30) ? salesPayload.revenue30.map(asNum) : []
-      const previousPeriod = Array.isArray(previousSalesPayload?.revenue30) ? previousSalesPayload.revenue30.map(asNum) : []
+      const previousPeriod = Array.isArray(salesPayload?.previous_period?.revenue_series)
+        ? salesPayload.previous_period.revenue_series.map(asNum)
+        : []
       const labels = Array.isArray(salesPayload.dayLabels) ? salesPayload.dayLabels.map((s: any) => String(s)) : []
       // Accept whatever length the range yields (was gated to exactly 30, which
       // blanked the chart for any other range).
@@ -472,8 +467,7 @@ async function loadDashboard() {
       const gm = Number(salesPayload.grossMargin)
       if (Number.isFinite(gm)) mapped.grossMargin = Math.round(gm * 100)
     }
-    const liveRaw = liveOrdersRes?.data?.data ?? liveOrdersRes?.data ?? {}
-    const liveRows = Array.isArray(liveRaw?.orders) ? liveRaw.orders : (Array.isArray(liveRaw?.items) ? liveRaw.items : [])
+    const liveRows = Array.isArray(rangePayload?.live_order_feed) ? rangePayload.live_order_feed : []
     mapped.liveFeed = liveRows.map((o: any) => ({
       id: Number(o?.id ?? o?.display_id) || 0,
       type: ['HALL', 'DELIVERY', 'PICKUP'].includes(o?.order_type) ? o.order_type : 'HALL',
@@ -483,7 +477,10 @@ async function loadDashboard() {
       status: o?.status === 'READY' ? 'READY' : 'PREPARING',
     })).filter((o: LiveOrder) => o.id > 0)
     data.value = mapped
-    comparisonRange.value = previousRange
+    const previousRange = salesPayload?.previous_period?.range
+    comparisonRange.value = previousRange?.from && previousRange?.to
+      ? { from: String(previousRange.from), to: String(previousRange.to) }
+      : null
     feed.value = mapped.liveFeed
   }
   catch (err) {
@@ -548,7 +545,7 @@ void locale
     >
       <div class="grid exec-hero">
         <div
-          v-for="i in 5"
+          v-for="i in 6"
           :key="`sk${i}`"
           class="herokpi"
         >
@@ -579,7 +576,7 @@ void locale
       v-else
       style="display: flex; flex-direction: column; gap: var(--sp-6);"
     >
-      <!-- Hero KPI strip (5 columns) -->
+      <!-- Hero KPI strip -->
       <div
         class="grid exec-hero"
       >
@@ -927,7 +924,7 @@ void locale
 }
 
 .exec-hero {
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .exec-main {

@@ -142,7 +142,12 @@ function togglePayment(p: string) {
     <Card class-name="ordersinsights__card">
       <div class="kpi__label" style="margin-bottom: 8px;">{{ t('Payment status') }}</div>
       <div class="row" style="gap: 16px; align-items: center;">
-        <ProgressRing :value="totals.paidPct" color="var(--success)" :size="84" />
+        <ProgressRing
+          :value="totals.paidPct"
+          color="var(--success)"
+          track-color="var(--error)"
+          :size="84"
+        />
         <div style="flex: 1; min-width: 0;">
           <button
             type="button"

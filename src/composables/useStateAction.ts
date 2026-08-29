@@ -22,7 +22,7 @@ export function useStateAction(
   async function doAction(successMsg?: string, errorMsg?: string) {
     actioning.value = true
     try {
-      await api.post(`${baseUrl}${actionItem.value.id}/${actionType.value}/`)
+      await api.post(`${baseUrl}${actionItem.value.id}/${actionType.value}/`, {})
       notify(successMsg ?? t('Updated'))
       actionDialog.value = false
       await onSuccess()

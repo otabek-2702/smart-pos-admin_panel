@@ -32,6 +32,7 @@ import LineAreaChart from './LineAreaChart.vue'
 import BarChart from './BarChart.vue'
 import DonutChart from './DonutChart.vue'
 import HBarChart from './HBarChart.vue'
+import { formatMonthCodeLabel } from '@/utils/monthLabels'
 
 export interface AIChartConfig {
   type: 'line' | 'bar' | 'donut' | 'hbar'
@@ -70,17 +71,20 @@ const safeConfig = computed<AIChartConfig | null>(() => {
   const c = props.config
   if (!c || typeof c !== 'object') return null
   if (!['line', 'bar', 'donut', 'hbar'].includes(c.type)) return null
+  if (Array.isArray(c.categories))
+    c.categories = c.categories.map(label => formatMonthCodeLabel(label, t))
+
   // Coerce strings → numbers (BE/AI sometimes returns Decimal strings).
   if (Array.isArray(c.series)) {
     c.series = c.series.map((s, i) => ({
-      label: String(s?.label ?? ''),
+      label: formatMonthCodeLabel(s?.label, t),
       color: s?.color || PALETTE[i % PALETTE.length],
       data: Array.isArray(s?.data) ? s.data.map(num) : [],
     }))
   }
   if (Array.isArray(c.data)) {
     c.data = c.data.map((d, i) => ({
-      label: String(d?.label ?? ''),
+      label: formatMonthCodeLabel(d?.label, t),
       value: num(d?.value),
       color: d?.color || PALETTE[i % PALETTE.length],
     }))

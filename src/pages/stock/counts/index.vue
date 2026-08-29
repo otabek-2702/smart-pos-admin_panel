@@ -20,8 +20,16 @@ import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import Switch from '@/components/design/Switch.vue'
+import { useUserAccess } from '@/composables/useUserAccess'
 
 const { t } = useI18n({ useScope: 'global' })
+const { hasAnyPermission, isAdministrator, currentUserId } = useUserAccess()
+const canCreateCounts = computed(() => hasAnyPermission(['stock.count.create']))
+const canRecordCounts = computed(() => hasAnyPermission(['stock.count.record']))
+const canApproveCounts = computed(() => hasAnyPermission(['stock.adjustment.approve']))
+const canCancelCounts = computed(() => hasAnyPermission(['stock.manage']))
+const canSetAutoAdjust = computed(() => isAdministrator.value)
+const canUseCountCategories = computed(() => isAdministrator.value)
 
 const counts = ref<any[]>([])
 const total = ref(0)
@@ -61,6 +69,7 @@ const STATUS_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'pr
   APPROVED: 'success',
   CANCELED: 'error',
 }
+
 function statusTone(s: string) {
   return STATUS_TONE[s] ?? (statusColor[s] === 'default' ? 'neutral' : (statusColor[s] as any)) ?? 'neutral'
 }
@@ -92,20 +101,18 @@ async function loadCounts() {
 
 async function loadLocations() {
   try {
-    const res = await axios.get('/locations/', { params: { per_page: 200 } })
-    const d = res.data?.data ?? res.data
-
-    locationsList.value = d?.locations ?? []
+    locationsList.value = await loadAllStockRows('/locations/', 'locations')
   }
   catch { /* ignore */ }
 }
 
 async function loadCategories() {
+  if (!canUseCountCategories.value) {
+    categoriesList.value = []
+    return
+  }
   try {
-    const res = await axios.get('/categories/', { params: { per_page: 500 } })
-    const d = res.data?.data ?? res.data
-
-    categoriesList.value = d?.categories ?? []
+    categoriesList.value = await loadAllStockRows('/categories/', 'categories')
   }
   catch { /* ignore */ }
 }
@@ -123,6 +130,9 @@ const categoryOptions = computed(() =>
 )
 
 function openCreate() {
+  if (!canCreateCounts.value)
+    return
+
   form.value = {
     location_id: null,
     count_type: 'FULL',
@@ -135,6 +145,9 @@ function openCreate() {
 }
 
 async function createCount() {
+  if (!canCreateCounts.value)
+    return
+
   if (form.value.location_id == null) {
     notify(t('Select location'), 'error')
 
@@ -142,7 +155,14 @@ async function createCount() {
   }
   saving.value = true
   try {
-    const payload: any = { ...form.value }
+    const payload: any = {
+      ...form.value,
+
+      // Only an approver may opt into automatic stock posting. Warehouse
+      // counters always create a reviewable count with no direct adjustment.
+      auto_adjust: canSetAutoAdjust.value ? Boolean(form.value.auto_adjust) : false,
+    }
+
     if (!payload.notes)
       delete payload.notes
     if (payload.category_id == null)
@@ -162,17 +182,171 @@ async function createCount() {
 
 const actionLabels: Record<string, string> = {
   start: 'Start Count',
-  complete: 'Complete Count',
+  complete: 'Submit Review',
   approve: 'Approve Count',
   cancel: 'Cancel Count',
 }
 
-const { actionDialog, actionItem, actionType, actioning, openAction, doAction } = useStateAction('/counts/', loadCounts, notify, t, axios)
+async function loadAllStockRows(path: string, key: string): Promise<any[]> {
+  const rows: any[] = []
+  const perPage = 100
+  for (let currentPage = 1; ; currentPage += 1) {
+    const response = await axios.get(path, { params: { page: currentPage, per_page: perPage } })
+    const data = response.data?.data ?? response.data
+    const pageRows = data?.[key] ?? data?.results ?? []
 
-function canStart(item: any) { return item.status === 'DRAFT' }
-function canComplete(item: any) { return item.status === 'IN_PROGRESS' }
-function canApprove(item: any) { return item.status === 'PENDING_APPROVAL' }
-function canCancel(item: any) { return !['APPROVED', 'CANCELED'].includes(item.status) }
+    rows.push(...pageRows)
+
+    const expectedTotal = Number(data?.pagination?.total ?? rows.length)
+    if (!pageRows.length || rows.length >= expectedTotal)
+      break
+  }
+
+  return rows
+}
+
+const {
+  actionDialog,
+  actionItem,
+  actionType,
+  actioning,
+  openAction: openStateAction,
+  doAction: doStateAction,
+} = useStateAction('/counts/', loadCounts, notify, t, axios)
+
+function isOwnedByCurrentUser(item: any): boolean {
+  if (isAdministrator.value)
+    return true
+
+  return currentUserId.value != null
+    && countOwnerId(item) != null
+    && String(currentUserId.value) === String(countOwnerId(item))
+}
+
+function isOwnCount(item: any): boolean {
+  return currentUserId.value != null
+    && countOwnerId(item) != null
+    && String(currentUserId.value) === String(countOwnerId(item))
+}
+
+function countOwnerId(item: any): string | number | null {
+  return item?.counted_by_id ?? item?.counted_by?.id ?? null
+}
+
+async function loadCountDetail(item: any, force = false): Promise<any | null> {
+  if (!force && countOwnerId(item) != null)
+    return item
+  try {
+    const response = await axios.get(`/counts/${item.id}/`)
+    const data = response.data?.data ?? response.data
+
+    return data?.count ?? data
+  }
+  catch (error: any) {
+    notify(error?.response?.data?.message ?? t('Failed to load count'), 'error')
+
+    return null
+  }
+}
+
+async function openCountAction(item: any, type: 'start' | 'complete' | 'approve') {
+  const allowed = type === 'approve' ? canApproveCounts.value : canRecordCounts.value
+  if (!allowed)
+    return
+
+  // Approval must always be based on exact server state because auto_adjust
+  // controls whether stock levels will be posted by this mutation.
+  const detail = await loadCountDetail(item, type === 'approve')
+  if (!detail)
+    return
+  if (type === 'approve' && detail.status !== 'PENDING_APPROVAL') {
+    notify(t('count_state_changed'), 'error')
+    await loadCounts()
+
+    return
+  }
+  if (type !== 'approve' && !isOwnedByCurrentUser(detail)) {
+    notify(t('count_not_assigned'), 'error')
+    return
+  }
+  if (type === 'approve' && isOwnCount(detail)) {
+    notify(t('count_self_approval_forbidden'), 'error')
+    return
+  }
+
+  openStateAction(detail, type)
+}
+
+async function performCountApproval() {
+  actioning.value = true
+  try {
+    const latestCount = await loadCountDetail(actionItem.value, true)
+    if (!latestCount)
+      return
+    if (latestCount.status !== 'PENDING_APPROVAL') {
+      notify(t('count_state_changed'), 'error')
+      actionDialog.value = false
+      await loadCounts()
+
+      return
+    }
+    if (isOwnCount(latestCount)) {
+      notify(t('count_self_approval_forbidden'), 'error')
+      actionDialog.value = false
+
+      return
+    }
+
+    actionItem.value = latestCount
+    await axios.post(`/counts/${latestCount.id}/approve/`, {
+      apply_adjustments: Boolean(latestCount.auto_adjust),
+    })
+    notify(t('Updated'))
+    actionDialog.value = false
+    await loadCounts()
+  }
+  catch (error: any) {
+    notify(error?.response?.data?.message ?? t('Error'), 'error')
+  }
+  finally {
+    actioning.value = false
+  }
+}
+
+async function performCountAction() {
+  if (actioning.value)
+    return
+
+  if (actionType.value === 'approve') {
+    if (canApproveCounts.value)
+      await performCountApproval()
+
+    return
+  }
+
+  if (!canRecordCounts.value)
+    return
+  if (!isOwnedByCurrentUser(actionItem.value)) {
+    notify(t('count_not_assigned'), 'error')
+    return
+  }
+
+  await doStateAction()
+}
+
+function canStart(item: any) {
+  return canRecordCounts.value && isOwnedByCurrentUser(item) && item.status === 'DRAFT'
+}
+function canComplete(item: any) {
+  return canRecordCounts.value && isOwnedByCurrentUser(item) && item.status === 'IN_PROGRESS'
+}
+function canApprove(item: any) {
+  return canApproveCounts.value && !isOwnCount(item) && item.status === 'PENDING_APPROVAL'
+}
+function canCancel(item: any) {
+  return canCancelCounts.value
+    && !['APPROVED', 'CANCELED'].includes(item.status)
+}
 
 // -------- Count detail + record_count UI --------
 const detailDialog = ref(false)
@@ -196,6 +370,7 @@ async function openDetail(count: any) {
       axios.get(`/counts/${count.id}/`),
       axios.get('/variance-codes/'),
     ])
+
     const dd = dRes.data?.data ?? dRes.data
     const vd = vRes.data?.data ?? vRes.data
 
@@ -229,14 +404,22 @@ const filteredItems = computed(() => {
 })
 
 const isCountEditable = computed(
-  () => detailCount.value?.status === 'DRAFT' || detailCount.value?.status === 'IN_PROGRESS',
+  () => canRecordCounts.value
+    && isOwnedByCurrentUser(detailCount.value)
+    && (detailCount.value?.status === 'DRAFT' || detailCount.value?.status === 'IN_PROGRESS'),
 )
 
 async function recordItem(item: any) {
-  if (!detailCount.value)
+  if (!isCountEditable.value || !detailCount.value)
     return
-  if (item._input == null || item._input === '') {
+  const countedQuantity = Number(item._input)
+  if (item._input == null || item._input === '' || !Number.isFinite(countedQuantity)) {
     notify(t('Enter a counted quantity'), 'error')
+
+    return
+  }
+  if (countedQuantity < 0) {
+    notify(t('Counted quantity cannot be negative'), 'error')
 
     return
   }
@@ -244,8 +427,9 @@ async function recordItem(item: any) {
   try {
     const payload: any = {
       item_id: item.id,
-      counted_quantity: item._input,
+      counted_quantity: countedQuantity,
     }
+
     if (item._reason_code_id)
       payload.reason_code_id = item._reason_code_id
     if (item._notes)
@@ -266,6 +450,7 @@ async function recordItem(item: any) {
       }
     }
     notify(t('Count recorded'))
+
     // refresh top-level list to update items_counted
     await loadCounts()
   }
@@ -278,8 +463,10 @@ async function recordItem(item: any) {
 }
 
 function varianceTone(v: number): 'success' | 'warning' | 'error' {
-  if (v === 0) return 'success'
-  if (v < 0) return 'error'
+  if (v === 0)
+    return 'success'
+  if (v < 0)
+    return 'error'
   return 'warning'
 }
 
@@ -288,17 +475,19 @@ function varianceTone(v: number): 'success' | 'warning' | 'error' {
 // would otherwise stay stale until the modal is reopened).
 const liveSummary = computed(() => {
   const items = detailItems.value
-  const total = items.length
+  const lineTotal = items.length
   const counted = items.filter((i: any) => i.counted_quantity != null).length
+
   const withVariance = items.filter(
     (i: any) => i.counted_quantity != null && Number(i.variance ?? 0) !== 0,
   ).length
+
   const varianceCost = items.reduce(
     (sum: number, i: any) => sum + (i.counted_quantity != null ? Number(i.variance_cost ?? 0) : 0),
     0,
   )
 
-  return { total, counted, pending: total - counted, withVariance, varianceCost }
+  return { total: lineTotal, counted, pending: lineTotal - counted, withVariance, varianceCost }
 })
 
 const progressPct = computed(() => {
@@ -317,20 +506,34 @@ const cancelReason = ref('')
 const cancelling = ref(false)
 
 function openCancel(item: any) {
+  if (!canCancelCounts.value)
+    return
+
   cancelItem.value = item
   cancelReason.value = ''
   cancelDialog.value = true
 }
 
 async function doCancel() {
-  if (!cancelItem.value)
+  if (!canCancelCounts.value || !cancelItem.value || cancelling.value)
     return
   cancelling.value = true
   try {
+    const latestCount = await loadCountDetail(cancelItem.value, true)
+    if (!latestCount)
+      return
+    if (['APPROVED', 'CANCELED'].includes(latestCount.status)) {
+      notify(t('count_state_changed'), 'error')
+      cancelDialog.value = false
+      await loadCounts()
+
+      return
+    }
+
     const payload: any = {}
     if (cancelReason.value.trim())
       payload.reason = cancelReason.value.trim()
-    await axios.post(`/counts/${cancelItem.value.id}/cancel/`, payload)
+    await axios.post(`/counts/${latestCount.id}/cancel/`, payload)
     notify(t('Stock count cancelled'))
     cancelDialog.value = false
     if (detailDialog.value && detailCount.value?.id === cancelItem.value.id)
@@ -348,12 +551,12 @@ async function doCancel() {
 // Complete the count directly from the detail view once every line is recorded.
 const completing = ref(false)
 async function completeFromDetail() {
-  if (!detailCount.value)
+  if (!isCountEditable.value || !detailCount.value)
     return
   completing.value = true
   try {
-    await axios.post(`/counts/${detailCount.value.id}/complete/`)
-    notify(t('Counting completed'))
+    await axios.post(`/counts/${detailCount.value.id}/complete/`, {})
+    notify(t('Submitted'))
     detailDialog.value = false
     await loadCounts()
   }
@@ -399,6 +602,7 @@ const itemFilterOptions = computed(() => [
     >
       <template #actions>
         <Button
+          v-if="canCreateCounts"
           variant="primary"
           icon="plus"
           @click="openCreate"
@@ -481,7 +685,10 @@ const itemFilterOptions = computed(() => [
         </template>
 
         <template #cell.status="{ row: r }">
-          <Badge :tone="statusTone(r.status)" dot>
+          <Badge
+            :tone="statusTone(r.status)"
+            dot
+          >
             {{ r.status ? t(`count_status_${r.status}`) : '—' }}
           </Badge>
         </template>
@@ -502,21 +709,21 @@ const itemFilterOptions = computed(() => [
             icon="play"
             tone="warning"
             :title="t('Start')"
-            @click="openAction(r, 'start')"
+            @click="openCountAction(r, 'start')"
           />
           <IconAction
             v-if="canComplete(r)"
             icon="check"
             tone="primary"
-            :title="t('Complete')"
-            @click="openAction(r, 'complete')"
+            :title="t('Submit Review')"
+            @click="openCountAction(r, 'complete')"
           />
           <IconAction
             v-if="canApprove(r)"
             icon="checkcircle"
             tone="success"
             :title="t('Approve')"
-            @click="openAction(r, 'approve')"
+            @click="openCountAction(r, 'approve')"
           />
           <IconAction
             v-if="canCancel(r)"
@@ -555,7 +762,11 @@ const itemFilterOptions = computed(() => [
           />
         </Field>
 
-        <Field :label="t('Category (optional)')" :hint="t('count_category_hint')">
+        <Field
+          v-if="canUseCountCategories"
+          :label="t('Category (optional)')"
+          :hint="t('count_category_hint')"
+        >
           <Select
             :model-value="form.category_id !== null ? String(form.category_id) : ''"
             :placeholder="t('All categories')"
@@ -575,7 +786,10 @@ const itemFilterOptions = computed(() => [
               <span class="opt-sub">{{ t('count_include_zero_hint') }}</span>
             </span>
           </label>
-          <label class="opt-toggle">
+          <label
+            v-if="canSetAutoAdjust"
+            class="opt-toggle"
+          >
             <Switch
               :model-value="form.auto_adjust"
               @update:model-value="(v: boolean) => form.auto_adjust = v"
@@ -596,9 +810,6 @@ const itemFilterOptions = computed(() => [
       </div>
 
       <template #footer>
-        <Button variant="ghost" @click="createDialog = false">
-          {{ t('Cancel') }}
-        </Button>
         <Button
           variant="primary"
           :loading="saving"
@@ -621,14 +832,21 @@ const itemFilterOptions = computed(() => [
         <strong class="mono">{{ actionItem?.count_number }}</strong>?
       </p>
 
+      <div
+        v-if="actionType === 'approve'"
+        class="approval-impact"
+        :class="actionItem?.auto_adjust ? 'approval-impact--changes' : 'approval-impact--no-change'"
+        role="status"
+      >
+        <strong>{{ t(actionItem?.auto_adjust ? 'count_approval_changes_stock_title' : 'count_approval_no_stock_change_title') }}</strong>
+        <span>{{ t(actionItem?.auto_adjust ? 'count_approval_changes_stock_body' : 'count_approval_no_stock_change_body') }}</span>
+      </div>
+
       <template #footer>
-        <Button variant="ghost" @click="actionDialog = false">
-          {{ t('Cancel') }}
-        </Button>
         <Button
           :variant="actionType === 'cancel' ? 'danger' : 'primary'"
           :loading="actioning"
-          @click="() => doAction()"
+          @click="performCountAction"
         >
           {{ t('Confirm') }}
         </Button>
@@ -644,17 +862,30 @@ const itemFilterOptions = computed(() => [
       @close="detailDialog = false"
     >
       <!-- status pill + notes -->
-      <div v-if="detailCount?.status" class="detail-head">
-        <Badge :tone="statusTone(detailCount.status)" dot>
+      <div
+        v-if="detailCount?.status"
+        class="detail-head"
+      >
+        <Badge
+          :tone="statusTone(detailCount.status)"
+          dot
+        >
           {{ t(`count_status_${detailCount.status}`) }}
         </Badge>
-        <span v-if="detailCount?.notes" class="detail-notes" :title="detailCount.notes">
+        <span
+          v-if="detailCount?.notes"
+          class="detail-notes"
+          :title="detailCount.notes"
+        >
           {{ detailCount.notes }}
         </span>
       </div>
 
       <!-- progress bar -->
-      <div v-if="liveSummary.total" class="count-progress">
+      <div
+        v-if="liveSummary.total"
+        class="count-progress"
+      >
         <div class="count-progress__meta">
           <span class="cell-muted">{{ t('Count progress') }}</span>
           <span class="mono cell-strong">{{ liveSummary.counted }} / {{ liveSummary.total }} · {{ progressPct }}%</span>
@@ -675,23 +906,50 @@ const itemFilterOptions = computed(() => [
         style="margin-bottom: 16px;"
       >
         <div class="summary-cell">
-          <div class="kpi__label">{{ t('Total items') }}</div>
-          <div class="summary-val mono">{{ liveSummary.total }}</div>
+          <div class="kpi__label">
+            {{ t('Total items') }}
+          </div>
+          <div class="summary-val mono">
+            {{ liveSummary.total }}
+          </div>
         </div>
         <div class="summary-cell">
-          <div class="kpi__label" style="color: rgb(var(--v-theme-success-strong));">{{ t('Counted') }}</div>
-          <div class="summary-val mono">{{ liveSummary.counted }}</div>
+          <div
+            class="kpi__label"
+            style="color: rgb(var(--v-theme-success-strong));"
+          >
+            {{ t('Counted') }}
+          </div>
+          <div class="summary-val mono">
+            {{ liveSummary.counted }}
+          </div>
         </div>
         <div class="summary-cell">
-          <div class="kpi__label" style="color: rgb(var(--v-theme-warning-strong));">{{ t('Pending') }}</div>
-          <div class="summary-val mono">{{ liveSummary.pending }}</div>
+          <div
+            class="kpi__label"
+            style="color: rgb(var(--v-theme-warning-strong));"
+          >
+            {{ t('Pending') }}
+          </div>
+          <div class="summary-val mono">
+            {{ liveSummary.pending }}
+          </div>
         </div>
         <div class="summary-cell">
-          <div class="kpi__label" style="color: rgb(var(--v-theme-error-strong));">{{ t('With variance') }}</div>
-          <div class="summary-val mono">{{ liveSummary.withVariance }}</div>
+          <div
+            class="kpi__label"
+            style="color: rgb(var(--v-theme-error-strong));"
+          >
+            {{ t('With variance') }}
+          </div>
+          <div class="summary-val mono">
+            {{ liveSummary.withVariance }}
+          </div>
         </div>
         <div class="summary-cell">
-          <div class="kpi__label">{{ t('Variance cost') }}</div>
+          <div class="kpi__label">
+            {{ t('Variance cost') }}
+          </div>
           <div
             class="summary-val mono"
             :style="{ color: liveSummary.varianceCost < 0 ? 'rgb(var(--v-theme-error-strong))' : (liveSummary.varianceCost > 0 ? 'rgb(var(--v-theme-warning-strong))' : undefined) }"
@@ -710,7 +968,11 @@ const itemFilterOptions = computed(() => [
         />
       </div>
 
-      <div v-if="detailLoading" class="cell-muted" style="margin-bottom: 8px;">
+      <div
+        v-if="detailLoading"
+        class="cell-muted"
+        style="margin-bottom: 8px;"
+      >
         {{ t('Loading') }}…
       </div>
 
@@ -720,29 +982,51 @@ const itemFilterOptions = computed(() => [
           <thead>
             <tr>
               <th>{{ t('Item') }}</th>
-              <th class="num">{{ t('System qty') }}</th>
-              <th class="num" style="min-width: 160px;">{{ t('Counted qty') }}</th>
-              <th class="num">{{ t('Variance') }}</th>
-              <th style="min-width: 180px;">{{ t('Reason') }}</th>
+              <th class="num">
+                {{ t('System qty') }}
+              </th>
+              <th
+                class="num"
+                style="min-width: 160px;"
+              >
+                {{ t('Counted qty') }}
+              </th>
+              <th class="num">
+                {{ t('Variance') }}
+              </th>
+              <th style="min-width: 180px;">
+                {{ t('Reason') }}
+              </th>
               <th>{{ t('Notes') }}</th>
               <th class="num" />
             </tr>
           </thead>
           <tbody>
-            <tr v-for="i in filteredItems" :key="i.id">
-              <td class="cell-strong">{{ i.stock_item?.name ?? '—' }}</td>
-              <td class="num mono">{{ i.system_quantity }} {{ i.stock_item?.unit ?? '' }}</td>
+            <tr
+              v-for="i in filteredItems"
+              :key="i.id"
+            >
+              <td class="cell-strong">
+                {{ i.stock_item?.name ?? '—' }}
+              </td>
+              <td class="num mono">
+                {{ i.system_quantity }} {{ i.stock_item?.unit ?? '' }}
+              </td>
               <td class="num">
                 <Input
                   :model-value="i._input ?? ''"
                   type="number"
+                  min="0"
                   step="0.01"
                   :disabled="!isCountEditable"
                   @update:model-value="(v: string) => i._input = v === '' ? null : Number(v)"
                 />
               </td>
               <td class="num">
-                <div v-if="i.counted_quantity != null" class="variance-cell">
+                <div
+                  v-if="i.counted_quantity != null"
+                  class="variance-cell"
+                >
                   <Badge :tone="varianceTone(Number(i.variance ?? 0))">
                     <span class="mono">{{ i.variance ?? 0 }} ({{ i.variance_percentage ?? 0 }}%)</span>
                   </Badge>
@@ -754,7 +1038,10 @@ const itemFilterOptions = computed(() => [
                     {{ Number(i.variance_cost) > 0 ? '+' : '' }}{{ formatCurrency(i.variance_cost) }}
                   </span>
                 </div>
-                <span v-else class="cell-muted">—</span>
+                <span
+                  v-else
+                  class="cell-muted"
+                >—</span>
               </td>
               <td>
                 <Select
@@ -783,7 +1070,11 @@ const itemFilterOptions = computed(() => [
               </td>
             </tr>
             <tr v-if="!filteredItems.length && !detailLoading">
-              <td colspan="7" class="center cell-muted" style="padding: 24px 12px;">
+              <td
+                colspan="7"
+                class="center cell-muted"
+                style="padding: 24px 12px;"
+              >
                 {{ t('No items') }}
               </td>
             </tr>
@@ -792,11 +1083,14 @@ const itemFilterOptions = computed(() => [
       </div>
 
       <template #footer>
-        <Button variant="ghost" @click="detailDialog = false">
+        <Button
+          variant="ghost"
+          @click="detailDialog = false"
+        >
           {{ t('Close') }}
         </Button>
         <Button
-          v-if="detailCount?.status === 'IN_PROGRESS'"
+          v-if="isCountEditable && detailCount?.status === 'IN_PROGRESS'"
           variant="primary"
           icon="check"
           :loading="completing"
@@ -804,7 +1098,7 @@ const itemFilterOptions = computed(() => [
           :title="!allCounted ? t('count_complete_disabled_hint') : ''"
           @click="completeFromDetail"
         >
-          {{ t('Complete Count') }}
+          {{ t('Submit Review') }}
         </Button>
       </template>
     </Modal>
@@ -829,7 +1123,10 @@ const itemFilterOptions = computed(() => [
       </Field>
 
       <template #footer>
-        <Button variant="ghost" @click="cancelDialog = false">
+        <Button
+          variant="ghost"
+          @click="cancelDialog = false"
+        >
           {{ t('Back') }}
         </Button>
         <Button
@@ -845,7 +1142,8 @@ const itemFilterOptions = computed(() => [
     <!-- Lightweight inline toast (kept for compatibility with useNotify) -->
     <div
       v-if="snackbar"
-      :class="['notify-snackbar', `tone-${snackbarColor}`]"
+      class="notify-snackbar"
+      :class="[`tone-${snackbarColor}`]"
       style="position: fixed; bottom: 24px; right: 24px; padding: 12px 18px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-md); z-index: 9999;"
     >
       {{ snackbarMsg }}
@@ -861,6 +1159,22 @@ const itemFilterOptions = computed(() => [
 .center { text-align: center; }
 .num { text-align: right; }
 .grid { display: grid; gap: 12px; }
+
+.approval-impact {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-subtle, var(--surface));
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.approval-impact strong { color: var(--text); }
+.approval-impact--changes { border-color: rgba(var(--v-theme-warning), 0.4); }
+.approval-impact--no-change { border-color: rgba(var(--v-theme-info), 0.35); }
 
 /* Toolbar filter cells: stay generous on desktop, drop to full width on mobile */
 .filter-cell { width: 220px; min-width: 0; }
@@ -960,4 +1274,6 @@ name: stock-counts
 meta:
   action: manage
   subject: all
+  anyPermission:
+    - stock.count.view
 </route>

@@ -30,11 +30,22 @@ function dayMonth(ymd: string): string {
   return p.length >= 3 ? `${p[2]}.${p[1]}` : String(ymd)
 }
 
+function nextDate(ymd: string): string {
+  const [year, month, day] = String(ymd).split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  date.setDate(date.getDate() + 1)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
 export function formatWindow(
   range: DateRangeValue | null | undefined,
   t: (key: string) => string,
 ): string {
   const r = range
+  if (r?.from && r?.to && r.fromTime && r.toTime) {
+    const end = r.from === r.to && r.toTime <= r.fromTime ? nextDate(r.to) : r.to
+    return `${dayMonth(r.from)} ${r.fromTime}–${dayMonth(end)} ${r.toTime}`
+  }
   if (r?.preset && PRESET_LABEL[r.preset])
     return t(PRESET_LABEL[r.preset])
   if (r?.from && r?.to)

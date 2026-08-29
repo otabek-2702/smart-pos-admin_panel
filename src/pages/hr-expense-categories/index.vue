@@ -15,6 +15,7 @@ import DesignIcon from '@/components/design/DesignIcon.vue'
 import Field from '@/components/design/Field.vue'
 import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
+import MoneyInput from '@/components/design/MoneyInput.vue'
 import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
@@ -142,14 +143,14 @@ const tablePagination = computed(() => ({
 type FormShape = {
   name: string
   description: string
-  budget_limit: string // keep as string so blank => no limit
+  budget_limit: number | null
   is_active: boolean
 }
 
 const blankForm = (): FormShape => ({
   name: '',
   description: '',
-  budget_limit: '',
+  budget_limit: null,
   is_active: true,
 })
 
@@ -172,8 +173,8 @@ function openEdit(row: any) {
     name: row.name ?? '',
     description: row.description ?? '',
     budget_limit: row.budget_limit === null || row.budget_limit === undefined || row.budget_limit === ''
-      ? ''
-      : String(row.budget_limit),
+      ? null
+      : Number(row.budget_limit),
     is_active: row.is_active ?? true,
   }
   errors.value = {}
@@ -193,7 +194,7 @@ function validate(): boolean {
     e.name = t('expcat_error_name_required')
   if (form.value.name.length > 100)
     e.name = t('Too long')
-  if (form.value.budget_limit !== '' && Number(form.value.budget_limit) < 0)
+  if (form.value.budget_limit !== null && Number(form.value.budget_limit) < 0)
     e.budget_limit = t('Required')
   errors.value = e
   return Object.keys(e).length === 0
@@ -207,7 +208,7 @@ async function submit() {
     const payload: any = {
       name: form.value.name.trim(),
       description: form.value.description.trim(),
-      budget_limit: form.value.budget_limit === '' ? null : Number(form.value.budget_limit),
+      budget_limit: form.value.budget_limit === null ? null : Number(form.value.budget_limit),
     }
     if (editing.value) {
       payload.is_active = !!form.value.is_active
@@ -524,15 +525,11 @@ function fmtInt(n: any): string {
             :error="errors.budget_limit"
             :hint="t('expcat_field_budget_hint')"
           >
-            <Input
+            <MoneyInput
               v-model="form.budget_limit"
-              type="number"
               icon="dollar"
               :error="!!errors.budget_limit"
               :placeholder="t('expcat_input_amount_ph')"
-              inputmode="decimal"
-              min="0"
-              step="0.01"
             />
           </Field>
 

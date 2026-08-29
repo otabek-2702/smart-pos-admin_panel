@@ -9,14 +9,16 @@ import Input from '@/components/design/Input.vue'
 import Kpi from '@/components/design/Kpi.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
+import { businessPreset } from '@/composables/useBusinessDay'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatDate } = useFormatters()
 
 // -------- filters --------
-const dateFrom = ref(new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10))
-const dateTo = ref(new Date().toISOString().slice(0, 10))
+const initialRange = businessPreset('30d')
+const dateFrom = ref(initialRange.from)
+const dateTo = ref(initialRange.to)
 const userIdFilter = ref<string>('')
 const roleFilter = ref<string>('WAITER')
 const targetPrepMinutes = ref<number>(15)

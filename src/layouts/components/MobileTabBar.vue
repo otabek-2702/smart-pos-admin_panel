@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import DesignIcon from '@/components/design/DesignIcon.vue'
+import { useUserAccess } from '@/composables/useUserAccess'
 
 /* ============================================================
    Alpha POS — Mobile bottom tab bar
@@ -8,6 +9,7 @@ import DesignIcon from '@/components/design/DesignIcon.vue'
    ============================================================ */
 
 const props = defineProps<{ drawerOpen?: boolean }>()
+
 const emit = defineEmits<{
   (e: 'more'): void
 }>()
@@ -15,6 +17,7 @@ const emit = defineEmits<{
 const { t } = useI18n({ useScope: 'global' })
 const router = useRouter()
 const route = useRoute()
+const { isWarehouse, hasAnyPermission } = useUserAccess()
 
 interface Tab {
   id: string
@@ -31,9 +34,34 @@ const TAB_ITEMS: Tab[] = [
   { id: '__more', label: 'Menu', icon: 'menu' },
 ]
 
+const tabItems = computed<Tab[]>(() => {
+  if (!isWarehouse.value)
+    return TAB_ITEMS
+
+  const items: Tab[] = [
+    { id: 'warehouse', label: 'Warehouse', icon: 'package', to: '/warehouse' },
+  ]
+
+  if (hasAnyPermission(['stock.purchase.view']))
+    items.push({ id: 'receiving', label: 'Receiving', icon: 'inbox', to: '/stock/receiving' })
+
+  if (hasAnyPermission(['stock.supplier.view']))
+    items.push({ id: 'suppliers', label: 'Suppliers', icon: 'building', to: '/stock/suppliers' })
+
+  if (hasAnyPermission(['attendance.view', 'discipline.case.view', 'discipline.rule.view', 'prep.audit.view']))
+    items.push({ id: 'audit', label: 'Audit', icon: 'flag', to: '/audit' })
+
+  items.push({ id: '__more', label: 'Menu', icon: 'menu' })
+
+  return items
+})
+
 function isActive(tab: Tab): boolean {
-  if (tab.id === '__more') return !!props.drawerOpen
-  if (!tab.to) return false
+  if (tab.id === '__more')
+    return !!props.drawerOpen
+  if (!tab.to)
+    return false
+
   return route.path === tab.to || route.path.startsWith(`${tab.to}/`)
 }
 
@@ -56,7 +84,7 @@ function onTap(e: MouseEvent, tab: Tab) {
     :aria-label="t('Navigation')"
   >
     <template
-      v-for="tab in TAB_ITEMS"
+      v-for="tab in tabItems"
       :key="tab.id"
     >
       <button

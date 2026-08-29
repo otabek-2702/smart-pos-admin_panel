@@ -3,6 +3,13 @@ export default [
     heading: 'Stock',
   },
   {
+    title: 'Warehouse operations',
+    icon: { icon: 'bx-package' },
+    to: 'warehouse',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
     title: 'Stock Items',
     icon: { icon: 'bx-package' },
     action: 'manage',
@@ -55,6 +62,13 @@ export default [
     title: 'Stock Counts',
     icon: { icon: 'bx-list-check' },
     to: 'stock-counts',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
+    title: 'Stock adjustment requests',
+    icon: { icon: 'bx-slider-alt' },
+    to: 'stock-adjustment-requests',
     action: 'manage',
     subject: 'all',
   },

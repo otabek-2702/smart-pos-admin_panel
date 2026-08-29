@@ -16,6 +16,7 @@ import HBarChart from '@/components/design/HBarChart.vue'
 import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
 import Kpi from '@/components/design/Kpi.vue'
+import MoneyInput from '@/components/design/MoneyInput.vue'
 import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
@@ -780,9 +781,8 @@ function statusTooltip(row: any): string {
           </Field>
 
           <Field :label="t('Amount')">
-            <Input
-              v-model.number="form.amount"
-              type="number"
+            <MoneyInput
+              v-model="form.amount"
               :placeholder="t('expense_amount_placeholder')"
             />
           </Field>

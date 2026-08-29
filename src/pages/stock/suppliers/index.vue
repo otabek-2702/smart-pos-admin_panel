@@ -14,15 +14,22 @@ import Field from '@/components/design/Field.vue'
 import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
 import Modal from '@/components/design/Modal.vue'
+import MoneyInput from '@/components/design/MoneyInput.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Pagination from '@/components/design/Pagination.vue'
 import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
+import { useUserAccess } from '@/composables/useUserAccess'
 
 const { t } = useI18n({ useScope: 'global' })
 const { notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 const router = useRouter()
+const { hasPermission, isAdministrator } = useUserAccess()
+
+const canViewSuppliers = computed(() => hasPermission('stock.supplier.view'))
+const canManageSuppliers = computed(() => hasPermission('stock.manage'))
+const canPaySuppliers = computed(() => isAdministrator.value)
 
 // List only returns: id, uuid, code(null), name, city, rating, is_active
 const suppliers = ref<any[]>([])
@@ -61,11 +68,15 @@ const form = ref({
 })
 
 async function loadSuppliers() {
+  if (!canViewSuppliers.value)
+    return
+
   loading.value = true
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
     if (search.value)
       params.search = search.value
+
     // BE accepts `active_only` (default true). Map our 3-state select:
     //   undefined → omit (BE will hide inactive by default)
     //   'true'    → active_only=true
@@ -98,6 +109,9 @@ watch(activeFilter, () => { page.value = 1; loadSuppliers() })
 watch(search, () => debouncedSearch())
 
 async function openDetail(item: any) {
+  if (!canViewSuppliers.value)
+    return
+
   detailItem.value = item
   detailDialog.value = true
   detailLoading.value = true
@@ -114,19 +128,25 @@ async function openDetail(item: any) {
 }
 
 function openCreate() {
+  if (!canManageSuppliers.value)
+    return
+
   dialogMode.value = 'create'
   form.value = { name: '', contact_person: '', email: '', phone: '', city: '', address: '', rating: 3, payment_terms_days: 30, lead_time_days: 7, notes: '' }
   dialog.value = true
 }
 
 function viewProfile(item: any) {
-  if (!item?.id)
+  if (!canViewSuppliers.value || !item?.id)
     return
   detailDialog.value = false
   router.push(`/stock/suppliers/${item.id}`)
 }
 
 function openEdit(item: any) {
+  if (!canManageSuppliers.value)
+    return
+
   dialogMode.value = 'edit'
   selectedItem.value = item
 
@@ -154,11 +174,15 @@ function openEdit(item: any) {
 }
 
 async function save() {
+  if (!canManageSuppliers.value)
+    return
+
   saving.value = true
   try {
     if (dialogMode.value === 'create')
       await axios.post('/suppliers/', form.value)
     else
+
       // Supplier detail route allows GET/PUT/DELETE (not PATCH).
       await axios.put(`/suppliers/${selectedItem.value.id}/`, form.value)
     notify(dialogMode.value === 'create' ? t('Supplier created') : t('Supplier updated'))
@@ -174,11 +198,17 @@ async function save() {
 }
 
 function confirmDelete(item: any) {
+  if (!canManageSuppliers.value)
+    return
+
   selectedItem.value = item
   deleteDialog.value = true
 }
 
 async function doDelete() {
+  if (!canManageSuppliers.value)
+    return
+
   deleting.value = true
   try {
     await axios.delete(`/suppliers/${selectedItem.value.id}/`)
@@ -201,12 +231,14 @@ const paySaving = ref(false)
 const payForm = ref({ amount: 0, source_account: 'BANK', commission: 0, note: '' })
 
 function openPay(s: any) {
+  if (!canPaySuppliers.value)
+    return
+
   paying.value = s
   payForm.value = { amount: 0, source_account: 'BANK', commission: 0, note: '' }
   payDialog.value = true
 
-  // List rows (serialize_brief) don't include current_balance — fetch the
-  // detail so the modal header can show what we owe this supplier.
+  // Fetch detail as a fallback for legacy list responses without balance.
   axios.get(`/suppliers/${s.id}/`).then(res => {
     const full = res.data?.data?.supplier
     if (full)
@@ -215,6 +247,9 @@ function openPay(s: any) {
 }
 
 async function doPay() {
+  if (!canPaySuppliers.value)
+    return
+
   if (!paying.value || payForm.value.amount <= 0) {
     notify(t('Amount must be greater than 0'), 'error')
 
@@ -243,34 +278,80 @@ const ledgerRows = ref<any[]>([])
 const ledgerPage = ref(1)
 const ledgerPerPage = ref(20)
 const ledgerTotal = ref(0)
-const ledgerBalance = ref<string | null>(null)
+const ledgerBalance = ref<number | null>(null)
+
+function moneyNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '')
+    return null
+
+  const amount = Number(value)
+
+  return Number.isFinite(amount) ? amount : null
+}
+
+function normalizedLedgerRow(row: any) {
+  const type = row?.type ?? row?.transaction_type ?? ''
+  const amount = moneyNumber(row?.amount_uzs ?? row?.amount) ?? 0
+  const deployedChange = moneyNumber(row?.change_uzs ?? row?.change)
+  const reducesDebt = type === 'PAYMENT' || type === 'RETURN'
+  const change = deployedChange ?? (reducesDebt ? -Math.abs(amount) : amount)
+
+  return {
+    ...row,
+    type,
+    amount,
+    change,
+    balance_after: moneyNumber(row?.balance_after_uzs ?? row?.balance_after) ?? 0,
+    fee: moneyNumber(row?.fee_uzs ?? row?.fee) ?? 0,
+  }
+}
+
+function formatLedgerChange(row: any): string {
+  const change = moneyNumber(row?.change) ?? 0
+
+  return `${change > 0 ? '+' : ''}${formatCurrency(change)}`
+}
 
 async function openLedger(s: any) {
+  if (!canViewSuppliers.value)
+    return
+
   ledgerSupplier.value = s
   ledgerPage.value = 1
   ledgerRows.value = []
-  ledgerBalance.value = null
+  ledgerBalance.value = supplierBalance(s)
   ledgerDialog.value = true
   await loadLedger()
 }
 
 async function loadLedger() {
-  if (!ledgerSupplier.value)
+  if (!canViewSuppliers.value || !ledgerSupplier.value)
     return
   ledgerLoading.value = true
   try {
     const res = await axios.get(`/suppliers/${ledgerSupplier.value.id}/ledger/`, {
       params: { page: ledgerPage.value, per_page: ledgerPerPage.value },
     })
+
     const d = res.data?.data ?? res.data
 
-    ledgerRows.value = d?.transactions ?? d?.entries ?? d?.items ?? []
-    ledgerTotal.value = d?.pagination?.total ?? ledgerRows.value.length
-    // BE only returns { transactions, pagination } — derive current balance
-    // from the most recent transaction's balance_after (rows are time-DESC).
-    const firstRow = ledgerRows.value[0]
+    const rows = d?.transactions ?? d?.entries ?? d?.items ?? []
 
-    ledgerBalance.value = firstRow?.balance_after ?? d?.current_balance ?? d?.balance ?? null
+    ledgerRows.value = rows.map(normalizedLedgerRow)
+    ledgerTotal.value = d?.pagination?.total ?? ledgerRows.value.length
+
+    // Deployed history returns transactions + pagination. The first page is
+    // newest-first, so its balance_after_uzs is the freshest ledger value.
+    const responseBalance = moneyNumber(d?.current_balance_uzs ?? d?.current_balance ?? d?.balance)
+
+    const newestBalance = ledgerPage.value === 1
+      ? moneyNumber(ledgerRows.value[0]?.balance_after)
+      : null
+
+    ledgerBalance.value = responseBalance
+      ?? newestBalance
+      ?? supplierBalance(ledgerSupplier.value)
+      ?? ledgerBalance.value
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Failed to load'), 'error')
@@ -290,12 +371,12 @@ const ledgerTypeTone: Record<string, 'warning' | 'success' | 'info' | 'neutral'>
 }
 
 // ---- DataTable columns ----
-// BE list endpoint (serialize_brief) only returns:
-// { id, uuid, code, name, city, rating, is_active } — do not add columns for
-// phone / contact_person / current_balance here; they're undefined on rows.
+// Newer list responses expose the server-calculated balance. Legacy responses
+// remain supported and render a dash instead of inventing zero debt.
 const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'name', label: t('supplier_col_name') },
   { key: 'city', label: t('supplier_col_city') },
+  { key: 'current_balance', label: t('Balance'), align: 'right' },
   { key: 'rating', label: t('supplier_col_rating') },
   { key: 'is_active', label: t('supplier_col_status') },
 ])
@@ -324,7 +405,7 @@ const isBankPay = computed(() => payForm.value.source_account === 'BANK')
 const payAmountNum = computed(() => Math.max(0, Number(payForm.value.amount) || 0))
 const payCommissionNum = computed(() => (isBankPay.value ? Math.max(0, Number(payForm.value.commission) || 0) : 0))
 const payTotalCharge = computed(() => payAmountNum.value + payCommissionNum.value)
-const payOwed = computed(() => Number(paying.value?.current_balance ?? 0))
+const payOwed = computed(() => Number(paying.value?.current_balance_uzs ?? paying.value?.current_balance ?? 0))
 const payRemaining = computed(() => payOwed.value - payAmountNum.value)
 
 // Prefill the amount with the full outstanding balance (one-click settle).
@@ -351,6 +432,18 @@ function balanceLabel(v: any): string {
     return t('supplier_balance_credit')
   return t('supplier_balance_settled')
 }
+
+function supplierBalance(supplier: any): number | null {
+  const raw = supplier?.current_balance_uzs ?? supplier?.current_balance
+
+  if (raw === null || raw === undefined || raw === '')
+    return null
+
+  const value = Number(raw)
+
+  return Number.isFinite(value) ? value : null
+}
+
 const balanceColorVar: Record<BalanceTone, string> = {
   warning: 'rgb(var(--v-theme-warning-strong))',
   success: 'rgb(var(--v-theme-success-strong))',
@@ -371,6 +464,7 @@ const refLabels: Record<string, string> = {
   TreasuryPayment: 'ref_TreasuryPayment',
   CashboxExpense: 'ref_CashboxExpense',
 }
+
 function refLabel(type: string): string {
   const key = refLabels[type]
   return key ? t(key) : type
@@ -381,6 +475,7 @@ const sourceLabels: Record<string, string> = {
   BANK: 'supplier_source_BANK',
   DRAWER: 'supplier_source_DRAWER',
 }
+
 function sourceLabel(src: string): string {
   const key = sourceLabels[src]
   return key ? t(key) : (src || '—')
@@ -396,6 +491,7 @@ function sourceLabel(src: string): string {
     >
       <template #actions>
         <Button
+          v-if="canManageSuppliers"
           variant="primary"
           icon="plus"
           @click="openCreate"
@@ -449,6 +545,22 @@ function sourceLabel(src: string): string {
           <span class="cell-muted">{{ row.city || '—' }}</span>
         </template>
 
+        <!-- Server-backed current balance; absent on legacy list responses. -->
+        <template #cell.current_balance="{ row }">
+          <div v-if="supplierBalance(row) !== null" style="text-align: right;">
+            <div
+              class="mono"
+              :style="{ color: balanceColorVar[balanceTone(supplierBalance(row))], fontWeight: 600 }"
+            >
+              {{ formatCurrency(Math.abs(supplierBalance(row) ?? 0)) }}
+            </div>
+            <div class="cell-muted" style="font-size: 12px;">
+              {{ balanceLabel(supplierBalance(row)) }}
+            </div>
+          </div>
+          <span v-else class="cell-muted">—</span>
+        </template>
+
         <!-- Rating -->
         <template #cell.rating="{ row }">
           <div class="row" style="gap: 4px;">
@@ -471,6 +583,7 @@ function sourceLabel(src: string): string {
         <!-- Inline row actions -->
         <template #row-actions="{ row }">
           <IconAction
+            v-if="canPaySuppliers"
             icon="dollar"
             tone="success"
             :title="t('Pay supplier')"
@@ -487,11 +600,13 @@ function sourceLabel(src: string): string {
             @click.stop="openDetail(row)"
           />
           <IconAction
+            v-if="canManageSuppliers"
             icon="edit"
             :title="t('Edit')"
             @click.stop="openEdit(row)"
           />
           <IconAction
+            v-if="canManageSuppliers"
             icon="trash"
             tone="danger"
             :title="t('Delete')"
@@ -565,14 +680,14 @@ function sourceLabel(src: string): string {
           </div>
           <div
             class="mono"
-            :style="{ color: balanceColorVar[balanceTone(detailItem.current_balance)], fontWeight: 600 }"
+            :style="{ color: balanceColorVar[balanceTone(supplierBalance(detailItem))], fontWeight: 600 }"
           >
-            {{ detailItem.current_balance != null ? formatCurrency(Math.abs(Number(detailItem.current_balance))) : '—' }}
+            {{ supplierBalance(detailItem) !== null ? formatCurrency(Math.abs(supplierBalance(detailItem) ?? 0)) : '—' }}
             <span
-              v-if="detailItem.current_balance != null"
+              v-if="supplierBalance(detailItem) !== null"
               class="cell-muted"
               style="font-weight: 400; font-size: 12px;"
-            >· {{ balanceLabel(detailItem.current_balance) }}</span>
+            >· {{ balanceLabel(supplierBalance(detailItem)) }}</span>
           </div>
         </div>
         <div>
@@ -850,10 +965,8 @@ function sourceLabel(src: string): string {
 
       <div class="grid cols-2 form-grid" style="gap: var(--sp-4);">
         <Field :label="t('Amount')">
-          <Input
+          <MoneyInput
             v-model="payForm.amount"
-            type="number"
-            min="0"
             autofocus
           />
         </Field>
@@ -870,10 +983,8 @@ function sourceLabel(src: string): string {
             :label="t('Commission / fee (optional)')"
             :hint="isBankPay ? t('pay_commission_hint') : t('pay_commission_bank_note')"
           >
-            <Input
+            <MoneyInput
               v-model="payForm.commission"
-              type="number"
-              min="0"
               :disabled="!isBankPay"
             />
           </Field>
@@ -929,7 +1040,7 @@ function sourceLabel(src: string): string {
       :open="ledgerDialog"
       :width="860"
       :title="`${ledgerSupplier?.name ?? ''} · ${t('Ledger')}`"
-      :subtitle="ledgerBalance !== null ? t('Current balance') + ': ' + formatCurrency(ledgerBalance) : undefined"
+      :subtitle="ledgerBalance !== null ? `${t('Current balance')}: ${formatCurrency(ledgerBalance)}` : undefined"
       @close="ledgerDialog = false"
     >
       <div class="row" style="justify-content: flex-end; margin-bottom: var(--sp-3);">
@@ -979,9 +1090,9 @@ function sourceLabel(src: string): string {
               </td>
               <td
                 class="num mono"
-                :style="{ color: Number(r.amount) > 0 ? 'rgb(var(--v-theme-warning-strong))' : 'rgb(var(--v-theme-success-strong))', fontWeight: 600 }"
+                :style="{ color: Number(r.change) >= 0 ? 'rgb(var(--v-theme-warning-strong))' : 'rgb(var(--v-theme-success-strong))', fontWeight: 600 }"
               >
-                {{ formatCurrency(r.amount ?? 0) }}
+                {{ formatLedgerChange(r) }}
               </td>
               <td class="num mono">
                 {{ formatCurrency(r.balance_after ?? 0) }}
@@ -1144,4 +1255,6 @@ name: stock-suppliers
 meta:
   action: manage
   subject: all
+  anyPermission:
+    - stock.supplier.view
 </route>

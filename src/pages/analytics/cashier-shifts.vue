@@ -8,42 +8,31 @@ import DataTable, { type DataTableColumn } from '@/components/design/DataTable.v
 import Field from '@/components/design/Field.vue'
 import IconAction from '@/components/design/IconAction.vue'
 import Select from '@/components/design/Select.vue'
+import { businessPreset } from '@/composables/useBusinessDay'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 
 // -------- filters --------
-const dateFrom = ref(new Date().toISOString().slice(0, 10))
-const dateTo = ref(new Date().toISOString().slice(0, 10))
+const initialRange = businessPreset('today')
+const dateFrom = ref(initialRange.from)
+const dateTo = ref(initialRange.to)
 const userIdFilter = ref<string>('')
 const cashiers = ref<any[]>([])
 const statusFilter = ref<string>('')
 
 function setRangePreset(preset: 'today' | 'last7' | 'last30' | 'thisMonth') {
-  const today = new Date()
-  const iso = (d: Date) => d.toISOString().slice(0, 10)
-  if (preset === 'today') {
-    dateFrom.value = iso(today)
-    dateTo.value = iso(today)
-  }
-  else if (preset === 'last7') {
-    const from = new Date(today)
-    from.setDate(today.getDate() - 6)
-    dateFrom.value = iso(from)
-    dateTo.value = iso(today)
-  }
-  else if (preset === 'last30') {
-    const from = new Date(today)
-    from.setDate(today.getDate() - 29)
-    dateFrom.value = iso(from)
-    dateTo.value = iso(today)
-  }
-  else if (preset === 'thisMonth') {
-    const from = new Date(today.getFullYear(), today.getMonth(), 1)
-    dateFrom.value = iso(from)
-    dateTo.value = iso(today)
-  }
+  const key = preset === 'last7'
+    ? '7d'
+    : preset === 'last30'
+      ? '30d'
+      : preset === 'thisMonth'
+        ? 'month'
+        : 'today'
+  const range = businessPreset(key)
+  dateFrom.value = range.from
+  dateTo.value = range.to
 }
 
 // -------- response --------

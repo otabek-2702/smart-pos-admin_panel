@@ -19,7 +19,7 @@ import { Fmt } from '@/components/design/utils/format'
 const { t } = useI18n({ useScope: 'global' })
 
 const store = useAIAssistantStore()
-const { chats, activeId, generating, notify, permission, suggestions, loadingMeta } = storeToRefs(store)
+const { chats, activeId, generating, notify, permission } = storeToRefs(store)
 
 const draft = ref('')
 const draftRestoreLock = ref(false)
@@ -47,21 +47,8 @@ const SUGGESTIONS = [
   { icon: 'box', text: 'What is running low on stock?', i18n: 'What is running low on stock?' },
 ]
 
-// Live, data-driven suggestions from the backend (/ai/suggestions/). These carry a
-// human `reason` (e.g. "3 items below reorder level") and a priority the BE computes
-// from real stock/PO state — far more actionable than the static prompt chips, so we
-// surface them above the defaults whenever the server returns any.
-function suggestionIcon(priority: string): string {
-  if (priority === 'high') return 'alert'
-  if (priority === 'medium') return 'clock'
-  return 'trend'
-}
-const liveSuggestions = computed(() => (suggestions.value ?? []).slice(0, 4))
-
 onMounted(() => {
   store.setChatVisible(true)
-  // Fetch dynamic suggestions/quick-actions once; safe to call repeatedly (store guards).
-  store.loadMeta()
   const onVis = () => store.setChatVisible(!document.hidden)
 
   document.addEventListener('visibilitychange', onVis)
@@ -525,44 +512,6 @@ function exportChat() {
             <p class="aiempty__sub">
               {{ t('Ask about sales, products, payments, shifts or stock. I read from your live data.') }}
             </p>
-            <!-- Live, data-driven suggestions from the backend (real stock / PO signals) -->
-            <div
-              v-if="liveSuggestions.length"
-              class="aiempty__live"
-            >
-              <div class="aiempty__livelabel">
-                {{ t('Suggested for you') }}
-              </div>
-              <div class="aiempty__livegrid">
-                <button
-                  v-for="(s, i) in liveSuggestions"
-                  :key="`live-${i}`"
-                  class="livechip"
-                  :class="`prio-${s.priority}`"
-                  @click="store.send(s.query)"
-                >
-                  <span class="livechip__dot" />
-                  <DesignIcon :name="suggestionIcon(s.priority)" :size="16" class="livechip__ic" />
-                  <span class="livechip__body">
-                    <span class="livechip__q">{{ s.query }}</span>
-                    <span v-if="s.reason" class="livechip__reason">{{ s.reason }}</span>
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            <div v-else-if="loadingMeta" class="aiempty__live">
-              <div class="aiempty__livegrid">
-                <div v-for="n in 2" :key="`sk-${n}`" class="livechip is-skeleton">
-                  <div class="sk-box" style="width: 16px; height: 16px; border-radius: 50%;" />
-                  <div style="flex: 1;">
-                    <div class="sk-box" style="width: 60%; height: 12px; border-radius: 4px;" />
-                    <div class="sk-box" style="width: 40%; height: 10px; border-radius: 4px; margin-top: 6px;" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <div class="aiempty__chips">
               <button
                 v-for="s in SUGGESTIONS"
@@ -819,59 +768,6 @@ meta:
   font-size: var(--fs-sm);
 }
 
-/* live suggestions in empty state */
-.aiempty__live { width: 100%; max-width: 520px; margin-bottom: var(--sp-5); }
-.aiempty__livelabel {
-  font-size: var(--fs-micro);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--text-tertiary);
-  text-align: left;
-  margin-bottom: 10px;
-}
-.aiempty__livegrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.livechip {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  border-radius: var(--r-md);
-  cursor: pointer;
-  text-align: left;
-  transition: all .14s;
-  box-shadow: var(--shadow-xs);
-  position: relative;
-}
-.livechip:hover {
-  border-color: var(--primary-border);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-sm);
-}
-.livechip__dot {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-tertiary);
-}
-.livechip.prio-high .livechip__dot { background: var(--error); }
-.livechip.prio-medium .livechip__dot { background: var(--warning, #f59e0b); }
-.livechip.prio-low .livechip__dot { background: var(--primary); }
-.livechip__ic { color: var(--text-tertiary); flex: 0 0 16px; margin-top: 1px; }
-.livechip:hover .livechip__ic { color: var(--primary); }
-.livechip__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-right: 8px; }
-.livechip__q { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text); }
-.livechip__reason { font-size: var(--fs-label); color: var(--text-tertiary); line-height: 1.35; }
-.livechip.is-skeleton { cursor: default; pointer-events: none; }
-.livechip.is-skeleton:hover { transform: none; border-color: var(--border); box-shadow: var(--shadow-xs); }
-.sk-box { background: rgba(var(--v-theme-on-surface), 0.08); animation: sk-pulse 1.5s ease-in-out infinite; }
-@keyframes sk-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-
 /* jump-to-latest floating button */
 .jumpbtn {
   position: absolute;
@@ -912,8 +808,7 @@ meta:
     align-items: flex-start;
   }
 
-  .aiempty__chips,
-  .aiempty__livegrid {
+  .aiempty__chips {
     grid-template-columns: 1fr;
   }
 

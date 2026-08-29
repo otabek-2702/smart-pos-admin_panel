@@ -2,7 +2,7 @@
 /* ============================================================
    Stock Adjustments — design primitive port
    Form-first: pick stock item + location + movement type + qty,
-   optional batch / unit / unit cost / reference / notes, submit.
+   optional unit / unit cost / reference / notes, submit.
    Below: variance codes table with create / edit / seed defaults.
    All strings go through t(). Status / movement values render
    via t(`prefix_${VALUE}`).
@@ -14,6 +14,7 @@ import DataTable, { type DataTableColumn } from '@/components/design/DataTable.v
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import Field from '@/components/design/Field.vue'
 import Input from '@/components/design/Input.vue'
+import MoneyInput from '@/components/design/MoneyInput.vue'
 import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
@@ -28,7 +29,6 @@ const { notify } = useNotify()
 const stockItems = ref<{ value: string, label: string }[]>([])
 const locations = ref<{ value: string, label: string }[]>([])
 const units = ref<{ value: string, label: string }[]>([])
-const batches = ref<{ value: string, label: string }[]>([])
 
 async function loadLookup<T = any>(
   url: string,
@@ -55,16 +55,14 @@ async function loadLookup<T = any>(
 }
 
 async function loadLookups() {
-  const [si, locs, us, bs] = await Promise.all([
+  const [si, locs, us] = await Promise.all([
     loadLookup('/items/', ['items', 'stock_items'], 'id', 'name'),
     loadLookup('/locations/', ['locations'], 'id', 'name'),
     loadLookup('/units/', ['units'], 'id', 'short_name'),
-    loadLookup('/batches/', ['batches'], 'id', 'batch_number'),
   ])
   stockItems.value = si
   locations.value = locs
   units.value = us
-  batches.value = bs
 }
 
 /* ---------------- adjustment form ---------------- */
@@ -93,7 +91,6 @@ interface AdjustForm {
   quantity: string
   unit_id: string
   unit_cost: string
-  batch_id: string
   reference_type: string
   reference_id: string
   notes: string
@@ -107,7 +104,6 @@ function emptyAdjust(): AdjustForm {
     quantity: '',
     unit_id: '',
     unit_cost: '',
-    batch_id: '',
     reference_type: '',
     reference_id: '',
     notes: '',
@@ -117,10 +113,50 @@ function emptyAdjust(): AdjustForm {
 const adjust = ref<AdjustForm>(emptyAdjust())
 const submitting = ref(false)
 const adjustErrors = ref<Record<string, string>>({})
+const selectedItemTracksBatches = ref(false)
+const itemTrackingLoading = ref(false)
+const itemTrackingError = ref('')
+let itemTrackingRequestId = 0
+
+async function fetchStockItemDetail(itemId: string | number): Promise<any> {
+  const response = await stockApi.get(`/items/${itemId}/`)
+  const data = response.data?.data ?? response.data ?? {}
+
+  return data.item ?? data
+}
+
+watch(() => adjust.value.stock_item_id, async itemId => {
+  const requestId = ++itemTrackingRequestId
+
+  selectedItemTracksBatches.value = false
+  itemTrackingError.value = ''
+  if (!itemId) {
+    itemTrackingLoading.value = false
+    return
+  }
+  itemTrackingLoading.value = true
+  try {
+    const item = await fetchStockItemDetail(itemId)
+    if (requestId !== itemTrackingRequestId)
+      return
+    selectedItemTracksBatches.value = item?.track_batches === true
+  }
+  catch {
+    if (requestId === itemTrackingRequestId)
+      itemTrackingError.value = t('stock_adjust_item_verification_failed')
+  }
+  finally {
+    if (requestId === itemTrackingRequestId)
+      itemTrackingLoading.value = false
+  }
+})
 
 function validateAdjust(): boolean {
   const e: Record<string, string> = {}
   if (!adjust.value.stock_item_id) e.stock_item_id = t('required_field')
+  else if (itemTrackingLoading.value) e.stock_item_id = t('stock_adjust_item_verification_pending')
+  else if (itemTrackingError.value) e.stock_item_id = itemTrackingError.value
+  else if (selectedItemTracksBatches.value) e.stock_item_id = t('stock_adjust_batch_tracked_blocked')
   if (!adjust.value.location_id) e.location_id = t('required_field')
   if (!adjust.value.movement_type) e.movement_type = t('required_field')
   if (!adjust.value.quantity || Number.isNaN(Number(adjust.value.quantity)))
@@ -134,6 +170,16 @@ async function submitAdjustment() {
   if (!validateAdjust()) return
   submitting.value = true
   try {
+    let latestItem: any
+    try {
+      latestItem = await fetchStockItemDetail(adjust.value.stock_item_id)
+    }
+    catch {
+      throw new Error(t('stock_adjust_item_verification_failed'))
+    }
+    if (latestItem?.track_batches === true)
+      throw new Error(t('stock_adjust_batch_tracked_blocked'))
+
     const payload: Record<string, any> = {
       stock_item_id: Number(adjust.value.stock_item_id),
       location_id: Number(adjust.value.location_id),
@@ -142,7 +188,6 @@ async function submitAdjustment() {
     }
     if (adjust.value.unit_id) payload.unit_id = Number(adjust.value.unit_id)
     if (adjust.value.unit_cost) payload.unit_cost = Number(adjust.value.unit_cost)
-    if (adjust.value.batch_id) payload.batch_id = Number(adjust.value.batch_id)
     if (adjust.value.reference_type) payload.reference_type = adjust.value.reference_type
     if (adjust.value.reference_id) payload.reference_id = Number(adjust.value.reference_id)
     if (adjust.value.notes) payload.notes = adjust.value.notes
@@ -153,7 +198,7 @@ async function submitAdjustment() {
     await loadHistory()
   }
   catch (e: any) {
-    notify(e?.response?.data?.message ?? t('adjustment_failed'), 'error')
+    notify(e?.response?.data?.message ?? e?.message ?? t('adjustment_failed'), 'error')
   }
   finally {
     submitting.value = false
@@ -420,6 +465,15 @@ watch([historyPage, historyPerPage], () => loadHistory())
           </Field>
         </div>
 
+        <div
+          v-if="selectedItemTracksBatches || itemTrackingError"
+          class="inline-alert"
+          style="grid-column: span 12;"
+        >
+          <DesignIcon name="alert" :size="16" />
+          <span>{{ itemTrackingError || t('stock_adjust_batch_tracked_blocked') }}</span>
+        </div>
+
         <!-- Location -->
         <div style="grid-column: span 6;">
           <Field :label="t('location')" :error="adjustErrors.location_id">
@@ -467,30 +521,20 @@ watch([historyPage, historyPerPage], () => loadHistory())
           </Field>
         </div>
 
-        <!-- Unit cost + batch -->
-        <div style="grid-column: span 4;">
+        <!-- Unit cost -->
+        <div style="grid-column: span 6;">
           <Field :label="t('unit_cost')">
-            <Input
-              v-model="adjust.unit_cost"
-              type="number"
-              step="0.0001"
-              min="0"
+            <MoneyInput
+              :model-value="adjust.unit_cost === '' ? null : Number(adjust.unit_cost)"
+              allow-fraction
+              :max-fraction-digits="4"
               :placeholder="'0.0000'"
+              @update:model-value="value => adjust.unit_cost = value ? String(value) : ''"
             />
           </Field>
         </div>
-        <div style="grid-column: span 4;">
-          <Field :label="t('batch')">
-            <Select
-              v-model="adjust.batch_id"
-              :options="batches"
-              :placeholder="t('batch')"
-            />
-          </Field>
-        </div>
-
         <!-- Reference type / id -->
-        <div style="grid-column: span 4;">
+        <div style="grid-column: span 6;">
           <Field :label="t('reference_type')">
             <Input
               v-model="adjust.reference_type"
@@ -539,7 +583,7 @@ watch([historyPage, historyPerPage], () => loadHistory())
             variant="primary"
             icon="check"
             :loading="submitting"
-            :disabled="submitting"
+            :disabled="submitting || itemTrackingLoading || !!itemTrackingError || selectedItemTracksBatches"
           >
             {{ t('submit_adjustment') }}
           </Button>
@@ -812,6 +856,18 @@ watch([historyPage, historyPerPage], () => loadHistory())
 .tool-select {
   width: 180px;
   max-width: 100%;
+}
+
+.inline-alert {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid rgb(var(--v-theme-error-border));
+  border-radius: var(--r-md);
+  color: rgb(var(--v-theme-error-strong));
+  background: rgb(var(--v-theme-error-weak));
+  font-size: 13px;
 }
 
 .adjust-form {

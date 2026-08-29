@@ -6,6 +6,8 @@ interface SegOption {
   value: string
   label: string
   icon?: string
+  id?: string
+  ariaControls?: string
 }
 type SegOptionLike = string | SegOption
 
@@ -27,25 +29,76 @@ const normalized = computed<SegOption[]>(() =>
   ),
 )
 
+const tabList = ref<HTMLElement | null>(null)
+
+const selectedIndex = computed(() => normalized.value.findIndex(option =>
+  String(option.value) === String(props.modelValue),
+))
+
+function isSelected(value: string): boolean {
+  return String(value) === String(props.modelValue)
+}
+
+function tabIndexFor(index: number): 0 | -1 {
+  return index === (selectedIndex.value >= 0 ? selectedIndex.value : 0) ? 0 : -1
+}
+
 function select(v: string) {
   emit('update:modelValue', v)
   emit('change', v)
+}
+
+function focusTab(index: number) {
+  nextTick(() => {
+    const tab = tabList.value?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]
+
+    tab?.focus()
+    tab?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  })
+}
+
+function onKeydown(event: KeyboardEvent, index: number) {
+  const count = normalized.value.length
+  if (!count)
+    return
+
+  let nextIndex: number | null = null
+  if (event.key === 'ArrowRight')
+    nextIndex = (index + 1) % count
+  else if (event.key === 'ArrowLeft')
+    nextIndex = (index - 1 + count) % count
+  else if (event.key === 'Home')
+    nextIndex = 0
+  else if (event.key === 'End')
+    nextIndex = count - 1
+
+  if (nextIndex === null)
+    return
+  event.preventDefault()
+  select(normalized.value[nextIndex].value)
+  focusTab(nextIndex)
 }
 </script>
 
 <template>
   <div
+    ref="tabList"
     class="seg"
     role="tablist"
+    aria-orientation="horizontal"
   >
     <button
-      v-for="o in normalized"
+      v-for="(o, index) in normalized"
+      :id="o.id"
       :key="o.value"
       type="button"
-      :class="cx('seg__btn', modelValue === o.value && 'is-active')"
+      :class="cx('seg__btn', isSelected(o.value) && 'is-active')"
       role="tab"
-      :aria-selected="modelValue === o.value"
+      :aria-selected="isSelected(o.value)"
+      :aria-controls="o.ariaControls"
+      :tabindex="tabIndexFor(index)"
       @click="select(o.value)"
+      @keydown="onKeydown($event, index)"
     >
       <DesignIcon
         v-if="o.icon"
@@ -56,3 +109,26 @@ function select(v: string) {
     </button>
   </div>
 </template>
+
+<style scoped>
+.seg {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+}
+
+.seg__btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.seg__btn:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+</style>

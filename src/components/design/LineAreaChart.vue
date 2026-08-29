@@ -5,6 +5,7 @@ import { useWidth } from './utils/useWidth'
 import Skeleton from './Skeleton.vue'
 import StateFill from './StateFill.vue'
 import ChartTip from './ChartTip.vue'
+import { formatMonthCodeLabel } from '@/utils/monthLabels'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -89,6 +90,10 @@ function y(v: number): number {
 
 const labelEvery = computed(() => Math.ceil(props.categories.length / 7))
 
+const displayCategories = computed(() =>
+  props.categories.map(label => formatMonthCodeLabel(label, t)),
+)
+
 const paths = computed(() => {
   if (!w.value)
     return []
@@ -128,7 +133,7 @@ const tipRows = computed(() => {
     }))
 })
 
-const tipTitle = computed(() => hover.value !== null ? props.categories[hover.value] : '')
+const tipTitle = computed(() => hover.value !== null ? displayCategories.value[hover.value] : '')
 </script>
 
 <template>
@@ -244,7 +249,7 @@ const tipTitle = computed(() => hover.value !== null ? props.categories[hover.va
 
       <!-- x labels -->
       <text
-        v-for="(c, i) in categories"
+        v-for="(c, i) in displayCategories"
         :key="`x${i}`"
         v-show="i % labelEvery === 0 || i === categories.length - 1"
         :x="x(i)"

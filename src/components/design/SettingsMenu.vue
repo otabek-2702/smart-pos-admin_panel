@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
  * Operating-hours settings popover.
- *  - Business day starts at  (business_day_start, the overnight cutover)
+ *  - Fixed reporting window  (07:00 .. 03:00 next day)
  *  - Working hours           (business_open .. business_close)
  *
  * All three are owned by the backend (AppSettings, GET/PUT /app-settings) and
  * managed through useBusinessDay — the single source that the date picker +
- * every dashboard/orders query read. Changing a value persists immediately.
+ * every dashboard/orders query read. Only working-hour bounds are editable.
  *
  * (Removed: "Week starts on" — unused. Icon swapped gear → sliders.)
  *
@@ -30,11 +30,9 @@ const menuId = designId('operating-hours')
 
 // Local mirrors so typing doesn't fire a PUT on every keystroke mid-edit;
 // commit on change. Kept in sync when the composable hydrates from the backend.
-const dayStart = ref<string>(biz.start.value)
 const workOpen = ref<string>(biz.open.value)
 const workClose = ref<string>(biz.close.value)
 
-watch(biz.start, v => (dayStart.value = v))
 watch(biz.open, v => (workOpen.value = v))
 watch(biz.close, v => (workClose.value = v))
 
@@ -43,14 +41,12 @@ async function commit() {
   saving.value = true
   try {
     await biz.save({
-      business_day_start: dayStart.value,
       business_open: workOpen.value,
       business_close: workClose.value,
     })
     notify(t('Settings saved'), 'success')
   }
   catch {
-    dayStart.value = biz.start.value
     workOpen.value = biz.open.value
     workClose.value = biz.close.value
     notify(t('Request failed. Please try again.'), 'error')
@@ -111,21 +107,14 @@ onBeforeUnmount(() => {
       <div class="setmenu__row">
         <div class="setmenu__main">
           <div class="setmenu__label">
-            {{ t('Business day starts at') }}
+            {{ t('Reporting window') }}
           </div>
           <div class="setmenu__hint">
-            {{ t('Sales after midnight count toward the previous day until this time.') }}
+            {{ t('Reporting uses the fixed 07:00–03:00 service window.') }}
           </div>
         </div>
-        <div style="width: 110px; flex: 0 0 110px;">
-          <input
-            v-model="dayStart"
-            type="time"
-            class="control control--sm setmenu__time"
-            :disabled="saving"
-            :aria-label="t('Business day starts at')"
-            @change="commit"
-          >
+        <div class="mono" style="width: 110px; flex: 0 0 110px; text-align: right; font-weight: 700;">
+          07:00–03:00
         </div>
       </div>
 

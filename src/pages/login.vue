@@ -44,6 +44,7 @@ const login = async () => {
     })
 
     const { token, user } = data.data
+    let sessionUser = user
 
     localStorage.setItem('accessToken', JSON.stringify(token))
     localStorage.setItem('userData', JSON.stringify(user))
@@ -63,20 +64,24 @@ const login = async () => {
         setBusinessDayStart(bds.slice(0, 5))
       // Refresh cached userData with the fuller /auth-me payload so other
       // pages that read userData see the new field too.
-      if (me && typeof me === 'object')
-        localStorage.setItem('userData', JSON.stringify({ ...user, ...me }))
+      if (me && typeof me === 'object') {
+        sessionUser = { ...user, ...me }
+        localStorage.setItem('userData', JSON.stringify(sessionUser))
+      }
     }
     catch { /* noop — keep prior default */ }
 
     // Pull operating-hours settings (day-start + working open/close) from
     // /app-settings so the picker's "Working hours" filter is correct.
-    void hydrateBusinessSettings()
-
-    // Temporary: grant manage-all to every authenticated user. Backend still
-    // enforces per-endpoint via @admin_required / @permission_required, so
-    // this is a UI gate only. Restore role-based CASL once finer-grained
-    // routing is needed.
-    const userAbilities = [{ action: 'manage', subject: 'all' }]
+    // Warehouse is the first back-office role with a deliberately restricted
+    // surface. Its route/action visibility is driven by backend permissions;
+    // do not persist the legacy manage-all ability for this account.
+    const normalizedRole = String(sessionUser?.role ?? sessionUser?.user?.role ?? '').toUpperCase()
+    if (normalizedRole !== 'WAREHOUSE')
+      void hydrateBusinessSettings()
+    const userAbilities = normalizedRole === 'WAREHOUSE'
+      ? [{ action: 'read', subject: 'Auth' }]
+      : [{ action: 'manage', subject: 'all' }]
 
     localStorage.setItem('userAbilities', JSON.stringify(userAbilities))
     ability.update(userAbilities)

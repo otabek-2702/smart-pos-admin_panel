@@ -19,15 +19,23 @@ import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
 import Kpi from '@/components/design/Kpi.vue'
 import Modal from '@/components/design/Modal.vue'
+import MoneyInput from '@/components/design/MoneyInput.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Segmented from '@/components/design/Segmented.vue'
 import Select from '@/components/design/Select.vue'
 import Switch from '@/components/design/Switch.vue'
+import { useUserAccess } from '@/composables/useUserAccess'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 const route = useRoute()
+const { hasPermission, isAdministrator } = useUserAccess()
+
+const canViewSupplier = computed(() => hasPermission('stock.supplier.view'))
+const canManageSupplier = computed(() => hasPermission('stock.manage'))
+const canPaySupplier = computed(() => isAdministrator.value)
+const canManageSupplierItems = computed(() => hasPermission('stock.manage'))
 
 const supplierReferenceLabels: Record<string, string> = {
   PurchaseOrder: 'ref_PurchaseOrder',
@@ -135,12 +143,17 @@ const CURRENCY_OPTS = [
 // Load
 // ============================================================
 async function loadSupplier() {
+  if (!canViewSupplier.value)
+    return
+
   loading.value = true
   try {
     const res = await stockApi.get(`/suppliers/${supplierId.value}/`, {
       params: { include_items: 'true', include_stats: 'true' },
     })
+
     const d = res.data?.data ?? res.data
+
     supplier.value = d?.supplier ?? d ?? null
     if (!supplier.value)
       notify(t('supplier_not_found'), 'error')
@@ -154,6 +167,9 @@ async function loadSupplier() {
 }
 
 async function loadItemsRefresh() {
+  if (!canViewSupplier.value)
+    return
+
   try {
     const res = await stockApi.get(`/suppliers/${supplierId.value}/items/`)
     const d = res.data?.data ?? res.data
@@ -167,13 +183,23 @@ async function loadItemsRefresh() {
 }
 
 async function loadLedger() {
+  if (!canViewSupplier.value)
+    return
+
   ledgerLoading.value = true
   try {
     const res = await stockApi.get(`/suppliers/${supplierId.value}/ledger/`, {
       params: { page: ledgerPage.value, per_page: ledgerPerPage.value },
     })
+
     const d = res.data?.data ?? res.data
-    ledgerRows.value = d?.transactions ?? []
+
+    ledgerRows.value = (d?.transactions ?? []).map((row: any) => ({
+      ...row,
+      amount: row.amount ?? row.amount_uzs,
+      balance_after: row.balance_after ?? row.balance_after_uzs,
+      fee: row.fee ?? row.fee_uzs,
+    }))
     ledgerTotal.value = d?.pagination?.total ?? 0
   }
   catch {
@@ -185,7 +211,7 @@ async function loadLedger() {
 }
 
 onMounted(loadSupplier)
-watch(tab, (v) => {
+watch(tab, v => {
   if (v === 'ledger' && ledgerRows.value.length === 0)
     loadLedger()
 })
@@ -197,14 +223,28 @@ watch([ledgerPage, ledgerPerPage], () => {
 // ============================================================
 // KPI strip
 // ============================================================
+function balanceValue(value: any): number | null {
+  const raw = value?.current_balance_uzs ?? value?.current_balance
+
+  if (raw === null || raw === undefined || raw === '')
+    return null
+
+  const balance = Number(raw)
+
+  return Number.isFinite(balance) ? balance : null
+}
+
+const currentBalance = computed(() => balanceValue(supplier.value))
+
 const kpiBalance = computed(() => ({
   label: t('supplier_kpi_balance'),
-  value: supplier.value ? Number(supplier.value.current_balance ?? 0) : null,
+  value: currentBalance.value,
   icon: 'wallet',
   tone: 'warning' as const,
   money: true,
   sub: supplier.value?.currency ?? t('currency_default'),
 }))
+
 const kpiCreditLimit = computed(() => ({
   label: t('supplier_kpi_credit_limit'),
   value: supplier.value ? Number(supplier.value.credit_limit ?? 0) : null,
@@ -213,12 +253,14 @@ const kpiCreditLimit = computed(() => ({
   money: true,
   sub: supplier.value?.currency ?? t('currency_default'),
 }))
+
 const kpiTotalOrders = computed(() => ({
   label: t('supplier_kpi_total_orders'),
   value: supplier.value ? Number(supplier.value.stats?.total_orders ?? 0) : null,
   icon: 'box',
   tone: 'primary' as const,
 }))
+
 const kpiTotalValue = computed(() => ({
   label: t('supplier_kpi_total_value'),
   value: supplier.value ? Number(supplier.value.stats?.total_value ?? 0) : null,
@@ -226,6 +268,7 @@ const kpiTotalValue = computed(() => ({
   tone: 'success' as const,
   money: true,
 }))
+
 const kpiAvgOrder = computed(() => ({
   label: t('supplier_kpi_avg_order'),
   value: supplier.value ? Number(supplier.value.stats?.avg_order_value ?? 0) : null,
@@ -233,12 +276,14 @@ const kpiAvgOrder = computed(() => ({
   tone: 'info' as const,
   money: true,
 }))
+
 const kpiItemsCount = computed(() => ({
   label: t('supplier_kpi_items_count'),
   value: supplier.value ? Number(supplier.value.item_count ?? supplier.value.items?.length ?? 0) : null,
   icon: 'list',
   tone: 'neutral' as const,
 }))
+
 const kpiLeadTime = computed(() => ({
   label: t('supplier_kpi_lead_time'),
   value: supplier.value
@@ -247,6 +292,7 @@ const kpiLeadTime = computed(() => ({
   icon: 'truck',
   tone: 'neutral' as const,
 }))
+
 const kpiPaymentTerms = computed(() => ({
   label: t('supplier_kpi_payment_terms'),
   value: supplier.value
@@ -299,11 +345,13 @@ const TXN_TONE: Record<string, 'warning' | 'success' | 'info' | 'neutral'> = {
   RETURN: 'info',
   ADJUSTMENT: 'neutral',
 }
+
 const SRC_TONE: Record<string, 'info' | 'primary' | 'neutral'> = {
   SAFE: 'info',
   BANK: 'primary',
   DRAWER: 'neutral',
 }
+
 const SIGN_FROM_TYPE: Record<string, '+' | '-'> = {
   PURCHASE: '+',
   ADJUSTMENT: '+',
@@ -312,7 +360,7 @@ const SIGN_FROM_TYPE: Record<string, '+' | '-'> = {
 }
 
 const filteredLedger = computed<any[]>(() => {
-  return ledgerRows.value.filter((r) => {
+  return ledgerRows.value.filter(r => {
     if (ledgerTypeFilter.value && r.type !== ledgerTypeFilter.value)
       return false
     if (ledgerSourceFilter.value && r.source_account !== ledgerSourceFilter.value)
@@ -327,11 +375,13 @@ const txnTypeOptions = computed(() => [
   { value: 'RETURN', label: t('supplier_txn_type_RETURN') },
   { value: 'ADJUSTMENT', label: t('supplier_txn_type_ADJUSTMENT') },
 ])
+
 const sourceOptions = computed(() => [
   { value: 'SAFE', label: t('supplier_source_SAFE') },
   { value: 'BANK', label: t('supplier_source_BANK') },
   { value: 'DRAWER', label: t('supplier_source_DRAWER') },
 ])
+
 const payAccountOptions = computed(() => [
   { value: 'SAFE', label: t('supplier_source_SAFE') },
   { value: 'BANK', label: t('supplier_source_BANK') },
@@ -349,9 +399,10 @@ const ledgerPagination = computed(() => ({
 // Edit modal
 // ============================================================
 function openEdit() {
-  if (!supplier.value)
+  if (!canManageSupplier.value || !supplier.value)
     return
   const s = supplier.value
+
   editForm.value = {
     code: s.code ?? '',
     name: s.name ?? '',
@@ -376,6 +427,9 @@ function openEdit() {
 }
 
 async function submitEdit() {
+  if (!canManageSupplier.value)
+    return
+
   if (!editForm.value.name?.trim()) {
     notify(t('supplier_field_name'), 'error')
     return
@@ -399,11 +453,17 @@ async function submitEdit() {
 // Pay modal
 // ============================================================
 function openPay() {
+  if (!canPaySupplier.value)
+    return
+
   payForm.value = { amount: 0, source_account: 'SAFE', commission: 0, note: '' }
   payOpen.value = true
 }
 
 async function submitPay() {
+  if (!canPaySupplier.value)
+    return
+
   if (!payForm.value.amount || Number(payForm.value.amount) <= 0) {
     notify(t('pay_amount_required'), 'error')
     return
@@ -415,6 +475,7 @@ async function submitPay() {
       source_account: payForm.value.source_account,
       note: payForm.value.note,
     }
+
     if (payForm.value.source_account === 'BANK')
       body.commission = Number(payForm.value.commission) || 0
     await stockApi.post(`/suppliers/${supplierId.value}/pay/`, body)
@@ -438,6 +499,7 @@ async function loadStockItems(q = '') {
     const res = await stockApi.get('/items/search/', { params: { q } })
     const d = res.data?.data ?? res.data
     const list = d?.items ?? d?.results ?? d ?? []
+
     stockItemOptions.value = list.map((it: any) => ({
       value: String(it.id),
       label: it.name ?? `#${it.id}`,
@@ -453,6 +515,7 @@ async function loadUnits() {
     const res = await stockApi.get('/units/')
     const d = res.data?.data ?? res.data
     const list = d?.units ?? d?.results ?? d ?? []
+
     unitOptions.value = list.map((u: any) => ({
       value: String(u.id),
       label: u.name ?? u.short_name ?? `#${u.id}`,
@@ -464,9 +527,13 @@ async function loadUnits() {
 }
 
 const debouncedItemSearch = useDebounceFn((q: string) => loadStockItems(q), 300)
+
 watch(stockItemQuery, q => debouncedItemSearch(q))
 
 function openAddItem() {
+  if (!canManageSupplierItems.value)
+    return
+
   addItemForm.value = {
     stock_item_id: '',
     unit_id: '',
@@ -487,6 +554,9 @@ function openAddItem() {
 }
 
 async function submitAddItem() {
+  if (!canManageSupplierItems.value)
+    return
+
   if (!addItemForm.value.stock_item_id || !addItemForm.value.unit_id || !(Number(addItemForm.value.price) > 0)) {
     notify(t('add_item_failed'), 'error')
     return
@@ -506,6 +576,7 @@ async function submitAddItem() {
       is_preferred: !!addItemForm.value.is_preferred,
       notes: addItemForm.value.notes,
     }
+
     await stockApi.post(`/suppliers/${supplierId.value}/items/`, body)
     notify(t('add_item_success'))
     addItemOpen.value = false
@@ -523,10 +594,16 @@ async function submitAddItem() {
 // Deactivate
 // ============================================================
 function openDeactivate() {
+  if (!canManageSupplier.value)
+    return
+
   deactivateOpen.value = true
 }
 
 async function submitDeactivate() {
+  if (!canManageSupplier.value)
+    return
+
   deactivating.value = true
   try {
     await stockApi.delete(`/suppliers/${supplierId.value}/`)
@@ -546,11 +623,17 @@ async function submitDeactivate() {
 // Remove item (UI only — endpoint not yet exposed; confirm + toast)
 // ============================================================
 function askRemoveItem(item: any) {
+  if (!canManageSupplierItems.value)
+    return
+
   removingItem.value = item
   removeItemOpen.value = true
 }
 
 async function submitRemoveItem() {
+  if (!canManageSupplierItems.value)
+    return
+
   // Endpoint not exposed yet on backend; surface a failure for honesty
   // until BE wires DELETE /supplier-items/{id}/.
   notify(t('remove_item_failed'), 'error')
@@ -562,6 +645,7 @@ async function submitRemoveItem() {
 // Helpers
 // ============================================================
 const statusBadgeTone = computed(() => (supplier.value?.is_active ? 'success' : 'neutral'))
+
 const statusBadgeText = computed(() =>
   supplier.value?.is_active ? t('supplier_status_active') : t('supplier_status_inactive'),
 )
@@ -615,6 +699,7 @@ function backToList() {
           {{ t('supplier_action_refresh') }}
         </Button>
         <Button
+          v-if="canManageSupplier"
           variant="secondary"
           icon="edit"
           :disabled="!supplier"
@@ -623,6 +708,7 @@ function backToList() {
           {{ t('supplier_action_edit') }}
         </Button>
         <Button
+          v-if="canPaySupplier"
           variant="primary"
           icon="wallet"
           :disabled="!supplier"
@@ -631,6 +717,7 @@ function backToList() {
           {{ t('supplier_action_pay') }}
         </Button>
         <Button
+          v-if="canManageSupplier"
           variant="danger"
           icon="trash"
           :disabled="!supplier || !supplier.is_active"
@@ -680,8 +767,7 @@ function backToList() {
             <span v-if="supplier.email"> · {{ supplier.email }}</span>
           </div>
         </div>
-        <div
-          class="cell-muted identity-meta"
+        <div class="cell-muted identity-meta"
         >
           <div>
             <span style="color: var(--color-warning, #d97706);">{{ ratingStars(supplier.rating) }}</span>
@@ -894,8 +980,7 @@ function backToList() {
           class="row"
           style="gap:10px; align-items:center; flex-wrap: wrap;"
         >
-          <Switch
-            v-model="itemPreferredOnly"
+          <Switch v-model="itemPreferredOnly"
           />
           <span style="font-size:14px;font-weight:500;color:var(--text-secondary);">
             {{ t('items_col_is_preferred') }}
@@ -903,6 +988,7 @@ function backToList() {
         </div>
         <div class="toolbar-spacer" />
         <Button
+          v-if="canManageSupplierItems"
           variant="primary"
           icon="plus"
           @click="openAddItem"
@@ -963,6 +1049,7 @@ function backToList() {
 
         <template #row-actions="{ row }">
           <IconAction
+            v-if="canManageSupplierItems"
             icon="trash"
             tone="danger"
             :title="t('supplier_action_remove_item')"
@@ -983,6 +1070,7 @@ function backToList() {
             </div>
             <div style="margin-top:12px;">
               <Button
+                v-if="canManageSupplierItems"
                 variant="secondary"
                 icon="plus"
                 @click="openAddItem"
@@ -1186,19 +1274,11 @@ function backToList() {
             />
           </Field>
           <Field :label="t('supplier_field_credit_limit')">
-            <Input
-              v-model="editForm.credit_limit"
-              type="number"
-              step="0.01"
-              min="0"
+            <MoneyInput v-model="editForm.credit_limit"
             />
           </Field>
           <Field :label="t('supplier_field_minimum_order_value')">
-            <Input
-              v-model="editForm.minimum_order_value"
-              type="number"
-              step="0.01"
-              min="0"
+            <MoneyInput v-model="editForm.minimum_order_value"
             />
           </Field>
           <Field :label="t('supplier_field_rating')">
@@ -1251,20 +1331,17 @@ function backToList() {
         class="cell-muted"
       >
         {{ supplier.name }}
-        <span v-if="Number(supplier.current_balance) > 0">
+        <span v-if="Number(currentBalance) > 0">
           · <strong class="num-tabular" style="color: rgb(var(--v-theme-warning-strong));">
-            {{ formatCurrency(supplier.current_balance) }}
+            {{ formatCurrency(currentBalance ?? 0) }}
           </strong>
         </span>
       </div>
       <form @submit.prevent="submitPay">
         <div class="form-grid">
           <Field :label="t('pay_field_amount')">
-            <Input
+            <MoneyInput
               v-model="payForm.amount"
-              type="number"
-              step="0.01"
-              min="0.01"
               icon="wallet"
             />
           </Field>
@@ -1282,11 +1359,7 @@ function backToList() {
             :label="t('pay_field_commission')"
             class="span-2"
           >
-            <Input
-              v-model="payForm.commission"
-              type="number"
-              step="0.01"
-              min="0"
+            <MoneyInput v-model="payForm.commission"
             />
           </Field>
           <Field
@@ -1350,11 +1423,7 @@ function backToList() {
             />
           </Field>
           <Field :label="t('add_item_field_price')">
-            <Input
-              v-model="addItemForm.price"
-              type="number"
-              step="0.0001"
-              min="0"
+            <MoneyInput v-model="addItemForm.price"
             />
           </Field>
           <Field :label="t('supplier_field_currency')">
@@ -1639,4 +1708,6 @@ function backToList() {
 meta:
   action: manage
   subject: all
+  anyPermission:
+    - stock.supplier.view
 </route>

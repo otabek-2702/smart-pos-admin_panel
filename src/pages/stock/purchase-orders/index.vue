@@ -21,6 +21,7 @@ import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import { useStateAction } from '@/composables/useStateAction'
 import { getStoredUserData } from '@/utils/storage'
+import { useUserAccess } from '@/composables/useUserAccess'
 
 const { t } = useI18n({ useScope: 'global' })
 const router = useRouter()
@@ -55,6 +56,9 @@ const form = ref({
 
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDateShort } = useFormatters()
+const { hasPermission, isAdministrator } = useUserAccess()
+const canManagePurchaseOrders = computed(() => hasPermission('stock.manage'))
+const canCreateReceiving = computed(() => hasPermission('stock.receiving.create'))
 
 // Status / payment tone maps for Badge
 const STATUS_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'primary' | 'neutral'> = {
@@ -65,6 +69,7 @@ const STATUS_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'pr
   RECEIVED: 'success',
   CANCELED: 'error',
 }
+
 const PAYMENT_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'primary' | 'neutral'> = {
   UNPAID: 'error',
   PARTIAL: 'warning',
@@ -74,9 +79,11 @@ const PAYMENT_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'p
 const statusOptions = computed(() =>
   ['DRAFT', 'SENT', 'CONFIRMED', 'PARTIAL', 'RECEIVED', 'CANCELED'].map(s => ({ value: s, label: t(`po_status_${s}`) })),
 )
+
 const paymentStatusOptions = computed(() =>
   ['UNPAID', 'PARTIAL', 'PAID'].map(s => ({ value: s, label: t(`po_payment_${s}`) })),
 )
+
 // Backend stores currency as a 3-char code (default UZS). Offer the codes an
 // operator here actually deals with instead of a free-text box that can be typo'd.
 const currencyOptions = ['UZS', 'USD', 'EUR', 'RUB'].map(c => ({ value: c, label: c }))
@@ -122,6 +129,7 @@ async function ensureDetail(row: any) {
   try {
     const res = await axios.get(`/purchase-orders/${row.id}/`)
     const d = res.data?.data ?? res.data
+
     detailCache.value[row.id] = d?.order ?? d
   }
   catch {
@@ -154,6 +162,7 @@ async function loadOrders() {
 
     orders.value = d?.orders ?? []
     total.value = d?.pagination?.total ?? orders.value.length
+
     // Invalidate the per-row detail cache whenever the list reloads, so
     // expanded rows refetch fresh detail after pagination/filter changes.
     detailCache.value = {}
@@ -218,12 +227,14 @@ async function createOrder() {
   saving.value = true
   try {
     const userData = getStoredUserData()
+
     const payload: any = {
       ...form.value,
       supplier_id: form.value.supplier_id ? Number(form.value.supplier_id) : null,
       delivery_location_id: form.value.delivery_location_id ? Number(form.value.delivery_location_id) : null,
       created_by_id: userData.id,
     }
+
     if (!payload.expected_date)
       delete payload.expected_date
     if (!payload.notes)
@@ -275,10 +286,13 @@ function goReceive(item: any) {
   router.push({ path: '/stock/receiving', query: { po: String(item.id) } })
 }
 
-function canSend(item: any) { return item.status === 'DRAFT' }
-function canConfirm(item: any) { return item.status === 'SENT' }
-function canReceive(item: any) { return ['CONFIRMED', 'PARTIAL'].includes(item.status) }
-function canCancel(item: any) { return !['RECEIVED', 'CANCELED'].includes(item.status) }
+function recordAllows(item: any, action: string, fallback: boolean) {
+  return Array.isArray(item?.allowed_actions) ? item.allowed_actions.map(String).includes(action) : fallback
+}
+function canSend(item: any) { return isAdministrator.value && item.status === 'DRAFT' && recordAllows(item, 'send', true) }
+function canConfirm(item: any) { return isAdministrator.value && item.status === 'SENT' && recordAllows(item, 'confirm', true) }
+function canReceive(item: any) { return canCreateReceiving.value && ['CONFIRMED', 'PARTIAL'].includes(item.status) && recordAllows(item, 'receive', true) }
+function canCancel(item: any) { return isAdministrator.value && !['RECEIVED', 'CANCELED'].includes(item.status) && recordAllows(item, 'cancel', true) }
 
 const pagination = computed(() => ({
   page: page.value,
@@ -299,6 +313,7 @@ const pagination = computed(() => ({
     >
       <template #actions>
         <Button
+          v-if="canManagePurchaseOrders"
           variant="primary"
           icon="plus"
           @click="openCreate"
@@ -518,13 +533,15 @@ const pagination = computed(() => ({
           />
         </template>
 
-        <!-- Expanded row: order metadata + line items.
-             BE list endpoint returns serialize_brief (no items / delivery_location /
-             expected_date / payment_status). Fetch detail on first expand and read
-             from detailCache. -->
+        <!--
+          Expanded row: order metadata + line items.
+          BE list endpoint returns serialize_brief (no items / delivery_location /
+          expected_date / payment_status). Fetch detail on first expand and read
+          from detailCache.
+        -->
         <template #expanded="{ row }">
           <!-- Trigger detail fetch on first render of the expanded slot -->
-          {{ (ensureDetail(row), '') }}
+          {{ ensureDetail(row), '' }}
           <div class="po-expand">
             <div class="po-expand__meta">
               <span>
@@ -911,4 +928,6 @@ name: stock-purchase-orders
 meta:
   action: manage
   subject: all
+  anyPermission:
+    - stock.purchase.view
 </route>

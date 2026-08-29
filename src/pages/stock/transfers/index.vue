@@ -22,15 +22,25 @@ import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
+import { useUserAccess } from '@/composables/useUserAccess'
 
 const { t } = useI18n({ useScope: 'global' })
 const { notify, snackbar, snackbarMsg, snackbarColor } = useNotify()
+const { translate } = useApiError()
 const { formatDate, formatDateShort } = useFormatters()
+const { access, hasAnyPermission, isAdministrator } = useUserAccess()
+const canRequestTransfers = computed(() => hasAnyPermission(['stock.manage', 'stock.transfer.create']))
+const canApproveTransfers = computed(() => hasAnyPermission(['stock.manage']))
+const canShipTransfers = computed(() => hasAnyPermission(['stock.manage']))
+const canReceiveTransfers = computed(() => hasAnyPermission(['stock.manage']))
+const canCancelTransfers = computed(() => hasAnyPermission(['stock.manage']))
+const canQuickTransfer = computed(() => hasAnyPermission(['stock.manage']))
 
 // ---------------- state ----------------
 const transfers = ref<any[]>([])
 const total = ref(0)
 const loading = ref(false)
+const loadError = ref('')
 const page = ref(1)
 const itemsPerPage = ref(10)
 
@@ -41,8 +51,15 @@ const typeFilter = ref<string | undefined>(undefined)
 
 const locationsList = ref<any[]>([])
 const itemsList = ref<any[]>([])
-const unitsList = ref<any[]>([])
 const batchesList = ref<any[]>([])
+const metaLoading = ref(false)
+const metaError = ref('')
+const selectedItemDetail = ref<any | null>(null)
+const itemSafetyLoading = ref(false)
+const itemSafetyError = ref('')
+const batchesLoading = ref(false)
+const batchesError = ref('')
+let selectionSafetyRequestId = 0
 
 const statuses = ['DRAFT', 'REQUESTED', 'APPROVED', 'IN_TRANSIT', 'RECEIVED', 'CANCELED']
 const transferTypes = ['INTERNAL', 'BRANCH_TO_BRANCH']
@@ -56,6 +73,7 @@ const STATUS_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'pr
   RECEIVED: 'success',
   CANCELED: 'error',
 }
+
 const TYPE_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'primary' | 'neutral'> = {
   INTERNAL: 'neutral',
   BRANCH_TO_BRANCH: 'info',
@@ -69,11 +87,9 @@ function statusTone(s: string) {
 const confirmDialog = ref<{ kind: 'request' | 'approve' | 'ship'; row: any } | null>(null)
 const receiveDialog = ref<{ row: any; loading: boolean } | null>(null)
 const cancelDialog = ref<{ row: any; reason: string; loading: boolean } | null>(null)
-const detailDialog = ref<{ row: any; loading: boolean } | null>(null)
+const detailDialog = ref<{ row: any; loading: boolean; error?: string } | null>(null)
 const quickDialog = ref(false)
-
-// Per-item received quantities map: item.id -> string (numeric)
-const receivedQtys = ref<Record<number, string>>({})
+const transferFormMode = ref<'request' | 'quick'>('request')
 
 // Quick transfer form
 const quickForm = ref({
@@ -81,10 +97,10 @@ const quickForm = ref({
   to_location_id: '' as string,
   stock_item_id: '' as string,
   quantity: '' as string,
-  unit_id: '' as string,
   batch_id: '' as string,
   notes: '',
 })
+
 const quickSaving = ref(false)
 const quickErrors = ref<Record<string, string>>({})
 
@@ -93,15 +109,19 @@ const actingId = ref<number | null>(null)
 // Cache enriched rows (list returns brief shape only). Indexed by id.
 const rowDetailCache = ref<Record<number, any>>({})
 async function ensureRowDetail(row: any) {
-  if (!row?.id) return
-  if (rowDetailCache.value[row.id]) return
+  if (!row?.id)
+    return
+  if (rowDetailCache.value[row.id])
+    return
   try {
     const res = await axios.get(`/transfers/${row.id}/`)
     const detail = res.data?.data?.transfer ?? res.data?.transfer ?? res.data?.data ?? res.data
-    if (!detail) return
+    if (!detail)
+      return
     rowDetailCache.value = { ...rowDetailCache.value, [row.id]: detail }
+
     // Merge in-place so columns relying on transfer_type/requested_at/etc. populate.
-    const idx = transfers.value.findIndex(t => t.id === row.id)
+    const idx = transfers.value.findIndex(transferRow => transferRow.id === row.id)
     if (idx !== -1)
       transfers.value[idx] = { ...transfers.value[idx], ...detail }
   }
@@ -111,6 +131,7 @@ async function ensureRowDetail(row: any) {
 // ---------------- loaders ----------------
 async function loadTransfers() {
   loading.value = true
+  loadError.value = ''
   try {
     const params: any = { page: page.value, per_page: itemsPerPage.value }
     if (statusFilter.value)
@@ -127,11 +148,15 @@ async function loadTransfers() {
 
     transfers.value = d?.transfers ?? []
     total.value = d?.pagination?.total ?? transfers.value.length
+
     // List shape is brief; reset detail cache so re-expand re-fetches.
     rowDetailCache.value = {}
+    await Promise.allSettled(transfers.value.map(row => ensureRowDetail(row)))
   }
-  catch {
-    notify(t('transfer_ext_empty'), 'error')
+  catch (error) {
+    transfers.value = []
+    total.value = 0
+    loadError.value = translate(error)
   }
   finally {
     loading.value = false
@@ -139,17 +164,97 @@ async function loadTransfers() {
 }
 
 async function loadMeta() {
+  metaLoading.value = true
+  metaError.value = ''
   try {
-    const [locRes, itemsRes, unitsRes] = await Promise.all([
-      axios.get('/locations/', { params: { per_page: 200 } }),
-      axios.get('/items/', { params: { per_page: 300 } }),
-      axios.get('/units/', { params: { per_page: 200 } }),
+    const [locations, items] = await Promise.all([
+      loadAllStockRows('/locations/', 'locations'),
+      loadAllStockRows('/items/', 'items'),
     ])
-    locationsList.value = locRes.data?.data?.locations ?? locRes.data?.locations ?? []
-    itemsList.value = itemsRes.data?.data?.items ?? itemsRes.data?.items ?? []
-    unitsList.value = unitsRes.data?.data?.units ?? unitsRes.data?.units ?? []
+
+    locationsList.value = locations
+    itemsList.value = items
   }
-  catch { /* ignore */ }
+  catch (error) {
+    locationsList.value = []
+    itemsList.value = []
+    metaError.value = translate(error)
+  }
+  finally {
+    metaLoading.value = false
+  }
+}
+
+async function loadAllStockRows(path: string, key: string): Promise<any[]> {
+  const rows: any[] = []
+  const perPage = 100
+  for (let currentPage = 1; ; currentPage += 1) {
+    const response = await axios.get(path, { params: { page: currentPage, per_page: perPage } })
+    const data = response.data?.data ?? response.data
+    const pageRows = data?.[key] ?? data?.results ?? []
+
+    rows.push(...pageRows)
+
+    const expectedTotal = Number(data?.pagination?.total ?? rows.length)
+    if (!pageRows.length || rows.length >= expectedTotal)
+      break
+  }
+
+  return rows
+}
+
+function unwrapStockResponse(response: any, key?: string): any {
+  const data = response?.data?.data ?? response?.data ?? {}
+
+  return key ? (data?.[key] ?? data) : data
+}
+
+async function fetchItemDetail(stockItemId: string | number): Promise<any> {
+  const response = await axios.get(`/items/${stockItemId}/`)
+
+  return unwrapStockResponse(response, 'item')
+}
+
+function batchAvailableQuantity(batch: any): number {
+  return Number(batch?.available_quantity ?? (Number(batch?.current_quantity ?? 0) - Number(batch?.reserved_quantity ?? 0)))
+}
+
+function isEligibleSourceBatch(batch: any, fromLocationId: string | number, stockItemId: string | number): boolean {
+  return String(batch?.location_id) === String(fromLocationId)
+    && String(batch?.stock_item_id) === String(stockItemId)
+    && batch?.status === 'AVAILABLE'
+    && batch?.quality_status === 'PASSED'
+    && batch?.is_expired === false
+    && batchAvailableQuantity(batch) > 0
+}
+
+async function fetchEligibleBatches(fromLocationId: string, stockItemId: string): Promise<any[]> {
+  const rows: any[] = []
+  const perPage = 100
+  for (let currentPage = 1; ; currentPage += 1) {
+    const response = await axios.get('/batches/', {
+      params: {
+        location_id: fromLocationId,
+        stock_item_id: stockItemId,
+        status: 'AVAILABLE',
+        has_stock_only: true,
+        page: currentPage,
+        per_page: perPage,
+      },
+    })
+
+    const data = unwrapStockResponse(response)
+    const pageRows = data?.batches ?? []
+
+    rows.push(...pageRows.filter((batch: any) => isEligibleSourceBatch(batch, fromLocationId, stockItemId)))
+
+    const batchTotal = Number(data?.pagination?.total_items ?? data?.pagination?.total ?? rows.length)
+
+    if (!pageRows.length || currentPage * perPage >= batchTotal)
+      break
+  }
+
+  return rows
 }
 
 async function loadBatchesFor(fromLocationId: string, stockItemId: string) {
@@ -157,19 +262,8 @@ async function loadBatchesFor(fromLocationId: string, stockItemId: string) {
     batchesList.value = []
     return
   }
-  try {
-    const res = await axios.get('/batches/', {
-      params: {
-        location_id: fromLocationId,
-        stock_item_id: stockItemId,
-        per_page: 100,
-      },
-    })
-    batchesList.value = res.data?.data?.batches ?? res.data?.batches ?? []
-  }
-  catch {
-    batchesList.value = []
-  }
+
+  batchesList.value = await fetchEligibleBatches(fromLocationId, stockItemId)
 }
 
 onMounted(() => {
@@ -186,12 +280,49 @@ watch([statusFilter, fromLocationFilter, toLocationFilter, typeFilter], () => {
 // reload batch list when quick form source/item changes
 watch(
   () => [quickForm.value.from_location_id, quickForm.value.stock_item_id],
-  ([fl, si]) => {
+  async ([fl, si]) => {
+    const requestId = ++selectionSafetyRequestId
+
     quickForm.value.batch_id = ''
-    if (fl && si)
-      loadBatchesFor(String(fl), String(si))
-    else
-      batchesList.value = []
+    selectedItemDetail.value = null
+    itemSafetyError.value = ''
+    batchesError.value = ''
+    batchesList.value = []
+    if (!si) {
+      itemSafetyLoading.value = false
+      batchesLoading.value = false
+      return
+    }
+
+    itemSafetyLoading.value = true
+    try {
+      const item = await fetchItemDetail(String(si))
+      if (requestId !== selectionSafetyRequestId)
+        return
+      selectedItemDetail.value = item
+      if (item?.track_batches && fl) {
+        batchesLoading.value = true
+        try {
+          await loadBatchesFor(String(fl), String(si))
+        }
+        catch {
+          if (requestId === selectionSafetyRequestId)
+            batchesError.value = t('transfer_ext_batch_verification_failed')
+        }
+        finally {
+          if (requestId === selectionSafetyRequestId)
+            batchesLoading.value = false
+        }
+      }
+    }
+    catch {
+      if (requestId === selectionSafetyRequestId)
+        itemSafetyError.value = t('transfer_ext_item_verification_failed')
+    }
+    finally {
+      if (requestId === selectionSafetyRequestId)
+        itemSafetyLoading.value = false
+    }
   },
 )
 
@@ -199,51 +330,158 @@ watch(
 const locationOptions = computed(() =>
   locationsList.value.map((l: any) => ({ value: String(l.id), label: l.name })),
 )
+
+function baseUnitShort(item: any): string {
+  return String(item?.base_unit_short ?? item?.base_unit?.short_name ?? '')
+}
+
 const itemOptions = computed(() =>
   itemsList.value.map((i: any) => ({
     value: String(i.id),
-    label: i.sku ? `${i.name} (${i.sku})` : i.name,
+    label: `${i.sku ? `${i.name} (${i.sku})` : i.name}${baseUnitShort(i) ? ` · ${baseUnitShort(i)}` : ''}`,
   })),
 )
-const unitOptions = computed(() =>
-  unitsList.value.map((u: any) => ({
-    value: String(u.id),
-    label: u.short_name ? `${u.name} (${u.short_name})` : u.name,
-  })),
-)
+
+const selectedBaseUnitShort = computed(() => {
+  const item = itemsList.value.find((row: any) => String(row.id) === String(quickForm.value.stock_item_id))
+
+  return baseUnitShort(item)
+})
+
+const selectedTracksBatches = computed(() => selectedItemDetail.value?.track_batches === true)
+
 const batchOptions = computed(() =>
   batchesList.value.map((b: any) => ({
     value: String(b.id),
-    label: b.batch_number ?? `${t('transfer_batch_label')} #${b.id}`,
+    label: `${b.batch_number ?? `${t('transfer_batch_label')} #${b.id}`} · ${t('transfer_ext_batch_available', { quantity: batchAvailableQuantity(b) })}`,
   })),
 )
 
 // ---------------- row-action visibility ----------------
-function canRequest(r: any) { return r.status === 'DRAFT' }
-function canApprove(r: any) { return ['DRAFT', 'REQUESTED'].includes(r.status) }
-function canShip(r: any) { return r.status === 'APPROVED' }
-function canReceive(r: any) { return r.status === 'IN_TRANSIT' }
-function canCancel(r: any) { return !['RECEIVED', 'CANCELED'].includes(r.status) }
+function isOwnedByCurrentUser(row: any): boolean {
+  if (isAdministrator.value)
+    return true
+  const currentUser = access.value.user?.user ?? access.value.user ?? {}
+  const currentUserId = currentUser.id ?? currentUser.user_id
+
+  return currentUserId != null
+    && row.requested_by_id != null
+    && String(currentUserId) === String(row.requested_by_id)
+}
+
+function canRequest(r: any) { return canRequestTransfers.value && r.status === 'DRAFT' && isOwnedByCurrentUser(r) }
+function canApprove(r: any) { return canApproveTransfers.value && ['DRAFT', 'REQUESTED'].includes(r.status) }
+function canShip(r: any) { return canShipTransfers.value && r.status === 'APPROVED' }
+function canReceive(r: any) { return canReceiveTransfers.value && r.status === 'IN_TRANSIT' }
+function canCancel(r: any) { return canCancelTransfers.value && ['DRAFT', 'REQUESTED', 'APPROVED'].includes(r.status) }
+
+function mayPerform(action: 'request' | 'approve' | 'ship'): boolean {
+  if (action === 'request')
+    return canRequestTransfers.value
+  if (action === 'approve')
+    return canApproveTransfers.value
+  return canShipTransfers.value
+}
+
+function transferSafetyError(key: string, params?: Record<string, unknown>): Error {
+  return new Error(t(key, params ?? {}))
+}
+
+async function verifyBatchTrackedTransferItem(transfer: any, item: any, quantity: number): Promise<void> {
+  const stockItemId = item?.stock_item_id ?? item?.stock_item?.id
+  if (!stockItemId)
+    throw transferSafetyError('transfer_ext_item_verification_failed')
+
+  const stockItem = await fetchItemDetail(stockItemId)
+  if (stockItem?.track_batches !== true)
+    return
+  if (!item?.batch_id)
+    throw transferSafetyError('transfer_ext_batch_required_existing', { item: item?.stock_item?.name ?? stockItem?.name ?? stockItemId })
+
+  const batchResponse = await axios.get(`/batches/${item.batch_id}/`)
+  const batch = unwrapStockResponse(batchResponse, 'batch')
+  if (!isEligibleSourceBatch(batch, transfer?.from_location_id ?? transfer?.from_location?.id, stockItemId))
+    throw transferSafetyError('transfer_ext_batch_no_longer_eligible')
+  if (!Number.isFinite(quantity) || quantity <= 0 || quantity > batchAvailableQuantity(batch))
+    throw transferSafetyError('transfer_ext_batch_insufficient', { available: batchAvailableQuantity(batch) })
+}
+
+async function verifyExistingTransferForAction(row: any, action: 'request' | 'approve' | 'ship'): Promise<any> {
+  const response = await axios.get(`/transfers/${row.id}/`)
+  const transfer = unwrapStockResponse(response, 'transfer')
+  const items = Array.isArray(transfer?.items) ? transfer.items : []
+  if (!items.length)
+    throw transferSafetyError('transfer_ext_item_verification_failed')
+
+  await Promise.all(items.map((item: any) => verifyBatchTrackedTransferItem(
+    transfer,
+    item,
+    Number(action === 'ship'
+      ? (item.shipped_qty ?? item.approved_qty ?? item.requested_qty)
+      : item.requested_qty),
+  )))
+
+  return transfer
+}
+
+async function verifyTransferFormSafety(): Promise<void> {
+  const stockItemId = quickForm.value.stock_item_id
+  const fromLocationId = quickForm.value.from_location_id
+  const quantity = Number(quickForm.value.quantity)
+  let item: any
+  try {
+    item = await fetchItemDetail(stockItemId)
+  }
+  catch {
+    throw transferSafetyError('transfer_ext_item_verification_failed')
+  }
+  if (item?.track_batches !== true)
+    return
+  if (!quickForm.value.batch_id)
+    throw transferSafetyError('transfer_ext_batch_required')
+
+  let batches: any[]
+  try {
+    batches = await fetchEligibleBatches(fromLocationId, stockItemId)
+  }
+  catch {
+    throw transferSafetyError('transfer_ext_batch_verification_failed')
+  }
+  const batch = batches.find(row => String(row.id) === quickForm.value.batch_id)
+  if (!batch)
+    throw transferSafetyError('transfer_ext_batch_no_longer_eligible')
+  if (quantity > batchAvailableQuantity(batch))
+    throw transferSafetyError('transfer_ext_batch_insufficient', { available: batchAvailableQuantity(batch) })
+}
 
 // ---------------- actions ----------------
 async function performAction(row: any, action: 'request' | 'approve' | 'ship') {
-  if (actingId.value === row.id) return
+  if (!mayPerform(action) || actingId.value === row.id)
+    return
   actingId.value = row.id
   try {
+    await verifyExistingTransferForAction(row, action)
     await axios.post(`/transfers/${row.id}/${action}/`, {})
+
     const okKey
-      = action === 'request' ? 'transfer_ext_msg_requested'
-        : action === 'approve' ? 'transfer_ext_msg_approved'
+      = action === 'request'
+        ? 'transfer_ext_msg_requested'
+        : action === 'approve'
+          ? 'transfer_ext_msg_approved'
           : 'transfer_ext_msg_shipped'
+
     notify(t(okKey))
     await loadTransfers()
   }
   catch (e: any) {
     const errKey
-      = action === 'request' ? 'transfer_ext_err_request'
-        : action === 'approve' ? 'transfer_ext_err_approve'
+      = action === 'request'
+        ? 'transfer_ext_err_request'
+        : action === 'approve'
+          ? 'transfer_ext_err_approve'
           : 'transfer_ext_err_ship'
-    notify(e?.response?.data?.message ?? t(errKey), 'error')
+
+    notify(e?.response?.data?.message ?? e?.message ?? t(errKey), 'error')
   }
   finally {
     actingId.value = null
@@ -252,15 +490,16 @@ async function performAction(row: any, action: 'request' | 'approve' | 'ship') {
 }
 
 async function confirmReceive() {
-  if (!receiveDialog.value) return
+  if (!canReceiveTransfers.value || !receiveDialog.value)
+    return
   const row = receiveDialog.value.row
+
   receiveDialog.value.loading = true
   try {
-    const received_quantities: Record<string, string> = {}
-    for (const [k, v] of Object.entries(receivedQtys.value))
-      received_quantities[String(k)] = String(v ?? '0')
-
-    await axios.post(`/transfers/${row.id}/receive/`, { received_quantities })
+    // The deployed server currently supports full receipts safely. Passing an
+    // empty map makes that behavior explicit and avoids pretending partial
+    // quantities were honored when JSON object keys arrive as strings.
+    await axios.post(`/transfers/${row.id}/receive/`, { received_quantities: {} })
     notify(t('transfer_ext_msg_received'))
     receiveDialog.value = null
     await loadTransfers()
@@ -273,10 +512,29 @@ async function confirmReceive() {
 }
 
 async function confirmCancel() {
-  if (!cancelDialog.value) return
+  if (!canCancelTransfers.value || !cancelDialog.value)
+    return
   const row = cancelDialog.value.row
+
   cancelDialog.value.loading = true
   try {
+    // Recheck the latest state immediately before canceling. The deployed
+    // backend does not safely restore batch quantities after shipment, so an
+    // IN_TRANSIT transfer must never be canceled from this client.
+    const detailResponse = await axios.get(`/transfers/${row.id}/`)
+
+    const latest = detailResponse.data?.data?.transfer
+      ?? detailResponse.data?.transfer
+      ?? detailResponse.data?.data
+      ?? detailResponse.data
+
+    if (!canCancel(latest)) {
+      notify(t('transfer_ext_err_cancel_after_ship'), 'error')
+      cancelDialog.value = null
+      await loadTransfers()
+
+      return
+    }
     await axios.post(`/transfers/${row.id}/cancel/`, { reason: cancelDialog.value.reason || '' })
     notify(t('transfer_ext_msg_canceled'))
     cancelDialog.value = null
@@ -291,24 +549,23 @@ async function confirmCancel() {
 
 // ---------------- openers ----------------
 function openConfirm(row: any, kind: 'request' | 'approve' | 'ship') {
+  if (!mayPerform(kind))
+    return
+
   confirmDialog.value = { kind, row }
 }
 
 async function openReceive(row: any) {
+  if (!canReceiveTransfers.value)
+    return
+
   // fetch detail to know items
   receiveDialog.value = { row, loading: false }
-  receivedQtys.value = {}
   try {
     const res = await axios.get(`/transfers/${row.id}/`)
     const detail = res.data?.data?.transfer ?? res.data?.transfer ?? res.data?.data ?? res.data
+
     receiveDialog.value = { row: detail, loading: false }
-    const items = (detail.items ?? []) as any[]
-    const map: Record<number, string> = {}
-    for (const it of items) {
-      const def = it.shipped_qty ?? it.approved_qty ?? it.requested_qty ?? '0'
-      map[it.id] = String(def)
-    }
-    receivedQtys.value = map
   }
   catch {
     notify(t('transfer_ext_err_receive'), 'error')
@@ -317,6 +574,9 @@ async function openReceive(row: any) {
 }
 
 function openCancel(row: any) {
+  if (!canCancel(row))
+    return
+
   cancelDialog.value = { row, reason: '', loading: false }
 }
 
@@ -325,27 +585,62 @@ async function openDetail(row: any) {
   try {
     const res = await axios.get(`/transfers/${row.id}/`)
     const detail = res.data?.data?.transfer ?? res.data?.transfer ?? res.data?.data ?? res.data
+
     detailDialog.value = { row: detail, loading: false }
   }
-  catch {
-    if (detailDialog.value)
+  catch (error) {
+    if (detailDialog.value) {
       detailDialog.value.loading = false
+      detailDialog.value.error = translate(error)
+    }
   }
 }
 
-function openQuick() {
+async function openQuick() {
+  if (!canQuickTransfer.value)
+    return
+
+  if (metaLoading.value)
+    return
+  if (metaError.value) {
+    await loadMeta()
+    if (metaError.value)
+      return
+  }
+
+  transferFormMode.value = 'quick'
+  resetTransferForm()
+  quickDialog.value = true
+}
+
+async function openRequest() {
+  if (!canRequestTransfers.value)
+    return
+
+  if (metaLoading.value)
+    return
+  if (metaError.value) {
+    await loadMeta()
+    if (metaError.value)
+      return
+  }
+
+  transferFormMode.value = 'request'
+  resetTransferForm()
+  quickDialog.value = true
+}
+
+function resetTransferForm() {
   quickForm.value = {
     from_location_id: '',
     to_location_id: '',
     stock_item_id: '',
     quantity: '',
-    unit_id: '',
     batch_id: '',
     notes: '',
   }
   quickErrors.value = {}
   batchesList.value = []
-  quickDialog.value = true
 }
 
 function validateQuick(): boolean {
@@ -361,34 +656,89 @@ function validateQuick(): boolean {
     errs.to_location_id = t('transfer_ext_validation_same_location')
   if (!quickForm.value.stock_item_id)
     errs.stock_item_id = t('transfer_ext_validation_required')
+  else if (itemSafetyLoading.value || itemSafetyError.value)
+    errs.stock_item_id = itemSafetyError.value || t('transfer_ext_item_verification_pending')
   const qty = Number(quickForm.value.quantity)
   if (!quickForm.value.quantity || Number.isNaN(qty) || qty <= 0)
     errs.quantity = t('transfer_ext_validation_positive_qty')
+  if (selectedTracksBatches.value) {
+    if (batchesError.value)
+      errs.batch_id = batchesError.value
+    else if (batchesLoading.value)
+      errs.batch_id = t('transfer_ext_batch_verification_pending')
+    else if (!quickForm.value.batch_id)
+      errs.batch_id = t('transfer_ext_batch_required')
+  }
   quickErrors.value = errs
   return Object.keys(errs).length === 0
 }
 
 async function submitQuick() {
-  if (!validateQuick()) return
+  const allowed = transferFormMode.value === 'request' ? canRequestTransfers.value : canQuickTransfer.value
+  if (!allowed || !validateQuick())
+    return
   quickSaving.value = true
+  let createdTransferId: number | null = null
   try {
+    await verifyTransferFormSafety()
     const payload: any = {
       from_location_id: Number(quickForm.value.from_location_id),
       to_location_id: Number(quickForm.value.to_location_id),
       stock_item_id: Number(quickForm.value.stock_item_id),
       quantity: Number(quickForm.value.quantity),
     }
-    if (quickForm.value.unit_id) payload.unit_id = Number(quickForm.value.unit_id)
-    if (quickForm.value.batch_id) payload.batch_id = Number(quickForm.value.batch_id)
-    if (quickForm.value.notes) payload.notes = quickForm.value.notes
 
-    await axios.post('/transfers/quick/', payload)
-    notify(t('transfer_ext_msg_quick_done'))
+    if (quickForm.value.batch_id)
+      payload.batch_id = Number(quickForm.value.batch_id)
+    if (quickForm.value.notes)
+      payload.notes = quickForm.value.notes
+
+    if (transferFormMode.value === 'request') {
+      const createPayload: any = {
+        from_location_id: payload.from_location_id,
+        to_location_id: payload.to_location_id,
+        transfer_type: 'INTERNAL',
+        notes: payload.notes ?? '',
+        items: [{
+          stock_item_id: payload.stock_item_id,
+          quantity: payload.quantity,
+          ...(payload.batch_id ? { batch_id: payload.batch_id } : {}),
+        }],
+      }
+
+      const response = await axios.post('/transfers/', createPayload)
+      const data = response.data?.data ?? response.data
+      const transferId = data?.id ?? data?.transfer?.id
+      if (!transferId)
+        throw new Error(t('transfer_ext_err_create_request'))
+      createdTransferId = Number(transferId)
+      await axios.post(`/transfers/${createdTransferId}/request/`, {})
+      notify(t('transfer_ext_msg_requested'))
+    }
+    else {
+      await axios.post('/transfers/quick/', payload)
+      notify(t('transfer_ext_msg_quick_done'))
+    }
     quickDialog.value = false
     await loadTransfers()
   }
   catch (e: any) {
-    notify(e?.response?.data?.message ?? t('transfer_ext_err_quick'), 'error')
+    if (transferFormMode.value === 'request' && createdTransferId !== null) {
+      // Creating a transfer and submitting it are separate backend operations.
+      // Close and refresh after a failed submit so retrying the modal cannot
+      // create a duplicate draft; the draft row exposes the safe Request action.
+      quickDialog.value = false
+      await loadTransfers()
+
+      const createdRow = transfers.value.find(transferRow => transferRow.id === createdTransferId)
+      if (createdRow && createdRow.status !== 'DRAFT')
+        notify(t('transfer_ext_msg_requested'))
+      else
+        notify(t('transfer_ext_err_draft_created', { id: createdTransferId }), 'error')
+    }
+    else {
+      notify(e?.response?.data?.message ?? e?.message ?? t(transferFormMode.value === 'request' ? 'transfer_ext_err_create_request' : 'transfer_ext_err_quick'), 'error')
+    }
   }
   finally {
     quickSaving.value = false
@@ -397,27 +747,15 @@ async function submitQuick() {
 
 // ---------------- helpers ----------------
 function locName(loc: any): string {
-  if (loc == null) return '—'
-  if (typeof loc === 'string') return loc
+  if (loc == null)
+    return '—'
+  if (typeof loc === 'string')
+    return loc
   return loc?.name ?? '—'
 }
 
 function shippedQtyOf(item: any): string {
   return String(item.shipped_qty ?? item.approved_qty ?? item.requested_qty ?? '0')
-}
-
-function getReceivedQty(itemId: number): string {
-  return receivedQtys.value[itemId] ?? '0'
-}
-function setReceivedQty(itemId: number, v: string) {
-  receivedQtys.value = { ...receivedQtys.value, [itemId]: v }
-}
-function receivedInvalid(item: any): boolean {
-  const v = Number(getReceivedQty(item.id))
-  const max = Number(shippedQtyOf(item))
-  if (Number.isNaN(v) || v < 0) return true
-  if (!Number.isNaN(max) && v > max) return true
-  return false
 }
 
 // ---------------- DataTable columns ----------------
@@ -442,18 +780,24 @@ const dtPagination = computed(() => ({
 }))
 
 const confirmText = computed(() => {
-  if (!confirmDialog.value) return ''
+  if (!confirmDialog.value)
+    return ''
   const k = confirmDialog.value.kind
-  if (k === 'request') return t('transfer_ext_confirm_request')
-  if (k === 'approve') return t('transfer_ext_confirm_approve')
+  if (k === 'request')
+    return t('transfer_ext_confirm_request')
+  if (k === 'approve')
+    return t('transfer_ext_confirm_approve')
   return t('transfer_ext_confirm_ship')
 })
 
 const confirmTitle = computed(() => {
-  if (!confirmDialog.value) return ''
+  if (!confirmDialog.value)
+    return ''
   const k = confirmDialog.value.kind
-  if (k === 'request') return t('transfer_action_request')
-  if (k === 'approve') return t('transfer_action_approve')
+  if (k === 'request')
+    return t('transfer_action_request')
+  if (k === 'approve')
+    return t('transfer_action_approve')
   return t('transfer_action_ship')
 })
 </script>
@@ -467,14 +811,32 @@ const confirmTitle = computed(() => {
     >
       <template #actions>
         <Button
+          v-if="canRequestTransfers"
           variant="primary"
+          icon="plus"
+          :loading="metaLoading"
+          :disabled="metaLoading"
+          @click="openRequest"
+        >
+          {{ t('transfer_request_title') }}
+        </Button>
+        <Button
+          v-if="canQuickTransfer"
+          variant="secondary"
           icon="sparkle"
+          :disabled="metaLoading"
           @click="openQuick"
         >
           {{ t('transfer_action_quick') }}
         </Button>
       </template>
     </PageHeader>
+
+    <div v-if="metaError" class="inline-alert" role="alert">
+      <DesignIcon name="alert" :size="18" />
+      <span><strong>{{ t('Failed to load') }}.</strong> {{ metaError }}</span>
+      <Button variant="ghost" size="sm" icon="retry" :loading="metaLoading" @click="loadMeta">{{ t('Retry') }}</Button>
+    </div>
 
     <!-- Filter card -->
     <div class="card">
@@ -532,7 +894,12 @@ const confirmTitle = computed(() => {
       <div class="card__divider" />
 
       <!-- DataTable -->
+      <StateFill v-if="loadError" icon="alert" :title="t('Failed to load transfers')" :sub="loadError" error>
+        <template #action><Button variant="secondary" size="sm" icon="retry" @click="loadTransfers">{{ t('Retry') }}</Button></template>
+      </StateFill>
+
       <DataTable
+        v-else
         :columns="columns"
         :rows="transfers"
         row-key="id"
@@ -696,9 +1063,6 @@ const confirmTitle = computed(() => {
       </div>
 
       <template #footer>
-        <Button variant="ghost" @click="confirmDialog = null">
-          {{ t('Cancel') }}
-        </Button>
         <Button
           variant="primary"
           :loading="actingId === confirmDialog?.row?.id"
@@ -711,6 +1075,7 @@ const confirmTitle = computed(() => {
 
     <!-- ============ RECEIVE modal ============ -->
     <Modal
+      v-if="canReceiveTransfers"
       :open="!!receiveDialog"
       :title="t('transfer_action_receive')"
       :subtitle="t('transfer_ext_confirm_receive')"
@@ -718,6 +1083,10 @@ const confirmTitle = computed(() => {
       @close="receiveDialog = null"
     >
       <div v-if="receiveDialog?.row?.items?.length">
+        <div class="receive-notice" role="note">
+          <DesignIcon name="info" :size="18" />
+          <span>{{ t('transfer_full_receipt_only') }}</span>
+        </div>
         <div
           v-for="it in (receiveDialog.row.items as any[])"
           :key="it.id"
@@ -732,18 +1101,6 @@ const confirmTitle = computed(() => {
               <span v-if="it.unit_short" class="mono"> {{ it.unit_short }}</span>
             </div>
           </div>
-          <div class="receive-qty-cell">
-            <Field :error="receivedInvalid(it) ? t('transfer_ext_received_lt_shipped') : ''">
-              <Input
-                :model-value="getReceivedQty(it.id)"
-                type="number"
-                step="0.0001"
-                min="0"
-                :max="shippedQtyOf(it)"
-                @update:model-value="(v: string) => setReceivedQty(it.id, v)"
-              />
-            </Field>
-          </div>
         </div>
       </div>
       <div v-else class="cell-muted">
@@ -751,13 +1108,10 @@ const confirmTitle = computed(() => {
       </div>
 
       <template #footer>
-        <Button variant="ghost" @click="receiveDialog = null">
-          {{ t('Cancel') }}
-        </Button>
         <Button
           variant="primary"
           :loading="receiveDialog?.loading"
-          :disabled="!receiveDialog?.row?.items?.length || (receiveDialog?.row?.items ?? []).some((it: any) => receivedInvalid(it))"
+          :disabled="!receiveDialog?.row?.items?.length"
           @click="confirmReceive"
         >
           {{ t('transfer_action_receive') }}
@@ -767,6 +1121,7 @@ const confirmTitle = computed(() => {
 
     <!-- ============ CANCEL modal ============ -->
     <Modal
+      v-if="canCancelTransfers"
       :open="!!cancelDialog"
       :title="t('transfer_action_cancel')"
       :subtitle="t('transfer_ext_confirm_cancel')"
@@ -784,9 +1139,6 @@ const confirmTitle = computed(() => {
       </Field>
 
       <template #footer>
-        <Button variant="ghost" @click="cancelDialog = null">
-          {{ t('Cancel') }}
-        </Button>
         <Button
           variant="danger"
           :loading="cancelDialog?.loading"
@@ -804,7 +1156,11 @@ const confirmTitle = computed(() => {
       :width="720"
       @close="detailDialog = null"
     >
-      <div v-if="detailDialog?.row" style="display: grid; gap: 14px;">
+      <StateFill v-if="detailDialog?.loading" icon="loader" :title="t('Loading')" />
+      <StateFill v-else-if="detailDialog?.error" icon="alert" :title="t('Failed to load')" :sub="detailDialog.error" error>
+        <template #action><Button variant="secondary" size="sm" icon="retry" @click="openDetail(detailDialog.row)">{{ t('Retry') }}</Button></template>
+      </StateFill>
+      <div v-else-if="detailDialog?.row" style="display: grid; gap: 14px;">
         <!-- Top meta -->
         <div class="grid cols-2" style="gap: 12px;">
           <div>
@@ -891,30 +1247,21 @@ const confirmTitle = computed(() => {
           <div>{{ detailDialog.row.notes }}</div>
         </div>
       </div>
-      <div v-else-if="detailDialog?.loading" class="cell-muted">
-        {{ t('Loading') }}…
-      </div>
-
-      <template #footer>
-        <Button variant="ghost" @click="detailDialog = null">
-          {{ t('Close') }}
-        </Button>
-      </template>
     </Modal>
 
-    <!-- ============ QUICK TRANSFER modal ============ -->
+    <!-- ============ TRANSFER REQUEST / QUICK TRANSFER modal ============ -->
     <Modal
+      v-if="canRequestTransfers || canQuickTransfer"
       :open="quickDialog"
-      :title="t('transfer_quick_title')"
-      :subtitle="t('transfer_quick_subtitle')"
+      :title="t(transferFormMode === 'request' ? 'transfer_request_title' : 'transfer_quick_title')"
+      :subtitle="t(transferFormMode === 'request' ? 'transfer_request_subtitle' : 'transfer_quick_subtitle')"
       :width="640"
       @close="quickDialog = false"
     >
-      <div
-        style="background: var(--surface-inset); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 14px; color: var(--text-secondary);"
+      <div style="background: var(--surface-inset); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 14px; color: var(--text-secondary);"
       >
         <DesignIcon name="info" :size="16" style="vertical-align: -3px; margin-right: 6px;" />
-        {{ t('transfer_ext_quick_help') }}
+        {{ t(transferFormMode === 'request' ? 'transfer_request_help' : 'transfer_ext_quick_help') }}
       </div>
 
       <div class="grid cols-2" style="gap: 12px;">
@@ -958,6 +1305,8 @@ const confirmTitle = computed(() => {
         <Field
           :label="t('transfer_field_quantity')"
           :error="quickErrors.quantity"
+          :hint="selectedBaseUnitShort ? t('transfer_ext_base_unit_hint', { unit: selectedBaseUnitShort }) : ''"
+          style="grid-column: 1 / -1;"
         >
           <Input
             :model-value="quickForm.quantity"
@@ -968,21 +1317,27 @@ const confirmTitle = computed(() => {
           />
         </Field>
 
-        <Field :label="t('transfer_field_unit')">
-          <Select
-            :model-value="quickForm.unit_id"
-            :placeholder="t('transfer_ext_select_unit')"
-            :options="unitOptions"
-            @update:model-value="(v: string) => quickForm.unit_id = v"
-          />
-        </Field>
+        <div
+          v-if="itemSafetyError"
+          class="inline-alert"
+          style="grid-column: 1 / -1; margin-bottom: 0;"
+        >
+          <DesignIcon name="alert" :size="16" />
+          <span>{{ itemSafetyError }}</span>
+        </div>
 
-        <Field :label="t('transfer_field_batch')" style="grid-column: 1 / -1;">
+        <Field
+          v-if="selectedTracksBatches"
+          :label="t('transfer_field_batch')"
+          :error="quickErrors.batch_id || batchesError"
+          :hint="t('transfer_ext_batch_required_hint')"
+          style="grid-column: 1 / -1;"
+        >
           <Select
             :model-value="quickForm.batch_id"
-            :placeholder="t('transfer_ext_select_batch_optional')"
+            :placeholder="batchesLoading ? t('transfer_ext_batch_verification_pending') : t('transfer_ext_select_batch_required')"
             :options="batchOptions"
-            :disabled="!quickForm.from_location_id || !quickForm.stock_item_id"
+            :disabled="!quickForm.from_location_id || !quickForm.stock_item_id || batchesLoading || !!batchesError"
             @update:model-value="(v: string) => quickForm.batch_id = v"
           />
         </Field>
@@ -998,16 +1353,13 @@ const confirmTitle = computed(() => {
       </div>
 
       <template #footer>
-        <Button variant="ghost" @click="quickDialog = false">
-          {{ t('Cancel') }}
-        </Button>
         <Button
           variant="primary"
-          icon="sparkle"
+          :icon="transferFormMode === 'request' ? 'send' : 'sparkle'"
           :loading="quickSaving"
           @click="submitQuick"
         >
-          {{ t('transfer_action_quick') }}
+          {{ t(transferFormMode === 'request' ? 'transfer_action_request' : 'transfer_action_quick') }}
         </Button>
       </template>
     </Modal>
@@ -1015,7 +1367,7 @@ const confirmTitle = computed(() => {
     <!-- Lightweight inline toast (kept for compatibility with useNotify) -->
     <div
       v-if="snackbar"
-      :class="['notify-snackbar', `tone-${snackbarColor}`]"
+      class="notify-snackbar" :class="[`tone-${snackbarColor}`]"
     >
       {{ snackbarMsg }}
     </div>
@@ -1023,6 +1375,8 @@ const confirmTitle = computed(() => {
 </template>
 
 <style scoped>
+.inline-alert { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; padding: 10px 12px; border: 1px solid rgb(var(--v-theme-error-border)); border-radius: var(--r-md); color: rgb(var(--v-theme-error-strong)); background: rgb(var(--v-theme-error-weak)); font-size: 13px; }
+.inline-alert span { flex: 1; min-width: 0; }
 .cell-strong { color: var(--text); font-weight: 600; }
 .cell-muted { color: var(--text-secondary); }
 .mono { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
@@ -1037,7 +1391,7 @@ const confirmTitle = computed(() => {
 .filter-cell { width: 200px; min-width: 0; }
 .filter-cell--wide { width: 220px; }
 .toolbar-spacer { margin-left: auto; }
-.receive-qty-cell { width: 160px; }
+.receive-notice { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 14px; padding: 10px 12px; border: 1px solid rgb(var(--v-theme-info-border)); border-radius: var(--r-md); color: rgb(var(--v-theme-info-strong)); background: rgb(var(--v-theme-info-weak)); font-size: 13px; }
 .tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 /* Snackbar pinned bottom-right; clears bottom tabbar on phone */
@@ -1059,7 +1413,6 @@ const confirmTitle = computed(() => {
   .filter-cell--wide { width: 100%; flex: 1 1 100%; }
   .toolbar-spacer { margin-left: 0; width: 100%; }
   .cols-2 { grid-template-columns: 1fr; }
-  .receive-qty-cell { width: 100%; }
 }
 
 @media (max-width: 768px) {
@@ -1091,4 +1444,6 @@ name: stock-transfers
 meta:
   action: manage
   subject: all
+  anyPermission:
+    - stock.transfer.view
 </route>

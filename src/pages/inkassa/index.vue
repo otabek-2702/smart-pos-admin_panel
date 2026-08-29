@@ -8,6 +8,7 @@ import Field from '@/components/design/Field.vue'
 import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
 import Modal from '@/components/design/Modal.vue'
+import MoneyInput from '@/components/design/MoneyInput.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 
@@ -434,33 +435,25 @@ const pagination = computed<DataTablePagination>(() => ({
               {{ t('Collect all') }} · {{ formatCurrency(availableCash) }}
             </button>
           </div>
-          <Input
+          <MoneyInput
             v-model="performAmounts.cash"
-            type="number"
-            min="0"
             :error="cashExceeds"
             autofocus
           />
         </Field>
         <Field :label="t('inkass_type_UZCARD')">
-          <Input
+          <MoneyInput
             v-model="performAmounts.uzcard"
-            type="number"
-            min="0"
           />
         </Field>
         <Field :label="t('inkass_type_HUMO')">
-          <Input
+          <MoneyInput
             v-model="performAmounts.humo"
-            type="number"
-            min="0"
           />
         </Field>
         <Field :label="t('inkass_type_PAYME')">
-          <Input
+          <MoneyInput
             v-model="performAmounts.payme"
-            type="number"
-            min="0"
           />
         </Field>
         <Field

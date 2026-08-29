@@ -17,6 +17,7 @@ import Field from '@/components/design/Field.vue'
 import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
 import Kpi from '@/components/design/Kpi.vue'
+import MoneyInput from '@/components/design/MoneyInput.vue'
 import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
@@ -788,13 +789,10 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown) })
             class="span-2"
             :hint="t('currency_short')"
           >
-            <Input
+            <MoneyInput
               v-model="form.base_salary"
-              type="number"
               icon="wallet"
               placeholder="0"
-              inputmode="numeric"
-              min="0"
             />
           </Field>
 

@@ -8,6 +8,13 @@
 import axios from '@/plugins/axios'
 import { STATUS_TONE } from '@/constants/statusTones'
 import Modal from '@/components/design/Modal.vue'
+import {
+  methodIsManagerConfirmed,
+  moneyNumber,
+  moneyText,
+  reconciledCash,
+  settlementRowIsUncounted,
+} from '@/utils/shiftMoney'
 
 const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
@@ -92,6 +99,13 @@ onMounted(load)
 
 const shift = computed<any>(() => data.value?.shift)
 const receipts = computed<any[]>(() => data.value?.receipts ?? [])
+function isCancelledReceipt(receipt: any): boolean {
+  return ['CANCELED', 'CANCELLED'].includes(String(receipt?.status ?? '').toUpperCase())
+}
+const sortedReceipts = computed<any[]>(() => receipts.value
+  .map((receipt, index) => ({ receipt, index }))
+  .sort((a, b) => Number(isCancelledReceipt(b.receipt)) - Number(isCancelledReceipt(a.receipt)) || a.index - b.index)
+  .map(({ receipt }) => receipt))
 const products = computed<any[]>(() => data.value?.products ?? [])
 
 const PRODUCTS_PREVIEW = 10
@@ -133,10 +147,20 @@ const cashExpenses = computed<any[]>(() => data.value?.cash_expenses ?? [])
 const cashExpensesTotal = computed(() =>
   cashExpenses.value.reduce((acc, e: any) => acc + Number(e.total || 0), 0),
 )
-function settlementDiffColor(diff: string | number): string {
-  const n = Number(diff)
+function settlementDiffColor(diff: unknown): string {
+  const n = moneyNumber(moneyText(diff))
+  if (n == null) return 'neutral'
   if (Math.abs(n) < 0.01) return 'success'
   return n < 0 ? 'error' : 'warning'
+}
+function settlementDifferenceText(row: any): string {
+  return moneyText(row?.difference) == null ? t('Variance unavailable') : fmtMoney(row.difference)
+}
+function cashierCountText(row: any): string {
+  return settlementRowIsUncounted(row) ? t('Cashier count not submitted') : fmtMoney(row?.counted)
+}
+function managerConfirmedText(row: any): string {
+  return methodIsManagerConfirmed(row) ? fmtMoney(row?.confirmed) : '—'
 }
 
 function fmtSec(s: number | null | undefined): string {
@@ -189,10 +213,17 @@ function titleCase(v: any): string {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
 }
 function reconTone(rec: any): string {
-  if (!rec) return 'neutral'
+  if (!reconciledCash({ reconciliation: rec })) return 'neutral'
   if (rec.is_short) return 'error'
   if (rec.is_over) return 'warning'
-  return 'success'
+  return moneyNumber(moneyText(rec.difference)) === 0 ? 'success' : 'warning'
+}
+function reconColor(rec: any): string {
+  const tone = reconTone(rec)
+  if (tone === 'error') return 'var(--error)'
+  if (tone === 'warning') return 'var(--warning)'
+  if (tone === 'success') return 'var(--success)'
+  return 'var(--text-tertiary)'
 }
 
 // ============================================================
@@ -906,7 +937,7 @@ function shiftDurationLabel(): string {
               <div class="kpi__label">
                 {{ t('Difference') }}
               </div>
-              <div class="mono" style="font-size:20px;font-weight:700;margin-top:4px;" :style="{ color: reconTone(shift.reconciliation) === 'error' ? 'var(--error)' : reconTone(shift.reconciliation) === 'warning' ? 'var(--warning)' : 'var(--success)' }">
+              <div class="mono" style="font-size:20px;font-weight:700;margin-top:4px;" :style="{ color: reconColor(shift.reconciliation) }">
                 {{ fmtMoney(shift.reconciliation.difference) }}
               </div>
             </div>
@@ -969,14 +1000,14 @@ function shiftDurationLabel(): string {
                 {{ fmtMoney(row.expected) }}
               </td>
               <td class="num mono">
-                {{ fmtMoney(row.counted) }}
+                {{ cashierCountText(row) }}
               </td>
               <td class="num mono cell-strong">
-                {{ fmtMoney(row.confirmed) }}
+                {{ managerConfirmedText(row) }}
               </td>
               <td class="num">
                 <span class="badge" :class="`t-${settlementDiffColor(row.difference)}`">
-                  <span class="mono">{{ fmtMoney(row.difference) }}</span>
+                  <span class="mono">{{ settlementDifferenceText(row) }}</span>
                 </span>
               </td>
             </tr>
@@ -1081,8 +1112,9 @@ function shiftDurationLabel(): string {
           </thead>
           <tbody>
             <tr
-              v-for="r in receipts"
+              v-for="r in sortedReceipts"
               :key="r.order_id"
+              :class="{ 'shift-handover__receipt--cancelled': isCancelledReceipt(r) }"
               style="cursor: pointer;"
               @click="openReceipt(r)"
             >
@@ -1252,6 +1284,15 @@ function shiftDurationLabel(): string {
 .dtable-scroll {
   inline-size: 100%;
   overflow-x: auto;
+}
+
+/* Canceled receipts stay at the top of the report and are visibly distinct
+   without obscuring their normal status badge or row content. */
+.shift-handover__receipt--cancelled > td {
+  background: color-mix(in srgb, var(--error) 6%, transparent);
+}
+.shift-handover__receipt--cancelled > td:first-child {
+  box-shadow: inset 3px 0 0 var(--error);
 }
 
 /* Orders breakdown stat row — stack columns on small screens */

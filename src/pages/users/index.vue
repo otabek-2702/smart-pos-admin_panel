@@ -5,7 +5,7 @@
    Uses design primitives (DataTable, Modal, Field, Input, Select,
    Switch, Button, Badge, StatusBadge, IconAction, Kpi, Card,
    PageHeader). All axios calls, refs, computeds, validation
-   (PIN-4-digit for cashier/waiter, email-required for ADMIN/MANAGER)
+   (PIN-4-digit for cashier/waiter, email-required for back-office roles)
    and i18n keys preserved verbatim from the prior implementation.
    ============================================================ */
 import type { DataTableColumn } from '@/components/design/DataTable.vue'
@@ -13,6 +13,7 @@ import axios from '@/plugins/axios'
 import Badge from '@/components/design/Badge.vue'
 import Button from '@/components/design/Button.vue'
 import Card from '@/components/design/Card.vue'
+import Checkbox from '@/components/design/Checkbox.vue'
 import DataTable from '@/components/design/DataTable.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import Field from '@/components/design/Field.vue'
@@ -24,14 +25,16 @@ import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import Switch from '@/components/design/Switch.vue'
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, te } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatDate } = useFormatters()
+const { isAdministrator } = useUserAccess()
 
 // NOTE: BE _serialize_user also returns 'uuid', 'permissions', and 'is_deleted'.
-// These are intentionally hidden from this surface:
+// These are intentionally hidden from the table:
 //   - uuid: internal identifier, never shown to admins
-//   - permissions: raw JSON list; edited via the dedicated Settings -> Roles screen
+//   - permissions: raw JSON list; a deliberately narrow, ADMIN-only subset is
+//     editable for existing WAREHOUSE users in the account modal
 //   - is_deleted: soft-delete flag, never user-facing
 // Any future "View details" panel / expanded row MUST also strip these fields.
 
@@ -61,7 +64,7 @@ const deleteBusy = ref(false)
 // created without any login credential — the BE stores an unusable password and
 // it never appears in the cashier PIN picker. Exposed here so operators can add
 // kitchen staff without dropping to the Django admin.
-const roles = ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER', 'CHEF', 'USER']
+const roles = ['ADMIN', 'MANAGER', 'WAREHOUSE', 'CASHIER', 'WAITER', 'CHEF', 'USER']
 const statuses = ['ACTIVE', 'SUSPENDED']
 
 const form = ref({
@@ -80,9 +83,88 @@ const editingId = ref<number | null>(null)
 const deletingId = ref<number | null>(null)
 const statusConfirm = ref<{ user: any; newStatus: string } | null>(null)
 
+interface PermissionDef {
+  key: string
+  label: string
+  group: string
+}
+
+interface WarehousePermissionBundle {
+  key: 'attendance' | 'discipline' | 'preparation' | 'expenses'
+  titleKey: string
+  permissionKeys: string[]
+  permissions: PermissionDef[]
+}
+
+// The user editor is intentionally not a generic permission surface. These
+// named, non-approval capabilities are the only per-user additions it can
+// grant or revoke. Role defaults and every other permission are preserved.
+const SAFE_WAREHOUSE_PERMISSION_BUNDLES = [
+  {
+    key: 'attendance',
+    titleKey: 'warehouse_user_perm_bundle_attendance',
+    permissionKeys: ['attendance.view', 'attendance.record', 'attendance.adjust.request'],
+  },
+  {
+    key: 'discipline',
+    titleKey: 'warehouse_user_perm_bundle_discipline',
+    permissionKeys: ['discipline.rule.view', 'discipline.case.create', 'discipline.case.view'],
+  },
+  {
+    key: 'preparation',
+    titleKey: 'warehouse_user_perm_bundle_preparation',
+    permissionKeys: ['prep.audit.view', 'prep.audit.review'],
+  },
+  {
+    key: 'expenses',
+    titleKey: 'warehouse_user_perm_bundle_expenses',
+    permissionKeys: ['expense.request.create', 'expense.request.view_own'],
+  },
+] as const
+
+const permissionCatalog = ref<PermissionDef[]>([])
+const warehouseRoleTemplate = ref<string[]>([])
+const warehousePermissionsLoading = ref(false)
+const warehousePermissionsLoaded = ref(false)
+const warehousePermissionsError = ref('')
+const originalWarehousePermissions = ref<string[]>([])
+const warehousePermissionDraft = ref<Set<string>>(new Set())
+
 const isAdminRole = computed(() => form.value.role === 'ADMIN')
-const requiresEmail = computed(() => ['ADMIN', 'MANAGER'].includes(form.value.role))
+const requiresEmail = computed(() => ['ADMIN', 'MANAGER', 'WAREHOUSE'].includes(form.value.role))
 const isPinRole = computed(() => ['CASHIER', 'WAITER'].includes(form.value.role))
+const isWarehouseRole = computed(() => form.value.role === 'WAREHOUSE')
+const editingWarehouse = computed(() => editing.value?.role === 'WAREHOUSE')
+
+const warehousePermissionBundles = computed<WarehousePermissionBundle[]>(() => {
+  const byKey = new Map(permissionCatalog.value.map(permission => [permission.key, permission]))
+
+  return SAFE_WAREHOUSE_PERMISSION_BUNDLES
+    .map(bundle => ({
+      ...bundle,
+      permissionKeys: [...bundle.permissionKeys],
+      permissions: bundle.permissionKeys
+        .map(key => byKey.get(key))
+        .filter((permission): permission is PermissionDef => Boolean(permission)),
+    }))
+    .filter(bundle => bundle.permissions.length > 0)
+})
+
+const editableWarehousePermissionKeys = computed(() => new Set(
+  warehousePermissionBundles.value.flatMap(bundle => bundle.permissions.map(permission => permission.key)),
+))
+
+const warehousePermissionsDirty = computed(() => {
+  if (!editingWarehouse.value || !warehousePermissionsLoaded.value)
+    return false
+
+  return [...editableWarehousePermissionKeys.value].some(key =>
+    originalWarehousePermissions.value.includes(key) !== warehousePermissionDraft.value.has(key),
+  )
+})
+
+const roleSelectionLocked = computed(() => editingWarehouse.value)
+
 // CHEF is a non-login kitchen label — no email, no PIN. The credential field is
 // hidden and replaced with an explanatory note; on create the BE forces an empty
 // (unusable) password regardless of what we send.
@@ -91,11 +173,14 @@ const isChef = computed(() => form.value.role === 'CHEF')
 function validateField(field: string) {
   // Surfaces inline errors without blocking submission flow.
   const err: Record<string, string> = { ...errors.value }
+
   delete err[field]
   if (field === 'email' && !editing.value && requiresEmail.value && !form.value.email.trim())
     err.email = t('Email is required for this role')
   if (field === 'password' && !editing.value && isPinRole.value && !/^\d{4}$/.test(form.value.password))
     err.password = t('PIN must be exactly 4 digits')
+  if (field === 'password' && isWarehouseRole.value && (!editing.value || form.value.password) && form.value.password.length < 8)
+    err.password = t('Password must be at least 8 characters')
   errors.value = err
 }
 
@@ -110,6 +195,7 @@ function onBlur(field: string) {
 const ROLE_TONE: Record<string, 'primary' | 'info' | 'neutral' | 'success' | 'warning' | 'error'> = {
   ADMIN: 'primary',
   MANAGER: 'primary',
+  WAREHOUSE: 'success',
   CASHIER: 'info',
   WAITER: 'info',
   CHEF: 'warning',
@@ -188,6 +274,87 @@ watch([roleFilter, statusFilter], () => { page.value = 1; loadUsers() })
 // ============================================================
 // Dialog
 // ============================================================
+function normalizePermissionKeys(source: unknown): string[] {
+  if (!Array.isArray(source))
+    return []
+
+  return Array.from(new Set(source.filter((permission): permission is string =>
+    typeof permission === 'string' && permission.trim().length > 0,
+  )))
+}
+
+function permissionLabel(permission: PermissionDef): string {
+  const key = `perm_label_${permission.key.replace(/\./g, '_')}`
+  if (te(key))
+    return t(key)
+
+  return permission.label || permission.key
+}
+
+function permissionGroupLabel(permission: PermissionDef): string {
+  const key = `perm_group_${permission.group.replace(/[^\p{L}\p{N}]+/gu, '_')}`
+  return te(key) ? t(key) : permission.group
+}
+
+function bundleAllSelected(bundle: WarehousePermissionBundle): boolean {
+  return bundle.permissions.length > 0
+    && bundle.permissions.every(permission => warehousePermissionDraft.value.has(permission.key))
+}
+
+function bundlePartiallySelected(bundle: WarehousePermissionBundle): boolean {
+  const selected = bundle.permissions.filter(permission => warehousePermissionDraft.value.has(permission.key)).length
+  return selected > 0 && selected < bundle.permissions.length
+}
+
+function toggleWarehousePermissionBundle(bundle: WarehousePermissionBundle, enabled: boolean) {
+  if (!isAdministrator.value || !editingWarehouse.value || !warehousePermissionsLoaded.value)
+    return
+
+  const next = new Set(warehousePermissionDraft.value)
+  for (const permission of bundle.permissions) {
+    if (enabled)
+      next.add(permission.key)
+    else
+      next.delete(permission.key)
+  }
+  warehousePermissionDraft.value = next
+}
+
+async function loadWarehousePermissionContext() {
+  if (!isAdministrator.value || !editingWarehouse.value || warehousePermissionsLoading.value)
+    return
+
+  warehousePermissionsLoading.value = true
+  warehousePermissionsError.value = ''
+  try {
+    const [permissionsResponse, roleResponse] = await Promise.all([
+      axios.get('/permissions'),
+      axios.get('/roles/WAREHOUSE'),
+    ])
+
+    const permissionData = permissionsResponse.data?.data ?? permissionsResponse.data
+    const roleData = roleResponse.data?.data ?? roleResponse.data
+
+    permissionCatalog.value = Array.isArray(permissionData?.permissions)
+      ? permissionData.permissions.filter((permission: any) =>
+        permission
+        && typeof permission.key === 'string'
+        && typeof permission.label === 'string'
+        && typeof permission.group === 'string',
+      )
+      : []
+    warehouseRoleTemplate.value = normalizePermissionKeys(roleData?.permissions)
+    warehousePermissionsLoaded.value = true
+  }
+  catch (error: any) {
+    warehousePermissionsLoaded.value = false
+    warehousePermissionsError.value = error?.response?.data?.message ?? t('warehouse_user_permissions_load_failed')
+  }
+  finally {
+    warehousePermissionsLoading.value = false
+  }
+}
+
 function openCreate() {
   editing.value = null
   form.value = {
@@ -200,22 +367,43 @@ function openCreate() {
   }
   touched.value = {}
   errors.value = {}
+  originalWarehousePermissions.value = []
+  warehousePermissionDraft.value = new Set()
   dialogOpen.value = true
 }
 
 function onRoleChange() {
-  // ADMIN + MANAGER require an explicit email; everything else lets BE auto-
+  // Backend role transitions currently retain per-user permissions. Prevent a
+  // WAREHOUSE account from carrying grants into another role, and prevent an
+  // existing non-WAREHOUSE account from entering WAREHOUSE without an atomic
+  // server-side role/template transition.
+  if (editing.value?.role === 'WAREHOUSE') {
+    form.value.role = 'WAREHOUSE'
+
+    return
+  }
+  if (editing.value && form.value.role === 'WAREHOUSE') {
+    form.value.role = editing.value.role
+
+    return
+  }
+
+  // Back-office roles require an explicit email; everything else lets BE auto-
   // generate. Clear stale input when leaving an email-required role.
   if (!requiresEmail.value)
     form.value.email = ''
+
   // Roles that authenticate via PIN must enter a 4-digit numeric code only;
   // clear any leftover free-form password when switching INTO a PIN role.
   if (isPinRole.value && form.value.password && !/^\d{4}$/.test(form.value.password))
     form.value.password = ''
+
   // CHEF has no credential at all — drop any typed value and its inline error.
   if (isChef.value) {
     form.value.password = ''
+
     const err = { ...errors.value }
+
     delete err.password
     errors.value = err
   }
@@ -235,13 +423,30 @@ function openEdit(user: any) {
   }
   touched.value = {}
   errors.value = {}
+  originalWarehousePermissions.value = normalizePermissionKeys(user.permissions)
+  warehousePermissionDraft.value = new Set(originalWarehousePermissions.value)
+  warehousePermissionsError.value = ''
   dialogOpen.value = true
+  if (user.role === 'WAREHOUSE' && isAdministrator.value)
+    loadWarehousePermissionContext()
 }
 
 function closeDialog() {
   if (dialogLoading.value) return
   dialogOpen.value = false
   editingId.value = null
+}
+
+function buildWarehousePermissionsPayload(): string[] {
+  const next = new Set(originalWarehousePermissions.value)
+  for (const key of editableWarehousePermissionKeys.value) {
+    if (warehousePermissionDraft.value.has(key))
+      next.add(key)
+    else
+      next.delete(key)
+  }
+
+  return Array.from(next)
 }
 
 async function save() {
@@ -252,6 +457,8 @@ async function save() {
     newErrors.email = t('Email is required for this role')
   if (!editing.value && isPinRole.value && !/^\d{4}$/.test(form.value.password))
     newErrors.password = t('PIN must be exactly 4 digits')
+  if (isWarehouseRole.value && (!editing.value || form.value.password) && form.value.password.length < 8)
+    newErrors.password = t('Password must be at least 8 characters')
 
   errors.value = newErrors
   if (Object.keys(newErrors).length > 0) {
@@ -274,6 +481,8 @@ async function save() {
         payload.email = form.value.email
       if (form.value.password)
         payload.password = form.value.password
+      if (isAdministrator.value && editingWarehouse.value && warehousePermissionsDirty.value)
+        payload.permissions = buildWarehousePermissionsPayload()
       await axios.patch(`/users/${editing.value.id}`, payload)
       notify(t('User updated'))
     }
@@ -356,7 +565,7 @@ function toggleStatus(user: any) {
   // Suspending privileged roles is sensitive — gate behind a confirm dialog.
   // Cashier/Waiter/User toggles fire immediately, matching prior UX.
   const newStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
-  const sensitive = ['ADMIN', 'MANAGER'].includes(user.role) && newStatus === 'SUSPENDED'
+  const sensitive = ['ADMIN', 'MANAGER', 'WAREHOUSE'].includes(user.role) && newStatus === 'SUSPENDED'
   if (sensitive) {
     statusConfirm.value = { user, newStatus }
 
@@ -455,7 +664,13 @@ const tablePagination = computed(() => ({
 // Role select options for the filter dropdown (placeholder = "All roles")
 const roleOptions = computed(() => roles.map(r => ({ value: r, label: t(`role_${r}`) })))
 const statusOptions = computed(() => statuses.map(s => ({ value: s, label: t(`user_status_${s}`) })))
-const formRoleOptions = computed(() => roles.map(r => ({ value: r, label: t(`role_${r}`) })))
+const formRoleOptions = computed(() => {
+  const availableRoles = (Boolean(editing.value) && !editingWarehouse.value)
+    ? roles.filter(role => role !== 'WAREHOUSE')
+    : roles
+
+  return availableRoles.map(role => ({ value: role, label: t(`role_${role}`) }))
+})
 
 // ESC handler — close whichever modal is open, top-most first.
 function onKeydown(e: KeyboardEvent) {
@@ -641,16 +856,20 @@ onBeforeUnmount(() => {
             v-if="row.last_login_at"
             class="cell-muted"
           >{{ formatDate(row.last_login_at) }}</span>
-          <!-- Dormant accounts (never signed in) are a housekeeping/security
-               signal — flag them so operators can spot unused logins. -->
           <span
             v-else
-            :title="t('This account has never signed in')"
+            class="cell-muted users-last-login-empty"
+            tabindex="0"
+            :aria-label="t('No dashboard login has been recorded. This column shows the user\'s most recent dashboard login.')"
           >
-            <Badge
-              tone="warning"
-              dot
-            >{{ t('Never') }}</Badge>
+            —
+            <VTooltip
+              activator="parent"
+              location="top"
+              max-width="320"
+            >
+              {{ t('No dashboard login has been recorded. This column shows the user\'s most recent dashboard login.') }}
+            </VTooltip>
           </span>
         </template>
 
@@ -757,10 +976,14 @@ onBeforeUnmount(() => {
           </Field>
 
           <!-- Role -->
-          <Field :label="t('Role')">
+          <Field
+            :label="t('Role')"
+            :hint="roleSelectionLocked ? t('warehouse_user_role_locked') : undefined"
+          >
             <Select
               v-model="form.role"
               :options="formRoleOptions"
+              :disabled="roleSelectionLocked"
               @change="onRoleChange"
             />
           </Field>
@@ -790,7 +1013,7 @@ onBeforeUnmount(() => {
             :label="t('Email')"
             class="span-2"
             :error="errors.email"
-            :hint="!editing && requiresEmail && !errors.email ? t('Required for ADMIN / MANAGER') : undefined"
+            :hint="!editing && requiresEmail && !errors.email ? t('Required for back-office roles') : undefined"
           >
             <Input
               v-model="form.email"
@@ -820,7 +1043,7 @@ onBeforeUnmount(() => {
             :label="editing ? t('New Password (leave blank to keep)') : (isPinRole ? t('4-digit PIN') : t('Password'))"
             class="span-2"
             :error="errors.password"
-            :hint="!editing && isPinRole && !errors.password ? t('Exactly 4 digits') : undefined"
+            :hint="!editing && !errors.password ? (isPinRole ? t('Exactly 4 digits') : (isWarehouseRole ? t('Password must be at least 8 characters') : undefined)) : undefined"
           >
             <Input
               v-model="form.password"
@@ -829,22 +1052,121 @@ onBeforeUnmount(() => {
               :type="isPinRole ? 'tel' : 'password'"
               :placeholder="editing ? t('Leave blank to keep') : t('Password placeholder dots')"
               :maxlength="isPinRole ? 4 : undefined"
+              :minlength="isWarehouseRole ? 8 : undefined"
               :pattern="isPinRole ? '[0-9]{4}' : undefined"
-              inputmode="numeric"
+              :inputmode="isPinRole ? 'numeric' : undefined"
               @blur="onBlur('password')"
             />
           </Field>
+
+          <section
+            v-if="editingWarehouse && isAdministrator"
+            class="span-2 warehouse-permissions"
+            aria-labelledby="warehouse-permissions-title"
+          >
+            <div class="warehouse-permissions__head">
+              <div>
+                <h4 id="warehouse-permissions-title">
+                  {{ t('warehouse_user_permissions_title') }}
+                </h4>
+                <p>{{ t('warehouse_user_permissions_subtitle') }}</p>
+              </div>
+              <Badge
+                v-if="warehousePermissionsDirty"
+                tone="warning"
+              >
+                {{ t('perm_dirty') }}
+              </Badge>
+            </div>
+
+            <div
+              v-if="warehousePermissionsLoading"
+              class="warehouse-permissions__state"
+              role="status"
+            >
+              <VProgressCircular
+                indeterminate
+                :size="18"
+                :width="2"
+              />
+              <span>{{ t('warehouse_user_permissions_loading') }}</span>
+            </div>
+
+            <div
+              v-else-if="warehousePermissionsError"
+              class="warehouse-permissions__state warehouse-permissions__state--error"
+              role="alert"
+            >
+              <DesignIcon
+                name="alert"
+                :size="17"
+              />
+              <span>{{ warehousePermissionsError }}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                @click="loadWarehousePermissionContext"
+              >
+                {{ t('Retry') }}
+              </Button>
+            </div>
+
+            <template v-else-if="warehousePermissionsLoaded">
+              <div class="warehouse-permissions__template-note">
+                <DesignIcon
+                  name="lock"
+                  :size="15"
+                />
+                <span>{{ t('warehouse_user_permissions_template_preserved', { count: warehouseRoleTemplate.length }) }}</span>
+              </div>
+
+              <div
+                v-if="warehousePermissionBundles.length"
+                class="warehouse-permissions__list"
+              >
+                <label
+                  v-for="bundle in warehousePermissionBundles"
+                  :key="bundle.key"
+                  class="warehouse-permissions__option"
+                >
+                  <Checkbox
+                    :model-value="bundleAllSelected(bundle)"
+                    :indeterminate="bundlePartiallySelected(bundle)"
+                    :aria-label="t(bundle.titleKey)"
+                    @update:model-value="(enabled: boolean) => toggleWarehousePermissionBundle(bundle, enabled)"
+                  />
+                  <span class="warehouse-permissions__copy">
+                    <strong>{{ t(bundle.titleKey) }}</strong>
+                    <span>
+                      {{ bundle.permissions.map(permissionLabel).join(' · ') }}
+                    </span>
+                    <small>
+                      {{ Array.from(new Set(bundle.permissions.map(permissionGroupLabel))).join(' · ') }}
+                    </small>
+                  </span>
+                </label>
+              </div>
+
+              <div
+                v-else
+                class="warehouse-permissions__state"
+                role="status"
+              >
+                {{ t('warehouse_user_permissions_empty') }}
+              </div>
+
+              <div
+                v-if="warehousePermissionBundles.some(bundle => bundle.key === 'expenses')"
+                class="warehouse-permissions__reserved-note"
+              >
+                {{ t('warehouse_user_permissions_expense_reserved') }}
+              </div>
+            </template>
+          </section>
         </div>
       </form>
 
       <template #footer>
-        <Button
-          variant="ghost"
-          :disabled="dialogLoading"
-          @click="closeDialog"
-        >
-          {{ t('Cancel') }}
-        </Button>
         <Button
           variant="primary"
           icon="check"
@@ -893,13 +1215,6 @@ onBeforeUnmount(() => {
       </div>
 
       <template #footer>
-        <Button
-          variant="ghost"
-          :disabled="deleteBusy"
-          @click="closeDeleteDialog"
-        >
-          {{ t('Cancel') }}
-        </Button>
         <Button
           variant="danger"
           icon="trash"
@@ -951,12 +1266,6 @@ onBeforeUnmount(() => {
       </div>
 
       <template #footer>
-        <Button
-          variant="ghost"
-          @click="cancelStatusChange"
-        >
-          {{ t('Cancel') }}
-        </Button>
         <Button
           variant="primary"
           @click="confirmStatusChange"
@@ -1017,6 +1326,97 @@ onBeforeUnmount(() => {
 .users-toolbar__filter {
   width: 180px;
 }
+.users-last-login-empty {
+  cursor: help;
+}
+
+.warehouse-permissions {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md, 10px);
+  background: var(--surface-inset);
+}
+.warehouse-permissions__head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.warehouse-permissions__head h4 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 650;
+}
+.warehouse-permissions__head p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.warehouse-permissions__state,
+.warehouse-permissions__template-note,
+.warehouse-permissions__reserved-note {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.warehouse-permissions__state--error {
+  color: rgb(var(--v-theme-error));
+}
+.warehouse-permissions__state--error .btn {
+  margin-inline-start: auto;
+}
+.warehouse-permissions__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.warehouse-permissions__option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm, 8px);
+  background: var(--surface-raised);
+  cursor: pointer;
+}
+.warehouse-permissions__option:focus-within {
+  border-color: rgb(var(--v-theme-primary));
+  box-shadow: 0 0 0 2px rgb(var(--v-theme-primary) / 0.14);
+}
+.warehouse-permissions__copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.warehouse-permissions__copy strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.3;
+}
+.warehouse-permissions__copy span,
+.warehouse-permissions__copy small {
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.warehouse-permissions__copy small {
+  color: var(--text-tertiary);
+}
+.warehouse-permissions__reserved-note {
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+}
 
 /* Tablet (canonical 1024px) — KPI strip drops to 2 columns; filters shrink to fit */
 @media (max-width: 1024px) {
@@ -1040,6 +1440,9 @@ onBeforeUnmount(() => {
     max-width: 100%;
     min-width: 0;
     flex: 1 1 100%;
+  }
+  .warehouse-permissions__list {
+    grid-template-columns: 1fr;
   }
 }
 

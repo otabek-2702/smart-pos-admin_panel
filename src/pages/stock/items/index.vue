@@ -20,9 +20,12 @@ import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
 import Switch from '@/components/design/Switch.vue'
+import { useUserAccess } from '@/composables/useUserAccess'
 
 const { t } = useI18n({ useScope: 'global' })
 const router = useRouter()
+const { hasPermission } = useUserAccess()
+const canManageStock = computed(() => hasPermission('stock.manage'))
 
 const items = ref<any[]>([])
 const total = ref(0)
@@ -188,23 +191,35 @@ const categoryLabel = computed(() =>
 )
 
 function openCreate() {
+  if (!canManageStock.value)
+    return
+
   dialogMode.value = 'create'
   selectedItem.value = null
   dialog.value = true
 }
 
 function openEdit(item: any) {
+  if (!canManageStock.value)
+    return
+
   dialogMode.value = 'edit'
   selectedItem.value = item
   dialog.value = true
 }
 
 function confirmDelete(item: any) {
+  if (!canManageStock.value)
+    return
+
   selectedItem.value = item
   deleteDialog.value = true
 }
 
 async function doDelete() {
+  if (!canManageStock.value)
+    return
+
   deleting.value = true
   try {
     await axios.delete(`/items/${selectedItem.value.id}/`)
@@ -252,6 +267,9 @@ async function lookupBarcode() {
 }
 
 async function toggleActive(item: any) {
+  if (!canManageStock.value)
+    return
+
   try {
     // The item detail route accepts GET/PUT/DELETE (NOT PATCH). Deactivation is a
     // soft-delete (DELETE), which the backend blocks while stock remains on hand;
@@ -288,6 +306,7 @@ const dtPagination = computed(() => ({
     >
       <template #actions>
         <Button
+          v-if="canManageStock"
           variant="primary"
           icon="plus"
           @click="openCreate"
@@ -494,7 +513,7 @@ const dtPagination = computed(() => ({
           </Badge>
         </template>
 
-        <template #row-actions="{ row }">
+        <template v-if="canManageStock" #row-actions="{ row }">
           <IconAction
             icon="edit"
             :title="t('Edit')"
@@ -525,7 +544,7 @@ const dtPagination = computed(() => ({
                 {{ t('Clear filters') }}
               </Button>
             </div>
-            <div v-else style="margin-top: 12px;">
+            <div v-else-if="canManageStock" style="margin-top: 12px;">
               <Button variant="primary" icon="plus" @click="openCreate">
                 {{ t('Add Item') }}
               </Button>
@@ -537,6 +556,7 @@ const dtPagination = computed(() => ({
 
     <!-- Create / Edit Dialog (kept as ItemFormDialog) -->
     <ItemFormDialog
+      v-if="canManageStock"
       v-model="dialog"
       :mode="dialogMode"
       :item="selectedItem"
@@ -547,6 +567,7 @@ const dtPagination = computed(() => ({
 
     <!-- Delete confirmation -->
     <Modal
+      v-if="canManageStock"
       :open="deleteDialog"
       :width="440"
       :title="t('Delete Item')"
@@ -759,4 +780,6 @@ name: stock-items
 meta:
   action: manage
   subject: all
+  anyPermission:
+    - stock.catalog.view
 </route>

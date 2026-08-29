@@ -12,7 +12,7 @@ import BarChart from '@/components/design/BarChart.vue'
 import { fmtAbbr, fmtNum } from '@/components/design/utils/format'
 import { useFormatters } from '@/composables/useFormatters'
 import { useDashboardData } from '@/composables/useDashboardData'
-import { buildDateParams } from '@/composables/useBusinessDay'
+import { buildDateParams, businessPreset } from '@/composables/useBusinessDay'
 import { formatWindow } from '@/composables/useWindowLabel'
 import type { Tone } from '@/components/design/utils'
 // MOCK_DASH dropped — real BE data only. /dashboard/sales endpoint pending (BACKEND_TODO item 11).
@@ -43,15 +43,37 @@ interface DashData {
   revenue30: number[]
   expense30: number[]
   previousRevenue: number[]
+  previousPeriod?: {
+    revenue?: string | number
+    revenue_series?: Array<string | number>
+  }
   dayLabels: string[]
   channelDays: ChannelDay[]
 }
 
+interface ExpenseRecord {
+  id: string | number
+  amount: number
+  category: string
+  comment: string
+  createdAt: string
+  shiftId: string | number | null
+  cashierName: string
+}
+
+interface ExpenseDetails {
+  total: number
+  rows: ExpenseRecord[]
+}
+
 const data = ref<DashData | null>(null)
 const loading = ref(true)
+const expenseDetails = ref<ExpenseDetails | null>(null)
+const expenseDetailsLoading = ref(false)
+const expenseDetailsError = ref(false)
 const isHourly = computed(() => /^\d{1,2}:\d{2}$/.test(String(data.value?.dayLabels?.[0] ?? '')))
 
-// ---------- Hero KPI strip (4 cards) ----------
+// ---------- Hero KPI strip ----------
 interface HeroKpiData {
   label: string
   value: number | string
@@ -67,18 +89,35 @@ interface HeroKpiData {
 // BE returns Decimal arrays as strings — coerce defensively.
 const toNumArr = (arr: any): number[] => Array.isArray(arr) ? arr.map(v => Number(v) || 0) : []
 
+function orderBucketCounts(D: DashData): number[] {
+  return D.channelDays.map(row =>
+    (Number(row.values?.hall) || 0)
+    + (Number(row.values?.delivery) || 0)
+    + (Number(row.values?.pickup) || 0),
+  )
+}
+
 const heroKpis = computed<HeroKpiData[]>(() => {
   const D = data.value
-  if (!D) return []
+  if (!D)
+    return []
+
   const revenue30 = toNumArr(D.revenue30)
   const expense30 = toNumArr(D.expense30)
-  const previousRevenue = toNumArr(D.previousRevenue)
-  const previousSum = previousRevenue.reduce((a, b) => a + b, 0)
+  const orderBuckets = orderBucketCounts(D)
+  const totalOrders = orderBuckets.reduce((sum, value) => sum + value, 0)
+  const bucketCount = Math.max(1, D.dayLabels.length || orderBuckets.length)
+  const averageOrders = new Intl.NumberFormat(String(locale.value), {
+    maximumFractionDigits: 1,
+  }).format(totalOrders / bucketCount)
+  const previousRevenue = toNumArr(D.previousPeriod?.revenue_series ?? D.previousRevenue)
+  const previousSum = Number(D.previousPeriod?.revenue) || previousRevenue.reduce((a, b) => a + b, 0)
   const monthRevenue = Number(D.monthRevenue) || 0
+
   // Diff is only meaningful if we ACTUALLY have a prior-month baseline. Otherwise
   // "+360.9M vs last month" is a confident lie — it's just the current value with
   // a green plus sign. When lastMonthSum is 0 we hide the comparison (— UZS).
-  const hasPrevious = previousSum > 0
+  const hasPrevious = !!D.previousPeriod || previousRevenue.length > 0
   const vsPreviousDiff = monthRevenue - previousSum
   return [
     {
@@ -96,6 +135,13 @@ const heroKpis = computed<HeroKpiData[]>(() => {
       unit: hasPrevious ? 'UZS' : '',
       icon: 'trend',
       tone: hasPrevious ? (vsPreviousDiff >= 0 ? 'success' : 'error') : 'neutral',
+    },
+    {
+      label: isHourly.value ? t('Average orders per hour') : t('Average orders per day'),
+      value: averageOrders,
+      icon: 'bars',
+      tone: 'info',
+      sub: `${t('Total Orders')}: ${fmtNum(totalOrders)}`,
     },
     {
       label: isHourly.value ? t('Peak revenue hour') : t('Peak revenue day'),
@@ -159,20 +205,38 @@ const revenueByDay = computed(() => {
   return rev.map((v, i) => ({ label: bucketLabel(labels[i] || ''), value: v }))
 })
 
-const expenseBreakdown = computed(() => {
-  const D = data.value
-  if (!D) return [] as { label: string; value: number }[]
-  const labels = Array.isArray(D.dayLabels) ? D.dayLabels : []
-  return toNumArr(D.expense30)
-    .map((value, index) => ({ label: bucketLabel(labels[index] || ''), value }))
-    .filter(row => row.value > 0)
-    .reverse()
-    .slice(0, 8)
-})
+const expenseRecords = computed(() => expenseDetails.value?.rows ?? [])
 
-const expenseListTitle = computed(() => isHourly.value
-  ? t('Expense totals by hour')
-  : t('Expense totals by day'))
+function formatExpenseDateTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime()))
+    return ''
+  return new Intl.DateTimeFormat(String(locale.value), {
+    timeZone: 'Asia/Tashkent',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
+function expenseTitle(row: ExpenseRecord): string {
+  return row.comment || row.category || t('Cash drawer expense')
+}
+
+function expenseMeta(row: ExpenseRecord): string {
+  const parts: string[] = []
+  if (row.comment && row.category)
+    parts.push(row.category)
+  const createdAt = formatExpenseDateTime(row.createdAt)
+  if (createdAt)
+    parts.push(createdAt)
+  if (row.cashierName)
+    parts.push(row.cashierName)
+  if (row.shiftId !== null && row.shiftId !== undefined)
+    parts.push(`${t('Shift')} #${row.shiftId}`)
+  return parts.join(' · ')
+}
 
 const ordersChartTitle = computed(() => isHourly.value
   ? t('Orders by hour')
@@ -243,37 +307,46 @@ function sparkTrend(values: number[]): 'up' | 'down' | 'flat' {
 }
 
 // ---------- Data loader ----------
+let salesRequestId = 0
+
+function normalizeExpenseDetails(raw: any): ExpenseDetails {
+  const rows = Array.isArray(raw?.expenses) ? raw.expenses : []
+  return {
+    total: Number(raw?.total_expense) || 0,
+    rows: rows.map((row: any, index: number) => ({
+      id: row?.id ?? index,
+      amount: Number(row?.amount) || 0,
+      category: typeof row?.category === 'string' ? row.category.trim() : '',
+      comment: typeof row?.comment === 'string' ? row.comment.trim() : '',
+      createdAt: typeof row?.created_at === 'string' ? row.created_at : '',
+      shiftId: row?.shift_id ?? null,
+      cashierName: typeof row?.cashier_name === 'string' ? row.cashier_name.trim() : '',
+    })),
+  }
+}
+
 async function loadDashboard() {
+  const requestId = ++salesRequestId
   loading.value = true
+  expenseDetailsLoading.value = true
+  expenseDetailsError.value = false
+  expenseDetails.value = null
   try {
     const r = sharedRange.value
-    const params: Record<string, string> = (r?.from && r?.to)
-      ? buildDateParams({ from: r.from, to: r.to, fromTime: r.fromTime, toTime: r.toTime })
-      : { range: r?.preset || '30d' }
-    const from = r?.from || ''
-    const to = r?.to || ''
-    // An unbounded "all time" result has no fair previous period. Do not
-    // accidentally compare it with the day before the browser clock.
-    const canCompare = Boolean(from && to)
-    const start = from ? new Date(`${from}T00:00:00`) : null
-    const end = to ? new Date(`${to}T00:00:00`) : null
-    const span = start && end
-      ? Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000))
-      : 0
-    const prevTo = start ? new Date(start) : null
-    prevTo?.setDate(prevTo.getDate() - 1)
-    const prevFrom = prevTo ? new Date(prevTo) : null
-    prevFrom?.setDate(prevFrom.getDate() - span)
-    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    const prevParams = prevFrom && prevTo
-      ? buildDateParams({ from: iso(prevFrom), to: iso(prevTo), fromTime: r?.fromTime, toTime: r?.toTime })
-      : {}
-    const [res, prevRes] = await Promise.all([
+    const fallback = businessPreset('30d')
+    const range = r?.from && r?.to
+      ? r
+      : { ...fallback, fromTime: r?.fromTime, toTime: r?.toTime }
+    const params = buildDateParams(range)
+    const expenseParams: Record<string, string> = { ...params, limit: '8' }
+    delete expenseParams.granularity
+    const [res, expenseRes] = await Promise.all([
       axiosIns.get('/dashboard/sales', { params }),
-      canCompare ? axiosIns.get('/dashboard/sales', { params: prevParams }).catch(() => null) : Promise.resolve(null),
+      axiosIns.get('/dashboard/sales/expenses', { params: expenseParams }).catch(() => null),
     ])
+    if (requestId !== salesRequestId)
+      return
     const raw = res.data?.data ?? res.data
-    const previous = prevRes?.data?.data ?? prevRes?.data ?? {}
     // BE channelDays shape: { day, hall, delivery, pickup }. FE stacked-bar
     // template uses { label, values: { hall, delivery, pickup } }. Adapt here
     // instead of touching N template bindings.
@@ -287,14 +360,33 @@ async function loadDashboard() {
           },
         }))
       : []
-    data.value = { ...raw, channelDays, previousRevenue: toNumArr(previous?.revenue30) }
+    data.value = {
+      ...raw,
+      channelDays,
+      previousPeriod: raw?.previous_period,
+      previousRevenue: toNumArr(raw?.previous_period?.revenue_series ?? raw?.lastMonthRev),
+    }
+    if (expenseRes) {
+      const expensesRaw = expenseRes.data?.data ?? expenseRes.data
+      expenseDetails.value = normalizeExpenseDetails(expensesRaw)
+    }
+    else {
+      expenseDetailsError.value = true
+    }
   }
   catch {
+    if (requestId !== salesRequestId)
+      return
     // Real data only — leave null so the page shows the empty state.
     data.value = null
+    expenseDetails.value = null
+    expenseDetailsError.value = true
   }
   finally {
-    loading.value = false
+    if (requestId === salesRequestId) {
+      loading.value = false
+      expenseDetailsLoading.value = false
+    }
   }
 }
 
@@ -320,7 +412,7 @@ onMounted(() => {
     >
       <div class="grid sales-hero">
         <div
-          v-for="i in 4"
+          v-for="i in 5"
           :key="`sk${i}`"
           class="herokpi"
         >
@@ -351,7 +443,7 @@ onMounted(() => {
       v-else
       style="display: flex; flex-direction: column; gap: var(--sp-6);"
     >
-      <!-- Hero KPI strip (4 columns) -->
+      <!-- Hero KPI strip -->
       <div class="grid sales-hero">
         <div
           v-for="k in heroKpis"
@@ -550,25 +642,47 @@ onMounted(() => {
           <div class="card__head">
             <div class="card__head-text">
               <div class="kpi__label">
-                {{ expenseListTitle }}
+                {{ t('Cash drawer expenses') }}
               </div>
               <h3 class="card__title">
-                {{ t('Expenses') }}
+                {{ t('Latest expense records') }}
               </h3>
             </div>
+            <strong
+              v-if="expenseDetails && !expenseDetailsError"
+              class="sales-expense-list__total mono"
+            >{{ formatCurrency(expenseDetails.total) }}</strong>
           </div>
           <div class="card__body">
             <div
-              v-if="expenseBreakdown.length"
+              v-if="expenseDetailsLoading"
+              class="sales-expense-list__loading"
+              aria-busy="true"
+            >
+              <Skeleton v-for="i in 3" :key="i" :h="34" w="100%" />
+            </div>
+            <p
+              v-else-if="expenseDetailsError"
+              class="muted"
+              role="alert"
+              style="margin: 4px 0 0; font-size: 13px;"
+            >
+              {{ t('Expense details unavailable') }}
+            </p>
+            <div
+              v-else-if="expenseRecords.length"
               class="sales-expense-list__rows"
             >
               <div
-                v-for="row in expenseBreakdown"
-                :key="row.label"
+                v-for="row in expenseRecords"
+                :key="row.id"
                 class="sales-expense-list__row"
               >
-                <span>{{ row.label }}</span>
-                <strong class="mono">{{ formatCurrency(row.value) }}</strong>
+                <span class="sales-expense-list__copy">
+                  <span class="sales-expense-list__name">{{ expenseTitle(row) }}</span>
+                  <span v-if="expenseMeta(row)" class="sales-expense-list__meta">{{ expenseMeta(row) }}</span>
+                </span>
+                <strong class="mono">{{ formatCurrency(row.amount) }}</strong>
               </div>
             </div>
             <p
@@ -649,7 +763,7 @@ onMounted(() => {
 }
 
 .sales-hero {
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 @media (max-width: 1100px) {
@@ -804,12 +918,21 @@ onMounted(() => {
   flex-direction: column;
   gap: 2px;
 }
+.sales-expense-list__loading {
+  display: grid;
+  gap: 10px;
+}
+.sales-expense-list__total {
+  color: rgb(var(--v-theme-on-surface));
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
 .sales-expense-list__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 38px;
+  min-height: 46px;
   padding: 8px 0;
   border-bottom: 1px solid rgb(var(--v-theme-border));
   color: rgb(var(--v-theme-text-secondary));
@@ -820,6 +943,25 @@ onMounted(() => {
 }
 .sales-expense-list__row strong {
   color: rgb(var(--v-theme-on-surface));
+  white-space: nowrap;
+}
+.sales-expense-list__copy {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 2px;
+}
+.sales-expense-list__name {
+  color: rgb(var(--v-theme-on-surface));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sales-expense-list__meta {
+  overflow: hidden;
+  color: rgb(var(--v-theme-text-tertiary));
+  font-size: 11px;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .sales-order-type :deep(.donut-row) {

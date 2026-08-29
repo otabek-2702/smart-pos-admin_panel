@@ -19,10 +19,20 @@ import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
 import Switch from '@/components/design/Switch.vue'
+import { useUserAccess } from '@/composables/useUserAccess'
 
 const { t } = useI18n({ useScope: 'global' })
 const { notify } = useNotify()
 const { formatCurrency, formatDateShort } = useFormatters()
+const { isAdministrator } = useUserAccess()
+const canAdministerBatches = computed(() => isAdministrator.value)
+
+// The deployed views omit the required movement_type argument when calling
+// both consume services, so these mutations currently fail before any domain
+// validation runs. Keep the inventory page useful and read-only until that
+// backend contract is repaired and regression-tested.
+const batchMutationSupported = false
+const canConsumeBatches = computed(() => canAdministerBatches.value && batchMutationSupported)
 
 // ---- state ----
 const batches = ref<any[]>([])
@@ -82,6 +92,7 @@ const expiryOptions = computed(() => [
 const locationOptions = computed(() =>
   locationsList.value.map(l => ({ value: String(l.id), label: l.name })),
 )
+
 const stockItemOptions = computed(() =>
   stockItemsList.value.map((i: any) => ({ value: String(i.id), label: i.name })),
 )
@@ -159,6 +170,9 @@ async function loadBatches() {
 }
 
 function openConsumeDialog(row: any) {
+  if (!canConsumeBatches.value)
+    return
+
   consumeBatch.value = row
   consumeQty.value = undefined
   consumeNotes.value = ''
@@ -166,7 +180,7 @@ function openConsumeDialog(row: any) {
 }
 
 async function submitConsume() {
-  if (!consumeBatch.value) {
+  if (!canConsumeBatches.value || !consumeBatch.value) {
     notify(t('batches_ext_select_batch_first'), 'error')
 
     return
@@ -207,6 +221,9 @@ async function submitConsume() {
 }
 
 function openAutoConsumeDialog() {
+  if (!canConsumeBatches.value)
+    return
+
   autoConsumeStockItem.value = undefined
   autoConsumeLocation.value = undefined
   autoConsumeQty.value = undefined
@@ -215,6 +232,9 @@ function openAutoConsumeDialog() {
 }
 
 async function submitAutoConsume() {
+  if (!canConsumeBatches.value)
+    return
+
   if (!autoConsumeStockItem.value || !autoConsumeLocation.value) {
     notify(t('batches_ext_select_item_location'), 'error')
 
@@ -337,6 +357,7 @@ function clearAll() {
     >
       <template #actions>
         <Button
+          v-if="canConsumeBatches"
           variant="secondary"
           icon="settings"
           @click="openAutoConsumeDialog"
@@ -352,6 +373,15 @@ function clearAll() {
         </Button>
       </template>
     </PageHeader>
+
+    <div
+      v-if="canAdministerBatches && !batchMutationSupported"
+      class="inline-alert"
+      role="note"
+    >
+      <DesignIcon name="alert" :size="18" />
+      <span>{{ t('batches_ext_mutation_backend_required') }}</span>
+    </div>
 
     <!-- Main card -->
     <div class="card">
@@ -638,7 +668,7 @@ function clearAll() {
           </Badge>
         </template>
 
-        <template #row-actions="{ row }">
+        <template v-if="canConsumeBatches" #row-actions="{ row }">
           <IconAction
             icon="minus"
             tone="primary"
@@ -672,6 +702,7 @@ function clearAll() {
 
     <!-- Consume from batch modal -->
     <Modal
+      v-if="canConsumeBatches"
       :open="consumeDialog"
       width="min(540px, 100%)"
       :title="t('batches_ext_consume_title')"
@@ -726,13 +757,6 @@ function clearAll() {
 
       <template #footer>
         <Button
-          variant="ghost"
-          :disabled="consumeSubmitting"
-          @click="consumeDialog = false"
-        >
-          {{ t('Cancel') }}
-        </Button>
-        <Button
           variant="primary"
           :loading="consumeSubmitting"
           @click="submitConsume"
@@ -744,6 +768,7 @@ function clearAll() {
 
     <!-- Auto-consume modal -->
     <Modal
+      v-if="canConsumeBatches"
       :open="autoConsumeDialog"
       width="min(600px, 100%)"
       :title="t('batches_ext_auto_consume_title')"
@@ -823,13 +848,6 @@ function clearAll() {
 
       <template #footer>
         <Button
-          variant="ghost"
-          :disabled="autoConsumeSubmitting"
-          @click="autoConsumeDialog = false"
-        >
-          {{ t('Close') }}
-        </Button>
-        <Button
           variant="primary"
           :loading="autoConsumeSubmitting"
           @click="submitAutoConsume"
@@ -842,6 +860,24 @@ function clearAll() {
 </template>
 
 <style scoped>
+.inline-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: var(--sp-4);
+  padding: 10px 12px;
+  border: 1px solid rgb(var(--v-theme-warning-border));
+  border-radius: var(--r-md);
+  color: rgb(var(--v-theme-warning-strong));
+  background: rgb(var(--v-theme-warning-weak));
+  font-size: 13px;
+}
+
+.inline-alert span {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Toolbar — flex-wrap, collapses to one column on mobile */
 .toolbar.tb-wrap {
   display: flex;
@@ -951,4 +987,6 @@ name: stock-batches
 meta:
   action: manage
   subject: all
+  anyPermission:
+    - stock.batch.view
 </route>

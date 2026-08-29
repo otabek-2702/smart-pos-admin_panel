@@ -241,11 +241,9 @@ async function save() {
             cols="12"
             sm="4"
           >
-            <VTextField
-              v-model.number="form.cost_price"
+            <AppPriceInput
+              v-model="form.cost_price"
               :label="t('Cost Price')"
-              type="number"
-              step="1"
             />
           </VCol>
 

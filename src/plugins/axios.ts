@@ -110,8 +110,16 @@ const IDEMPOTENT_ROUTES: IdempotentRoute[] = [
   { method: 'PATCH', path: /^\/orders\/\d+\/status$/ },
   { method: 'POST', path: /^\/inkassa\/perform$/ },
   { method: 'POST', path: /^\/treasury\/(?:transfer|expense)$/ },
+  { method: 'POST', path: /^\/shifts\/\d+\/reconcile\/?$/ },
   { method: 'POST', path: /^\/suppliers\/\d+\/pay\/?$/ },
+  { method: 'POST', path: /^\/receiving\/[^/]+\/complete\/?$/ },
   { method: 'POST', path: /^\/loyalty\/accounts\/[^/]+\/redeem\/?$/ },
+  { method: 'POST', path: /^\/attendance\/manual-entry\/?$/ },
+  { method: 'POST', path: /^\/attendance\/[^/]+\/(?:adjustment-requests|excuses)\/?$/ },
+  { method: 'POST', path: /^\/discipline-(?:cases|rules)\/?$/ },
+  { method: 'PATCH', path: /^\/(?:discipline-rules|work-schedules)\/[^/]+\/?$/ },
+  { method: 'POST', path: /^\/discipline-cases\/[^/]+\/(?:approve|reject|void)\/?$/ },
+  { method: 'POST', path: /^\/preparation-audits\/[^/]+\/(?:review|reopen)\/?$/ },
 ]
 
 function isIdempotentPath(method: string | undefined, url: string | undefined): boolean {

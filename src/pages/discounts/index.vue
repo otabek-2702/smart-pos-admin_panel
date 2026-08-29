@@ -8,6 +8,7 @@ import Field from '@/components/design/Field.vue'
 import IconAction from '@/components/design/IconAction.vue'
 import Input from '@/components/design/Input.vue'
 import Modal from '@/components/design/Modal.vue'
+import MoneyInput from '@/components/design/MoneyInput.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import Skeleton from '@/components/design/Skeleton.vue'
@@ -204,6 +205,9 @@ const statusOptions = computed(() => [
 const typeOptions = computed(() =>
   types.value.map((tp: any) => ({ value: String(tp.id), label: tp.name })),
 )
+const isPercentageDiscount = computed(() =>
+  types.value.find((tp: any) => Number(tp.id) === form.value.discount_type_id)?.discount_method === 'PERCENTAGE',
+)
 
 // ---- CRUD ----
 function openCreate() {
@@ -258,6 +262,7 @@ async function save() {
     // Build payload — when editing, omit secret_word if blank so we don't
     // overwrite the stored secret (BE never returns it, so it can't be repopulated).
     const payload: any = { ...form.value }
+    payload.value = Number(payload.value)
     // Optional numeric caps: a blank field means "no cap / unlimited", which
     // the backend models as NULL. Send null rather than 0 so an empty usage
     // limit isn't stored as "0 uses allowed".
@@ -535,16 +540,24 @@ function clearAllFilters() {
           />
         </Field>
         <Field :label="t('Value')">
-          <Input
+          <MoneyInput
+            v-if="!isPercentageDiscount"
             v-model="form.value"
-            type="number"
             :placeholder="t('Value')"
+          />
+          <Input
+            v-else
+            :model-value="String(form.value)"
+            type="number"
+            min="0"
+            step="0.01"
+            :placeholder="t('Value')"
+            @update:model-value="value => form.value = Number(value)"
           />
         </Field>
         <Field :label="t('Min Order Amount')">
-          <Input
+          <MoneyInput
             v-model="form.min_order_amount"
-            type="number"
             :placeholder="t('Min Order Amount')"
           />
         </Field>
@@ -552,9 +565,8 @@ function clearAllFilters() {
           :label="t('discount_max_amount')"
           :hint="t('discount_max_amount_hint')"
         >
-          <Input
+          <MoneyInput
             v-model="form.max_discount_amount"
-            type="number"
             :placeholder="t('discount_no_cap')"
           />
         </Field>

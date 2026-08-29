@@ -21,7 +21,7 @@ import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import SwitchEl from '@/components/design/Switch.vue'
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, te } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 
 interface PermissionDef { key: string; label: string; group: string }
@@ -30,10 +30,23 @@ interface RoleRow { name: string; permissions: string[] }
 // ============================================================
 // Role / group constants
 // ============================================================
-const ROLES = ['ADMIN', 'MANAGER', 'CASHIER', 'WAITER', 'USER'] as const
+const ROLES = ['ADMIN', 'MANAGER', 'WAREHOUSE', 'CASHIER', 'WAITER', 'CHEF', 'USER'] as const
 type RoleName = typeof ROLES[number]
 
-const GROUPS = ['Orders', 'Menu', 'Stock', 'HR', 'Reports', 'Administration']
+const FALLBACK_GROUPS = [
+  'Orders',
+  'Menu',
+  'Stock',
+  'Warehouse',
+  'Warehouse approvals',
+  'Operational audit',
+  'Operational audit approvals',
+  'Expense requests',
+  'Expense request approvals',
+  'HR',
+  'Reports',
+  'Administration',
+]
 
 // Frontend keeps a copy of defaults so we can offer a "reset" PATCH per spec.
 const DEFAULT_ROLE_PERMISSIONS: Record<RoleName, string[]> = {
@@ -44,11 +57,20 @@ const DEFAULT_ROLE_PERMISSIONS: Record<RoleName, string[]> = {
     'product.create', 'product.update', 'product.delete',
     'category.create', 'category.update', 'category.delete',
     'stock.view', 'stock.manage',
-    'hr.view', 'hr.manage',
+    'hr.view',
     'reports.view', 'inkassa.manage',
   ],
-  CASHIER: ['order.create', 'order.update', 'order.pay', 'discount.apply', 'order.stats'],
+  WAREHOUSE: [
+    'stock.catalog.view', 'stock.level.view', 'stock.batch.view',
+    'stock.supplier.view', 'stock.purchase.view',
+    'stock.receiving.create', 'stock.receiving.update_draft', 'stock.receiving.complete',
+    'stock.transfer.view', 'stock.transfer.create',
+    'stock.count.view', 'stock.count.create', 'stock.count.record',
+    'stock.adjustment.request',
+  ],
+  CASHIER: ['order.create', 'order.update', 'order.pay', 'discount.apply'],
   WAITER: ['order.create', 'order.update'],
+  CHEF: [],
   USER: [],
 }
 
@@ -56,6 +78,12 @@ const GROUP_TONE: Record<string, 'primary' | 'info' | 'success' | 'warning' | 'e
   Orders: 'primary',
   Menu: 'info',
   Stock: 'success',
+  Warehouse: 'success',
+  'Warehouse approvals': 'warning',
+  'Operational audit': 'info',
+  'Operational audit approvals': 'warning',
+  'Expense requests': 'info',
+  'Expense request approvals': 'warning',
   HR: 'warning',
   Reports: 'info',
   Administration: 'error',
@@ -64,8 +92,10 @@ const GROUP_TONE: Record<string, 'primary' | 'info' | 'success' | 'warning' | 'e
 const ROLE_TONE: Record<string, 'primary' | 'info' | 'neutral' | 'success' | 'warning' | 'error'> = {
   ADMIN: 'error',
   MANAGER: 'primary',
+  WAREHOUSE: 'success',
   CASHIER: 'warning',
   WAITER: 'info',
+  CHEF: 'neutral',
   USER: 'neutral',
 }
 
@@ -146,10 +176,15 @@ function hasPerm(name: string, key: string): boolean {
 }
 
 function labelOf(p: PermissionDef): string {
-  // Backend label is preferred; otherwise fall back to a translation key
-  // derived from the dotted permission key.
   const i18nKey = `perm_label_${p.key.replace(/\./g, '_')}`
-  return p.label || t(i18nKey)
+
+  return te(i18nKey) ? t(i18nKey) : (p.label || p.key)
+}
+
+function groupLabel(group: string): string {
+  const i18nKey = `perm_group_${group.replace(/[^\p{L}\p{N}]+/gu, '_')}`
+
+  return te(i18nKey) ? t(i18nKey) : group
 }
 
 // ============================================================
@@ -161,7 +196,7 @@ const filteredPermissions = computed<PermissionDef[]>(() => {
     if (groupFilter.value && p.group !== groupFilter.value)
       return false
     if (!q) return true
-    const lbl = (p.label || '').toLowerCase()
+    const lbl = labelOf(p).toLowerCase()
     const key = p.key.toLowerCase()
     return lbl.includes(q) || key.includes(q)
   })
@@ -176,6 +211,11 @@ const grantedCount = computed(() => {
 })
 
 const totalCount = computed(() => permissions.value.length)
+const groups = computed(() => {
+  const fromBackend = Array.from(new Set(permissions.value.map(permission => permission.group).filter(Boolean)))
+
+  return fromBackend.length ? fromBackend : FALLBACK_GROUPS
+})
 
 // ============================================================
 // Inline switch toggles (row-level)
@@ -306,7 +346,7 @@ const draftFilteredByGroup = computed<Record<string, PermissionDef[]>>(() => {
   const q = draftSearch.value.trim().toLowerCase()
   for (const p of permissions.value) {
     if (q) {
-      const lbl = (p.label || '').toLowerCase()
+      const lbl = labelOf(p).toLowerCase()
       const key = p.key.toLowerCase()
       if (!lbl.includes(q) && !key.includes(q)) continue
     }
@@ -384,7 +424,7 @@ const activeFilters = computed(() => {
   if (search.value)
     out.push({ k: 'q', label: t('perm_search'), val: search.value, clear: () => { search.value = '' } })
   if (groupFilter.value)
-    out.push({ k: 'g', label: t('perm_group'), val: t(`perm_group_${groupFilter.value}`), clear: () => { groupFilter.value = '' } })
+    out.push({ k: 'g', label: t('perm_group'), val: groupLabel(groupFilter.value), clear: () => { groupFilter.value = '' } })
   if (roleFilter.value && roleFilter.value !== 'MANAGER')
     out.push({ k: 'r', label: t('perm_role'), val: t(`role_${roleFilter.value}`), clear: () => { roleFilter.value = 'MANAGER' } })
   return out
@@ -399,7 +439,7 @@ function clearAllFilters() {
 // ============================================================
 // Select option sources
 // ============================================================
-const groupOptions = computed(() => GROUPS.map(g => ({ value: g, label: t(`perm_group_${g}`) })))
+const groupOptions = computed(() => groups.value.map(g => ({ value: g, label: groupLabel(g) })))
 const roleOptions = computed(() => ROLES.map(r => ({ value: r, label: t(`role_${r}`) })))
 
 // ============================================================
@@ -411,6 +451,7 @@ const columns: DataTableColumn<PermissionDef>[] = [
   { key: 'label', label: t('perm_col_label'), sortable: true },
   { key: 'ADMIN', label: t('role_ADMIN'), align: 'center', width: 90 },
   { key: 'MANAGER', label: t('role_MANAGER'), align: 'center', width: 110 },
+  { key: 'WAREHOUSE', label: t('role_WAREHOUSE'), align: 'center', width: 120 },
   { key: 'CASHIER', label: t('role_CASHIER'), align: 'center', width: 100 },
   { key: 'WAITER', label: t('role_WAITER'), align: 'center', width: 100 },
   { key: 'USER', label: t('role_USER'), align: 'center', width: 100 },
@@ -591,7 +632,7 @@ onBeforeUnmount(() => {
           style="font-size:13px;margin-right:4px;"
         >{{ t('perm_select_all_group') }}:</span>
         <button
-          v-for="g in GROUPS"
+          v-for="g in groups"
           :key="g"
           class="chip"
           :disabled="roleFilter === 'ADMIN' || isWildcard(roleFilter)"
@@ -605,7 +646,7 @@ onBeforeUnmount(() => {
             :name="groupAllOn(g) ? 'checkcircle' : 'plus'"
             :size="13"
           />
-          <span>{{ t(`perm_group_${g}`) }}</span>
+          <span>{{ groupLabel(g) }}</span>
         </button>
       </div>
 
@@ -623,7 +664,7 @@ onBeforeUnmount(() => {
         <!-- Group cell -->
         <template #cell.group="{ row }">
           <Badge :tone="GROUP_TONE[row.group] || 'neutral'">
-            {{ t(`perm_group_${row.group}`) }}
+            {{ groupLabel(row.group) }}
           </Badge>
         </template>
 
@@ -660,6 +701,19 @@ onBeforeUnmount(() => {
               :model-value="hasPerm('MANAGER', row.key)"
               :disabled="savingRole === 'MANAGER' || isWildcard('MANAGER')"
               @update:model-value="toggleCell('MANAGER', row.key)"
+            />
+          </div>
+        </template>
+
+        <template #cell.WAREHOUSE="{ row }">
+          <div
+            class="row"
+            style="justify-content:center;"
+          >
+            <SwitchEl
+              :model-value="hasPerm('WAREHOUSE', row.key)"
+              :disabled="savingRole === 'WAREHOUSE' || isWildcard('WAREHOUSE')"
+              @update:model-value="toggleCell('WAREHOUSE', row.key)"
             />
           </div>
         </template>
@@ -843,7 +897,7 @@ onBeforeUnmount(() => {
               "
             >
               <Badge :tone="GROUP_TONE[group] || 'neutral'">
-                {{ t(`perm_group_${group}`) }}
+                {{ groupLabel(String(group)) }}
               </Badge>
               <span
                 class="num"

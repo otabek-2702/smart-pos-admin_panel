@@ -177,10 +177,6 @@ function prepBarColor(row: PrepRow): string {
    BE does NOT support `?range=30d` for products — compute the [from, to] window.
 */
 
-function localDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 function num(v: unknown): number {
   const n = typeof v === 'string' ? Number(v) : (v as number)
   return Number.isFinite(n) ? n : 0
@@ -278,45 +274,20 @@ function mapTrends(raw: any, previousRaw?: any): TrendRow[] {
   return trendSeries(raw).map(series => mapTrendRow(series, dates, previous))
 }
 /* ---------- Loader ---------- */
+let productsRequestId = 0
+
 async function loadDashboard() {
+  const requestId = ++productsRequestId
   loading.value = true
   try {
-    // Consume hub's shared range; fall back to last 30d when hub hasn't fired.
-    let from = ''
-    let to = ''
     const sr = sharedRange.value
-    if (sr?.from && sr?.to) { from = sr.from; to = sr.to }
-    else { const d = businessPreset('30d'); from = d.from; to = d.to }
-    // Previous period of same length for delta computation.
-    const prev = (() => {
-      // Noon keeps calendar-date arithmetic independent of the browser's UTC
-      // offset, including the cafe's 07:00-to-03:00 business-day boundary.
-      const fromD = new Date(`${from}T12:00:00`)
-      const toD = new Date(`${to}T12:00:00`)
-      const span = Math.max(0, Math.round((toD.getTime() - fromD.getTime()) / 86400000))
-      const prevTo = new Date(fromD)
-      prevTo.setDate(prevTo.getDate() - 1)
-      const prevFrom = new Date(prevTo)
-      prevFrom.setDate(prevTo.getDate() - span)
-      return { from: localDate(prevFrom), to: localDate(prevTo) }
-    })()
-
-    // Same time-of-day filter (Working hours / custom) on the current window;
-    // apply it to the previous period too so the delta compares like-for-like.
-    const tod = { fromTime: sr?.fromTime, toTime: sr?.toTime }
-    const curParams = buildDateParams({ from, to, ...tod })
-    const prevParams = buildDateParams({ from: prev.from, to: prev.to, ...tod })
-    const [ovRes, catRes, parRes, trRes, ovPrevRes, trPrevRes, opsRes] = await Promise.all([
+    const range = sr?.from && sr?.to ? sr : businessPreset('30d')
+    const curParams = buildDateParams(range)
+    const [ovRes, catRes, parRes, trRes, opsRes] = await Promise.all([
       axiosIns.get('/analytics/products/overview', { params: curParams }),
       axiosIns.get('/analytics/products/categories', { params: curParams }),
       axiosIns.get('/analytics/products/pareto', { params: curParams }),
       axiosIns.get('/analytics/products/trends', { params: { ...curParams, top_n: 6 } }),
-      // Previous-period overview so we can compute units30dDelta + menuRevenueDelta.
-      // Best-effort: if it fails, deltas stay null.
-      axiosIns.get('/analytics/products/overview', { params: prevParams }).catch(() => null),
-      // Ask for a wider prior set so a current top product can still receive
-      // its true previous-period comparison instead of a false 0% change.
-      axiosIns.get('/analytics/products/trends', { params: { ...prevParams, top_n: 50 } }).catch(() => null),
       // The useful category-speed insight used to be isolated on Operations.
       // Keep it with the product/category decisions it informs.
       axiosIns.get('/dashboard/operations', { params: curParams }).catch(() => null),
@@ -326,6 +297,23 @@ async function loadDashboard() {
     const catRaw = catRes.data?.data ?? catRes.data
     const parRaw = parRes.data?.data ?? parRes.data
     const trRaw = trRes.data?.data ?? trRes.data
+    if (requestId !== productsRequestId)
+      return
+    const previousQuery = trRaw?.previous_period?.query
+    const previousParams = previousQuery?.datetime_from && previousQuery?.datetime_to
+      ? buildDateParams({
+          fromAt: String(previousQuery.datetime_from),
+          toAt: String(previousQuery.datetime_to),
+        })
+      : null
+    const [ovPrevRes, trPrevRes] = previousParams
+      ? await Promise.all([
+          axiosIns.get('/analytics/products/overview', { params: previousParams }).catch(() => null),
+          axiosIns.get('/analytics/products/trends', { params: { ...previousParams, top_n: 50 } }).catch(() => null),
+        ])
+      : [null, null]
+    if (requestId !== productsRequestId)
+      return
     const ovPrevRaw = ovPrevRes?.data?.data ?? ovPrevRes?.data ?? null
     const trPrevRaw = trPrevRes?.data?.data ?? trPrevRes?.data ?? null
     const opsRaw = opsRes?.data?.data ?? opsRes?.data ?? null
@@ -367,6 +355,8 @@ async function loadDashboard() {
     }
   }
   catch (err) {
+    if (requestId !== productsRequestId)
+      return
     // Soft-degrade so the page renders empty-states/skeletons instead of throwing.
     data.value = {
       overview: {
@@ -387,7 +377,8 @@ async function loadDashboard() {
     void err
   }
   finally {
-    loading.value = false
+    if (requestId === productsRequestId)
+      loading.value = false
   }
 }
 
@@ -544,7 +535,14 @@ onMounted(() => {
       <!-- Frequently bought together — switchable views -->
       <Affinity
         :loading="loading"
-        :range="sharedRange?.from && sharedRange?.to ? { from: sharedRange.from, to: sharedRange.to } : null"
+        :range="sharedRange?.from && sharedRange?.to ? {
+          from: sharedRange.from,
+          to: sharedRange.to,
+          fromTime: sharedRange.fromTime,
+          toTime: sharedRange.toTime,
+          fromAt: sharedRange.fromAt,
+          toAt: sharedRange.toAt,
+        } : null"
         :window-label="windowLabel"
       />
 

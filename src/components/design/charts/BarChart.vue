@@ -13,13 +13,14 @@
  * - Hover bands extend the full band width over the plot area; mousemove
  *   updates ChartTip x/y to track the cursor.
  */
-import { useShown } from '@/composables/useAlphaMotion'
 import { Fmt } from '../utils/format'
 import Skeleton from '../Skeleton.vue'
 import StateFill from '../StateFill.vue'
 import ChartTip from './ChartTip.vue'
 import { niceTicks } from './niceTicks'
 import { useWidth } from './useWidth'
+import { useShown } from '@/composables/useAlphaMotion'
+import { formatMonthCodeLabel } from '@/utils/monthLabels'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -113,7 +114,11 @@ const tipRows = computed(() => {
   }]
 })
 
-const tipTitle = computed(() => hover.value !== null ? props.data[hover.value].label : '')
+function displayLabel(label: string): string {
+  return formatMonthCodeLabel(label, t)
+}
+
+const tipTitle = computed(() => hover.value !== null ? displayLabel(props.data[hover.value].label) : '')
 </script>
 
 <template>
@@ -197,7 +202,7 @@ const tipTitle = computed(() => hover.value !== null ? props.data[hover.value].l
           text-anchor="middle"
           font-size="11"
           fill="var(--chart-axis)"
-        >{{ d.label }}</text>
+        >{{ displayLabel(d.label) }}</text>
         <rect
           :x="padL + band * i"
           :y="padT"

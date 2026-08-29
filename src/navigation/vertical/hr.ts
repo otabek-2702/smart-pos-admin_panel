@@ -3,6 +3,13 @@ export default [
     heading: 'HR',
   },
   {
+    title: 'Operational Audit',
+    icon: { icon: 'bx-shield-quarter' },
+    to: 'audit',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
     title: 'Employees',
     icon: { icon: 'bx-group' },
     to: 'hr-employees',

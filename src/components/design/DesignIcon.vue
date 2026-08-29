@@ -57,6 +57,7 @@ export const ICON_PATHS: Record<string, string> = {
   mail: '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4 7 8 6 8-6"/>',
   user: '<circle cx="12" cy="8" r="3.6"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/>',
   userok: '<circle cx="10" cy="8" r="3.4"/><path d="M4 20a6 6 0 0 1 12 0M16 12l2 2 3.5-3.5"/>',
+  logout: '<path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M9 12h9"/>',
   sliders: '<path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2.2"/><circle cx="8" cy="16" r="2.2"/>',
   inbox: '<path d="M4 13h4l1.5 2.5h5L16 13h4"/><path d="M4 13 6 5h12l2 8v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5Z"/>',
   dept: '<rect x="3.5" y="8" width="7" height="12" rx="1.4"/><rect x="13.5" y="4" width="7" height="16" rx="1.4"/><path d="M5.5 12h3M5.5 15.5h3M15.5 8h3M15.5 11.5h3M15.5 15h3"/>',

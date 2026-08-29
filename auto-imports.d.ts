@@ -289,6 +289,7 @@ declare global {
   const useScriptTag: typeof import('@vueuse/core')['useScriptTag']
   const useScroll: typeof import('@vueuse/core')['useScroll']
   const useScrollLock: typeof import('@vueuse/core')['useScrollLock']
+  const useSessionLogout: typeof import('./src/composables/useSessionLogout')['useSessionLogout']
   const useSessionStorage: typeof import('@vueuse/core')['useSessionStorage']
   const useShare: typeof import('@vueuse/core')['useShare']
   const useShown: typeof import('./src/composables/useAlphaMotion')['useShown']
@@ -669,6 +670,7 @@ declare module 'vue' {
     readonly useScriptTag: UnwrapRef<typeof import('@vueuse/core')['useScriptTag']>
     readonly useScroll: UnwrapRef<typeof import('@vueuse/core')['useScroll']>
     readonly useScrollLock: UnwrapRef<typeof import('@vueuse/core')['useScrollLock']>
+    readonly useSessionLogout: UnwrapRef<typeof import('./src/composables/useSessionLogout')['useSessionLogout']>
     readonly useSessionStorage: UnwrapRef<typeof import('@vueuse/core')['useSessionStorage']>
     readonly useShare: UnwrapRef<typeof import('@vueuse/core')['useShare']>
     readonly useShown: UnwrapRef<typeof import('./src/composables/useAlphaMotion')['useShown']>

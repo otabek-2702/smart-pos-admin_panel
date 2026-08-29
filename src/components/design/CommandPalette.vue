@@ -19,9 +19,8 @@ import DesignIcon from './DesignIcon.vue'
 import { designId } from './ids'
 import { useTheme } from 'vuetify'
 import { useAlphaTheme } from '@/composables/useAlphaTheme'
-import ability from '@/plugins/casl/ability'
-import { initialAbility } from '@/plugins/casl/ability'
 import { readUserAccess } from '@/composables/useUserAccess'
+import { useSessionLogout } from '@/composables/useSessionLogout'
 import { warehousePathAllowed } from '@/navigation/access'
 
 const { t, locale } = useI18n({ useScope: 'global' })
@@ -54,6 +53,7 @@ const dialogRef = ref<HTMLElement | null>(null)
 const listboxId = designId('command-listbox')
 let previouslyFocused: HTMLElement | null = null
 const { toggleTheme } = useAlphaTheme(vuetifyTheme)
+const { logout } = useSessionLogout()
 
 function flattenNav(group: string, nav: any[]): CmdItem[] {
   const out: CmdItem[] = []
@@ -89,14 +89,6 @@ function buildItem(group: string, n: NavItem): CmdItem {
 function setLocale(code: string) {
   locale.value = code as any
   localStorage.setItem('appLocale', code)
-}
-
-function logout() {
-  localStorage.removeItem('accessToken')
-  localStorage.removeItem('userData')
-  localStorage.removeItem('userAbilities')
-  ability.update(initialAbility)
-  router.push('/login')
 }
 
 function actionsGroup(): CmdItem[] {

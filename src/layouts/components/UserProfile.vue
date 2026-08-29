@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import axios from '@/plugins/axios'
 import { fmtDateTime } from '@/components/design/utils/format'
-import { initialAbility } from '@/plugins/casl/ability'
-import { useAppAbility } from '@/plugins/casl/useAppAbility'
-import { getStoredToken, getStoredUserData } from '@/utils/storage'
+import { useSessionLogout } from '@/composables/useSessionLogout'
+import { getStoredUserData } from '@/utils/storage'
 
 const { t } = useI18n({ useScope: 'global' })
-const router = useRouter()
-const ability = useAppAbility()
+const { logout } = useSessionLogout()
 const userData = getStoredUserData()
 const hasUserData = Boolean(Object.keys(userData).length)
 
@@ -26,24 +23,6 @@ const userRole = computed(() => {
 
   return userData.role || ''
 })
-
-const logout = () => {
-  const token = getStoredToken()
-
-  const revokeRequest = axios.post('/auth-logout', undefined, token
-    ? { headers: { Authorization: `Bearer ${token}` } }
-    : undefined)
-
-  localStorage.removeItem('userData')
-  localStorage.removeItem('accessToken')
-  localStorage.removeItem('userAbilities')
-  ability.update(initialAbility)
-
-  router.replace('/login').catch(() => undefined)
-
-  // The local session must end immediately even when the server is unavailable.
-  revokeRequest.catch(() => undefined)
-}
 </script>
 
 <template>

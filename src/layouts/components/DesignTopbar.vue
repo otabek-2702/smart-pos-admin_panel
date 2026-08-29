@@ -3,6 +3,7 @@ import { useTheme } from 'vuetify'
 import { storeToRefs } from 'pinia'
 import AnomalyBell from '@/components/design/AnomalyBell.vue'
 import DesignIcon from '@/components/design/DesignIcon.vue'
+import ProfileMenu from '@/components/design/ProfileMenu.vue'
 import SettingsMenu from '@/components/design/SettingsMenu.vue'
 import NavBarI18n from '@/layouts/components/NavBarI18n.vue'
 import { useAlphaTheme } from '@/composables/useAlphaTheme'
@@ -16,10 +17,7 @@ import { useUserAccess } from '@/composables/useUserAccess'
    - SettingsMenu rendered between (where) DateRange (would be)
      and the theme toggle iconbtn
    - Global language switcher
-   - DROPPED: avatar dropdown (UserProfile / avatarRoot)
-   - KEPT: bare <div class="avatar">{{ initials }}</div>
-     (no click, no dropdown), initials computed from
-     localStorage.userData.first_name[0] + last_name[0]
+   - Account menu keeps the compact initials avatar and exposes logout.
    ============================================================ */
 
 withDefaults(
@@ -63,24 +61,6 @@ const showDate = computed(() => false)
 /* ---------- Theme (mirrors source onToggleTheme) ---------- */
 const vuetifyTheme = useTheme()
 const { theme, toggleTheme } = useAlphaTheme(vuetifyTheme)
-
-/* ---------- Avatar initials (bare div, no dropdown) ---------- */
-const initials = computed(() => {
-  try {
-    const raw = localStorage.getItem('userData')
-    if (!raw)
-      return '?'
-    const u = JSON.parse(raw) as { first_name?: string; last_name?: string }
-    const a = (u.first_name || '').charAt(0)
-    const b = (u.last_name || '').charAt(0)
-    const out = (a + b).toUpperCase()
-    return out || '?'
-  }
-  catch {
-    return '?'
-  }
-})
-
 </script>
 
 <template>
@@ -90,12 +70,18 @@ const initials = computed(() => {
       :title="t('Toggle sidebar')"
       @click="$emit('toggleSidebar')"
     >
-      <DesignIcon name="layout" :size="18" />
+      <DesignIcon
+        name="layout"
+        :size="18"
+      />
     </button>
 
     <div class="topbar__crumbs">
       <span>{{ t('Alpha POS') }}</span>
-      <DesignIcon name="chevright" :size="14" />
+      <DesignIcon
+        name="chevright"
+        :size="14"
+      />
       <b>{{ currentNavLabel ? t(currentNavLabel) : '' }}</b>
     </div>
 
@@ -129,12 +115,13 @@ const initials = computed(() => {
       :title="t('Toggle theme')"
       @click="toggleTheme"
     >
-      <DesignIcon :name="theme === 'dark' ? 'sun' : 'moon'" :size="18" />
+      <DesignIcon
+        :name="theme === 'dark' ? 'sun' : 'moon'"
+        :size="18"
+      />
     </button>
 
-    <!-- Bare avatar (no dropdown, no click) — decision #5 v3 -->
-    <div class="avatar">
-      {{ initials }}
-    </div>
+    <!-- Compact account menu -->
+    <ProfileMenu />
   </header>
 </template>

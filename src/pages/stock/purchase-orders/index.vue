@@ -20,7 +20,6 @@ import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import { useStateAction } from '@/composables/useStateAction'
-import { getStoredUserData } from '@/utils/storage'
 import { useUserAccess } from '@/composables/useUserAccess'
 
 const { t } = useI18n({ useScope: 'global' })
@@ -226,13 +225,10 @@ async function createOrder() {
   }
   saving.value = true
   try {
-    const userData = getStoredUserData()
-
     const payload: any = {
       ...form.value,
       supplier_id: form.value.supplier_id ? Number(form.value.supplier_id) : null,
       delivery_location_id: form.value.delivery_location_id ? Number(form.value.delivery_location_id) : null,
-      created_by_id: userData.id,
     }
 
     if (!payload.expected_date)

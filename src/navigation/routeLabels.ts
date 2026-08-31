@@ -35,6 +35,7 @@ export const ROUTE_LABELS: Record<string, string> = {
   '/places': 'Places & Tables',
   '/discounts': 'Discounts',
   '/cashbox/categories': 'Cashbox Expense Categories',
+  '/money-control': 'Money Control',
   '/treasury': 'Safe & Bank',
   '/inkassa': 'Inkassa',
   '/loyalty': 'Loyalty',

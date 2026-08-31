@@ -59,6 +59,14 @@ export default [
     subject: 'all',
   },
   {
+    title: 'Money Control',
+    icon: { icon: 'bx-wallet' },
+    to: 'money-control',
+    action: 'manage',
+    subject: 'all',
+    anyPermission: ['money.control.view'],
+  },
+  {
     title: 'Safe & Bank',
     icon: { icon: 'bx-shield' },
     to: 'treasury',

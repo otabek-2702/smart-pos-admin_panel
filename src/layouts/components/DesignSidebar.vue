@@ -97,6 +97,7 @@ const NAV: NavEntry[] = [
   { type: 'item', id: 'places', label: 'Places & Tables', icon: 'table', to: '/places' },
   { type: 'item', id: 'discounts', label: 'Discounts', icon: 'tag', to: '/discounts' },
   { type: 'item', id: 'cash', label: 'Cashbox Expense Categories', icon: 'register', to: '/cashbox/categories' },
+  { type: 'item', id: 'money-control', label: 'Money Control', icon: 'wallet', to: '/money-control', anyPermission: ['money.control.view'] },
   { type: 'item', id: 'treasury', label: 'Treasury', icon: 'store', to: '/treasury' },
   { type: 'item', id: 'loyalty', label: 'Loyalty', icon: 'gift', to: '/loyalty' },
   { type: 'item', id: 'sessions', label: 'Sessions', icon: 'lock', to: '/sessions' },

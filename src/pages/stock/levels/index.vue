@@ -21,10 +21,12 @@ import { buildCsv } from '@/utils/csv'
 import { useUserAccess } from '@/composables/useUserAccess'
 
 const { t } = useI18n({ useScope: 'global' })
+const route = useRoute()
 const { notify } = useNotify()
 const { formatDateShort } = useFormatters()
 const { isAdministrator } = useUserAccess()
 const canAdministerLevels = computed(() => isAdministrator.value)
+const ITEM_TYPES = ['RAW', 'SEMI', 'FINISHED', 'PACKAGING']
 
 // ---- state ----
 const levels = ref<any[]>([])
@@ -36,15 +38,14 @@ const itemsPerPage = ref(10)
 const search = ref('')
 const locationFilter = ref<string>('')
 const categoryFilter = ref<string>('')
-const itemTypeFilter = ref<string>('')
+const requestedItemType = String(Array.isArray(route.query.item_type) ? route.query.item_type[0] : route.query.item_type ?? '').toUpperCase()
+const itemTypeFilter = ref<string>(ITEM_TYPES.includes(requestedItemType) ? requestedItemType : '')
 const lowStockOnly = ref(false)
 
 const locationsList = ref<any[]>([])
 const categoriesList = ref<any[]>([])
 
 const MOVEMENT_TYPES = ['ADJUSTMENT_PLUS', 'ADJUSTMENT_MINUS', 'WASTE', 'SPOILAGE', 'COUNT_ADJUSTMENT', 'RETURN_FROM_CUSTOMER', 'RETURN_TO_SUPPLIER', 'PURCHASE_IN', 'SALE_OUT']
-const ITEM_TYPES = ['RAW', 'SEMI', 'FINISHED', 'PACKAGING']
-
 const debouncedSearch = useDebounceFn(() => {
   page.value = 1
   loadLevels()

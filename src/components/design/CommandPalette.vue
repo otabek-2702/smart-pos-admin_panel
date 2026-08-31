@@ -33,6 +33,7 @@ interface NavItem {
   icon?: { icon: string } | string
   action?: string
   subject?: string
+  anyPermission?: string[]
 }
 
 interface CmdItem {
@@ -43,6 +44,7 @@ interface CmdItem {
   action?: () => void
   icon?: string
   searchKey: string
+  anyPermission?: string[]
 }
 
 const open = ref(false)
@@ -81,6 +83,7 @@ function buildItem(group: string, n: NavItem): CmdItem {
     group,
     to: n.to || '',
     icon: iconName,
+    anyPermission: n.anyPermission,
     searchKey: `${title} ${group} ${n.to ?? ''}`.toLowerCase(),
   }
 }
@@ -117,10 +120,14 @@ const items = computed<CmdItem[]>(() => {
     ...flattenNav(t('Settings'), systemNav as any),
   ]
   const access = readUserAccess()
-  if (!access.isWarehouse)
-    return [...actions, ...routes]
+  const permittedRoutes = routes.filter(item =>
+    !item.anyPermission?.length || access.hasAny(item.anyPermission),
+  )
 
-  const allowedRoutes = routes.filter(item => {
+  if (!access.isWarehouse)
+    return [...actions, ...permittedRoutes]
+
+  const allowedRoutes = permittedRoutes.filter(item => {
     if (!item.to) return false
     try {
       const path = router.resolve({ name: item.to }).path

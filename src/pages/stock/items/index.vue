@@ -24,6 +24,7 @@ import { useUserAccess } from '@/composables/useUserAccess'
 
 const { t } = useI18n({ useScope: 'global' })
 const router = useRouter()
+const route = useRoute()
 const { hasPermission } = useUserAccess()
 const canManageStock = computed(() => hasPermission('stock.manage'))
 
@@ -42,7 +43,10 @@ function onScanned(code: string) {
   // Defer lookup one tick so the v-model reflects the new value before lookup runs.
   nextTick(() => { lookupBarcode() })
 }
-const typeFilter = ref<string | undefined>(undefined)
+const requestedType = String(Array.isArray(route.query.type) ? route.query.type[0] : route.query.type ?? '').toUpperCase()
+const typeFilter = ref<string | undefined>(
+  ['RAW', 'SEMI', 'FINISHED', 'PACKAGING'].includes(requestedType) ? requestedType : undefined,
+)
 const categoryFilter = ref<number | undefined>(undefined)
 const lowStockOnly = ref(false)
 const statusFilter = ref<string>('all')

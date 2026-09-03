@@ -55,6 +55,10 @@ export function readUserAccess() {
     return required.some(has)
   }
 
+  function hasAll(required: string[]): boolean {
+    return required.every(has)
+  }
+
   return {
     user,
     userId,
@@ -65,6 +69,7 @@ export function readUserAccess() {
     isManager: role === 'MANAGER',
     has,
     hasAny,
+    hasAll,
   }
 }
 
@@ -93,6 +98,7 @@ export function useUserAccess() {
     isManager: computed(() => access.value.isManager),
     hasPermission: (permission: string) => access.value.has(permission),
     hasAnyPermission: (required: string[]) => access.value.hasAny(required),
+    hasAllPermissions: (required: string[]) => access.value.hasAll(required),
     refresh,
   }
 }

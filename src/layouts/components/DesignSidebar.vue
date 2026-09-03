@@ -26,6 +26,7 @@ interface NavItem {
   to: string
   badge?: string
   anyPermission?: string[]
+  allPermissions?: string[]
 }
 type NavEntry = NavSection | NavItem
 
@@ -47,12 +48,13 @@ const WAREHOUSE_WORKSPACE_PERMISSIONS = [
   'stock.count.create',
   'stock.count.record',
   'stock.adjustment.request',
+  'stock.adjustment.approve',
 ]
 
 const { t } = useI18n({ useScope: 'global' })
 const router = useRouter()
 const route = useRoute()
-const { isWarehouse, hasAnyPermission } = useUserAccess()
+const { isWarehouse, hasAnyPermission, hasAllPermissions } = useUserAccess()
 const isMobile = useMediaQuery('(max-width: 768px)')
 const drawerHidden = computed(() => isMobile.value && !props.open)
 const closeButton = ref<HTMLButtonElement | null>(null)
@@ -118,7 +120,11 @@ const NAV: NavEntry[] = [
   { type: 'section', label: 'Stock' },
   { type: 'item', id: 'stock-alerts', label: 'Stock Alerts', icon: 'alert', to: '/stock/alerts' },
   { type: 'item', id: 'stock-receiving', label: 'Receiving', icon: 'inbox', to: '/stock/receiving' },
-  { type: 'item', id: 'stock-adjustments', label: 'Adjustments', icon: 'sliders', to: '/stock/adjustments' },
+  {
+    type: 'item', id: 'stock-adjustments', label: 'Adjustments', icon: 'sliders', to: '/stock/adjustments',
+    allPermissions: ['stock.adjustment.approve', 'stock.catalog.view'],
+    anyPermission: ['stock.level.view', 'stock.inventory_control.view'],
+  },
   { type: 'item', id: 'stock-reservations', label: 'Reservations', icon: 'lock', to: '/stock/reservations' },
   { type: 'section', label: 'Settings' },
   { type: 'item', id: 'qr-codes', label: 'QR Codes', icon: 'grid', to: '/qr-codes' },
@@ -140,6 +146,11 @@ const WAREHOUSE_NAV: NavEntry[] = [
   { type: 'item', id: 'stock-receiving', label: 'Receiving', icon: 'inbox', to: '/stock/receiving', anyPermission: ['stock.purchase.view'] },
   { type: 'item', id: 'stock-counts', label: 'Stock Counts', icon: 'list', to: '/stock/counts', anyPermission: ['stock.count.view'] },
   { type: 'item', id: 'stock-adjustment-requests', label: 'Stock adjustment requests', icon: 'sliders', to: '/stock/adjustment-requests', anyPermission: ['stock.adjustment.request'] },
+  {
+    type: 'item', id: 'stock-adjustments', label: 'Adjustments', icon: 'sliders', to: '/stock/adjustments',
+    allPermissions: ['stock.adjustment.approve', 'stock.catalog.view'],
+    anyPermission: ['stock.level.view', 'stock.inventory_control.view'],
+  },
   { type: 'item', id: 'stock-transfers', label: 'Transfers', icon: 'share', to: '/stock/transfers', anyPermission: ['stock.transfer.view'] },
   { type: 'section', label: 'HR' },
   { type: 'item', id: 'operational-audit', label: 'Operational Audit', icon: 'flag', to: '/audit', anyPermission: AUDIT_PERMISSIONS },
@@ -149,7 +160,10 @@ const WAREHOUSE_NAV: NavEntry[] = [
 
 const visibleNav = computed<NavEntry[]>(() => {
   const source = isWarehouse.value ? WAREHOUSE_NAV : NAV
-  const allowed = source.filter(entry => entry.type === 'section' || !entry.anyPermission?.length || hasAnyPermission(entry.anyPermission))
+  const allowed = source.filter(entry => entry.type === 'section' || (
+    (!entry.anyPermission?.length || hasAnyPermission(entry.anyPermission))
+    && (!entry.allPermissions?.length || hasAllPermissions(entry.allPermissions))
+  ))
 
   return allowed.filter((entry, index) => {
     if (entry.type !== 'section')

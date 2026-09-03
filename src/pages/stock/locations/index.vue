@@ -21,17 +21,23 @@ import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
 import Switch from '@/components/design/Switch.vue'
+import { useUserAccess } from '@/composables/useUserAccess'
 
 const { t } = useI18n({ useScope: 'global' })
 const { notify } = useNotify()
 const { formatDate } = useFormatters()
+const { hasPermission } = useUserAccess()
+const canManageLocations = computed(() => hasPermission('stock.manage'))
+const canViewStockLevels = computed(() => hasPermission('stock.level.view'))
 
 // ---- state ----
-// NOTE: BE view (stock/views/location_views.py) only reads `type`, `parent_id`, `tree` from
-// request.GET. It IGNORES page/per_page/include_stats/include_inactive/production_only/search.
-// → All filtering/pagination/search is done CLIENT-SIDE below.
+// The list endpoint returns the complete branch-scoped collection. Keep all display
+// filters client-side so list and tree views use exactly the same source rows; the
+// backend tree response has a different shape and does not accept type/parent filters.
 const allLocations = ref<any[]>([])
 const loading = ref(false)
+const locationsLoadError = ref(false)
+let locationListRequestId = 0
 
 const page = ref(1)
 const itemsPerPage = ref(10)
@@ -52,11 +58,14 @@ const deleting = ref(false)
 
 const setDefaultDialog = ref(false)
 const settingDefault = ref(false)
+const locationMutationInFlight = computed(() => saving.value || deleting.value || settingDefault.value)
 
 const stockModalOpen = ref(false)
 const stockLoading = ref(false)
 const stockLevels = ref<any[]>([])
 const stockForLocation = ref<any>(null)
+const stockLoadError = ref(false)
+let stockModalRequestId = 0
 
 const selectedItem = ref<any>(null)
 
@@ -74,7 +83,6 @@ const form = ref({
   name: '',
   type: 'WAREHOUSE',
   parent_id: null as number | null,
-  is_default: false,
   is_production_area: false,
   sort_order: 0,
   is_active: true,
@@ -85,39 +93,45 @@ const debouncedSearch = useDebounceFn(() => {
 }, 350)
 
 // ---- load ----
-// BE only honors `type`, `parent_id`, `tree`. Everything else is filtered client-side.
+// Inactive rows must be requested explicitly; all other filters are applied below.
 async function loadLocations() {
+  const requestId = ++locationListRequestId
+
   loading.value = true
+  locationsLoadError.value = false
   try {
-    const params: any = {}
-    if (typeFilter.value)
-      params.type = typeFilter.value
-    if (parentFilter.value)
-      params.parent_id = parentFilter.value
-    if (treeView.value)
-      params.tree = 'true'
+    const params = {
+      include_inactive: includeInactive.value ? 'true' : 'false',
+    }
 
     const res = await axios.get('/locations/', { params })
+    if (requestId !== locationListRequestId)
+      return
     const d = res.data?.data ?? res.data
 
     allLocations.value = d?.locations ?? []
   }
   catch {
-    notify(t('msg_no_locations'), 'error')
+    if (requestId === locationListRequestId) {
+      allLocations.value = []
+      locationsLoadError.value = true
+      notify(t('Failed to load locations'), 'error')
+    }
   }
   finally {
-    loading.value = false
+    if (requestId === locationListRequestId)
+      loading.value = false
   }
 }
 
 onMounted(loadLocations)
-// Only re-fetch on filters BE actually honors (type/parent/tree).
-watch([typeFilter, parentFilter, treeView], () => {
+// Re-fetch only when the requested collection itself changes.
+watch(includeInactive, () => {
   page.value = 1
   loadLocations()
 })
-// Client-side filters: just reset page; computed `locations` reacts.
-watch([productionOnly, includeInactive], () => {
+// Client-side filters and view changes only reset pagination.
+watch([typeFilter, parentFilter, productionOnly, treeView], () => {
   page.value = 1
 })
 watch(search, () => debouncedSearch())
@@ -143,6 +157,8 @@ const filteredLocations = computed(() => {
   const q = search.value.trim().toLowerCase()
   return allLocations.value.filter((l) => {
     if (!includeInactive.value && !l.is_active) return false
+    if (typeFilter.value && l.type !== typeFilter.value) return false
+    if (parentFilter.value != null && Number(l.parent_id) !== Number(parentFilter.value)) return false
     if (productionOnly.value && !l.is_production_area) return false
     if (q) {
       const hay = `${l.name ?? ''} ${l.type ?? ''}`.toLowerCase()
@@ -152,9 +168,55 @@ const filteredLocations = computed(() => {
   })
 })
 const total = computed(() => filteredLocations.value.length)
+const displayedLocations = computed(() => {
+  if (!treeView.value)
+    return filteredLocations.value
+
+  const rows = filteredLocations.value
+  const visibleIds = new Set(rows.map(row => String(row.id)))
+  const childrenByParent = new Map<string, any[]>()
+  const roots: any[] = []
+
+  for (const row of rows) {
+    const parentId = row.parent_id == null ? '' : String(row.parent_id)
+    if (!parentId || !visibleIds.has(parentId)) {
+      roots.push(row)
+      continue
+    }
+    const children = childrenByParent.get(parentId) ?? []
+    children.push(row)
+    childrenByParent.set(parentId, children)
+  }
+
+  const byOrder = (a: any, b: any) =>
+    (Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))
+    || String(a.name ?? '').localeCompare(String(b.name ?? ''))
+  roots.sort(byOrder)
+  for (const children of childrenByParent.values())
+    children.sort(byOrder)
+
+  const ordered: any[] = []
+  const visited = new Set<string>()
+  const append = (row: any, depth: number) => {
+    const id = String(row.id)
+    if (visited.has(id))
+      return
+    visited.add(id)
+    ordered.push({ ...row, __treeDepth: depth })
+    for (const child of childrenByParent.get(id) ?? [])
+      append(child, depth + 1)
+  }
+  for (const root of roots)
+    append(root, 0)
+  // Malformed cycles should still remain visible rather than disappearing.
+  for (const row of rows)
+    append(row, 0)
+
+  return ordered
+})
 const locations = computed(() => {
   const start = (page.value - 1) * itemsPerPage.value
-  return filteredLocations.value.slice(start, start + itemsPerPage.value)
+  return displayedLocations.value.slice(start, start + itemsPerPage.value)
 })
 
 // ---- KPI stats (over the full set, not just current page) ----
@@ -168,13 +230,15 @@ const kpiDefault = computed(() => {
 
 // ---- modals ----
 function openCreate() {
+  if (!canManageLocations.value || locationMutationInFlight.value)
+    return
+
   dialogMode.value = 'create'
   selectedItem.value = null
   form.value = {
     name: '',
     type: 'WAREHOUSE',
     parent_id: null,
-    is_default: false,
     is_production_area: false,
     sort_order: 0,
     is_active: true,
@@ -183,13 +247,15 @@ function openCreate() {
 }
 
 function openEdit(item: any) {
+  if (!canManageLocations.value || locationMutationInFlight.value)
+    return
+
   dialogMode.value = 'edit'
   selectedItem.value = item
   form.value = {
     name: item.name ?? '',
     type: item.type ?? 'WAREHOUSE',
     parent_id: item.parent_id ?? null,
-    is_default: !!item.is_default,
     is_production_area: !!item.is_production_area,
     sort_order: item.sort_order ?? 0,
     is_active: item.is_active ?? true,
@@ -198,35 +264,47 @@ function openEdit(item: any) {
 }
 
 async function save() {
-  if (saving.value) return
+  if (saving.value || !canManageLocations.value) return
+
+  const mode = dialogMode.value
+  const target = selectedItem.value
+    ? { id: selectedItem.value.id, is_active: !!selectedItem.value.is_active }
+    : null
+  const formSnapshot = { ...form.value }
+  if (mode === 'edit' && target?.id == null)
+    return
+
+  // Default-location changes are intentionally excluded. They must go through
+  // the canonical POST /locations/:id/set-default/ action.
+  const payload = {
+    name: formSnapshot.name,
+    type: formSnapshot.type,
+    // Keep an explicit null so editing a child can detach it from its parent.
+    parent_id: formSnapshot.parent_id ?? null,
+    is_production_area: !!formSnapshot.is_production_area,
+    sort_order: formSnapshot.sort_order,
+  }
+  const desiredActive = !!formSnapshot.is_active
+
   saving.value = true
   try {
-    // BE update whitelist: name, type, is_default, is_production_area, sort_order.
-    // `is_active` is dropped — must use POST /locations/:id/set-default/ or DELETE for deactivate.
-    const payload: any = { ...form.value }
-    if (!payload.parent_id)
-      delete payload.parent_id
-    const desiredActive = !!payload.is_active
-    delete payload.is_active
-
-    if (dialogMode.value === 'create') {
+    if (mode === 'create') {
       await axios.post('/locations/', payload)
     }
     else {
       // BE detail view accepts GET/PUT/DELETE — NOT PATCH.
-      await axios.put(`/locations/${selectedItem.value.id}/`, payload)
+      await axios.put(`/locations/${target!.id}/`, payload)
 
       // Handle is_active separately via dedicated endpoints.
-      const wasActive = !!selectedItem.value?.is_active
-      if (wasActive !== desiredActive) {
+      if (target!.is_active !== desiredActive) {
         if (desiredActive)
-          await axios.post(`/locations/${selectedItem.value.id}/activate/`)
+          await axios.post(`/locations/${target!.id}/activate/`)
         else
-          await axios.delete(`/locations/${selectedItem.value.id}/`)
+          await axios.delete(`/locations/${target!.id}/`)
       }
     }
 
-    notify(dialogMode.value === 'create' ? t('msg_location_created') : t('msg_location_updated'))
+    notify(mode === 'create' ? t('msg_location_created') : t('msg_location_updated'))
     dialog.value = false
     await loadLocations()
   }
@@ -240,14 +318,19 @@ async function save() {
 
 // ---- delete ----
 function confirmDelete(item: any) {
+  if (!canManageLocations.value || locationMutationInFlight.value)
+    return
+
   selectedItem.value = item
   deleteDialog.value = true
 }
 async function doDelete() {
-  if (deleting.value) return
+  if (deleting.value || !selectedItem.value || !canManageLocations.value) return
+
+  const target = { id: selectedItem.value.id }
   deleting.value = true
   try {
-    await axios.delete(`/locations/${selectedItem.value.id}/`)
+    await axios.delete(`/locations/${target.id}/`)
     notify(t('msg_location_deactivated'))
     deleteDialog.value = false
     await loadLocations()
@@ -263,14 +346,19 @@ async function doDelete() {
 
 // ---- set as default ----
 function confirmSetDefault(item: any) {
+  if (!canManageLocations.value || locationMutationInFlight.value)
+    return
+
   selectedItem.value = item
   setDefaultDialog.value = true
 }
 async function doSetDefault() {
-  if (settingDefault.value || !selectedItem.value) return
+  if (settingDefault.value || !selectedItem.value || !canManageLocations.value) return
+
+  const target = { id: selectedItem.value.id }
   settingDefault.value = true
   try {
-    await axios.post(`/locations/${selectedItem.value.id}/set-default/`)
+    await axios.post(`/locations/${target.id}/set-default/`)
     notify(t('msg_default_set'))
     setDefaultDialog.value = false
     await loadLocations()
@@ -284,37 +372,81 @@ async function doSetDefault() {
   }
 }
 
+function closeEditDialog() {
+  if (!saving.value)
+    dialog.value = false
+}
+
+function closeDeleteDialog() {
+  if (!deleting.value)
+    deleteDialog.value = false
+}
+
+function closeSetDefaultDialog() {
+  if (!settingDefault.value)
+    setDefaultDialog.value = false
+}
+
 // ---- view stock at location ----
 async function openStockModal(item: any) {
+  if (!canViewStockLevels.value) {
+    notify(t('stock_location_levels_permission_required'), 'error')
+    return
+  }
+
+  const requestId = ++stockModalRequestId
+  const targetLocationId = String(item.id)
   stockForLocation.value = item
   stockModalOpen.value = true
   stockLoading.value = true
   stockLevels.value = []
+  stockLoadError.value = false
   try {
     const res = await axios.get(`/levels/location/${item.id}/`)
+    if (requestId !== stockModalRequestId || targetLocationId !== String(stockForLocation.value?.id))
+      return
     const d = res.data?.data ?? res.data
     stockLevels.value = d?.levels ?? d?.results ?? []
   }
   catch {
-    stockLevels.value = []
+    if (requestId === stockModalRequestId && targetLocationId === String(stockForLocation.value?.id)) {
+      stockLevels.value = []
+      stockLoadError.value = true
+      notify(t('stock_location_levels_load_failed'), 'error')
+    }
   }
   finally {
-    stockLoading.value = false
+    if (requestId === stockModalRequestId)
+      stockLoading.value = false
   }
+}
+
+function closeStockModal() {
+  stockModalRequestId += 1
+  stockModalOpen.value = false
+  stockForLocation.value = null
+  stockLevels.value = []
+  stockLoadError.value = false
+  stockLoading.value = false
+}
+
+function retryStockModal() {
+  if (stockForLocation.value)
+    openStockModal(stockForLocation.value)
 }
 
 function fmtDecimal(v: any) {
   if (v == null || v === '') return '—'
   const n = Number(v)
   if (!Number.isFinite(n)) return '—'
-  return n.toLocaleString('fr-FR', { maximumFractionDigits: 3 }).replace(/ | /g, ' ')
+  return n.toLocaleString('en-US', { maximumFractionDigits: 4 }).replace(/,/g, '\u202f')
 }
 
 function fmtNumber(v: any) {
   if (v == null) return '—'
   const n = Number(v)
   if (!Number.isFinite(n)) return '—'
-  return n.toLocaleString('fr-FR').replace(/ | /g, ' ')
+  return n.toLocaleString('en-US').replace(/,/g, '\u202f')
 }
 
 // ---- filters / chips ----
@@ -369,8 +501,10 @@ function parentNameOf(row: any) {
     >
       <template #actions>
         <Button
+          v-if="canManageLocations"
           variant="primary"
           icon="plus"
+          :disabled="locationMutationInFlight"
           @click="openCreate"
         >
           {{ t('btn_add_location') }}
@@ -462,7 +596,7 @@ function parentNameOf(row: any) {
             icon="layout"
             @click="treeView = !treeView"
           >
-            {{ treeView ? t('btn_tree_view') : t('btn_list_view') }}
+            {{ treeView ? t('btn_list_view') : t('btn_tree_view') }}
           </Button>
         </div>
       </div>
@@ -513,11 +647,20 @@ function parentNameOf(row: any) {
         :loading="loading"
         :pagination="dtPagination"
         :per-page-options="[10, 25, 50, 100]"
-        @row-click="(r: any) => openStockModal(r)"
+        v-on="canViewStockLevels ? { 'row-click': openStockModal } : {}"
       >
         <!-- Name -->
         <template #cell.name="{ row }">
-          <div class="row" style="gap: 8px;">
+          <div
+            class="row location-name"
+            :style="treeView ? { paddingInlineStart: `${Math.min(Number(row.__treeDepth ?? 0), 6) * 18}px` } : undefined"
+          >
+            <DesignIcon
+              v-if="treeView && Number(row.__treeDepth ?? 0) > 0"
+              name="chevright"
+              :size="14"
+              class="location-name__branch"
+            />
             <DesignIcon
               v-if="row.is_default"
               name="star"
@@ -578,26 +721,31 @@ function parentNameOf(row: any) {
           <IconAction
             icon="package"
             tone="primary"
-            :title="t('action_view_stock')"
+            :title="canViewStockLevels ? t('action_view_stock') : t('stock_location_levels_permission_required')"
+            :disabled="!canViewStockLevels"
             @click.stop="openStockModal(row)"
           />
           <IconAction
-            v-if="!row.is_default && row.is_active"
+            v-if="canManageLocations && !row.is_default && row.is_active"
             icon="star"
             tone="warning"
             :title="t('action_set_default')"
+            :disabled="locationMutationInFlight"
             @click.stop="confirmSetDefault(row)"
           />
           <IconAction
+            v-if="canManageLocations"
             icon="edit"
             :title="t('action_edit')"
+            :disabled="locationMutationInFlight"
             @click.stop="openEdit(row)"
           />
           <IconAction
-            v-if="row.is_active"
+            v-if="canManageLocations && row.is_active"
             icon="trash"
             tone="danger"
             :title="t('action_delete')"
+            :disabled="locationMutationInFlight"
             @click.stop="confirmDelete(row)"
           />
         </template>
@@ -605,10 +753,16 @@ function parentNameOf(row: any) {
         <!-- Empty state -->
         <template #empty>
           <StateFill
-            icon="building"
-            :title="t('msg_no_locations')"
-            :sub="t('locations_ext_subtitle')"
+            :icon="locationsLoadError ? 'alert' : 'building'"
+            :title="locationsLoadError ? t('Failed to load locations') : t('msg_no_locations')"
+            :sub="locationsLoadError ? undefined : t('locations_ext_subtitle')"
+            :error="locationsLoadError"
           >
+            <div v-if="locationsLoadError" style="margin-top: 12px;">
+              <Button variant="secondary" icon="refresh" @click="loadLocations">
+                {{ t('Retry') }}
+              </Button>
+            </div>
             <div v-if="hasFilters" style="margin-top: 12px;">
               <Button variant="secondary" @click="clearAll">
                 {{ t('Clear filters') }}
@@ -624,12 +778,14 @@ function parentNameOf(row: any) {
       :open="dialog"
       :width="540"
       :title="dialogMode === 'create' ? t('modal_create_title') : t('modal_edit_title')"
-      @close="dialog = false"
+      :close-on-backdrop="!saving"
+      :close-on-esc="!saving"
+      @close="closeEditDialog"
     >
       <div class="grid cols-2 modal-grid" style="gap: var(--sp-4);">
         <div class="modal-grid__full" style="grid-column: span 2;">
           <Field :label="t('field_name')">
-            <Input v-model="form.name" />
+            <Input v-model="form.name" :disabled="saving" />
           </Field>
         </div>
 
@@ -637,6 +793,7 @@ function parentNameOf(row: any) {
           <Select
             v-model="form.type"
             :options="typeOptions"
+            :disabled="saving"
           />
         </Field>
 
@@ -645,6 +802,7 @@ function parentNameOf(row: any) {
             :model-value="form.parent_id != null ? String(form.parent_id) : ''"
             :placeholder="t('field_parent_id_hint')"
             :options="parentOptions"
+            :disabled="saving"
             @update:model-value="(v: string) => form.parent_id = v ? Number(v) : null"
           />
         </Field>
@@ -654,28 +812,20 @@ function parentNameOf(row: any) {
             v-model="form.sort_order"
             type="number"
             min="0"
+            :disabled="saving"
           />
         </Field>
 
-        <div />
-
-        <Field :label="t('field_is_default')" :hint="t('field_is_default_hint')">
-          <Switch v-model="form.is_default" />
-        </Field>
-
         <Field :label="t('field_is_production_area')" :hint="t('field_is_production_area_hint')">
-          <Switch v-model="form.is_production_area" />
+          <Switch v-model="form.is_production_area" :disabled="saving" />
         </Field>
 
         <Field v-if="dialogMode === 'edit'" :label="t('col_is_active')">
-          <Switch v-model="form.is_active" />
+          <Switch v-model="form.is_active" :disabled="saving" />
         </Field>
       </div>
 
       <template #footer>
-        <Button variant="ghost" :disabled="saving" @click="dialog = false">
-          {{ t('Cancel') }}
-        </Button>
         <Button
           variant="primary"
           :loading="saving"
@@ -693,7 +843,9 @@ function parentNameOf(row: any) {
       :width="440"
       :title="t('confirm_delete_title')"
       :subtitle="t('confirm_delete_msg')"
-      @close="deleteDialog = false"
+      :close-on-backdrop="!deleting"
+      :close-on-esc="!deleting"
+      @close="closeDeleteDialog"
     >
       <div class="row" style="gap: 14px; align-items: flex-start;">
         <div
@@ -713,9 +865,6 @@ function parentNameOf(row: any) {
       </div>
 
       <template #footer>
-        <Button variant="ghost" :disabled="deleting" @click="deleteDialog = false">
-          {{ t('Cancel') }}
-        </Button>
         <Button
           variant="danger"
           :loading="deleting"
@@ -733,7 +882,9 @@ function parentNameOf(row: any) {
       :width="440"
       :title="t('confirm_set_default_title')"
       :subtitle="t('confirm_set_default_msg')"
-      @close="setDefaultDialog = false"
+      :close-on-backdrop="!settingDefault"
+      :close-on-esc="!settingDefault"
+      @close="closeSetDefaultDialog"
     >
       <div class="row" style="gap: 14px; align-items: flex-start;">
         <div
@@ -753,9 +904,6 @@ function parentNameOf(row: any) {
       </div>
 
       <template #footer>
-        <Button variant="ghost" :disabled="settingDefault" @click="setDefaultDialog = false">
-          {{ t('Cancel') }}
-        </Button>
         <Button
           variant="primary"
           icon="star"
@@ -774,12 +922,25 @@ function parentNameOf(row: any) {
       :width="720"
       :title="`${t('modal_stock_title')}: ${stockForLocation?.name ?? ''}`"
       :subtitle="stockForLocation?.type ? t(`location_type_${stockForLocation.type}`) : undefined"
-      @close="stockModalOpen = false"
+      @close="closeStockModal"
     >
       <div v-if="stockLoading" class="row" style="justify-content: center; padding: 32px 0;">
         <DesignIcon name="refresh" :size="20" />
         <span style="margin-left: 8px;" class="cell-muted">{{ t('Loading') }}…</span>
       </div>
+
+      <StateFill
+        v-else-if="stockLoadError"
+        icon="alert"
+        :title="t('stock_location_levels_load_failed')"
+        error
+      >
+        <div style="margin-top: 12px;">
+          <Button variant="secondary" icon="refresh" @click="retryStockModal">
+            {{ t('Retry') }}
+          </Button>
+        </div>
+      </StateFill>
 
       <div v-else-if="stockLevels.length === 0">
         <StateFill
@@ -840,11 +1001,6 @@ function parentNameOf(row: any) {
         </table>
       </div>
 
-      <template #footer>
-        <Button variant="ghost" @click="stockModalOpen = false">
-          {{ t('Close') }}
-        </Button>
-      </template>
     </Modal>
   </div>
 </template>
@@ -876,6 +1032,16 @@ function parentNameOf(row: any) {
 .tablewrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+.location-name {
+  gap: 8px;
+  min-inline-size: 0;
+}
+
+.location-name__branch {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
 }
 
 @media (max-width: 1100px) {
@@ -918,4 +1084,7 @@ name: stock-locations
 meta:
   action: manage
   subject: all
+  anyPermission:
+    - stock.level.view
+    - stock.inventory_control.view
 </route>

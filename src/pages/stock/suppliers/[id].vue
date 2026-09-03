@@ -23,6 +23,7 @@ import MoneyInput from '@/components/design/MoneyInput.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Segmented from '@/components/design/Segmented.vue'
 import Select from '@/components/design/Select.vue'
+import StateFill from '@/components/design/StateFill.vue'
 import Switch from '@/components/design/Switch.vue'
 import { useUserAccess } from '@/composables/useUserAccess'
 
@@ -30,17 +31,26 @@ const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 const route = useRoute()
-const { hasPermission, isAdministrator } = useUserAccess()
+const { hasPermission } = useUserAccess()
 
 const canViewSupplier = computed(() => hasPermission('stock.supplier.view'))
 const canManageSupplier = computed(() => hasPermission('stock.manage'))
-const canPaySupplier = computed(() => isAdministrator.value)
-const canManageSupplierItems = computed(() => hasPermission('stock.manage'))
+const canViewSupplierBalance = computed(() => hasPermission('stock.supplier.balance.view'))
+const canPaySupplier = computed(() =>
+  hasPermission('stock.supplier.pay') && hasPermission('stock.supplier.balance.view'),
+)
+const canManageSupplierItems = computed(() =>
+  hasPermission('stock.manage') && hasPermission('stock.catalog.view'),
+)
 
 const supplierReferenceLabels: Record<string, string> = {
   PurchaseOrder: 'ref_PurchaseOrder',
   TreasuryPayment: 'ref_TreasuryPayment',
   CashboxExpense: 'ref_CashboxExpense',
+  SupplierPayment: 'ref_SupplierPayment',
+  Supplier: 'ref_Supplier',
+  PurchaseReceiving: 'ref_PurchaseReceiving',
+  PurchaseReceivingCorrection: 'ref_PurchaseReceivingCorrection',
 }
 
 function supplierReferenceLabel(type: string): string {
@@ -49,7 +59,7 @@ function supplierReferenceLabel(type: string): string {
 }
 const router = useRouter()
 
-const supplierId = computed(() => String(route.params.id))
+const supplierId = computed(() => String(route.params.id ?? ''))
 
 // ============================================================
 // State
@@ -57,6 +67,9 @@ const supplierId = computed(() => String(route.params.id))
 const supplier = ref<any>(null)
 const loading = ref(false)
 const tab = ref<'overview' | 'items' | 'ledger'>('overview')
+let supplierRouteVersion = 0
+let supplierRequestId = 0
+let supplierItemsRequestId = 0
 
 // items (local filter)
 const itemPreferredOnly = ref(false)
@@ -64,11 +77,13 @@ const itemPreferredOnly = ref(false)
 // ledger
 const ledgerLoading = ref(false)
 const ledgerRows = ref<any[]>([])
+const ledgerLoadError = ref(false)
 const ledgerPage = ref(1)
 const ledgerPerPage = ref(20)
 const ledgerTotal = ref(0)
 const ledgerTypeFilter = ref<string>('')
 const ledgerSourceFilter = ref<string>('')
+let ledgerRequestId = 0
 
 // modals
 const editOpen = ref(false)
@@ -79,13 +94,15 @@ const addItemOpen = ref(false)
 const addItemSaving = ref(false)
 const deactivateOpen = ref(false)
 const deactivating = ref(false)
-const removeItemOpen = ref(false)
-const removingItem = ref<any>(null)
 
 // async select datasources for add-item modal
 const stockItemOptions = ref<{ value: string; label: string }[]>([])
 const unitOptions = ref<{ value: string; label: string }[]>([])
 const stockItemQuery = ref('')
+const unitOptionsLoading = ref(false)
+const unitOptionsError = ref('')
+let itemUnitRequestId = 0
+let stockItemSearchRequestId = 0
 
 // ============================================================
 // Forms
@@ -142,15 +159,63 @@ const CURRENCY_OPTS = [
 // ============================================================
 // Load
 // ============================================================
+function isCurrentSupplierRoute(targetSupplierId: string, routeVersion: number): boolean {
+  return supplierRouteVersion === routeVersion && supplierId.value === targetSupplierId
+}
+
+function resetSupplierRouteState() {
+  supplierRouteVersion += 1
+  supplierRequestId += 1
+  supplierItemsRequestId += 1
+  ledgerRequestId += 1
+  itemUnitRequestId += 1
+  stockItemSearchRequestId += 1
+
+  supplier.value = null
+  loading.value = false
+  tab.value = 'overview'
+  itemPreferredOnly.value = false
+
+  ledgerLoading.value = false
+  ledgerRows.value = []
+  ledgerLoadError.value = false
+  ledgerPage.value = 1
+  ledgerTotal.value = 0
+  ledgerTypeFilter.value = ''
+  ledgerSourceFilter.value = ''
+
+  editOpen.value = false
+  editSaving.value = false
+  payOpen.value = false
+  paySaving.value = false
+  addItemOpen.value = false
+  addItemSaving.value = false
+  deactivateOpen.value = false
+  deactivating.value = false
+
+  stockItemOptions.value = []
+  stockItemQuery.value = ''
+  unitOptions.value = []
+  unitOptionsLoading.value = false
+  unitOptionsError.value = ''
+}
+
 async function loadSupplier() {
-  if (!canViewSupplier.value)
+  const targetSupplierId = supplierId.value
+  const routeVersion = supplierRouteVersion
+  const requestId = ++supplierRequestId
+
+  if (!canViewSupplier.value || !targetSupplierId)
     return
 
   loading.value = true
   try {
-    const res = await stockApi.get(`/suppliers/${supplierId.value}/`, {
+    const res = await stockApi.get(`/suppliers/${targetSupplierId}/`, {
       params: { include_items: 'true', include_stats: 'true' },
     })
+
+    if (requestId !== supplierRequestId || !isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      return
 
     const d = res.data?.data ?? res.data
 
@@ -159,38 +224,63 @@ async function loadSupplier() {
       notify(t('supplier_not_found'), 'error')
   }
   catch {
-    notify(t('supplier_failed_load'), 'error')
+    if (requestId === supplierRequestId && isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      notify(t('supplier_failed_load'), 'error')
   }
   finally {
-    loading.value = false
+    if (requestId === supplierRequestId && isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      loading.value = false
   }
 }
 
 async function loadItemsRefresh() {
-  if (!canViewSupplier.value)
+  const targetSupplierId = supplierId.value
+  const routeVersion = supplierRouteVersion
+  const requestId = ++supplierItemsRequestId
+
+  if (!canViewSupplier.value || !targetSupplierId)
     return
 
   try {
-    const res = await stockApi.get(`/suppliers/${supplierId.value}/items/`)
+    const res = await stockApi.get(`/suppliers/${targetSupplierId}/items/`)
+
+    if (requestId !== supplierItemsRequestId || !isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      return
+
     const d = res.data?.data ?? res.data
     const items = d?.supplier?.items ?? d?.items ?? []
     if (supplier.value)
       supplier.value.items = items
   }
   catch {
-    notify(t('supplier_failed_load_items'), 'error')
+    if (requestId === supplierItemsRequestId && isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      notify(t('supplier_failed_load_items'), 'error')
   }
 }
 
 async function loadLedger() {
-  if (!canViewSupplier.value)
+  const targetSupplierId = supplierId.value
+  const routeVersion = supplierRouteVersion
+
+  if (!canViewSupplierBalance.value || !targetSupplierId)
     return
 
+  const requestId = ++ledgerRequestId
+
   ledgerLoading.value = true
+  ledgerLoadError.value = false
   try {
-    const res = await stockApi.get(`/suppliers/${supplierId.value}/ledger/`, {
-      params: { page: ledgerPage.value, per_page: ledgerPerPage.value },
+    const res = await stockApi.get(`/suppliers/${targetSupplierId}/ledger/`, {
+      params: {
+        page: ledgerPage.value,
+        per_page: ledgerPerPage.value,
+        ...(ledgerTypeFilter.value ? { type: ledgerTypeFilter.value } : {}),
+        ...(ledgerSourceFilter.value ? { source_account: ledgerSourceFilter.value } : {}),
+      },
     })
+
+    if (requestId !== ledgerRequestId || !isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      return
 
     const d = res.data?.data ?? res.data
 
@@ -201,22 +291,41 @@ async function loadLedger() {
       fee: row.fee ?? row.fee_uzs,
     }))
     ledgerTotal.value = d?.pagination?.total ?? 0
+    ledgerLoadError.value = false
   }
   catch {
-    notify(t('supplier_failed_load_ledger'), 'error')
+    if (requestId === ledgerRequestId && isCurrentSupplierRoute(targetSupplierId, routeVersion)) {
+      ledgerRows.value = []
+      ledgerTotal.value = 0
+      ledgerLoadError.value = true
+      notify(t('supplier_failed_load_ledger'), 'error')
+    }
   }
   finally {
-    ledgerLoading.value = false
+    if (requestId === ledgerRequestId && isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      ledgerLoading.value = false
   }
 }
 
-onMounted(loadSupplier)
+watch(supplierId, () => {
+  resetSupplierRouteState()
+  loadSupplier()
+}, { immediate: true })
 watch(tab, v => {
-  if (v === 'ledger' && ledgerRows.value.length === 0)
+  if (v === 'ledger' && canViewSupplierBalance.value && ledgerRows.value.length === 0)
     loadLedger()
 })
 watch([ledgerPage, ledgerPerPage], () => {
-  if (tab.value === 'ledger')
+  if (tab.value === 'ledger' && canViewSupplierBalance.value)
+    loadLedger()
+})
+watch([ledgerTypeFilter, ledgerSourceFilter], () => {
+  if (tab.value !== 'ledger' || !canViewSupplierBalance.value)
+    return
+
+  if (ledgerPage.value !== 1)
+    ledgerPage.value = 1
+  else
     loadLedger()
 })
 
@@ -235,6 +344,35 @@ function balanceValue(value: any): number | null {
 }
 
 const currentBalance = computed(() => balanceValue(supplier.value))
+const supplierCurrency = computed(() => String(supplier.value?.currency ?? '').trim().toUpperCase())
+const supplierItemCurrency = computed(() => supplierCurrency.value || 'UZS')
+const supplierItemCurrencyOptions = computed(() => [{
+  value: supplierItemCurrency.value,
+  label: supplierItemCurrency.value,
+}])
+const supplierPaymentUnavailableReason = computed(() => {
+  if (supplierCurrency.value && supplierCurrency.value !== 'UZS')
+    return t('pay_currency_unsupported')
+  if (currentBalance.value !== null && currentBalance.value <= 0)
+    return t('pay_no_outstanding_balance')
+
+  return ''
+})
+const payAmountNumber = computed(() => Number(payForm.value.amount) || 0)
+const payAmountError = computed(() => {
+  if (payAmountNumber.value <= 0)
+    return ''
+  if (currentBalance.value !== null && payAmountNumber.value > currentBalance.value)
+    return t('pay_amount_exceeds_balance')
+
+  return ''
+})
+const canSubmitSupplierPayment = computed(() =>
+  !paySaving.value
+  && !supplierPaymentUnavailableReason.value
+  && payAmountNumber.value > 0
+  && !payAmountError.value,
+)
 
 const kpiBalance = computed(() => ({
   label: t('supplier_kpi_balance'),
@@ -342,6 +480,7 @@ const ledgerColumns: DataTableColumn<any>[] = [
 const TXN_TONE: Record<string, 'warning' | 'success' | 'info' | 'neutral'> = {
   PURCHASE: 'warning',
   PAYMENT: 'success',
+  PAYMENT_REVERSAL: 'warning',
   RETURN: 'info',
   ADJUSTMENT: 'neutral',
 }
@@ -356,22 +495,16 @@ const SIGN_FROM_TYPE: Record<string, '+' | '-'> = {
   PURCHASE: '+',
   ADJUSTMENT: '+',
   PAYMENT: '-',
+  PAYMENT_REVERSAL: '+',
   RETURN: '-',
 }
 
-const filteredLedger = computed<any[]>(() => {
-  return ledgerRows.value.filter(r => {
-    if (ledgerTypeFilter.value && r.type !== ledgerTypeFilter.value)
-      return false
-    if (ledgerSourceFilter.value && r.source_account !== ledgerSourceFilter.value)
-      return false
-    return true
-  })
-})
+const filteredLedger = computed<any[]>(() => ledgerRows.value)
 
 const txnTypeOptions = computed(() => [
   { value: 'PURCHASE', label: t('supplier_txn_type_PURCHASE') },
   { value: 'PAYMENT', label: t('supplier_txn_type_PAYMENT') },
+  { value: 'PAYMENT_REVERSAL', label: t('supplier_txn_type_PAYMENT_REVERSAL') },
   { value: 'RETURN', label: t('supplier_txn_type_RETURN') },
   { value: 'ADJUSTMENT', label: t('supplier_txn_type_ADJUSTMENT') },
 ])
@@ -399,7 +532,7 @@ const ledgerPagination = computed(() => ({
 // Edit modal
 // ============================================================
 function openEdit() {
-  if (!canManageSupplier.value || !supplier.value)
+  if (!canManageSupplier.value || !supplier.value || editSaving.value)
     return
   const s = supplier.value
 
@@ -426,26 +559,40 @@ function openEdit() {
   editOpen.value = true
 }
 
+function closeEdit() {
+  if (!editSaving.value)
+    editOpen.value = false
+}
+
 async function submitEdit() {
-  if (!canManageSupplier.value)
+  if (!canManageSupplier.value || editSaving.value)
     return
 
   if (!editForm.value.name?.trim()) {
     notify(t('supplier_field_name'), 'error')
     return
   }
+  const targetSupplierId = supplierId.value
+  const routeVersion = supplierRouteVersion
+  const payload = { ...editForm.value }
+
   editSaving.value = true
   try {
-    await stockApi.put(`/suppliers/${supplierId.value}/`, editForm.value)
+    await stockApi.put(`/suppliers/${targetSupplierId}/`, payload)
+    if (!isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      return
+
     notify(t('update_success'))
     editOpen.value = false
     await loadSupplier()
   }
   catch (e: any) {
-    notify(e?.response?.data?.message ?? t('update_failed'), 'error')
+    if (isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      notify(e?.response?.data?.message ?? t('update_failed'), 'error')
   }
   finally {
-    editSaving.value = false
+    if (isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      editSaving.value = false
   }
 }
 
@@ -453,41 +600,63 @@ async function submitEdit() {
 // Pay modal
 // ============================================================
 function openPay() {
-  if (!canPaySupplier.value)
+  if (!canPaySupplier.value || paySaving.value)
     return
+  if (supplierPaymentUnavailableReason.value) {
+    notify(supplierPaymentUnavailableReason.value, 'error')
+    return
+  }
 
   payForm.value = { amount: 0, source_account: 'SAFE', commission: 0, note: '' }
   payOpen.value = true
 }
 
+function closePay() {
+  if (!paySaving.value)
+    payOpen.value = false
+}
+
 async function submitPay() {
-  if (!canPaySupplier.value)
+  if (!canPaySupplier.value || paySaving.value)
     return
 
   if (!payForm.value.amount || Number(payForm.value.amount) <= 0) {
     notify(t('pay_amount_required'), 'error')
     return
   }
+  if (supplierPaymentUnavailableReason.value || payAmountError.value) {
+    notify(supplierPaymentUnavailableReason.value || payAmountError.value, 'error')
+    return
+  }
+  const targetSupplierId = supplierId.value
+  const routeVersion = supplierRouteVersion
+  const body = {
+    amount_uzs: Number(payForm.value.amount),
+    fee_uzs: payForm.value.source_account === 'BANK'
+      ? (Number(payForm.value.commission) || 0)
+      : 0,
+    source_account: payForm.value.source_account,
+    allocation_mode: 'AUTO_OLDEST_DUE',
+    note: payForm.value.note.trim(),
+  }
+
   paySaving.value = true
   try {
-    const body: any = {
-      amount: Number(payForm.value.amount),
-      source_account: payForm.value.source_account,
-      note: payForm.value.note,
-    }
+    await stockApi.post(`/suppliers/${targetSupplierId}/payments/`, body)
+    if (!isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      return
 
-    if (payForm.value.source_account === 'BANK')
-      body.commission = Number(payForm.value.commission) || 0
-    await stockApi.post(`/suppliers/${supplierId.value}/pay/`, body)
     notify(t('pay_success'))
     payOpen.value = false
     await Promise.all([loadSupplier(), loadLedger()])
   }
   catch (e: any) {
-    notify(e?.response?.data?.message ?? t('pay_failed'), 'error')
+    if (isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      notify(e?.response?.data?.message ?? t('pay_failed'), 'error')
   }
   finally {
-    paySaving.value = false
+    if (isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      paySaving.value = false
   }
 }
 
@@ -495,8 +664,22 @@ async function submitPay() {
 // Add item modal
 // ============================================================
 async function loadStockItems(q = '') {
+  const requestId = ++stockItemSearchRequestId
+  const routeVersion = supplierRouteVersion
+  const targetSupplierId = supplierId.value
+
+  if (!addItemOpen.value || !canManageSupplierItems.value)
+    return
+
   try {
     const res = await stockApi.get('/items/search/', { params: { q } })
+    if (
+      requestId !== stockItemSearchRequestId
+      || !addItemOpen.value
+      || !isCurrentSupplierRoute(targetSupplierId, routeVersion)
+    )
+      return
+
     const d = res.data?.data ?? res.data
     const list = d?.items ?? d?.results ?? d ?? []
 
@@ -506,32 +689,98 @@ async function loadStockItems(q = '') {
     }))
   }
   catch {
-    stockItemOptions.value = []
+    if (
+      requestId === stockItemSearchRequestId
+      && addItemOpen.value
+      && isCurrentSupplierRoute(targetSupplierId, routeVersion)
+    )
+      stockItemOptions.value = []
   }
 }
 
-async function loadUnits() {
-  try {
-    const res = await stockApi.get('/units/')
-    const d = res.data?.data ?? res.data
-    const list = d?.units ?? d?.results ?? d ?? []
+async function loadUnitsForItem(itemId: string) {
+  const requestId = ++itemUnitRequestId
+  const routeVersion = supplierRouteVersion
+  const targetSupplierId = supplierId.value
 
-    unitOptions.value = list.map((u: any) => ({
-      value: String(u.id),
-      label: u.name ?? u.short_name ?? `#${u.id}`,
-    }))
+  addItemForm.value.unit_id = ''
+  unitOptions.value = []
+  unitOptionsError.value = ''
+  if (!itemId || !addItemOpen.value) {
+    unitOptionsLoading.value = false
+    return
+  }
+
+  unitOptionsLoading.value = true
+  try {
+    const res = await stockApi.get(`/items/${itemId}/`)
+    if (
+      requestId !== itemUnitRequestId
+      || !addItemOpen.value
+      || !isCurrentSupplierRoute(targetSupplierId, routeVersion)
+    )
+      return
+    const d = res.data?.data ?? res.data ?? {}
+    const item = d?.item ?? d
+    const configuredUnits: { value: string; label: string }[] = []
+
+    if (item?.base_unit_id) {
+      configuredUnits.push({
+        value: String(item.base_unit_id),
+        label: `${item.base_unit?.name ?? item.base_unit?.short_name ?? item.base_unit_id} · ${t('stock_adjust_base_unit')}`,
+      })
+    }
+
+    for (const alternative of item?.alternative_units ?? []) {
+      if (
+        alternative?.is_active === false
+        || !alternative?.unit_id
+        || String(alternative.unit_id) === String(item?.base_unit_id ?? '')
+      )
+        continue
+
+      configuredUnits.push({
+        value: String(alternative.unit_id),
+        label: `${alternative.unit_name ?? alternative.short_name ?? alternative.unit_id} · ×${alternative.conversion_to_base}`,
+      })
+    }
+
+    unitOptions.value = [...new Map(configuredUnits.map(unit => [unit.value, unit])).values()]
+    addItemForm.value.unit_id = unitOptions.value[0]?.value ?? ''
+    if (!unitOptions.value.length)
+      unitOptionsError.value = t('supplier_item_unit_empty')
   }
   catch {
-    unitOptions.value = []
+    if (
+      requestId === itemUnitRequestId
+      && addItemOpen.value
+      && isCurrentSupplierRoute(targetSupplierId, routeVersion)
+    )
+      unitOptionsError.value = t('supplier_item_unit_failed')
+  }
+  finally {
+    if (
+      requestId === itemUnitRequestId
+      && addItemOpen.value
+      && isCurrentSupplierRoute(targetSupplierId, routeVersion)
+    )
+      unitOptionsLoading.value = false
   }
 }
 
-const debouncedItemSearch = useDebounceFn((q: string) => loadStockItems(q), 300)
+const debouncedItemSearch = useDebounceFn((q: string, targetSupplierId: string, routeVersion: number) => {
+  if (addItemOpen.value && isCurrentSupplierRoute(targetSupplierId, routeVersion))
+    loadStockItems(q)
+}, 300)
 
-watch(stockItemQuery, q => debouncedItemSearch(q))
+watch(stockItemQuery, q => {
+  if (addItemOpen.value)
+    debouncedItemSearch(q, supplierId.value, supplierRouteVersion)
+})
+watch(() => addItemForm.value.stock_item_id, itemId => loadUnitsForItem(itemId))
 
 function openAddItem() {
-  if (!canManageSupplierItems.value)
+  if (!canManageSupplierItems.value || addItemSaving.value)
     return
 
   addItemForm.value = {
@@ -540,7 +789,7 @@ function openAddItem() {
     supplier_sku: '',
     supplier_name: '',
     price: 0,
-    currency: 'UZS',
+    currency: supplierItemCurrency.value,
     min_order_qty: 1,
     pack_size: 1,
     lead_time_days: 0,
@@ -548,45 +797,93 @@ function openAddItem() {
     notes: '',
   }
   stockItemQuery.value = ''
-  loadStockItems()
-  loadUnits()
+  itemUnitRequestId += 1
+  unitOptions.value = []
+  unitOptionsError.value = ''
+  unitOptionsLoading.value = false
   addItemOpen.value = true
+  loadStockItems()
+}
+
+function closeAddItem(force = false) {
+  if (addItemSaving.value && !force)
+    return
+
+  itemUnitRequestId += 1
+  stockItemSearchRequestId += 1
+  unitOptionsLoading.value = false
+  stockItemOptions.value = []
+  addItemOpen.value = false
+}
+
+function positiveSupplierItemQuantity(value: unknown): number | null {
+  const raw = String(value ?? '').trim()
+  if (!/^\d+(?:\.\d{1,4})?$/.test(raw))
+    return null
+
+  const quantity = Number(raw)
+
+  return Number.isFinite(quantity) && quantity > 0 ? quantity : null
 }
 
 async function submitAddItem() {
-  if (!canManageSupplierItems.value)
+  if (!canManageSupplierItems.value || addItemSaving.value)
     return
 
-  if (!addItemForm.value.stock_item_id || !addItemForm.value.unit_id || !(Number(addItemForm.value.price) > 0)) {
+  const minOrderQty = positiveSupplierItemQuantity(addItemForm.value.min_order_qty)
+  const packSize = positiveSupplierItemQuantity(addItemForm.value.pack_size)
+  const price = Number(addItemForm.value.price)
+  const leadTimeDays = Number(addItemForm.value.lead_time_days)
+  if (
+    !addItemForm.value.stock_item_id
+    || !addItemForm.value.unit_id
+    || unitOptionsLoading.value
+    || !!unitOptionsError.value
+    || !unitOptions.value.some(unit => unit.value === addItemForm.value.unit_id)
+    || !Number.isFinite(price)
+    || price < 0
+    || minOrderQty === null
+    || packSize === null
+    || !Number.isInteger(leadTimeDays)
+    || leadTimeDays < 0
+  ) {
     notify(t('add_item_failed'), 'error')
     return
   }
+  const targetSupplierId = supplierId.value
+  const routeVersion = supplierRouteVersion
+  const currency = supplierItemCurrency.value
+  const body = {
+    stock_item_id: Number(addItemForm.value.stock_item_id),
+    unit_id: Number(addItemForm.value.unit_id),
+    price,
+    currency,
+    supplier_sku: addItemForm.value.supplier_sku,
+    supplier_name: addItemForm.value.supplier_name,
+    min_order_qty: minOrderQty,
+    pack_size: packSize,
+    lead_time_days: leadTimeDays,
+    is_preferred: !!addItemForm.value.is_preferred,
+    notes: addItemForm.value.notes,
+  }
+
   addItemSaving.value = true
   try {
-    const body = {
-      stock_item_id: Number(addItemForm.value.stock_item_id),
-      unit_id: Number(addItemForm.value.unit_id),
-      price: Number(addItemForm.value.price),
-      currency: addItemForm.value.currency,
-      supplier_sku: addItemForm.value.supplier_sku,
-      supplier_name: addItemForm.value.supplier_name,
-      min_order_qty: Number(addItemForm.value.min_order_qty) || 0,
-      pack_size: Number(addItemForm.value.pack_size) || 0,
-      lead_time_days: Number(addItemForm.value.lead_time_days) || 0,
-      is_preferred: !!addItemForm.value.is_preferred,
-      notes: addItemForm.value.notes,
-    }
+    await stockApi.post(`/suppliers/${targetSupplierId}/items/`, body)
+    if (!isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      return
 
-    await stockApi.post(`/suppliers/${supplierId.value}/items/`, body)
     notify(t('add_item_success'))
-    addItemOpen.value = false
+    closeAddItem(true)
     await loadItemsRefresh()
   }
   catch (e: any) {
-    notify(e?.response?.data?.message ?? t('add_item_failed'), 'error')
+    if (isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      notify(e?.response?.data?.message ?? t('add_item_failed'), 'error')
   }
   finally {
-    addItemSaving.value = false
+    if (isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      addItemSaving.value = false
   }
 }
 
@@ -594,51 +891,42 @@ async function submitAddItem() {
 // Deactivate
 // ============================================================
 function openDeactivate() {
-  if (!canManageSupplier.value)
+  if (!canManageSupplier.value || deactivating.value)
     return
 
   deactivateOpen.value = true
 }
 
+function closeDeactivate() {
+  if (!deactivating.value)
+    deactivateOpen.value = false
+}
+
 async function submitDeactivate() {
-  if (!canManageSupplier.value)
+  if (!canManageSupplier.value || deactivating.value)
     return
+
+  const targetSupplierId = supplierId.value
+  const routeVersion = supplierRouteVersion
 
   deactivating.value = true
   try {
-    await stockApi.delete(`/suppliers/${supplierId.value}/`)
+    await stockApi.delete(`/suppliers/${targetSupplierId}/`)
+    if (!isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      return
+
     notify(t('deactivate_success'))
     deactivateOpen.value = false
     router.push('/stock/suppliers')
   }
   catch (e: any) {
-    notify(e?.response?.data?.message ?? t('deactivate_failed'), 'error')
+    if (isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      notify(e?.response?.data?.message ?? t('deactivate_failed'), 'error')
   }
   finally {
-    deactivating.value = false
+    if (isCurrentSupplierRoute(targetSupplierId, routeVersion))
+      deactivating.value = false
   }
-}
-
-// ============================================================
-// Remove item (UI only — endpoint not yet exposed; confirm + toast)
-// ============================================================
-function askRemoveItem(item: any) {
-  if (!canManageSupplierItems.value)
-    return
-
-  removingItem.value = item
-  removeItemOpen.value = true
-}
-
-async function submitRemoveItem() {
-  if (!canManageSupplierItems.value)
-    return
-
-  // Endpoint not exposed yet on backend; surface a failure for honesty
-  // until BE wires DELETE /supplier-items/{id}/.
-  notify(t('remove_item_failed'), 'error')
-  removeItemOpen.value = false
-  removingItem.value = null
 }
 
 // ============================================================
@@ -667,8 +955,15 @@ function signedAmount(row: any): string {
 const tabOptions = computed(() => [
   { value: 'overview', label: t('tab_overview'), icon: 'info' },
   { value: 'items', label: t('tab_items'), icon: 'box' },
-  { value: 'ledger', label: t('tab_ledger'), icon: 'receipt' },
+  ...(canViewSupplierBalance.value
+    ? [{ value: 'ledger', label: t('tab_ledger'), icon: 'receipt' }]
+    : []),
 ])
+
+watch(() => payForm.value.source_account, source => {
+  if (source === 'SAFE')
+    payForm.value.commission = 0
+})
 
 function backToList() {
   router.push('/stock/suppliers')
@@ -711,7 +1006,8 @@ function backToList() {
           v-if="canPaySupplier"
           variant="primary"
           icon="wallet"
-          :disabled="!supplier"
+          :disabled="!supplier || !!supplierPaymentUnavailableReason"
+          :title="supplierPaymentUnavailableReason || undefined"
           @click="openPay"
         >
           {{ t('supplier_action_pay') }}
@@ -727,6 +1023,15 @@ function backToList() {
         </Button>
       </template>
     </PageHeader>
+
+    <div
+      v-if="canPaySupplier && supplierPaymentUnavailableReason"
+      class="supplier-payment-warning"
+      role="status"
+    >
+      <DesignIcon name="alert" :size="18" />
+      <span>{{ supplierPaymentUnavailableReason }}</span>
+    </div>
 
     <!-- Identity strip (name / status / code / rating) -->
     <Card
@@ -785,7 +1090,7 @@ function backToList() {
       class="grid cols-4 kpi-strip"
       style="margin-bottom: var(--sp-5);"
     >
-      <Kpi :data="kpiBalance" />
+      <Kpi v-if="canViewSupplierBalance" :data="kpiBalance" />
       <Kpi :data="kpiCreditLimit" />
       <Kpi :data="kpiTotalOrders" />
       <Kpi :data="kpiTotalValue" />
@@ -1047,13 +1352,13 @@ function backToList() {
           <span class="cell-muted">{{ row.last_price_update ? formatDate(row.last_price_update) : '—' }}</span>
         </template>
 
-        <template #row-actions="{ row }">
+        <template #row-actions>
           <IconAction
             v-if="canManageSupplierItems"
             icon="trash"
             tone="danger"
-            :title="t('supplier_action_remove_item')"
-            @click="askRemoveItem(row)"
+            :title="t('supplier_remove_item_backend_required')"
+            disabled
           />
         </template>
 
@@ -1113,7 +1418,19 @@ function backToList() {
 
       <div class="card__divider" />
 
+      <StateFill
+        v-if="ledgerLoadError && !ledgerLoading"
+        icon="alert"
+        :title="t('supplier_failed_load_ledger')"
+        error
+      >
+        <Button variant="secondary" icon="refresh" @click="loadLedger">
+          {{ t('Retry') }}
+        </Button>
+      </StateFill>
+
       <DataTable
+        v-else
         :columns="ledgerColumns"
         :rows="filteredLedger"
         row-key="id"
@@ -1154,7 +1471,7 @@ function backToList() {
         </template>
         <template #cell.fee="{ row }">
           <span
-            v-if="Number(row.fee) > 0"
+            v-if="Number(row.fee) !== 0"
             class="num-tabular"
           >{{ formatCurrency(row.fee) }}</span>
           <span v-else class="cell-muted">—</span>
@@ -1200,7 +1517,9 @@ function backToList() {
       :title="t('supplier_action_edit')"
       :subtitle="supplier?.name"
       :width="720"
-      @close="editOpen = false"
+      :close-on-backdrop="!editSaving"
+      :close-on-esc="!editSaving"
+      @close="closeEdit"
     >
       <form @submit.prevent="submitEdit">
         <div class="form-grid">
@@ -1299,13 +1618,6 @@ function backToList() {
       </form>
       <template #footer>
         <Button
-          variant="ghost"
-          :disabled="editSaving"
-          @click="editOpen = false"
-        >
-          {{ t('supplier_action_cancel') }}
-        </Button>
-        <Button
           variant="primary"
           icon="check"
           :loading="editSaving"
@@ -1323,7 +1635,9 @@ function backToList() {
       :title="t('pay_title')"
       :subtitle="t('pay_subtitle')"
       :width="520"
-      @close="payOpen = false"
+      :close-on-backdrop="!paySaving"
+      :close-on-esc="!paySaving"
+      @close="closePay"
     >
       <div
         v-if="supplier"
@@ -1331,7 +1645,7 @@ function backToList() {
         class="cell-muted"
       >
         {{ supplier.name }}
-        <span v-if="Number(currentBalance) > 0">
+        <span v-if="canViewSupplierBalance && Number(currentBalance) > 0">
           · <strong class="num-tabular" style="color: rgb(var(--v-theme-warning-strong));">
             {{ formatCurrency(currentBalance ?? 0) }}
           </strong>
@@ -1339,10 +1653,11 @@ function backToList() {
       </div>
       <form @submit.prevent="submitPay">
         <div class="form-grid">
-          <Field :label="t('pay_field_amount')">
+          <Field :label="t('pay_field_amount')" :error="payAmountError">
             <MoneyInput
               v-model="payForm.amount"
               icon="wallet"
+              :error="!!payAmountError"
             />
           </Field>
           <Field
@@ -1372,17 +1687,10 @@ function backToList() {
       </form>
       <template #footer>
         <Button
-          variant="ghost"
-          :disabled="paySaving"
-          @click="payOpen = false"
-        >
-          {{ t('supplier_action_cancel') }}
-        </Button>
-        <Button
           variant="primary"
           icon="check"
           :loading="paySaving"
-          :disabled="paySaving"
+          :disabled="!canSubmitSupplierPayment"
           @click="submitPay"
         >
           {{ t('supplier_action_save') }}
@@ -1395,7 +1703,9 @@ function backToList() {
       :open="addItemOpen"
       :title="t('add_item_title')"
       :width="640"
-      @close="addItemOpen = false"
+      :close-on-backdrop="!addItemSaving"
+      :close-on-esc="!addItemSaving"
+      @close="closeAddItem"
     >
       <form @submit.prevent="submitAddItem">
         <div class="form-grid">
@@ -1415,11 +1725,12 @@ function backToList() {
               style="margin-top:8px;"
             />
           </Field>
-          <Field :label="t('add_item_field_unit')">
+          <Field :label="t('add_item_field_unit')" :error="unitOptionsError">
             <Select
               v-model="addItemForm.unit_id"
               :options="unitOptions"
-              :placeholder="t('items_col_unit')"
+              :placeholder="unitOptionsLoading ? t('supplier_item_unit_loading') : t('items_col_unit')"
+              :disabled="!addItemForm.stock_item_id || unitOptionsLoading || !!unitOptionsError"
             />
           </Field>
           <Field :label="t('add_item_field_price')">
@@ -1429,7 +1740,8 @@ function backToList() {
           <Field :label="t('supplier_field_currency')">
             <Select
               v-model="addItemForm.currency"
-              :options="CURRENCY_OPTS"
+              :options="supplierItemCurrencyOptions"
+              disabled
             />
           </Field>
           <Field :label="t('add_item_field_supplier_sku')">
@@ -1446,7 +1758,7 @@ function backToList() {
               v-model="addItemForm.min_order_qty"
               type="number"
               step="0.0001"
-              min="0"
+              min="0.0001"
             />
           </Field>
           <Field :label="t('add_item_field_pack_size')">
@@ -1454,7 +1766,7 @@ function backToList() {
               v-model="addItemForm.pack_size"
               type="number"
               step="0.0001"
-              min="0"
+              min="0.0001"
             />
           </Field>
           <Field :label="t('add_item_field_lead_time_days')">
@@ -1485,17 +1797,10 @@ function backToList() {
       </form>
       <template #footer>
         <Button
-          variant="ghost"
-          :disabled="addItemSaving"
-          @click="addItemOpen = false"
-        >
-          {{ t('supplier_action_cancel') }}
-        </Button>
-        <Button
           variant="primary"
           icon="plus"
           :loading="addItemSaving"
-          :disabled="addItemSaving"
+          :disabled="addItemSaving || unitOptionsLoading || !!unitOptionsError"
           @click="submitAddItem"
         >
           {{ t('supplier_action_save') }}
@@ -1509,7 +1814,9 @@ function backToList() {
       :title="t('deactivate_confirm_title')"
       :subtitle="supplier?.name"
       :width="440"
-      @close="deactivateOpen = false"
+      :close-on-backdrop="!deactivating"
+      :close-on-esc="!deactivating"
+      @close="closeDeactivate"
     >
       <div
         class="row"
@@ -1532,13 +1839,6 @@ function backToList() {
       </div>
       <template #footer>
         <Button
-          variant="ghost"
-          :disabled="deactivating"
-          @click="deactivateOpen = false"
-        >
-          {{ t('supplier_action_cancel') }}
-        </Button>
-        <Button
           variant="danger"
           icon="trash"
           :loading="deactivating"
@@ -1546,50 +1846,6 @@ function backToList() {
           @click="submitDeactivate"
         >
           {{ t('supplier_action_deactivate') }}
-        </Button>
-      </template>
-    </Modal>
-
-    <!-- ===================== Remove item confirm ===================== -->
-    <Modal
-      :open="removeItemOpen"
-      :title="t('remove_item_confirm_title')"
-      :subtitle="removingItem?.stock_item_name || removingItem?.supplier_name"
-      :width="440"
-      @close="removeItemOpen = false"
-    >
-      <div
-        class="row"
-        style="gap:14px; align-items:flex-start;"
-      >
-        <div
-          class="kpi__icon t-warning"
-          style="width:44px;height:44px;flex:0 0 44px;"
-        >
-          <DesignIcon
-            name="alert"
-            :size="22"
-          />
-        </div>
-        <div>
-          <p style="margin:0;font-size:14px;line-height:1.5;">
-            {{ t('supplier_action_remove_item') }}
-          </p>
-        </div>
-      </div>
-      <template #footer>
-        <Button
-          variant="ghost"
-          @click="removeItemOpen = false"
-        >
-          {{ t('supplier_action_cancel') }}
-        </Button>
-        <Button
-          variant="danger"
-          icon="trash"
-          @click="submitRemoveItem"
-        >
-          {{ t('supplier_action_remove_item') }}
         </Button>
       </template>
     </Modal>
@@ -1620,6 +1876,18 @@ function backToList() {
   text-align: right;
   font-size: 13px;
   min-width: 0;
+}
+.supplier-payment-warning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-block-end: var(--sp-4);
+  padding: 10px 12px;
+  border: 1px solid rgb(var(--v-theme-warning-border));
+  border-radius: var(--r-md);
+  color: rgb(var(--v-theme-warning-strong));
+  background: rgb(var(--v-theme-warning-weak));
+  font-size: 13px;
 }
 .ledger-note {
   display: inline-block;

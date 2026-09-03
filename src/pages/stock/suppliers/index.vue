@@ -25,16 +25,22 @@ const { t } = useI18n({ useScope: 'global' })
 const { notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 const router = useRouter()
-const { hasPermission, isAdministrator } = useUserAccess()
+const { hasPermission } = useUserAccess()
 
 const canViewSuppliers = computed(() => hasPermission('stock.supplier.view'))
 const canManageSuppliers = computed(() => hasPermission('stock.manage'))
-const canPaySuppliers = computed(() => isAdministrator.value)
+const canViewSupplierBalances = computed(() => hasPermission('stock.supplier.balance.view'))
+const canPaySuppliers = computed(() =>
+  hasPermission('stock.supplier.pay') && hasPermission('stock.supplier.balance.view'),
+)
 
-// List only returns: id, uuid, code(null), name, city, rating, is_active
+// The list exposes balances on current backends, but currency still comes from
+// the detail contract and must be verified before a payment can be submitted.
 const suppliers = ref<any[]>([])
 const total = ref(0)
 const loading = ref(false)
+const listLoadError = ref(false)
+let supplierListRequestId = 0
 
 const page = ref(1)
 const itemsPerPage = ref(10)
@@ -45,11 +51,15 @@ const activeFilter = ref<string | undefined>(undefined)
 const detailDialog = ref(false)
 const detailItem = ref<any>(null)
 const detailLoading = ref(false)
+let detailRequestId = 0
 
 // create/edit dialog
 const dialog = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
 const saving = ref(false)
+const editDetailLoading = ref(false)
+const editDetailError = ref(false)
+let editDetailRequestId = 0
 const deleteDialog = ref(false)
 const deleting = ref(false)
 const selectedItem = ref<any>(null)
@@ -71,46 +81,108 @@ async function loadSuppliers() {
   if (!canViewSuppliers.value)
     return
 
-  loading.value = true
-  try {
-    const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (search.value)
-      params.search = search.value
+  const requestId = ++supplierListRequestId
+  const requestedPage = page.value
+  const requestedPerPage = itemsPerPage.value
+  const requestedSearch = search.value.trim()
+  const requestedActiveFilter = activeFilter.value
 
-    // BE accepts `active_only` (default true). Map our 3-state select:
-    //   undefined → omit (BE will hide inactive by default)
-    //   'true'    → active_only=true
-    //   'false'   → active_only=false (show all incl. inactive)
-    if (activeFilter.value !== undefined)
-      params.active_only = activeFilter.value === 'true' ? 'true' : 'false'
+  loading.value = true
+  listLoadError.value = false
+  try {
+    const params: any = { page: requestedPage, per_page: requestedPerPage }
+    if (requestedSearch)
+      params.search = requestedSearch
+
+    // `active_only=false` means all statuses on the backend. For an
+    // inactive-only view, collect every server page first and paginate the
+    // filtered result locally so rows and totals remain truthful.
+    if (requestedActiveFilter === 'false') {
+      const allRows: any[] = []
+      let serverPage = 1
+      let totalPages = 1
+
+      do {
+        const res = await axios.get('/suppliers/', {
+          params: {
+            ...(requestedSearch ? { search: requestedSearch } : {}),
+            active_only: 'false',
+            page: serverPage,
+            per_page: 100,
+          },
+        })
+        const data = res.data?.data ?? res.data ?? {}
+        if (requestId !== supplierListRequestId)
+          return
+
+        allRows.push(...(data?.suppliers ?? []))
+        totalPages = Math.max(1, Number(data?.pagination?.total_pages ?? 1) || 1)
+        serverPage += 1
+      } while (serverPage <= totalPages)
+
+      const inactiveRows = allRows.filter(row => row.is_active === false)
+      const start = (requestedPage - 1) * requestedPerPage
+
+      if (requestId !== supplierListRequestId)
+        return
+      suppliers.value = inactiveRows.slice(start, start + requestedPerPage)
+      total.value = inactiveRows.length
+      return
+    }
+
+    params.active_only = requestedActiveFilter === 'true' ? 'true' : 'false'
 
     const res = await axios.get('/suppliers/', { params })
     const d = res.data?.data ?? res.data
+    if (requestId !== supplierListRequestId)
+      return
 
     suppliers.value = d?.suppliers ?? []
     total.value = d?.pagination?.total_suppliers ?? suppliers.value.length
   }
   catch {
-    notify(t('Failed to load suppliers'), 'error')
+    if (requestId === supplierListRequestId) {
+      suppliers.value = []
+      total.value = 0
+      listLoadError.value = true
+      notify(t('Failed to load suppliers'), 'error')
+    }
   }
   finally {
-    loading.value = false
+    if (requestId === supplierListRequestId)
+      loading.value = false
   }
 }
 
 const debouncedSearch = useDebounceFn(() => {
-  page.value = 1
-  loadSuppliers()
+  if (page.value !== 1)
+    page.value = 1
+  else
+    loadSuppliers()
 }, 350)
 
 onMounted(loadSuppliers)
 watch([page, itemsPerPage], loadSuppliers)
-watch(activeFilter, () => { page.value = 1; loadSuppliers() })
-watch(search, () => debouncedSearch())
+watch(activeFilter, () => {
+  if (page.value !== 1)
+    page.value = 1
+  else
+    loadSuppliers()
+})
+watch(search, () => {
+  supplierListRequestId += 1
+  suppliers.value = []
+  total.value = 0
+  loading.value = true
+  listLoadError.value = false
+  debouncedSearch()
+})
 
 async function openDetail(item: any) {
   if (!canViewSuppliers.value)
     return
+
+  const requestId = ++detailRequestId
 
   detailItem.value = item
   detailDialog.value = true
@@ -119,19 +191,31 @@ async function openDetail(item: any) {
     const res = await axios.get(`/suppliers/${item.id}/`)
 
     // BE wrapper: { success, message, data: { supplier: {...} } }
-    detailItem.value = res.data?.data?.supplier ?? item
+    if (requestId === detailRequestId && detailDialog.value)
+      detailItem.value = res.data?.data?.supplier ?? item
   }
   catch { /* keep basic data */ }
   finally {
-    detailLoading.value = false
+    if (requestId === detailRequestId)
+      detailLoading.value = false
   }
+}
+
+function closeDetail() {
+  detailRequestId += 1
+  detailDialog.value = false
+  detailLoading.value = false
 }
 
 function openCreate() {
   if (!canManageSuppliers.value)
     return
 
+  editDetailRequestId += 1
+  editDetailLoading.value = false
+  editDetailError.value = false
   dialogMode.value = 'create'
+  selectedItem.value = null
   form.value = { name: '', contact_person: '', email: '', phone: '', city: '', address: '', rating: 3, payment_terms_days: 30, lead_time_days: 7, notes: '' }
   dialog.value = true
 }
@@ -139,8 +223,72 @@ function openCreate() {
 function viewProfile(item: any) {
   if (!canViewSuppliers.value || !item?.id)
     return
-  detailDialog.value = false
+  closeDetail()
   router.push(`/stock/suppliers/${item.id}`)
+}
+
+function supplierForm(item: any) {
+  return {
+    name: item.name ?? '',
+    contact_person: item.contact_person ?? '',
+    email: item.email ?? '',
+    phone: item.phone ?? '',
+    city: item.city ?? '',
+    address: item.address ?? '',
+    rating: item.rating ?? 3,
+    payment_terms_days: item.payment_terms_days ?? 30,
+    lead_time_days: item.lead_time_days ?? 7,
+    notes: item.notes ?? '',
+  }
+}
+
+function isValidSupplierDetail(value: any, supplierId: unknown): boolean {
+  return Boolean(
+    value
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && String(value.id) === String(supplierId)
+    && typeof value.name === 'string'
+    && value.name.trim(),
+  )
+}
+
+function isCurrentEditDetailRequest(requestId: number, supplierId: unknown): boolean {
+  return requestId === editDetailRequestId
+    && dialog.value
+    && dialogMode.value === 'edit'
+    && String(selectedItem.value?.id) === String(supplierId)
+}
+
+async function loadEditDetails(item: any) {
+  const supplierId = item?.id
+  const requestId = ++editDetailRequestId
+  editDetailLoading.value = true
+  editDetailError.value = false
+
+  try {
+    const res = await axios.get(`/suppliers/${supplierId}/`)
+    if (!isCurrentEditDetailRequest(requestId, supplierId))
+      return
+
+    // BE wrapper: { success, message, data: { supplier: {...} } }
+    const detail = res.data?.data?.supplier
+    if (!isValidSupplierDetail(detail, supplierId)) {
+      editDetailError.value = true
+      return
+    }
+
+    selectedItem.value = { ...item, ...detail }
+    form.value = supplierForm(detail)
+  }
+  catch {
+    if (isCurrentEditDetailRequest(requestId, supplierId))
+      editDetailError.value = true
+  }
+  finally {
+    if (requestId === editDetailRequestId)
+      editDetailLoading.value = false
+  }
 }
 
 function openEdit(item: any) {
@@ -149,33 +297,36 @@ function openEdit(item: any) {
 
   dialogMode.value = 'edit'
   selectedItem.value = item
-
-  // Load detail first to get all fields
-  axios.get(`/suppliers/${item.id}/`).then(res => {
-    // BE wrapper: { success, message, data: { supplier: {...} } }
-    const d = res.data?.data?.supplier ?? item
-
-    form.value = {
-      name: d.name ?? '',
-      contact_person: d.contact_person ?? '',
-      email: d.email ?? '',
-      phone: d.phone ?? '',
-      city: d.city ?? '',
-      address: d.address ?? '',
-      rating: d.rating ?? 3,
-      payment_terms_days: d.payment_terms_days ?? 30,
-      lead_time_days: d.lead_time_days ?? 7,
-      notes: d.notes ?? '',
-    }
-  }).catch(() => {
-    form.value = { name: item.name ?? '', contact_person: '', email: '', phone: '', city: item.city ?? '', address: '', rating: item.rating ?? 3, payment_terms_days: 30, lead_time_days: 7, notes: '' }
-  })
+  form.value = supplierForm({})
+  editDetailError.value = false
   dialog.value = true
+  void loadEditDetails(item)
+}
+
+function retryEditDetails() {
+  if (!selectedItem.value?.id) {
+    editDetailError.value = true
+    return
+  }
+
+  void loadEditDetails(selectedItem.value)
+}
+
+function closeSupplierForm() {
+  editDetailRequestId += 1
+  editDetailLoading.value = false
+  editDetailError.value = false
+  dialog.value = false
 }
 
 async function save() {
-  if (!canManageSuppliers.value)
+  if (!canManageSuppliers.value || saving.value || !form.value.name.trim())
     return
+
+  if (dialogMode.value === 'edit' && (editDetailLoading.value || editDetailError.value || !selectedItem.value?.id)) {
+    notify(t('supplier_failed_load'), 'error')
+    return
+  }
 
   saving.value = true
   try {
@@ -186,7 +337,7 @@ async function save() {
       // Supplier detail route allows GET/PUT/DELETE (not PATCH).
       await axios.put(`/suppliers/${selectedItem.value.id}/`, form.value)
     notify(dialogMode.value === 'create' ? t('Supplier created') : t('Supplier updated'))
-    dialog.value = false
+    closeSupplierForm()
     await loadSuppliers()
   }
   catch (e: any) {
@@ -228,22 +379,51 @@ async function doDelete() {
 const payDialog = ref(false)
 const paying = ref<any>(null)
 const paySaving = ref(false)
+const payDetailsLoading = ref(false)
+const payDetailsError = ref(false)
 const payForm = ref({ amount: 0, source_account: 'BANK', commission: 0, note: '' })
+let payDetailRequestId = 0
 
-function openPay(s: any) {
-  if (!canPaySuppliers.value)
+function closePayDialog() {
+  if (paySaving.value)
+    return
+  payDetailRequestId += 1
+  payDialog.value = false
+  payDetailsLoading.value = false
+  payDetailsError.value = false
+}
+
+async function openPay(s: any) {
+  if (!canPaySuppliers.value || paySaving.value)
     return
 
   paying.value = s
   payForm.value = { amount: 0, source_account: 'BANK', commission: 0, note: '' }
+  payDetailsLoading.value = true
+  payDetailsError.value = false
   payDialog.value = true
+  const requestId = ++payDetailRequestId
 
-  // Fetch detail as a fallback for legacy list responses without balance.
-  axios.get(`/suppliers/${s.id}/`).then(res => {
+  // Currency is intentionally absent from the brief list contract. Verify the
+  // full supplier before allowing a Treasury payment.
+  try {
+    const res = await axios.get(`/suppliers/${s.id}/`)
+    if (requestId !== payDetailRequestId || !payDialog.value || String(paying.value?.id) !== String(s.id))
+      return
     const full = res.data?.data?.supplier
     if (full)
       paying.value = { ...s, ...full }
-  }).catch(() => { /* keep basic info */ })
+    else
+      payDetailsError.value = true
+  }
+  catch {
+    if (requestId === payDetailRequestId)
+      payDetailsError.value = true
+  }
+  finally {
+    if (requestId === payDetailRequestId)
+      payDetailsLoading.value = false
+  }
 }
 
 async function doPay() {
@@ -255,11 +435,26 @@ async function doPay() {
 
     return
   }
+  if (payUnavailableReason.value || payAmountError.value) {
+    notify(payUnavailableReason.value || payAmountError.value, 'error')
+    return
+  }
   paySaving.value = true
   try {
-    await axios.post(`/suppliers/${paying.value.id}/pay/`, payForm.value)
+    await axios.post(`/suppliers/${paying.value.id}/payments/`, {
+      amount_uzs: Number(payForm.value.amount),
+      fee_uzs: payForm.value.source_account === 'BANK'
+        ? (Number(payForm.value.commission) || 0)
+        : 0,
+      source_account: payForm.value.source_account,
+      allocation_mode: 'AUTO_OLDEST_DUE',
+      note: payForm.value.note.trim(),
+    })
     notify(t('Payment recorded'))
+    payDetailRequestId += 1
     payDialog.value = false
+    payDetailsLoading.value = false
+    payDetailsError.value = false
     await loadSuppliers()
   }
   catch (e: any) {
@@ -279,6 +474,8 @@ const ledgerPage = ref(1)
 const ledgerPerPage = ref(20)
 const ledgerTotal = ref(0)
 const ledgerBalance = ref<number | null>(null)
+const ledgerLoadError = ref(false)
+let ledgerRequestId = 0
 
 function moneyNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '')
@@ -313,25 +510,44 @@ function formatLedgerChange(row: any): string {
 }
 
 async function openLedger(s: any) {
-  if (!canViewSuppliers.value)
+  if (!canViewSupplierBalances.value)
     return
 
+  const startsOnFirstPage = ledgerPage.value === 1
+
+  ledgerRequestId += 1
   ledgerSupplier.value = s
   ledgerPage.value = 1
   ledgerRows.value = []
+  ledgerLoadError.value = false
   ledgerBalance.value = supplierBalance(s)
   ledgerDialog.value = true
-  await loadLedger()
+  if (startsOnFirstPage)
+    await loadLedger()
 }
 
 async function loadLedger() {
-  if (!canViewSuppliers.value || !ledgerSupplier.value)
+  if (!canViewSupplierBalances.value || !ledgerSupplier.value)
     return
+
+  const requestId = ++ledgerRequestId
+  const supplierId = ledgerSupplier.value.id
+  const requestedPage = ledgerPage.value
+  const requestedPerPage = ledgerPerPage.value
+
   ledgerLoading.value = true
+  ledgerLoadError.value = false
   try {
-    const res = await axios.get(`/suppliers/${ledgerSupplier.value.id}/ledger/`, {
-      params: { page: ledgerPage.value, per_page: ledgerPerPage.value },
+    const res = await axios.get(`/suppliers/${supplierId}/ledger/`, {
+      params: { page: requestedPage, per_page: requestedPerPage },
     })
+
+    if (
+      requestId !== ledgerRequestId
+      || !ledgerDialog.value
+      || ledgerSupplier.value?.id !== supplierId
+    )
+      return
 
     const d = res.data?.data ?? res.data
 
@@ -344,7 +560,7 @@ async function loadLedger() {
     // newest-first, so its balance_after_uzs is the freshest ledger value.
     const responseBalance = moneyNumber(d?.current_balance_uzs ?? d?.current_balance ?? d?.balance)
 
-    const newestBalance = ledgerPage.value === 1
+    const newestBalance = requestedPage === 1
       ? moneyNumber(ledgerRows.value[0]?.balance_after)
       : null
 
@@ -354,18 +570,35 @@ async function loadLedger() {
       ?? ledgerBalance.value
   }
   catch (e: any) {
-    notify(e?.response?.data?.message ?? t('Failed to load'), 'error')
+    if (requestId === ledgerRequestId) {
+      ledgerRows.value = []
+      ledgerTotal.value = 0
+      ledgerLoadError.value = true
+      notify(e?.response?.data?.message ?? t('Failed to load'), 'error')
+    }
   }
   finally {
-    ledgerLoading.value = false
+    if (requestId === ledgerRequestId)
+      ledgerLoading.value = false
   }
 }
 
-watch(ledgerPage, loadLedger)
+function closeLedger() {
+  ledgerRequestId += 1
+  ledgerDialog.value = false
+  ledgerLoading.value = false
+  ledgerLoadError.value = false
+}
+
+watch([ledgerPage, ledgerPerPage], () => {
+  if (ledgerDialog.value)
+    loadLedger()
+})
 
 const ledgerTypeTone: Record<string, 'warning' | 'success' | 'info' | 'neutral'> = {
   PURCHASE: 'warning',
   PAYMENT: 'success',
+  PAYMENT_REVERSAL: 'warning',
   RETURN: 'info',
   ADJUSTMENT: 'neutral',
 }
@@ -376,7 +609,9 @@ const ledgerTypeTone: Record<string, 'warning' | 'success' | 'info' | 'neutral'>
 const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'name', label: t('supplier_col_name') },
   { key: 'city', label: t('supplier_col_city') },
-  { key: 'current_balance', label: t('Balance'), align: 'right' },
+  ...(canViewSupplierBalances.value
+    ? [{ key: 'current_balance', label: t('Balance'), align: 'right' as const }]
+    : []),
   { key: 'rating', label: t('supplier_col_rating') },
   { key: 'is_active', label: t('supplier_col_status') },
 ])
@@ -407,6 +642,34 @@ const payCommissionNum = computed(() => (isBankPay.value ? Math.max(0, Number(pa
 const payTotalCharge = computed(() => payAmountNum.value + payCommissionNum.value)
 const payOwed = computed(() => Number(paying.value?.current_balance_uzs ?? paying.value?.current_balance ?? 0))
 const payRemaining = computed(() => payOwed.value - payAmountNum.value)
+const payCurrency = computed(() => String(paying.value?.currency ?? '').trim().toUpperCase())
+const payUnavailableReason = computed(() => {
+  if (payDetailsError.value)
+    return t('pay_supplier_details_failed')
+  if (payCurrency.value && payCurrency.value !== 'UZS')
+    return t('pay_currency_unsupported')
+  if (!payDetailsLoading.value && payOwed.value <= 0)
+    return t('pay_no_outstanding_balance')
+
+  return ''
+})
+const payAmountError = computed(() =>
+  payAmountNum.value > payOwed.value && payOwed.value > 0
+    ? t('pay_amount_exceeds_balance')
+    : '',
+)
+const canSubmitSupplierPayment = computed(() =>
+  !paySaving.value
+  && !payDetailsLoading.value
+  && !payUnavailableReason.value
+  && payAmountNum.value > 0
+  && !payAmountError.value,
+)
+
+watch(() => payForm.value.source_account, source => {
+  if (source === 'SAFE')
+    payForm.value.commission = 0
+})
 
 // Prefill the amount with the full outstanding balance (one-click settle).
 function payFull() {
@@ -455,7 +718,6 @@ const ledgerPages = computed(() => Math.max(1, Math.ceil(ledgerTotal.value / led
 function onLedgerPerPage(n: number) {
   ledgerPerPage.value = n
   ledgerPage.value = 1
-  loadLedger()
 }
 
 // Ledger reference labels (backend reference_type values).
@@ -463,6 +725,10 @@ const refLabels: Record<string, string> = {
   PurchaseOrder: 'ref_PurchaseOrder',
   TreasuryPayment: 'ref_TreasuryPayment',
   CashboxExpense: 'ref_CashboxExpense',
+  SupplierPayment: 'ref_SupplierPayment',
+  Supplier: 'ref_Supplier',
+  PurchaseReceiving: 'ref_PurchaseReceiving',
+  PurchaseReceivingCorrection: 'ref_PurchaseReceivingCorrection',
 }
 
 function refLabel(type: string): string {
@@ -590,6 +856,7 @@ function sourceLabel(src: string): string {
             @click.stop="openPay(row)"
           />
           <IconAction
+            v-if="canViewSupplierBalances"
             icon="receipt"
             :title="t('Ledger')"
             @click.stop="openLedger(row)"
@@ -617,10 +884,17 @@ function sourceLabel(src: string): string {
         <!-- Empty state -->
         <template #empty>
           <StateFill
-            icon="package"
-            :title="t('suppliers_empty_title')"
-            :sub="t('suppliers_empty_sub')"
-          />
+            :icon="listLoadError ? 'alert' : 'package'"
+            :title="listLoadError ? t('Failed to load suppliers') : t('suppliers_empty_title')"
+            :sub="listLoadError ? undefined : t('suppliers_empty_sub')"
+            :error="listLoadError"
+          >
+            <div v-if="listLoadError" style="margin-top: 12px;">
+              <Button variant="secondary" icon="refresh" @click="loadSuppliers">
+                {{ t('Retry') }}
+              </Button>
+            </div>
+          </StateFill>
         </template>
       </DataTable>
     </div>
@@ -630,7 +904,7 @@ function sourceLabel(src: string): string {
       :open="detailDialog"
       :width="560"
       :title="detailItem?.name ?? ''"
-      @close="detailDialog = false"
+      @close="closeDetail"
     >
       <div v-if="detailLoading" class="row" style="justify-content: center; padding: 16px 0;">
         <DesignIcon name="refresh" :size="20" />
@@ -674,7 +948,7 @@ function sourceLabel(src: string): string {
           </div>
           <div>{{ detailItem.lead_time_days ? `${detailItem.lead_time_days} ${t('days')}` : '—' }}</div>
         </div>
-        <div>
+        <div v-if="canViewSupplierBalances">
           <div class="field__label">
             {{ t('Balance') }}
           </div>
@@ -799,9 +1073,6 @@ function sourceLabel(src: string): string {
       </div>
 
       <template #footer>
-        <Button variant="ghost" @click="detailDialog = false">
-          {{ t('Close') }}
-        </Button>
         <Button
           v-if="detailItem?.id"
           variant="primary"
@@ -819,9 +1090,25 @@ function sourceLabel(src: string): string {
       :width="560"
       :title="dialogMode === 'create' ? t('Add Supplier') : t('Edit Supplier')"
       :close-on-backdrop="false"
-      @close="dialog = false"
+      @close="closeSupplierForm"
     >
-      <div class="grid cols-2 form-grid" style="gap: var(--sp-4);">
+      <div v-if="editDetailLoading" class="row" style="justify-content: center; padding: 24px 0;">
+        <DesignIcon name="refresh" :size="20" />
+        <span class="cell-muted" style="margin-left: 8px;">{{ t('Loading') }}</span>
+      </div>
+      <StateFill
+        v-else-if="editDetailError"
+        icon="alert"
+        :title="t('supplier_failed_load')"
+        error
+      >
+        <div style="margin-top: 12px;">
+          <Button variant="secondary" icon="refresh" @click="retryEditDetails">
+            {{ t('Retry') }}
+          </Button>
+        </div>
+      </StateFill>
+      <div v-else class="grid cols-2 form-grid" style="gap: var(--sp-4);">
         <div class="form-grid__full" style="grid-column: span 2;">
           <Field :label="t('Name')">
             <Input v-model="form.name" />
@@ -883,13 +1170,11 @@ function sourceLabel(src: string): string {
       </div>
 
       <template #footer>
-        <Button variant="ghost" :disabled="saving" @click="dialog = false">
-          {{ t('Cancel') }}
-        </Button>
         <Button
+          v-if="!editDetailLoading && !editDetailError"
           variant="primary"
           :loading="saving"
-          :disabled="!form.name || saving"
+          :disabled="!form.name.trim() || saving"
           @click="save"
         >
           {{ t('Save') }}
@@ -923,9 +1208,6 @@ function sourceLabel(src: string): string {
       </div>
 
       <template #footer>
-        <Button variant="ghost" :disabled="deleting" @click="deleteDialog = false">
-          {{ t('Cancel') }}
-        </Button>
         <Button
           variant="danger"
           :loading="deleting"
@@ -943,18 +1225,18 @@ function sourceLabel(src: string): string {
       :width="520"
       :title="t('Pay supplier')"
       :close-on-backdrop="false"
-      @close="payDialog = false"
+      @close="closePayDialog"
     >
       <div v-if="paying" class="pay-head">
         <div>
           <strong style="color: var(--text);">{{ paying.name }}</strong>
-          <span v-if="payOwed" class="cell-muted" style="font-size: 13px;">
+          <span v-if="canViewSupplierBalances && payOwed" class="cell-muted" style="font-size: 13px;">
             · {{ t('Owed') }}:
             <strong class="mono" style="color: rgb(var(--v-theme-warning-strong));">{{ formatCurrency(payOwed) }}</strong>
           </span>
         </div>
         <Button
-          v-if="payOwed > 0"
+          v-if="canViewSupplierBalances && payOwed > 0"
           variant="ghost"
           size="sm"
           @click="payFull"
@@ -963,71 +1245,81 @@ function sourceLabel(src: string): string {
         </Button>
       </div>
 
-      <div class="grid cols-2 form-grid" style="gap: var(--sp-4);">
-        <Field :label="t('Amount')">
-          <MoneyInput
-            v-model="payForm.amount"
-            autofocus
-          />
-        </Field>
-
-        <Field :label="t('Source account')">
-          <Select
-            v-model="payForm.source_account"
-            :options="sourceOptions"
-          />
-        </Field>
-
-        <div class="form-grid__full" style="grid-column: span 2;">
-          <Field
-            :label="t('Commission / fee (optional)')"
-            :hint="isBankPay ? t('pay_commission_hint') : t('pay_commission_bank_note')"
-          >
+      <StateFill
+        v-if="payDetailsLoading"
+        icon="refresh"
+        :title="t('Loading')"
+      />
+      <StateFill
+        v-else-if="payUnavailableReason"
+        icon="alert"
+        :title="payUnavailableReason"
+      />
+      <template v-else>
+        <div class="grid cols-2 form-grid" style="gap: var(--sp-4);">
+          <Field :label="t('Amount')" :error="payAmountError">
             <MoneyInput
-              v-model="payForm.commission"
-              :disabled="!isBankPay"
+              v-model="payForm.amount"
+              autofocus
+              :error="!!payAmountError"
             />
           </Field>
-        </div>
 
-        <div class="form-grid__full" style="grid-column: span 2;">
-          <Field :label="t('Note')">
-            <Input v-model="payForm.note" />
+          <Field :label="t('Source account')">
+            <Select
+              v-model="payForm.source_account"
+              :options="sourceOptions"
+            />
           </Field>
-        </div>
-      </div>
 
-      <!-- Live payment preview -->
-      <div v-if="payAmountNum > 0" class="pay-preview">
-        <div class="pay-preview__row">
-          <span class="cell-muted">{{ t('pay_total_charge') }}</span>
-          <span class="mono" style="font-weight: 600;">{{ formatCurrency(payTotalCharge) }}</span>
+          <div class="form-grid__full" style="grid-column: span 2;">
+            <Field
+              :label="t('Commission / fee (optional)')"
+              :hint="isBankPay ? t('pay_commission_hint') : t('pay_commission_bank_note')"
+            >
+              <MoneyInput
+                v-model="payForm.commission"
+                :disabled="!isBankPay"
+              />
+            </Field>
+          </div>
+
+          <div class="form-grid__full" style="grid-column: span 2;">
+            <Field :label="t('Note')">
+              <Input v-model="payForm.note" />
+            </Field>
+          </div>
         </div>
-        <div v-if="payCommissionNum > 0" class="pay-preview__row">
-          <span class="cell-muted">{{ t('Fee') }}</span>
-          <span class="mono">{{ formatCurrency(payCommissionNum) }}</span>
+
+        <!-- Live payment preview -->
+        <div v-if="payAmountNum > 0" class="pay-preview">
+          <div class="pay-preview__row">
+            <span class="cell-muted">{{ t('pay_total_charge') }}</span>
+            <span class="mono" style="font-weight: 600;">{{ formatCurrency(payTotalCharge) }}</span>
+          </div>
+          <div v-if="payCommissionNum > 0" class="pay-preview__row">
+            <span class="cell-muted">{{ t('Fee') }}</span>
+            <span class="mono">{{ formatCurrency(payCommissionNum) }}</span>
+          </div>
+          <div v-if="canViewSupplierBalances && payOwed" class="pay-preview__row">
+            <span class="cell-muted">{{ t('pay_remaining_after') }}</span>
+            <span
+              class="mono"
+              :style="{ color: balanceColorVar[balanceTone(Math.max(0, payRemaining))], fontWeight: 600 }"
+            >
+              {{ formatCurrency(Math.max(0, payRemaining)) }}
+            </span>
+          </div>
         </div>
-        <div v-if="payOwed" class="pay-preview__row">
-          <span class="cell-muted">{{ t('pay_remaining_after') }}</span>
-          <span
-            class="mono"
-            :style="{ color: balanceColorVar[balanceTone(payRemaining)], fontWeight: 600 }"
-          >
-            {{ formatCurrency(Math.abs(payRemaining)) }}
-            <template v-if="payRemaining < 0">({{ t('supplier_balance_credit') }})</template>
-          </span>
-        </div>
-      </div>
+      </template>
 
       <template #footer>
-        <Button variant="ghost" :disabled="paySaving" @click="payDialog = false">
-          {{ t('Cancel') }}
-        </Button>
         <Button
+          v-if="!payDetailsLoading && !payUnavailableReason"
           variant="primary"
           icon="dollar"
           :loading="paySaving"
-          :disabled="paySaving"
+          :disabled="!canSubmitSupplierPayment"
           @click="doPay"
         >
           {{ t('Pay') }}
@@ -1041,10 +1333,10 @@ function sourceLabel(src: string): string {
       :width="860"
       :title="`${ledgerSupplier?.name ?? ''} · ${t('Ledger')}`"
       :subtitle="ledgerBalance !== null ? `${t('Current balance')}: ${formatCurrency(ledgerBalance)}` : undefined"
-      @close="ledgerDialog = false"
+      @close="closeLedger"
     >
       <div class="row" style="justify-content: flex-end; margin-bottom: var(--sp-3);">
-        <Button variant="ghost" size="sm" icon="refresh" @click="loadLedger">
+        <Button variant="ghost" size="sm" icon="refresh" :disabled="ledgerLoading" @click="loadLedger">
           {{ t('supplier_action_refresh') }}
         </Button>
       </div>
@@ -1053,6 +1345,19 @@ function sourceLabel(src: string): string {
         <DesignIcon name="refresh" :size="20" />
         <span style="margin-left: 8px;" class="cell-muted">{{ t('Loading') }}</span>
       </div>
+
+      <StateFill
+        v-else-if="ledgerLoadError"
+        icon="alert"
+        :title="t('supplier_failed_load_ledger')"
+        error
+      >
+        <div style="margin-top: 12px;">
+          <Button variant="secondary" icon="refresh" @click="loadLedger">
+            {{ t('Retry') }}
+          </Button>
+        </div>
+      </StateFill>
 
       <div v-else-if="ledgerRows.length === 0">
         <StateFill
@@ -1101,7 +1406,7 @@ function sourceLabel(src: string): string {
                 <span v-if="r.source_account">{{ sourceLabel(r.source_account) }}</span>
                 <span v-else class="cell-muted">—</span>
                 <span
-                  v-if="Number(r.fee) > 0"
+                  v-if="Number(r.fee) !== 0"
                   class="cell-muted"
                   style="font-size: 11px;"
                 >· {{ t('Fee') }} {{ formatCurrency(r.fee) }}</span>
@@ -1135,11 +1440,6 @@ function sourceLabel(src: string): string {
         />
       </div>
 
-      <template #footer>
-        <Button variant="ghost" @click="ledgerDialog = false">
-          {{ t('Close') }}
-        </Button>
-      </template>
     </Modal>
   </div>
 </template>

@@ -34,6 +34,7 @@ interface NavItem {
   action?: string
   subject?: string
   anyPermission?: string[]
+  allPermissions?: string[]
 }
 
 interface CmdItem {
@@ -45,6 +46,7 @@ interface CmdItem {
   icon?: string
   searchKey: string
   anyPermission?: string[]
+  allPermissions?: string[]
 }
 
 const open = ref(false)
@@ -84,6 +86,7 @@ function buildItem(group: string, n: NavItem): CmdItem {
     to: n.to || '',
     icon: iconName,
     anyPermission: n.anyPermission,
+    allPermissions: n.allPermissions,
     searchKey: `${title} ${group} ${n.to ?? ''}`.toLowerCase(),
   }
 }
@@ -121,7 +124,8 @@ const items = computed<CmdItem[]>(() => {
   ]
   const access = readUserAccess()
   const permittedRoutes = routes.filter(item =>
-    !item.anyPermission?.length || access.hasAny(item.anyPermission),
+    (!item.anyPermission?.length || access.hasAny(item.anyPermission))
+    && (!item.allPermissions?.length || access.hasAll(item.allPermissions)),
   )
 
   if (!access.isWarehouse)
@@ -227,6 +231,10 @@ function onGlobalKey(e: KeyboardEvent) {
   const isCmd = e.metaKey || e.ctrlKey
   if (isCmd && (e.key === 'k' || e.key === 'K')) {
     e.preventDefault()
+    // A page modal owns focus and interaction until it closes. Do not open a
+    // second global dialog behind that higher modal stack.
+    if (!open.value && document.querySelector('.overlay [role="dialog"]'))
+      return
     open.value = !open.value
     return
   }

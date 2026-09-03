@@ -29,6 +29,7 @@ import Select from '@/components/design/Select.vue'
 import Switch from '@/components/design/Switch.vue'
 import StateFill from '@/components/design/StateFill.vue'
 import { useUserAccess } from '@/composables/useUserAccess'
+import { availableStockQuantity, fetchStockLevelSnapshot } from '@/utils/stockLevels'
 
 const { t } = useI18n({ useScope: 'global' })
 const route = useRoute()
@@ -37,7 +38,13 @@ const { notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 const { hasPermission, isAdministrator } = useUserAccess()
 const canManageStock = computed(() => hasPermission('stock.manage'))
-const canAdministerLevels = computed(() => isAdministrator.value)
+const canAdjustStock = computed(() =>
+  hasPermission('stock.adjustment.approve')
+  && (hasPermission('stock.level.view') || hasPermission('stock.inventory_control.view')),
+)
+const canAdministerReservations = computed(() => isAdministrator.value)
+const canViewStockHistory = computed(() => hasPermission('stock.batch.view'))
+const canViewStockLevels = computed(() => hasPermission('stock.level.view'))
 
 // ---- ids ----
 const itemId = computed(() => String(route.params.id ?? ''))
@@ -49,10 +56,16 @@ const levels = ref<any[]>([])
 const levelsSummary = ref<{ total_quantity?: number, total_reserved?: number, total_available?: number }>({})
 const transactions = ref<any[]>([])
 const txSummary = ref<any>(null)
+const txTotal = ref(0)
 const loadingItem = ref(false)
 const loadingLevels = ref(false)
 const loadingTx = ref(false)
+const levelsLoadError = ref(false)
+const historyLoadError = ref(false)
 const days = ref<string>('30')
+let itemRequestId = 0
+let levelsRequestId = 0
+let historyRequestId = 0
 
 // Filter state (client-side over loaded tx)
 const movementTypeFilter = ref<string>('')
@@ -87,7 +100,10 @@ const MOVEMENT_TYPES = [
   'WASTE', 'SPOILAGE', 'RETURN_FROM_CUSTOMER', 'RETURN_TO_SUPPLIER',
   'COUNT_ADJUSTMENT', 'OPENING_BALANCE', 'RESERVATION', 'RESERVATION_RELEASE',
 ]
-const ADJUST_TYPES = ['ADJUSTMENT_PLUS', 'ADJUSTMENT_MINUS', 'WASTE', 'SPOILAGE', 'OPENING_BALANCE']
+const ADJUST_TYPES = ['ADJUSTMENT_PLUS', 'ADJUSTMENT_MINUS', 'WASTE', 'SPOILAGE']
+const OUTGOING_ADJUST_TYPES = new Set(['ADJUSTMENT_MINUS', 'WASTE', 'SPOILAGE'])
+const MAX_ADJUSTMENT_QUANTITY = 99_999_999_999
+const ADJUSTMENT_QUANTITY_PATTERN = /^\d+(?:\.\d{1,4})?$/
 
 // Movement badge tone map
 const MOVEMENT_TONE: Record<string, string> = {
@@ -113,6 +129,17 @@ function movementTone(v?: string): 'success' | 'warning' | 'error' | 'info' | 'p
   return (MOVEMENT_TONE[v] ?? 'neutral') as any
 }
 
+function normalizedAdjustmentQuantity(value: string): string | null {
+  const normalized = value.trim()
+  if (!ADJUSTMENT_QUANTITY_PATTERN.test(normalized))
+    return null
+
+  const quantity = Number(normalized)
+  const isValid = Number.isFinite(quantity) && quantity > 0 && quantity <= MAX_ADJUSTMENT_QUANTITY
+
+  return isValid ? normalized : null
+}
+
 const ITEM_TYPE_TONE: Record<string, string> = {
   RAW: 'success',
   SEMI: 'warning',
@@ -130,7 +157,7 @@ function formatQty(val: any): string {
     return '—'
   const n = Number(val)
   if (!Number.isFinite(n)) return '—'
-  return Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/\.?0+$/, '')
+  return Number.isInteger(n) ? String(n) : n.toFixed(4).replace(/\.?0+$/, '')
 }
 function formatMoney(val: any): string {
   if (val === null || val === undefined || val === '')
@@ -139,27 +166,44 @@ function formatMoney(val: any): string {
 }
 
 // ---- loaders ----
-async function loadItem() {
-  if (!itemId.value) return
+async function loadItem(targetItemId = itemId.value) {
+  const requestId = ++itemRequestId
+  if (!targetItemId) return
   loadingItem.value = true
   try {
-    const res = await stockApi.get(`/items/${itemId.value}/`)
+    const res = await stockApi.get(`/items/${targetItemId}/`)
+    if (requestId !== itemRequestId || targetItemId !== itemId.value)
+      return
     const d = res.data?.data ?? res.data
     item.value = d?.item ?? d
   }
   catch {
-    notify(t('Failed to load items'), 'error')
+    if (requestId === itemRequestId && targetItemId === itemId.value) {
+      item.value = null
+      notify(t('Failed to load items'), 'error')
+    }
   }
   finally {
-    loadingItem.value = false
+    if (requestId === itemRequestId)
+      loadingItem.value = false
   }
 }
 
-async function loadLevels() {
-  if (!itemId.value) return
+async function loadLevels(targetItemId = itemId.value) {
+  const requestId = ++levelsRequestId
+  if (!targetItemId || !canViewStockLevels.value) {
+    levels.value = []
+    levelsSummary.value = {}
+    loadingLevels.value = false
+    levelsLoadError.value = false
+    return
+  }
   loadingLevels.value = true
+  levelsLoadError.value = false
   try {
-    const res = await stockApi.get(`/levels/item/${itemId.value}/`)
+    const res = await stockApi.get(`/levels/item/${targetItemId}/`)
+    if (requestId !== levelsRequestId || targetItemId !== itemId.value)
+      return
     const d = res.data?.data ?? res.data
     levels.value = d?.levels ?? []
     levelsSummary.value = {
@@ -167,46 +211,78 @@ async function loadLevels() {
       total_reserved: Number(d?.total_reserved ?? 0),
       total_available: Number(d?.total_available ?? 0),
     }
+    levelsLoadError.value = false
   }
   catch {
-    levels.value = []
-    levelsSummary.value = {}
+    if (requestId === levelsRequestId && targetItemId === itemId.value) {
+      levels.value = []
+      levelsSummary.value = {}
+      levelsLoadError.value = true
+    }
   }
   finally {
-    loadingLevels.value = false
+    if (requestId === levelsRequestId)
+      loadingLevels.value = false
   }
 }
 
-async function loadHistory() {
-  if (!itemId.value) return
+async function loadHistory(targetItemId = itemId.value, targetDays = days.value) {
+  const requestId = ++historyRequestId
+  if (!targetItemId || !canViewStockHistory.value) {
+    transactions.value = []
+    txSummary.value = null
+    txTotal.value = 0
+    loadingTx.value = false
+    historyLoadError.value = false
+    return
+  }
   loadingTx.value = true
+  historyLoadError.value = false
   try {
-    const res = await stockApi.get(`/transactions/item/${itemId.value}/`, { params: { days: Number(days.value) } })
+    const res = await stockApi.get(`/transactions/item/${targetItemId}/`, { params: { days: Number(targetDays) } })
+    if (requestId !== historyRequestId || targetItemId !== itemId.value || targetDays !== days.value)
+      return
     const d = res.data?.data ?? res.data
     transactions.value = d?.transactions ?? []
     txSummary.value = d?.summary ?? null
+    txTotal.value = Number(d?.total_transactions ?? transactions.value.length) || 0
+    historyLoadError.value = false
   }
   catch {
-    transactions.value = []
-    txSummary.value = null
+    if (requestId === historyRequestId && targetItemId === itemId.value && targetDays === days.value) {
+      transactions.value = []
+      txSummary.value = null
+      txTotal.value = 0
+      historyLoadError.value = true
+    }
   }
   finally {
-    loadingTx.value = false
+    if (requestId === historyRequestId)
+      loadingTx.value = false
   }
 }
 
 async function loadLookups() {
+  locations.value = []
   try {
-    const [locRes, catRes, unitRes] = await Promise.all([
-      stockApi.get('/locations/', { params: { per_page: 200 } }),
-      stockApi.get('/categories/', { params: { per_page: 200 } }),
-      stockApi.get('/units/', { params: { per_page: 200 } }),
-    ])
+    const locRes = await stockApi.get('/locations/', { params: { per_page: 200 } })
     locations.value = (locRes.data?.data ?? locRes.data)?.locations ?? []
-    categoriesList.value = (catRes.data?.data ?? catRes.data)?.categories ?? []
-    unitsList.value = (unitRes.data?.data ?? unitRes.data)?.units ?? []
   }
-  catch { /* ignore */ }
+  catch { /* The adjustment form remains honest with an empty location list. */ }
+
+  categoriesList.value = []
+  unitsList.value = []
+  if (!canManageStock.value)
+    return
+
+  const [categoryResult, unitResult] = await Promise.allSettled([
+    stockApi.get('/categories/', { params: { per_page: 200 } }),
+    stockApi.get('/units/', { params: { per_page: 200 } }),
+  ])
+  if (categoryResult.status === 'fulfilled')
+    categoriesList.value = (categoryResult.value.data?.data ?? categoryResult.value.data)?.categories ?? []
+  if (unitResult.status === 'fulfilled')
+    unitsList.value = (unitResult.value.data?.data ?? unitResult.value.data)?.units ?? []
 }
 
 onMounted(() => {
@@ -215,8 +291,24 @@ onMounted(() => {
   loadHistory()
   loadLookups()
 })
-watch(days, loadHistory)
-watch(() => route.params.id, () => {
+watch(days, () => loadHistory())
+watch(itemId, () => {
+  itemRequestId += 1
+  levelsRequestId += 1
+  historyRequestId += 1
+  item.value = null
+  levels.value = []
+  levelsSummary.value = {}
+  levelsLoadError.value = false
+  transactions.value = []
+  txSummary.value = null
+  txTotal.value = 0
+  historyLoadError.value = false
+  editOpen.value = false
+  deleteOpen.value = false
+  adjustOpen.value = false
+  reserveOpen.value = false
+  releaseOpen.value = false
   loadItem()
   loadLevels()
   loadHistory()
@@ -258,6 +350,7 @@ const filteredTransactions = computed(() => {
 })
 
 const hasTxFilters = computed(() => !!(movementTypeFilter.value || locationFilter.value || search.value))
+const isHistoryTruncated = computed(() => txTotal.value > transactions.value.length)
 function clearTxFilters() {
   movementTypeFilter.value = ''
   locationFilter.value = ''
@@ -269,6 +362,28 @@ function locationLabel(id: string) {
 
 // Unit display (used as suffix on qty cells)
 const unitShort = computed(() => item.value?.base_unit?.short_name ?? item.value?.base_unit?.name ?? '')
+
+function transactionUnit(row: any): string {
+  const unit = row?.unit_short ?? row?.unit?.short_name ?? row?.unit?.name ?? row?.unit
+
+  return unit ? String(unit) : unitShort.value
+}
+
+function showsTransactionBaseQuantity(row: any): boolean {
+  if (row?.base_quantity === null || row?.base_quantity === undefined)
+    return false
+
+  const quantity = Number(row.quantity)
+  const baseQuantity = Number(row.base_quantity)
+  const hasDifferentQuantity = Number.isFinite(quantity)
+    && Number.isFinite(baseQuantity)
+    && Math.abs(quantity - baseQuantity) > 0.0000001
+  const transactionUnitLabel = transactionUnit(row).trim().toLocaleLowerCase()
+  const baseUnitLabel = unitShort.value.trim().toLocaleLowerCase()
+
+  return hasDifferentQuantity
+    || Boolean(transactionUnitLabel && baseUnitLabel && transactionUnitLabel !== baseUnitLabel)
+}
 
 // ---- DataTable columns (history) ----
 const txColumns = computed<DataTableColumn<any>[]>(() => [
@@ -323,7 +438,8 @@ function validateEdit(): boolean {
 }
 
 async function saveEdit() {
-  if (!canManageStock.value || !validateEdit()) return
+  if (saving.value || !canManageStock.value || !validateEdit()) return
+  const targetItemId = itemId.value
   saving.value = true
   try {
     const payload: any = {
@@ -331,28 +447,29 @@ async function saveEdit() {
       sku: editForm.value.sku?.trim() || null,
       barcode: editForm.value.barcode?.trim() || null,
       item_type: editForm.value.item_type,
-      base_unit_id: Number(editForm.value.base_unit_id),
+      category_id: editForm.value.category_id ? Number(editForm.value.category_id) : null,
       is_purchasable: !!editForm.value.is_purchasable,
       is_sellable: !!editForm.value.is_sellable,
       is_producible: !!editForm.value.is_producible,
       track_batches: !!editForm.value.track_batches,
       track_expiry: !!editForm.value.track_expiry,
       storage_conditions: editForm.value.storage_conditions?.trim() || null,
+      max_stock_level: editForm.value.max_stock_level !== '' ? Number(editForm.value.max_stock_level) : null,
+      default_expiry_days: editForm.value.default_expiry_days !== '' ? Number(editForm.value.default_expiry_days) : null,
     }
-    if (editForm.value.category_id) payload.category_id = Number(editForm.value.category_id)
     if (editForm.value.min_stock_level !== '') payload.min_stock_level = Number(editForm.value.min_stock_level)
-    if (editForm.value.max_stock_level !== '') payload.max_stock_level = Number(editForm.value.max_stock_level)
     if (editForm.value.reorder_point !== '') payload.reorder_point = Number(editForm.value.reorder_point)
     if (editForm.value.cost_price !== '') payload.cost_price = Number(editForm.value.cost_price)
-    if (editForm.value.default_expiry_days !== '') payload.default_expiry_days = Number(editForm.value.default_expiry_days)
 
-    await stockApi.put(`/items/${itemId.value}/`, payload)
+    await stockApi.put(`/items/${targetItemId}/`, payload)
     notify(t('Saved'))
-    editOpen.value = false
-    await loadItem()
+    if (targetItemId === itemId.value) {
+      editOpen.value = false
+      await loadItem(targetItemId)
+    }
   }
   catch (e: any) {
-    notify(e?.response?.data?.message ?? t('Error'), 'error')
+    notify(e?.response?.data?.message ?? e?.message ?? t('Error'), 'error')
   }
   finally {
     saving.value = false
@@ -370,15 +487,18 @@ const stockOnHand = computed(() => Number(levelsSummary.value.total_quantity ?? 
 const canDeactivate = computed(() => stockOnHand.value <= 0)
 
 async function confirmDelete() {
-  if (!canManageStock.value)
+  if (deleting.value || !canManageStock.value)
     return
 
+  const targetItemId = itemId.value
   deleting.value = true
   try {
-    await stockApi.delete(`/items/${itemId.value}/`)
+    await stockApi.delete(`/items/${targetItemId}/`)
     notify(t('Deleted'))
-    deleteOpen.value = false
-    router.push({ name: 'stock-items' }).catch(() => router.push('/stock/items'))
+    if (targetItemId === itemId.value) {
+      deleteOpen.value = false
+      router.push({ name: 'stock-items' }).catch(() => router.push('/stock/items'))
+    }
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('item_drill_deactivate_blocked'), 'error')
@@ -389,32 +509,75 @@ async function confirmDelete() {
 }
 
 // ---- adjust / reserve / release modals share a similar form ----
-const adjForm = ref<{ location_id: string, quantity: string, movement_type: string, notes: string }>({
-  location_id: '', quantity: '', movement_type: 'ADJUSTMENT_PLUS', notes: '',
+const adjForm = ref<{ location_id: string, quantity: string, movement_type: string, reason: string, notes: string }>({
+  location_id: '', quantity: '', movement_type: 'ADJUSTMENT_PLUS', reason: '', notes: '',
 })
 const adjErrors = ref<Record<string, string>>({})
+const selectedAdjustmentLevel = computed(() => levels.value.find(level =>
+  String(level.location_id ?? level.location?.id) === String(adjForm.value.location_id),
+))
+const selectedAdjustmentAvailable = computed(() => availableStockQuantity(selectedAdjustmentLevel.value))
+const isOutgoingItemAdjustment = computed(() => OUTGOING_ADJUST_TYPES.has(adjForm.value.movement_type))
 
 function openAdjust() {
-  if (!canAdministerLevels.value || isBatchTracked.value)
+  if (!canAdjustStock.value || isBatchTracked.value)
     return
 
-  adjForm.value = { location_id: locationOptions.value[0]?.value ?? '', quantity: '', movement_type: 'ADJUSTMENT_PLUS', notes: '' }
+  adjForm.value = { location_id: locationOptions.value[0]?.value ?? '', quantity: '', movement_type: 'ADJUSTMENT_PLUS', reason: '', notes: '' }
   adjErrors.value = {}
   adjustOpen.value = true
 }
-function validateAdj(requireType = true): boolean {
+function validateAdj(mode: 'adjust' | 'reserve' | 'release'): boolean {
   const errs: Record<string, string> = {}
   if (!adjForm.value.location_id) errs.location_id = t('Required')
-  if (!adjForm.value.quantity || Number(adjForm.value.quantity) <= 0) errs.quantity = t('Required')
-  if (requireType && !adjForm.value.movement_type) errs.movement_type = t('Required')
+  if (mode === 'adjust') {
+    if (!normalizedAdjustmentQuantity(adjForm.value.quantity)) errs.quantity = t('stock_adjust_quantity_invalid')
+    if (!ADJUST_TYPES.includes(adjForm.value.movement_type)) errs.movement_type = t('Required')
+    if (!adjForm.value.reason.trim()) errs.reason = t('Required')
+    if (isOutgoingItemAdjustment.value && !canViewStockLevels.value)
+      errs.quantity = t('stock_adjust_level_view_required')
+    if (normalizedAdjustmentQuantity(adjForm.value.quantity)
+      && isOutgoingItemAdjustment.value
+      && canViewStockLevels.value
+      && Number(adjForm.value.quantity) > selectedAdjustmentAvailable.value) {
+      errs.quantity = t('stock_adjust_exceeds_available', {
+        quantity: formatQty(selectedAdjustmentAvailable.value),
+      })
+    }
+  }
+  else if (!Number.isFinite(Number(adjForm.value.quantity)) || Number(adjForm.value.quantity) <= 0) {
+    errs.quantity = t('Required')
+  }
   adjErrors.value = errs
   return Object.keys(errs).length === 0
 }
 async function submitAdjust() {
-  if (!canAdministerLevels.value || !validateAdj(true)) return
+  if (adjusting.value)
+    return
+  if (!canAdjustStock.value) {
+    notify(t('err_no_permission'), 'error')
+    return
+  }
+  if (!validateAdj('adjust')) return
+
+  const quantity = normalizedAdjustmentQuantity(adjForm.value.quantity)
+  if (!quantity)
+    return
+  const command = {
+    stock_item_id: Number(itemId.value),
+    location_id: Number(adjForm.value.location_id),
+    quantity,
+    movement_type: adjForm.value.movement_type,
+    reason: adjForm.value.reason.trim(),
+  }
+  const targetItemId = String(command.stock_item_id)
+  const outgoing = OUTGOING_ADJUST_TYPES.has(command.movement_type)
+
   adjusting.value = true
   try {
-    const itemResponse = await stockApi.get(`/items/${itemId.value}/`)
+    const itemResponse = await stockApi.get(`/items/${targetItemId}/`)
+    if (targetItemId !== itemId.value || !adjustOpen.value)
+      return
     const latestItemData = itemResponse.data?.data ?? itemResponse.data
     const latestItem = latestItemData?.item ?? latestItemData
     if (latestItem?.track_batches === true) {
@@ -425,16 +588,29 @@ async function submitAdjust() {
       return
     }
 
-    await stockApi.post('/adjust/', {
-      stock_item_id: Number(itemId.value),
-      location_id: Number(adjForm.value.location_id),
-      quantity: Number(adjForm.value.quantity),
-      movement_type: adjForm.value.movement_type,
-      notes: adjForm.value.notes?.trim() || undefined,
-    })
+    if (outgoing) {
+      if (!canViewStockLevels.value)
+        throw new Error(t('stock_adjust_level_view_required'))
+      let latestLevel: any
+      try {
+        latestLevel = await fetchStockLevelSnapshot(stockApi, targetItemId, command.location_id)
+      }
+      catch {
+        throw new Error(t('stock_adjust_availability_check_failed'))
+      }
+      if (targetItemId !== itemId.value || !adjustOpen.value)
+        return
+      const latestAvailable = availableStockQuantity(latestLevel)
+      if (Number(command.quantity) > latestAvailable)
+        throw new Error(t('stock_adjust_exceeds_available', { quantity: formatQty(latestAvailable) }))
+    }
+
+    await stockApi.post('/adjust/', command)
     notify(t('Saved'))
-    adjustOpen.value = false
-    await Promise.all([loadItem(), loadLevels(), loadHistory()])
+    if (targetItemId === itemId.value) {
+      adjustOpen.value = false
+      await Promise.all([loadItem(targetItemId), loadLevels(targetItemId), loadHistory(targetItemId)])
+    }
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -445,26 +621,30 @@ async function submitAdjust() {
 }
 
 function openReserve() {
-  if (!canAdministerLevels.value)
+  if (!canAdministerReservations.value)
     return
 
-  adjForm.value = { location_id: locationOptions.value[0]?.value ?? '', quantity: '', movement_type: 'RESERVATION', notes: '' }
+  adjForm.value = { location_id: locationOptions.value[0]?.value ?? '', quantity: '', movement_type: 'RESERVATION', reason: '', notes: '' }
   adjErrors.value = {}
   reserveOpen.value = true
 }
 async function submitReserve() {
-  if (!canAdministerLevels.value || !validateAdj(false)) return
+  if (reserving.value || !canAdministerReservations.value || !validateAdj('reserve')) return
+  const targetItemId = itemId.value
+  const command = {
+    stock_item_id: Number(targetItemId),
+    location_id: Number(adjForm.value.location_id),
+    quantity: Number(adjForm.value.quantity),
+    notes: adjForm.value.notes?.trim() || undefined,
+  }
   reserving.value = true
   try {
-    await stockApi.post('/reserve/', {
-      stock_item_id: Number(itemId.value),
-      location_id: Number(adjForm.value.location_id),
-      quantity: Number(adjForm.value.quantity),
-      notes: adjForm.value.notes?.trim() || undefined,
-    })
+    await stockApi.post('/reserve/', command)
     notify(t('Saved'))
-    reserveOpen.value = false
-    await Promise.all([loadLevels(), loadHistory()])
+    if (targetItemId === itemId.value) {
+      reserveOpen.value = false
+      await Promise.all([loadLevels(targetItemId), loadHistory(targetItemId)])
+    }
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -475,26 +655,30 @@ async function submitReserve() {
 }
 
 function openRelease() {
-  if (!canAdministerLevels.value)
+  if (!canAdministerReservations.value)
     return
 
-  adjForm.value = { location_id: locationOptions.value[0]?.value ?? '', quantity: '', movement_type: 'RESERVATION_RELEASE', notes: '' }
+  adjForm.value = { location_id: locationOptions.value[0]?.value ?? '', quantity: '', movement_type: 'RESERVATION_RELEASE', reason: '', notes: '' }
   adjErrors.value = {}
   releaseOpen.value = true
 }
 async function submitRelease() {
-  if (!canAdministerLevels.value || !validateAdj(false)) return
+  if (releasing.value || !canAdministerReservations.value || !validateAdj('release')) return
+  const targetItemId = itemId.value
+  const command = {
+    stock_item_id: Number(targetItemId),
+    location_id: Number(adjForm.value.location_id),
+    quantity: Number(adjForm.value.quantity),
+    notes: adjForm.value.notes?.trim() || undefined,
+  }
   releasing.value = true
   try {
-    await stockApi.post('/release-reservation/', {
-      stock_item_id: Number(itemId.value),
-      location_id: Number(adjForm.value.location_id),
-      quantity: Number(adjForm.value.quantity),
-      notes: adjForm.value.notes?.trim() || undefined,
-    })
+    await stockApi.post('/release-reservation/', command)
     notify(t('Saved'))
-    releaseOpen.value = false
-    await Promise.all([loadLevels(), loadHistory()])
+    if (targetItemId === itemId.value) {
+      releaseOpen.value = false
+      await Promise.all([loadLevels(targetItemId), loadHistory(targetItemId)])
+    }
   }
   catch (e: any) {
     notify(e?.response?.data?.message ?? t('Error'), 'error')
@@ -529,7 +713,7 @@ const levelsSkeletonRows = computed(() => 3)
           {{ t('item_drill_back') }}
         </Button>
         <Button
-          v-if="canAdministerLevels"
+          v-if="canAdjustStock"
           variant="secondary"
           icon="sliders"
           :disabled="!item || isBatchTracked"
@@ -539,7 +723,7 @@ const levelsSkeletonRows = computed(() => 3)
           {{ t('item_drill_adjust') }}
         </Button>
         <Button
-          v-if="canAdministerLevels"
+          v-if="canAdministerReservations"
           variant="secondary"
           icon="lock"
           :disabled="!item"
@@ -548,7 +732,7 @@ const levelsSkeletonRows = computed(() => 3)
           {{ t('item_drill_reserve') }}
         </Button>
         <Button
-          v-if="canAdministerLevels"
+          v-if="canAdministerReservations"
           variant="secondary"
           icon="play"
           :disabled="!item"
@@ -577,7 +761,7 @@ const levelsSkeletonRows = computed(() => 3)
     </PageHeader>
 
     <div
-      v-if="canAdministerLevels && isBatchTracked"
+      v-if="canAdjustStock && isBatchTracked"
       class="inline-alert"
       role="note"
     >
@@ -726,9 +910,26 @@ const levelsSkeletonRows = computed(() => 3)
         </div>
       </div>
 
-      <div v-if="loadingLevels && levels.length === 0" style="padding: var(--sp-4) var(--sp-5);">
+      <StateFill
+        v-if="!canViewStockLevels"
+        icon="lock"
+        :title="t('err_no_permission')"
+      />
+
+      <div v-else-if="loadingLevels && levels.length === 0" style="padding: var(--sp-4) var(--sp-5);">
         <div v-for="n in levelsSkeletonRows" :key="n" class="sk-box" style="height: 36px; margin-bottom: 8px; border-radius: 6px;" />
       </div>
+
+      <StateFill
+        v-else-if="levelsLoadError"
+        icon="alert"
+        :title="t('Failed to load stock levels')"
+        error
+      >
+        <Button variant="secondary" icon="refresh" @click="() => loadLevels()">
+          {{ t('Retry') }}
+        </Button>
+      </StateFill>
 
       <div v-else-if="levels.length === 0" style="padding: var(--sp-4);">
         <StateFill
@@ -767,13 +968,13 @@ const levelsSkeletonRows = computed(() => 3)
         <div class="history-title" style="font-weight: var(--fw-semibold); font-size: var(--fs-md); margin-right: auto;">
           {{ t('item_drill_history') }}
         </div>
-        <div class="filter-control">
+        <div v-if="canViewStockHistory" class="filter-control">
           <Select
             v-model="days"
             :options="periodOptions"
           />
         </div>
-        <div class="filter-control">
+        <div v-if="canViewStockHistory" class="filter-control">
           <Select
             :model-value="movementTypeFilter"
             :placeholder="t('Movement')"
@@ -781,7 +982,7 @@ const levelsSkeletonRows = computed(() => 3)
             @update:model-value="(v: string) => movementTypeFilter = v"
           />
         </div>
-        <div class="filter-control">
+        <div v-if="canViewStockHistory" class="filter-control">
           <Select
             :model-value="locationFilter"
             :placeholder="t('Location')"
@@ -789,7 +990,7 @@ const levelsSkeletonRows = computed(() => 3)
             @update:model-value="(v: string) => locationFilter = v"
           />
         </div>
-        <div class="filter-control filter-control--search">
+        <div v-if="canViewStockHistory" class="filter-control filter-control--search">
           <Input
             v-model="search"
             icon="search"
@@ -797,16 +998,34 @@ const levelsSkeletonRows = computed(() => 3)
           />
         </div>
         <Button
+          v-if="canViewStockHistory"
           variant="ghost"
           icon="refresh"
-          @click="loadHistory"
+          @click="() => loadHistory()"
         >
           {{ t('Refresh') }}
         </Button>
       </div>
 
       <!-- Active chips -->
-      <div v-if="hasTxFilters" class="toolbar" style="padding-top: 0;">
+      <StateFill
+        v-if="!canViewStockHistory"
+        icon="lock"
+        :title="t('err_no_permission')"
+      />
+
+      <StateFill
+        v-else-if="historyLoadError && !loadingTx"
+        icon="alert"
+        :title="t('Failed to load transactions')"
+        error
+      >
+        <Button variant="secondary" icon="refresh" @click="() => loadHistory()">
+          {{ t('Retry') }}
+        </Button>
+      </StateFill>
+
+      <div v-if="canViewStockHistory && hasTxFilters" class="toolbar" style="padding-top: 0;">
         <div class="chips">
           <span class="cell-muted" style="font-size: 13px; margin-right: 2px;">{{ t('Filters') }}:</span>
           <span v-if="movementTypeFilter" class="chip">
@@ -834,14 +1053,20 @@ const levelsSkeletonRows = computed(() => 3)
       </div>
 
       <!-- Tx summary mini-row -->
-      <div v-if="txSummary" class="toolbar" style="padding-top: 0;">
+      <div v-if="canViewStockHistory && txSummary" class="toolbar" style="padding-top: 0;">
         <div class="cell-muted" style="font-size: 13px;">
           {{ t('item_drill_summary') }}:
-          <span class="mono">{{ t('item_drill_filter_count', { shown: filteredTransactions.length, total: transactions.length }) }}</span>
+          <span class="mono">{{ t('item_drill_filter_count', { shown: filteredTransactions.length, total: txTotal }) }}</span>
         </div>
       </div>
 
+      <div v-if="canViewStockHistory && isHistoryTruncated" class="history-limit-note">
+        <DesignIcon name="info" :size="16" />
+        <span>{{ t('item_drill_history_truncated', { loaded: transactions.length, total: txTotal }) }}</span>
+      </div>
+
       <DataTable
+        v-if="canViewStockHistory && !historyLoadError"
         :columns="txColumns"
         :rows="filteredTransactions"
         row-key="id"
@@ -866,16 +1091,24 @@ const levelsSkeletonRows = computed(() => 3)
           <span>{{ row.location_name ?? '—' }}</span>
         </template>
         <template #cell.quantity="{ row }">
-          <span class="mono cell-strong">
-            {{ formatQty(row.quantity) }}
-            <span v-if="unitShort" class="cell-muted" style="margin-left: 4px;">{{ unitShort }}</span>
-          </span>
+          <div class="transaction-quantity mono">
+            <span class="cell-strong">
+              {{ formatQty(row.quantity) }}<span v-if="transactionUnit(row)">&nbsp;{{ transactionUnit(row) }}</span>
+            </span>
+            <span v-if="showsTransactionBaseQuantity(row)" class="cell-muted">
+              &asymp;&nbsp;{{ formatQty(row.base_quantity) }}&nbsp;{{ unitShort || t('stock_adjust_base_unit') }}
+            </span>
+          </div>
         </template>
         <template #cell.quantity_before="{ row }">
-          <span class="mono cell-muted">{{ formatQty(row.quantity_before) }}</span>
+          <span class="mono cell-muted">
+            {{ formatQty(row.quantity_before) }}<span v-if="unitShort">&nbsp;{{ unitShort }}</span>
+          </span>
         </template>
         <template #cell.quantity_after="{ row }">
-          <span class="mono">{{ formatQty(row.quantity_after) }}</span>
+          <span class="mono">
+            {{ formatQty(row.quantity_after) }}<span v-if="unitShort">&nbsp;{{ unitShort }}</span>
+          </span>
         </template>
         <template #cell.unit_cost="{ row }">
           <span class="mono">{{ formatMoney(row.unit_cost) }}</span>
@@ -927,6 +1160,7 @@ const levelsSkeletonRows = computed(() => 3)
             v-model="editForm.base_unit_id"
             :options="unitOptions"
             :placeholder="t('item_drill_base_unit')"
+            disabled
           />
         </Field>
         <Field :label="t('item_drill_min_stock')">
@@ -1010,7 +1244,7 @@ const levelsSkeletonRows = computed(() => 3)
 
     <!-- Adjust stock modal -->
     <Modal
-      v-if="canAdministerLevels"
+      v-if="canAdjustStock"
       :open="adjustOpen"
       :title="t('item_drill_adjust')"
       :width="520"
@@ -1023,6 +1257,7 @@ const levelsSkeletonRows = computed(() => 3)
             v-model="adjForm.location_id"
             :options="locationOptions"
             :placeholder="t('Location')"
+            :disabled="adjusting"
           />
         </Field>
         <Field :label="t('Movement')" :error="adjErrors.movement_type">
@@ -1030,18 +1265,38 @@ const levelsSkeletonRows = computed(() => 3)
             v-model="adjForm.movement_type"
             :options="adjustTypeOptions"
             :placeholder="t('Movement')"
+            :disabled="adjusting"
           />
         </Field>
         <Field :label="t('Qty')" :error="adjErrors.quantity">
-          <Input v-model="adjForm.quantity" type="number" step="any" />
+          <Input
+            v-model="adjForm.quantity"
+            type="number"
+            step="0.0001"
+            min="0.0001"
+            :max="MAX_ADJUSTMENT_QUANTITY"
+            :error="!!adjErrors.quantity"
+            :disabled="adjusting"
+          />
+          <div v-if="isOutgoingItemAdjustment" class="form-hint">
+            {{ canViewStockLevels
+              ? t('stock_adjust_available_hint', { quantity: formatQty(selectedAdjustmentAvailable) })
+              : t('stock_adjust_level_view_required') }}
+          </div>
         </Field>
-        <Field :label="t('Notes')" class="span-2">
-          <Input v-model="adjForm.notes" />
+        <Field :label="t('Reason')" :error="adjErrors.reason" class="span-2">
+          <Input
+            v-model="adjForm.reason"
+            :placeholder="t('Reason')"
+            :error="!!adjErrors.reason"
+            maxlength="1000"
+            :disabled="adjusting"
+          />
         </Field>
       </div>
 
       <template #footer>
-        <Button variant="primary" :loading="adjusting" @click="submitAdjust">
+        <Button variant="primary" :loading="adjusting" :disabled="adjusting" @click="submitAdjust">
           {{ t('Save') }}
         </Button>
       </template>
@@ -1049,7 +1304,7 @@ const levelsSkeletonRows = computed(() => 3)
 
     <!-- Reserve stock modal -->
     <Modal
-      v-if="canAdministerLevels"
+      v-if="canAdministerReservations"
       :open="reserveOpen"
       :title="t('item_drill_reserve')"
       :width="520"
@@ -1081,7 +1336,7 @@ const levelsSkeletonRows = computed(() => 3)
 
     <!-- Release reservation modal -->
     <Modal
-      v-if="canAdministerLevels"
+      v-if="canAdministerReservations"
       :open="releaseOpen"
       :title="t('item_drill_release')"
       :width="520"
@@ -1132,6 +1387,12 @@ const levelsSkeletonRows = computed(() => 3)
   min-width: 0;
 }
 
+.form-hint {
+  margin-block-start: 6px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
 .filter-control {
   flex: 1 1 180px;
   min-width: 160px;
@@ -1146,6 +1407,36 @@ const levelsSkeletonRows = computed(() => 3)
 
 .history-toolbar {
   gap: var(--sp-2);
+}
+
+.history-limit-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 var(--sp-5) var(--sp-3);
+  padding: 10px 12px;
+  border: 1px solid rgb(var(--v-theme-warning-strong) / 24%);
+  border-radius: var(--radius-md);
+  background: rgb(var(--v-theme-warning-strong) / 8%);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+
+.history-limit-note .ic {
+  flex: 0 0 auto;
+  color: rgb(var(--v-theme-warning-strong));
+}
+
+.transaction-quantity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.transaction-quantity .cell-muted {
+  font-size: 11px;
 }
 
 @media (max-width: 1024px) {

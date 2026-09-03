@@ -115,6 +115,8 @@ const IDEMPOTENT_ROUTES: IdempotentRoute[] = [
   { method: 'POST', path: /^\/suppliers\/\d+\/(?:pay|payments)\/?$/ },
   { method: 'POST', path: /^\/suppliers\/\d+\/payments\/\d+\/reverse\/?$/ },
   { method: 'POST', path: /^\/receiving\/[^/]+\/complete\/?$/ },
+  { method: 'POST', path: /^\/adjust\/?$/ },
+  { method: 'POST', path: /^\/adjust\/[^/]+\/reverse\/?$/ },
   { method: 'POST', path: /^\/loyalty\/accounts\/[^/]+\/redeem\/?$/ },
   { method: 'POST', path: /^\/attendance\/manual-entry\/?$/ },
   { method: 'POST', path: /^\/attendance\/[^/]+\/(?:adjustment-requests|excuses)\/?$/ },

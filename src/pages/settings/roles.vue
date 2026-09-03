@@ -39,6 +39,7 @@ const FALLBACK_GROUPS = [
   'Stock',
   'Warehouse',
   'Warehouse approvals',
+  'Money control',
   'Operational audit',
   'Operational audit approvals',
   'Expense requests',
@@ -48,7 +49,8 @@ const FALLBACK_GROUPS = [
   'Administration',
 ]
 
-// Frontend keeps a copy of defaults so we can offer a "reset" PATCH per spec.
+// The roles API currently exposes PATCH only, so the frontend must carry the
+// intended reset template. Backend creation defaults must be kept in parity too.
 const DEFAULT_ROLE_PERMISSIONS: Record<RoleName, string[]> = {
   ADMIN: ['*'],
   MANAGER: [
@@ -56,13 +58,21 @@ const DEFAULT_ROLE_PERMISSIONS: Record<RoleName, string[]> = {
     'discount.apply',
     'product.create', 'product.update', 'product.delete',
     'category.create', 'category.update', 'category.delete',
-    'stock.view', 'stock.manage',
+    'stock.view', 'stock.manage', 'stock.catalog.view',
     'hr.view',
     'reports.view', 'inkassa.manage',
+    'money.control.view', 'money.control.reconcile',
+    'stock.inventory_control.view', 'stock.supplier.view',
+    'stock.supplier.balance.view', 'stock.supplier.pay',
+    'stock.purchase.view', 'expense.category.view',
+    'expense.category.manage', 'expense.request.create',
+    'expense.request.view_own', 'expense.request.view_all',
+    'expense.request.approve', 'expense.request.pay',
+    'treasury.account.view', 'treasury.transfer',
   ],
   WAREHOUSE: [
     'stock.catalog.view', 'stock.level.view', 'stock.batch.view',
-    'stock.supplier.view', 'stock.purchase.view',
+    'stock.supplier.view', 'stock.supplier.balance.view', 'stock.purchase.view',
     'stock.receiving.create', 'stock.receiving.update_draft', 'stock.receiving.complete',
     'stock.transfer.view', 'stock.transfer.create',
     'stock.count.view', 'stock.count.create', 'stock.count.record',
@@ -80,6 +90,7 @@ const GROUP_TONE: Record<string, 'primary' | 'info' | 'success' | 'warning' | 'e
   Stock: 'success',
   Warehouse: 'success',
   'Warehouse approvals': 'warning',
+  'Money control': 'primary',
   'Operational audit': 'info',
   'Operational audit approvals': 'warning',
   'Expense requests': 'info',

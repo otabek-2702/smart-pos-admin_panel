@@ -17,6 +17,7 @@ const warehousePermissions = [
   'stock.level.view',
   'stock.batch.view',
   'stock.supplier.view',
+  'stock.supplier.balance.view',
   'stock.purchase.view',
   'stock.receiving.create',
   'stock.receiving.update_draft',
@@ -718,7 +719,7 @@ test.describe('warehouse stock safety boundaries', () => {
   })
 
   test('renders supplier ledger values from the deployed *_uzs fields', async ({ page }) => {
-    await seedSession(page, ['stock.supplier.view'])
+    await seedSession(page, ['stock.supplier.view', 'stock.supplier.balance.view'])
 
     await page.route('**/api/**', async route => {
       const request = route.request()
@@ -787,7 +788,7 @@ test.describe('warehouse stock safety boundaries', () => {
   })
 
   test('renders deployed balances in the supplier list ledger modal', async ({ page }) => {
-    await seedSession(page, ['stock.supplier.view'])
+    await seedSession(page, ['stock.supplier.view', 'stock.supplier.balance.view'])
 
     await page.route('**/api/**', async route => {
       const request = route.request()
@@ -1569,7 +1570,7 @@ test.describe('warehouse stock safety boundaries', () => {
 
     await page.goto('/stock/items/901')
 
-    await expect(page.getByText(/Direct adjustments are unavailable for batch-tracked items/)).toBeVisible()
+    await expect(page.getByText(/Direct adjustments are temporarily unavailable for batch-tracked items/)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Adjust stock' })).toBeDisabled()
     expect(adjustmentPosts).toHaveLength(0)
   })

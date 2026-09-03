@@ -73,6 +73,15 @@ export default [
     subject: 'all',
   },
   {
+    title: 'Adjustments',
+    icon: { icon: 'bx-slider-alt' },
+    to: 'stock-adjustments',
+    action: 'manage',
+    subject: 'all',
+    allPermissions: ['stock.adjustment.approve', 'stock.catalog.view'],
+    anyPermission: ['stock.level.view', 'stock.inventory_control.view'],
+  },
+  {
     title: 'Transactions',
     icon: { icon: 'bx-history' },
     to: 'stock-transactions',

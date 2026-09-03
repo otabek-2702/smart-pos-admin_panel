@@ -118,7 +118,7 @@ function recalcMenu() {
     left: `${left}px`,
     width: `${width}px`,
     [wantUp ? 'bottom' : 'top']: wantUp ? `${vh - r.top + 4}px` : `${r.bottom + 4}px`,
-    zIndex: '1000',
+    zIndex: '1100',
   }
 }
 

@@ -102,8 +102,11 @@ router.beforeEach(to => {
     const required = Array.isArray(to.meta.anyPermission)
       ? to.meta.anyPermission.map(String)
       : []
+    const requiredAll = Array.isArray(to.meta.allPermissions)
+      ? to.meta.allPermissions.map(String)
+      : []
 
-    if (required.length && !access.hasAny(required))
+    if ((required.length && !access.hasAny(required)) || (requiredAll.length && !access.hasAll(requiredAll)))
       return { name: 'not-authorized' }
 
     // Warehouse routes intentionally bypass the legacy manage/all CASL meta;

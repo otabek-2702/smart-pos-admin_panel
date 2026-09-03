@@ -21,6 +21,7 @@ export const EXPENSE_CATEGORY_PERMISSIONS = [
 interface WarehouseRouteRule {
   prefix: string
   anyPermission?: string[]
+  allPermissions?: string[]
 }
 
 const WAREHOUSE_ROUTE_RULES: WarehouseRouteRule[] = [
@@ -33,6 +34,11 @@ const WAREHOUSE_ROUTE_RULES: WarehouseRouteRule[] = [
   { prefix: '/stock/receiving', anyPermission: ['stock.purchase.view'] },
   { prefix: '/stock/counts', anyPermission: ['stock.count.view'] },
   { prefix: '/stock/adjustment-requests', anyPermission: ['stock.adjustment.request'] },
+  {
+    prefix: '/stock/adjustments',
+    allPermissions: ['stock.adjustment.approve', 'stock.catalog.view'],
+    anyPermission: ['stock.level.view', 'stock.inventory_control.view'],
+  },
   { prefix: '/stock/transfers', anyPermission: ['stock.transfer.view'] },
   { prefix: '/audit', anyPermission: AUDIT_PERMISSIONS },
   { prefix: '/hr-expenses', anyPermission: EXPENSE_REQUEST_PERMISSIONS },
@@ -46,8 +52,8 @@ export function warehousePathAllowed(path: string, access: ReturnTypeReadUserAcc
   const rule = WAREHOUSE_ROUTE_RULES.find(candidate => path === candidate.prefix || path.startsWith(`${candidate.prefix}/`))
   if (!rule)
     return false
-  if (!rule.anyPermission?.length)
-    return true
+  const hasAny = !rule.anyPermission?.length || access.hasAny(rule.anyPermission)
+  const hasAll = !rule.allPermissions?.length || access.hasAll(rule.allPermissions)
 
-  return access.hasAny(rule.anyPermission)
+  return hasAny && hasAll
 }

@@ -1,3 +1,5 @@
+import { EXPENSE_CATEGORY_PERMISSIONS, EXPENSE_REQUEST_PERMISSIONS } from '../access'
+
 export default [
   {
     heading: 'HR',
@@ -36,6 +38,7 @@ export default [
     to: 'hr-expenses',
     action: 'manage',
     subject: 'all',
+    anyPermission: EXPENSE_REQUEST_PERMISSIONS,
   },
   {
     title: 'Attendance',
@@ -85,6 +88,7 @@ export default [
     to: 'hr-expense-categories',
     action: 'manage',
     subject: 'all',
+    anyPermission: EXPENSE_CATEGORY_PERMISSIONS,
   },
   {
     title: 'Goals',

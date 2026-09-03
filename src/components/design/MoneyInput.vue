@@ -12,6 +12,7 @@ interface Props {
   disabled?: boolean
   allowFraction?: boolean
   maxFractionDigits?: number
+  nullable?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -19,7 +20,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: number): void
+  (e: 'update:modelValue', value: number | null): void
 }>()
 
 defineOptions({ inheritAttrs: false })
@@ -52,7 +53,10 @@ const klass = computed(() =>
 )
 
 function setDisplay(value: number | null | undefined) {
-  displayValue.value = Number(value) > 0 ? formatMoneyInput(String(value), props) : ''
+  const hasValue = value !== null && value !== undefined
+  const shouldDisplay = hasValue && (props.nullable || Number(value) > 0)
+
+  displayValue.value = shouldDisplay ? formatMoneyInput(String(value), props) : ''
 }
 
 watch(() => props.modelValue, value => {
@@ -64,7 +68,8 @@ function onInput(event: Event) {
   const input = event.target as HTMLInputElement
   const caretDigits = input.value.slice(0, input.selectionStart ?? input.value.length).replace(/\D/g, '').length
   const formatted = formatMoneyInput(input.value, props)
-  const amount = parseMoneyInput(formatted, props) ?? 0
+  const parsedAmount = parseMoneyInput(formatted, props)
+  const amount = props.nullable ? parsedAmount : parsedAmount ?? 0
 
   displayValue.value = formatted
   emit('update:modelValue', amount)

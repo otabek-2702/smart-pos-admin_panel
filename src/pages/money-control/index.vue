@@ -75,6 +75,8 @@ const overviewLoading = ref(false)
 const inventoryLoading = ref(false)
 const locationsLoading = ref(false)
 const locationsError = ref(false)
+let overviewRequestId = 0
+let inventoryRequestId = 0
 
 const rangeInvalid = computed(() => Boolean(dateFrom.value && dateTo.value && dateFrom.value > dateTo.value))
 const isRefreshing = computed(() => overviewLoading.value || inventoryLoading.value)
@@ -140,14 +142,13 @@ const expenseRows = computed<ExpenseTableRow[]>(() => {
 })
 
 const allIssues = computed<MoneyControlIssue[]>(() => {
-  if (!overview.value)
-    return []
-
   const unique = new Map<string, MoneyControlIssue>()
 
   const issues = [
-    ...overview.value.completeness.issues,
-    ...overview.value.reconciliation.issues,
+    ...(overview.value?.completeness.issues ?? []),
+    ...(overview.value?.reconciliation.issues ?? []),
+    ...(inventory.value?.completeness.issues ?? []),
+    ...(inventory.value?.issues ?? []),
   ]
 
   issues.forEach((issue, index) => {
@@ -188,7 +189,7 @@ const rawMaterialColumns = computed<DataTableColumn<InventoryTableRow>[]>(() => 
 
 const supplierColumns = computed<DataTableColumn<SupplierTableRow>[]>(() => [
   { key: 'supplierName', label: t('moneyControl.colSupplier'), sortable: true },
-  { key: 'payableUzs', label: t('moneyControl.colSupplierBalance'), align: 'right', sortable: true, sortValue: row => numeric(supplierPayable(row)) },
+  { key: 'balanceUzs', label: t('moneyControl.colSupplierBalance'), align: 'right', sortable: true, sortValue: row => numeric(row.balanceUzs) },
 ])
 
 const expenseColumns = computed<DataTableColumn<ExpenseTableRow>[]>(() => [
@@ -307,11 +308,9 @@ function displayPercent(value: number | null): string {
   return `${percentFormatter.value.format(value)}%`
 }
 
-function supplierPayable(row: SupplierBalanceSummaryRow): DecimalValue | null {
-  return row.payableUzs ?? row.balanceUzs
-}
-
 function materialStatus(row: RawInventoryRow): { text: string; tone: BadgeTone } {
+  if (row.availableQuantity === null)
+    return { text: t('moneyControl.statusUnknown'), tone: 'neutral' }
   if (row.isOutOfStock === true || numeric(row.availableQuantity) <= 0)
     return { text: t('moneyControl.statusOut'), tone: 'error' }
   if (row.isLowStock === true)
@@ -324,7 +323,9 @@ function statusLabel(status: string | null | undefined): string {
   switch (String(status ?? '').toUpperCase()) {
     case 'COMPLETE': return t('moneyControl.statusComplete')
     case 'BALANCED': return t('moneyControl.statusBalanced')
+    case 'PARTIAL': return t('moneyControl.statusPartial')
     case 'WARNING': return t('moneyControl.statusWarning')
+    case 'UNSAFE': return t('moneyControl.statusUnsafe')
     case 'INCOMPLETE': return t('moneyControl.statusIncomplete')
     default: return t('moneyControl.statusUnknown')
   }
@@ -334,7 +335,9 @@ function statusTone(status: string | null | undefined): BadgeTone {
   switch (String(status ?? '').toUpperCase()) {
     case 'COMPLETE':
     case 'BALANCED': return 'success'
+    case 'PARTIAL':
     case 'WARNING': return 'warning'
+    case 'UNSAFE':
     case 'INCOMPLETE': return 'error'
     default: return 'neutral'
   }
@@ -373,44 +376,64 @@ function stateBody(state: ViewState): string {
 }
 
 async function loadOverview() {
-  if (rangeInvalid.value)
+  if (rangeInvalid.value) {
+    overviewRequestId += 1
+    overviewLoading.value = false
+
     return
+  }
+
+  const requestId = ++overviewRequestId
 
   overviewLoading.value = true
   overview.value = null
   try {
-    overview.value = await fetchMoneyControlOverview({
+    const result = await fetchMoneyControlOverview({
       date_from: dateFrom.value || undefined,
       date_to: dateTo.value || undefined,
       location_id: locationId.value || undefined,
     })
-    overviewState.value = 'ready'
+
+    if (requestId === overviewRequestId) {
+      overview.value = result
+      overviewState.value = 'ready'
+    }
   }
   catch (error: unknown) {
-    overviewState.value = classifyMoneyControlApiError(error).kind
+    if (requestId === overviewRequestId)
+      overviewState.value = classifyMoneyControlApiError(error).kind
   }
   finally {
-    overviewLoading.value = false
+    if (requestId === overviewRequestId)
+      overviewLoading.value = false
   }
 }
 
 async function loadInventory() {
+  const requestId = ++inventoryRequestId
+
   inventoryLoading.value = true
   inventory.value = null
   try {
-    inventory.value = await fetchRawInventory({
+    const result = await fetchRawInventory({
       location_id: locationId.value || undefined,
       search: search.value.trim() || undefined,
       page: inventoryPage.value,
       per_page: inventoryPerPage.value,
     })
-    inventoryState.value = 'ready'
+
+    if (requestId === inventoryRequestId) {
+      inventory.value = result
+      inventoryState.value = 'ready'
+    }
   }
   catch (error: unknown) {
-    inventoryState.value = classifyMoneyControlApiError(error).kind
+    if (requestId === inventoryRequestId)
+      inventoryState.value = classifyMoneyControlApiError(error).kind
   }
   finally {
-    inventoryLoading.value = false
+    if (requestId === inventoryRequestId)
+      inventoryLoading.value = false
   }
 }
 
@@ -430,8 +453,18 @@ async function loadLocations() {
 }
 
 async function refreshAll() {
-  if (rangeInvalid.value)
+  if (rangeInvalid.value) {
+    overviewRequestId += 1
+    inventoryRequestId += 1
+    overviewLoading.value = false
+    inventoryLoading.value = false
+    overview.value = null
+    inventory.value = null
+    overviewState.value = 'idle'
+    inventoryState.value = 'idle'
+
     return
+  }
 
   inventoryPage.value = 1
   await Promise.all([loadOverview(), loadInventory()])
@@ -516,7 +549,19 @@ onMounted(() => {
     </Card>
 
     <Card
-      v-if="integrationUnavailable"
+      v-if="rangeInvalid"
+      class-name="endpoint-state-card"
+    >
+      <StateFill
+        icon="calendar"
+        :title="t('moneyControl.invalidRange')"
+        :sub="t('moneyControl.invalidRangeBody')"
+        error
+      />
+    </Card>
+
+    <Card
+      v-else-if="integrationUnavailable"
       class-name="endpoint-state-card"
     >
       <StateFill
@@ -648,7 +693,7 @@ onMounted(() => {
     </Card>
 
     <div
-      v-if="overview"
+      v-if="overview || inventory"
       class="money-control-detail-grid"
     >
       <Card class-name="detail-card reconciliation-card">
@@ -664,7 +709,7 @@ onMounted(() => {
         </div>
         <div class="card__body reconciliation-body">
           <div class="reconciliation-statuses">
-            <div>
+            <div v-if="overview">
               <span>{{ t('moneyControl.dataCompleteness') }}</span>
               <Badge
                 :tone="statusTone(overview.completeness.status)"
@@ -673,13 +718,22 @@ onMounted(() => {
                 {{ statusLabel(overview.completeness.status) }}
               </Badge>
             </div>
-            <div>
+            <div v-if="overview">
               <span>{{ t('moneyControl.reconciliationTitle') }}</span>
               <Badge
                 :tone="statusTone(overview.reconciliation.status)"
                 dot
               >
                 {{ statusLabel(overview.reconciliation.status) }}
+              </Badge>
+            </div>
+            <div v-if="inventory">
+              <span>{{ t('moneyControl.inventoryCompleteness') }}</span>
+              <Badge
+                :tone="statusTone(inventory.completeness.status)"
+                dot
+              >
+                {{ statusLabel(inventory.completeness.status) }}
               </Badge>
             </div>
           </div>
@@ -745,7 +799,7 @@ onMounted(() => {
     </div>
 
     <Card
-      v-if="!integrationUnavailable"
+      v-if="!rangeInvalid && !integrationUnavailable"
       class-name="raw-materials-card"
     >
       <div class="card__head between raw-materials-head">
@@ -909,8 +963,8 @@ onMounted(() => {
             </RouterLink>
             <strong v-else>{{ row.supplierName }}</strong>
           </template>
-          <template #cell.payableUzs="{ row }">
-            <strong class="num-tabular">{{ displayMoney(supplierPayable(row)) }}</strong>
+          <template #cell.balanceUzs="{ row }">
+            <strong class="num-tabular">{{ displayMoney(row.balanceUzs) }}</strong>
           </template>
         </DataTable>
       </Card>

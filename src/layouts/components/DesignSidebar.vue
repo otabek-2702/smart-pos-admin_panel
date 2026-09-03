@@ -2,6 +2,11 @@
 import { storeToRefs } from 'pinia'
 import { useMediaQuery } from '@vueuse/core'
 import DesignIcon from '@/components/design/DesignIcon.vue'
+import {
+  AUDIT_PERMISSIONS,
+  EXPENSE_CATEGORY_PERMISSIONS,
+  EXPENSE_REQUEST_PERMISSIONS,
+} from '@/navigation/access'
 import { routeLabelForPath } from '@/navigation/routeLabels'
 import { useNavCountsStore } from '@/stores/navCounts'
 import { useUserAccess } from '@/composables/useUserAccess'
@@ -42,13 +47,6 @@ const WAREHOUSE_WORKSPACE_PERMISSIONS = [
   'stock.count.create',
   'stock.count.record',
   'stock.adjustment.request',
-]
-
-const OPERATIONAL_AUDIT_PERMISSIONS = [
-  'attendance.view',
-  'discipline.rule.view',
-  'discipline.case.view',
-  'prep.audit.view',
 ]
 
 const { t } = useI18n({ useScope: 'global' })
@@ -98,19 +96,20 @@ const NAV: NavEntry[] = [
   { type: 'item', id: 'discounts', label: 'Discounts', icon: 'tag', to: '/discounts' },
   { type: 'item', id: 'cash', label: 'Cashbox Expense Categories', icon: 'register', to: '/cashbox/categories' },
   { type: 'item', id: 'money-control', label: 'Money Control', icon: 'wallet', to: '/money-control', anyPermission: ['money.control.view'] },
-  { type: 'item', id: 'treasury', label: 'Treasury', icon: 'store', to: '/treasury' },
+  { type: 'item', id: 'treasury', label: 'Treasury', icon: 'store', to: '/treasury', anyPermission: ['treasury.account.view'] },
   { type: 'item', id: 'loyalty', label: 'Loyalty', icon: 'gift', to: '/loyalty' },
   { type: 'item', id: 'sessions', label: 'Sessions', icon: 'lock', to: '/sessions' },
   { type: 'item', id: 'warehouse', label: 'Warehouse operations', icon: 'package', to: '/warehouse', anyPermission: WAREHOUSE_WORKSPACE_PERMISSIONS },
   { type: 'section', label: 'HR' },
-  { type: 'item', id: 'operational-audit', label: 'Operational Audit', icon: 'flag', to: '/audit', anyPermission: OPERATIONAL_AUDIT_PERMISSIONS },
+  { type: 'item', id: 'operational-audit', label: 'Operational Audit', icon: 'flag', to: '/audit', anyPermission: AUDIT_PERMISSIONS },
   { type: 'item', id: 'employees', label: 'Employees', icon: 'employee', to: '/hr-employees' },
   { type: 'item', id: 'departments', label: 'Departments', icon: 'dept', to: '/hr-departments' },
   { type: 'item', id: 'salaries', label: 'Salaries', icon: 'coins', to: '/hr-salaries' },
   { type: 'item', id: 'hr-cash', label: 'HR Cash', icon: 'wallet', to: '/hr-cash' },
   { type: 'item', id: 'hr-documents', label: 'HR Documents', icon: 'receipt', to: '/hr-documents' },
   { type: 'item', id: 'hr-events', label: 'Employment Events', icon: 'flag', to: '/hr-events' },
-  { type: 'item', id: 'hr-expense-categories', label: 'Expense Categories', icon: 'grid', to: '/hr-expense-categories' },
+  { type: 'item', id: 'hr-expenses', label: 'Expenses', icon: 'receipt', to: '/hr-expenses', anyPermission: EXPENSE_REQUEST_PERMISSIONS },
+  { type: 'item', id: 'hr-expense-categories', label: 'Expense Categories', icon: 'grid', to: '/hr-expense-categories', anyPermission: EXPENSE_CATEGORY_PERMISSIONS },
   { type: 'item', id: 'hr-goals', label: 'Goals', icon: 'target', to: '/hr-goals' },
   { type: 'item', id: 'hr-leave-balances', label: 'Leave Balances', icon: 'clock', to: '/hr-leave-balances' },
   { type: 'item', id: 'hr-leave-types', label: 'Leave Types', icon: 'clock', to: '/hr-leave-types' },
@@ -143,7 +142,9 @@ const WAREHOUSE_NAV: NavEntry[] = [
   { type: 'item', id: 'stock-adjustment-requests', label: 'Stock adjustment requests', icon: 'sliders', to: '/stock/adjustment-requests', anyPermission: ['stock.adjustment.request'] },
   { type: 'item', id: 'stock-transfers', label: 'Transfers', icon: 'share', to: '/stock/transfers', anyPermission: ['stock.transfer.view'] },
   { type: 'section', label: 'HR' },
-  { type: 'item', id: 'operational-audit', label: 'Operational Audit', icon: 'flag', to: '/audit', anyPermission: ['attendance.view', 'discipline.rule.view', 'discipline.case.view', 'prep.audit.view'] },
+  { type: 'item', id: 'operational-audit', label: 'Operational Audit', icon: 'flag', to: '/audit', anyPermission: AUDIT_PERMISSIONS },
+  { type: 'item', id: 'hr-expenses', label: 'Expenses', icon: 'receipt', to: '/hr-expenses', anyPermission: EXPENSE_REQUEST_PERMISSIONS },
+  { type: 'item', id: 'hr-expense-categories', label: 'Expense Categories', icon: 'grid', to: '/hr-expense-categories', anyPermission: EXPENSE_CATEGORY_PERMISSIONS },
 ]
 
 const visibleNav = computed<NavEntry[]>(() => {

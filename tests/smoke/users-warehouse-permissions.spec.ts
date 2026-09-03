@@ -1,4 +1,11 @@
 import { type Page, expect, test } from '@playwright/test'
+import {
+  EXPENSE_CATEGORY_PERMISSIONS,
+  EXPENSE_REQUEST_PERMISSIONS,
+  warehousePathAllowed,
+} from '@/navigation/access'
+import hrNav from '@/navigation/vertical/hr'
+import managementNav from '@/navigation/vertical/management'
 
 interface TestUser {
   id: number
@@ -27,6 +34,7 @@ const optionalCatalog = [
   { key: 'discipline.case.view', label: 'View disciplinary cases', group: 'Operational audit' },
   { key: 'prep.audit.view', label: 'View preparation audits', group: 'Operational audit' },
   { key: 'prep.audit.review', label: 'Review preparation audits', group: 'Operational audit' },
+  { key: 'expense.category.view', label: 'View expense categories', group: 'Expense requests' },
   { key: 'expense.request.create', label: 'Create expense requests', group: 'Expense requests' },
   { key: 'expense.request.view_own', label: 'View own expense requests', group: 'Expense requests' },
 
@@ -74,6 +82,38 @@ async function openUserEditor(page: Page, fullName: string) {
 }
 
 test.describe('Warehouse per-user permissions', () => {
+  test('legacy command-palette routes carry the same permission gates', () => {
+    const managementItems = managementNav as Array<{ to?: string; anyPermission?: string[] }>
+    const hrItems = hrNav as Array<{ to?: string; anyPermission?: string[] }>
+
+    expect(managementItems.find(item => item.to === 'treasury')?.anyPermission)
+      .toEqual(['treasury.account.view'])
+
+    expect(managementItems.find(item => item.to === 'hr-expenses')?.anyPermission)
+      .toEqual(EXPENSE_REQUEST_PERMISSIONS)
+    expect(hrItems.find(item => item.to === 'hr-expenses')?.anyPermission)
+      .toEqual(EXPENSE_REQUEST_PERMISSIONS)
+    expect(hrItems.find(item => item.to === 'hr-expense-categories')?.anyPermission)
+      .toEqual(EXPENSE_CATEGORY_PERMISSIONS)
+  })
+
+  test('optional expense permissions unlock only the matching Warehouse routes', () => {
+    const permissions = [
+      'expense.category.view',
+      'expense.request.create',
+      'expense.request.view_own',
+    ]
+
+    const access = {
+      hasAny: (required: string[]) => required.some(permission => permissions.includes(permission)),
+    } as Parameters<typeof warehousePathAllowed>[1]
+
+    expect(warehousePathAllowed('/hr-expenses', access)).toBe(true)
+    expect(warehousePathAllowed('/hr-expense-categories', access)).toBe(true)
+    expect(warehousePathAllowed('/treasury', access)).toBe(false)
+    expect(warehousePathAllowed('/money-control', access)).toBe(false)
+  })
+
   test('ADMIN edits only the safe audit bundle while preserving exact existing permissions', async ({ page }) => {
     await seedSession(page, 'ADMIN')
     let user = warehouseUser()
@@ -119,10 +159,12 @@ test.describe('Warehouse per-user permissions', () => {
     await expect(dialog.getByText('Additional warehouse responsibilities')).toBeVisible()
     await expect(dialog.getByRole('combobox', { name: 'Role' })).toHaveAttribute('aria-disabled', 'true')
     await expect(dialog.getByRole('checkbox', { name: 'Attendance records' })).not.toBeChecked()
+    await expect(dialog.getByRole('checkbox', { name: 'Expense requests' })).not.toBeChecked()
     await expect(dialog.getByRole('checkbox', { name: 'Pay expense requests' })).toHaveCount(0)
     await expect(dialog.getByRole('checkbox', { name: 'Manage users' })).toHaveCount(0)
 
     await dialog.getByRole('checkbox', { name: 'Attendance records' }).click()
+    await dialog.getByRole('checkbox', { name: 'Expense requests' }).click()
     await dialog.getByRole('button', { name: 'Save' }).click()
 
     await expect.poll(() => patchedBody).not.toBeNull()
@@ -134,6 +176,9 @@ test.describe('Warehouse per-user permissions', () => {
       'attendance.view',
       'attendance.record',
       'attendance.adjust.request',
+      'expense.category.view',
+      'expense.request.create',
+      'expense.request.view_own',
     ])
     expect(permissions).not.toContain('*')
     expect(permissions).not.toContain('attendance.adjust.approve')

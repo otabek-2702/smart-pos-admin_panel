@@ -1,3 +1,5 @@
+import { EXPENSE_REQUEST_PERMISSIONS } from '../access'
+
 export default [
   {
     heading: 'Management',
@@ -72,6 +74,7 @@ export default [
     to: 'treasury',
     action: 'manage',
     subject: 'all',
+    anyPermission: ['treasury.account.view'],
   },
   {
     title: 'Expenses',
@@ -79,6 +82,7 @@ export default [
     to: 'hr-expenses',
     action: 'manage',
     subject: 'all',
+    anyPermission: EXPENSE_REQUEST_PERMISSIONS,
   },
   {
     title: 'Loyalty',

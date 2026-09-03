@@ -118,7 +118,7 @@ const SAFE_WAREHOUSE_PERMISSION_BUNDLES = [
   {
     key: 'expenses',
     titleKey: 'warehouse_user_perm_bundle_expenses',
-    permissionKeys: ['expense.request.create', 'expense.request.view_own'],
+    permissionKeys: ['expense.category.view', 'expense.request.create', 'expense.request.view_own'],
   },
 ] as const
 

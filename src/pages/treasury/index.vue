@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import axios, { cashboxApi } from '@/plugins/axios'
+import axios from '@/plugins/axios'
 import Badge from '@/components/design/Badge.vue'
 import Button from '@/components/design/Button.vue'
 import DataTable, { type DataTableColumn } from '@/components/design/DataTable.vue'
@@ -11,16 +11,46 @@ import Modal from '@/components/design/Modal.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import Select from '@/components/design/Select.vue'
 import Skeleton from '@/components/design/Skeleton.vue'
+import StateFill from '@/components/design/StateFill.vue'
+import { useUserAccess } from '@/composables/useUserAccess'
+import { listAllExpenseCategories } from '@/services/expenseControlApi'
+import type { ExpenseCategory } from '@/types/expenseControl'
 
-const { t } = useI18n({ useScope: 'global' })
+const { t, te } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
+const route = useRoute()
+const { hasPermission } = useUserAccess()
+
+const canTransfer = computed(() => hasPermission('treasury.transfer'))
+const canDirectExpense = computed(() => hasPermission('expense.direct.pay'))
 
 const TXN_TYPES = [
-  'INKASSA', 'TRANSFER_IN', 'TRANSFER_OUT', 'FEE', 'EXPENSE', 'ADJUSTMENT',
-  'SUPPLIER_PAYMENT', 'SALARY_PAYMENT', 'SHIFT_DEPOSIT',
+  'INKASSA',
+  'TRANSFER_IN',
+  'TRANSFER_OUT',
+  'FEE',
+  'EXPENSE',
+  'EXPENSE_REVERSAL',
+  'ADJUSTMENT',
+  'SUPPLIER_PAYMENT',
+  'SUPPLIER_PAYMENT_REVERSAL',
+  'SALARY_PAYMENT',
+  'SHIFT_DEPOSIT',
+  'SHIFT_RECLASS_OUT',
+  'SHIFT_RECLASS_IN',
 ]
-const txnTypeItems = computed(() => TXN_TYPES.map(v => ({ value: v, label: t(`treasury_txn_${v}`) })))
+
+function txnTypeLabel(type: string): string {
+  const key = `treasury_txn_${type}`
+
+  return te(key) ? t(key) : type.replaceAll('_', ' ')
+}
+
+const txnTypeItems = computed(() => TXN_TYPES.map(value => ({
+  value,
+  label: txnTypeLabel(value),
+})))
 
 const accountOptions = computed(() => [
   { value: 'SAFE', label: t('treasury_account_SAFE') },
@@ -33,18 +63,24 @@ const txnTypeTone: Record<string, 'success' | 'info' | 'warning' | 'neutral' | '
   TRANSFER_OUT: 'warning',
   FEE: 'neutral',
   EXPENSE: 'error',
+  EXPENSE_REVERSAL: 'success',
   ADJUSTMENT: 'neutral',
   SUPPLIER_PAYMENT: 'warning',
+  SUPPLIER_PAYMENT_REVERSAL: 'success',
   SALARY_PAYMENT: 'warning',
   SHIFT_DEPOSIT: 'success',
+  SHIFT_RECLASS_OUT: 'warning',
+  SHIFT_RECLASS_IN: 'info',
 }
 
 // -------- accounts --------
 const accounts = ref<Record<string, any>>({})
 const accountsLoading = ref(false)
+const accountsError = ref('')
 
 async function loadAccounts() {
   accountsLoading.value = true
+  accountsError.value = ''
   try {
     const res = await axios.get('/treasury/accounts')
     const d = res.data?.data ?? res.data
@@ -52,7 +88,9 @@ async function loadAccounts() {
     accounts.value = d?.accounts ?? {}
   }
   catch (e: any) {
-    notify(e?.response?.data?.message ?? t('Failed to load accounts'), 'error')
+    accounts.value = {}
+    accountsError.value = e?.response?.data?.message ?? t('Failed to load accounts')
+    notify(accountsError.value, 'error')
   }
   finally {
     accountsLoading.value = false
@@ -62,6 +100,7 @@ async function loadAccounts() {
 // Combined money on hand across both accounts — the single figure an operator
 // checks first ("how much cash does the business currently control?").
 const accountsReady = computed(() => !!(accounts.value?.SAFE || accounts.value?.BANK))
+
 const totalBalance = computed(() =>
   Number(accounts.value?.SAFE?.balance ?? 0) + Number(accounts.value?.BANK?.balance ?? 0),
 )
@@ -70,50 +109,109 @@ const totalBalance = computed(() =>
 const txns = ref<any[]>([])
 const total = ref(0)
 const loading = ref(false)
-const page = ref(1)
-const itemsPerPage = ref(20)
-const accountFilter = ref<string | undefined>(undefined)
-const typeFilter = ref<string | undefined>(undefined)
-// NOTE: BE /treasury/history does not yet accept date_from/date_to/search params,
-// so these filters are applied client-side over the current page until BE support lands.
-const dateFrom = ref<string>('')
-const dateTo = ref<string>('')
-const search = ref<string>('')
+const historyError = ref('')
 
-const filteredTxns = computed(() => {
-  const q = search.value.trim().toLowerCase()
-  const from = dateFrom.value ? new Date(dateFrom.value).getTime() : null
-  const to = dateTo.value ? new Date(dateTo.value).getTime() + 86_400_000 : null
+interface TreasuryHistoryTotals {
+  totalInflowUzs: number | null
+  totalOutflowUzs: number | null
+  totalFeeUzs: number | null
+  rowCount: number | null
+}
 
-  return txns.value.filter((tx: any) => {
-    if (from || to) {
-      const ts = tx.created_at ? new Date(tx.created_at).getTime() : 0
-      if (from && ts < from)
-        return false
-      if (to && ts >= to)
-        return false
-    }
-    if (q) {
-      const hay = `${tx.description ?? ''} ${tx.category ?? ''}`.toLowerCase()
-      if (!hay.includes(q))
-        return false
-    }
+const historyTotals = ref<TreasuryHistoryTotals | null>(null)
+let historyRequestId = 0
 
-    return true
-  })
-})
+function queryValue(value: unknown): string {
+  return String(Array.isArray(value) ? value[0] ?? '' : value ?? '').trim()
+}
 
-// Client-side filters (search + date range) narrow only the rows already on the
-// current page — expose whether any are active so we can offer a quick reset and
-// an honest "showing X of Y on this page" count.
-const hasClientFilters = computed(() =>
-  !!(search.value.trim() || dateFrom.value || dateTo.value),
+function positiveQueryInteger(value: unknown, fallback: number, allowed?: number[]): number {
+  const parsed = Number(queryValue(value))
+  if (!Number.isInteger(parsed) || parsed <= 0 || (allowed && !allowed.includes(parsed)))
+    return fallback
+
+  return parsed
+}
+
+function routeDate(value: unknown): string {
+  const parsed = queryValue(value)
+
+  return /^\d{4}-\d{2}-\d{2}$/.test(parsed) ? parsed : ''
+}
+
+const requestedAccount = queryValue(route.query.account).toUpperCase()
+const requestedType = queryValue(route.query.type).toUpperCase()
+
+const page = ref(positiveQueryInteger(route.query.page, 1))
+const itemsPerPage = ref(positiveQueryInteger(route.query.per_page, 20, [10, 20, 50, 100]))
+
+const accountFilter = ref<string | undefined>(
+  accountOptions.value.some(option => option.value === requestedAccount) ? requestedAccount : undefined,
 )
 
-function clearClientFilters() {
+const typeFilter = ref<string | undefined>(TXN_TYPES.includes(requestedType) ? requestedType : undefined)
+
+const dateFrom = ref(routeDate(route.query.date_from))
+const dateTo = ref(routeDate(route.query.date_to))
+const search = ref(queryValue(route.query.search))
+
+const hasServerFilters = computed(() => !!(
+  search.value.trim()
+  || dateFrom.value
+  || dateTo.value
+  || accountFilter.value
+  || typeFilter.value
+))
+
+function clearServerFilters() {
   search.value = ''
   dateFrom.value = ''
   dateTo.value = ''
+  accountFilter.value = undefined
+  typeFilter.value = undefined
+}
+
+function finiteNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '')
+    return null
+
+  const parsed = Number(value)
+
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function normalizeHistoryTotals(value: unknown): TreasuryHistoryTotals | null {
+  if (!value || typeof value !== 'object')
+    return null
+
+  const totals = value as Record<string, unknown>
+
+  return {
+    totalInflowUzs: finiteNumber(totals.total_inflow_uzs),
+    totalOutflowUzs: finiteNumber(totals.total_outflow_uzs),
+    totalFeeUzs: finiteNumber(totals.total_fee_uzs),
+    rowCount: finiteNumber(totals.row_count),
+  }
+}
+
+function historyParams() {
+  const params: Record<string, string | number> = {
+    page: page.value,
+    per_page: itemsPerPage.value,
+  }
+
+  if (accountFilter.value)
+    params.account = accountFilter.value
+  if (typeFilter.value)
+    params.type = typeFilter.value
+  if (dateFrom.value)
+    params.date_from = dateFrom.value
+  if (dateTo.value)
+    params.date_to = dateTo.value
+  if (search.value.trim())
+    params.search = search.value.trim()
+
+  return params
 }
 
 const columns = computed<DataTableColumn<any>[]>(() => [
@@ -128,30 +226,54 @@ const columns = computed<DataTableColumn<any>[]>(() => [
 ])
 
 async function loadHistory() {
+  const requestId = ++historyRequestId
+
   loading.value = true
+  historyError.value = ''
   try {
-    const params: any = { page: page.value, per_page: itemsPerPage.value }
-    if (accountFilter.value)
-      params.account = accountFilter.value
-    if (typeFilter.value)
-      params.type = typeFilter.value
-    const res = await axios.get('/treasury/history', { params })
+    const res = await axios.get('/treasury/history', { params: historyParams() })
     const d = res.data?.data ?? res.data
 
+    if (requestId !== historyRequestId)
+      return
+
     txns.value = d?.transactions ?? []
-    total.value = d?.pagination?.total ?? txns.value.length
+    historyTotals.value = normalizeHistoryTotals(d?.totals)
+
+    const paginationTotal = finiteNumber(d?.pagination?.total)
+
+    total.value = paginationTotal
+      ?? historyTotals.value?.rowCount
+      ?? txns.value.length
   }
   catch (e: any) {
-    notify(e?.response?.data?.message ?? t('Failed to load history'), 'error')
+    if (requestId !== historyRequestId)
+      return
+
+    txns.value = []
+    total.value = 0
+    historyTotals.value = null
+    historyError.value = e?.response?.data?.message ?? t('Failed to load history')
+    notify(historyError.value, 'error')
   }
   finally {
-    loading.value = false
+    if (requestId === historyRequestId)
+      loading.value = false
   }
 }
 
+function resetHistoryPageAndLoad() {
+  if (page.value !== 1)
+    page.value = 1
+  else
+    loadHistory()
+}
+
+const loadFilteredHistory = useDebounceFn(resetHistoryPageAndLoad, 300)
+
 onMounted(() => { loadAccounts(); loadHistory() })
-watch([page, itemsPerPage], loadHistory)
-watch([accountFilter, typeFilter], () => { page.value = 1; loadHistory() })
+watch([page, itemsPerPage], () => loadHistory())
+watch([accountFilter, typeFilter, dateFrom, dateTo, search], () => loadFilteredHistory())
 
 const dtPagination = computed(() => ({
   page: page.value,
@@ -167,12 +289,18 @@ const transferSaving = ref(false)
 const transferForm = ref({ from: 'BANK', to: 'SAFE', amount: 0, fee: 0, description: '' })
 
 function openTransfer() {
+  if (!canTransfer.value) {
+    notify(t('err_no_permission'), 'error')
+
+    return
+  }
   transferForm.value = { from: 'BANK', to: 'SAFE', amount: 0, fee: 0, description: '' }
   transferDialog.value = true
 }
 
 function swapTransferAccounts() {
   const { from, to } = transferForm.value
+
   transferForm.value.from = to
   transferForm.value.to = from
 }
@@ -194,6 +322,12 @@ const transferInsufficient = computed(() => {
 })
 
 async function doTransfer() {
+  if (!canTransfer.value) {
+    transferDialog.value = false
+    notify(t('err_no_permission'), 'error')
+
+    return
+  }
   if (transferForm.value.from === transferForm.value.to) {
     notify(t('From and To must differ'), 'error')
 
@@ -227,67 +361,161 @@ async function doTransfer() {
 // -------- expense dialog --------
 const expenseDialog = ref(false)
 const expenseSaving = ref(false)
-const expenseForm = ref({ account: 'SAFE', amount: 0, fee: 0, categoryId: '', description: '' })
-const expenseCategories = ref<Array<{ id: number; name: string; sort_order?: number }>>([])
+
+const expenseForm = ref({
+  account: 'SAFE',
+  amount: 0,
+  feePercent: '',
+  categoryId: '',
+  description: '',
+  receiptNumber: '',
+})
+
+const expenseValidationAttempted = ref(false)
+
+const expenseCategories = ref<ExpenseCategory[]>([])
 const expenseCategoriesLoading = ref(false)
 const expenseCategoriesError = ref('')
+let expenseCategoriesRequestId = 0
 
-const expenseCategoryOptions = computed(() => expenseCategories.value.map(category => ({
+const availableExpenseCategories = computed(() => expenseCategories.value.filter(category => {
+  if (category.is_active === false)
+    return false
+
+  if (!Array.isArray(category.allowed_sources))
+    return true
+
+  return category.allowed_sources
+    .map(source => String(source).toUpperCase())
+    .includes(expenseForm.value.account)
+}))
+
+const expenseCategoryOptions = computed(() => availableExpenseCategories.value.map(category => ({
   value: String(category.id),
   label: category.name,
 })))
-const selectedExpenseCategory = computed(() => expenseCategories.value.find(category =>
+
+const selectedExpenseCategory = computed(() => availableExpenseCategories.value.find(category =>
   String(category.id) === expenseForm.value.categoryId,
 ))
+
 const isBankExpense = computed(() => expenseForm.value.account === 'BANK')
 
+const expenseDescriptionError = computed(() => {
+  if (!expenseValidationAttempted.value
+    || !selectedExpenseCategory.value?.requires_description
+    || expenseForm.value.description.trim())
+    return ''
+
+  return t('expense_description_required')
+})
+
+const expenseReceiptError = computed(() => {
+  if (!expenseValidationAttempted.value
+    || !selectedExpenseCategory.value?.requires_receipt
+    || expenseForm.value.receiptNumber.trim())
+    return ''
+
+  return t('expense_receipt_required')
+})
+
 async function loadExpenseCategories() {
+  const requestId = ++expenseCategoriesRequestId
+
   expenseCategoriesLoading.value = true
   expenseCategoriesError.value = ''
   try {
-    const res = await cashboxApi.get('/categories/')
-    const data = res.data?.data ?? res.data
-    expenseCategories.value = (Array.isArray(data) ? data : data?.categories ?? data?.items ?? [])
+    const result = await listAllExpenseCategories()
+
+    if (requestId !== expenseCategoriesRequestId)
+      return
+
+    expenseCategories.value = result
+      .filter((category: ExpenseCategory) => category.is_active !== false)
       .slice()
-      .sort((a: any, b: any) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))
+      .sort((a: ExpenseCategory, b: ExpenseCategory) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))
   }
   catch (error: any) {
-    expenseCategories.value = []
-    expenseCategoriesError.value = error?.response?.data?.message ?? t('Failed to load expense categories')
+    if (requestId === expenseCategoriesRequestId) {
+      expenseCategories.value = []
+      expenseCategoriesError.value = error?.response?.data?.message ?? t('Failed to load expense categories')
+    }
   }
   finally {
-    expenseCategoriesLoading.value = false
+    if (requestId === expenseCategoriesRequestId)
+      expenseCategoriesLoading.value = false
   }
 }
 
 function openExpense() {
-  expenseForm.value = { account: 'SAFE', amount: 0, fee: 0, categoryId: '', description: '' }
+  if (!canDirectExpense.value) {
+    notify(t('err_no_permission'), 'error')
+
+    return
+  }
+  expenseForm.value = {
+    account: 'SAFE',
+    amount: 0,
+    feePercent: '',
+    categoryId: '',
+    description: '',
+    receiptNumber: '',
+  }
+  expenseValidationAttempted.value = false
   expenseDialog.value = true
-  void loadExpenseCategories()
+  loadExpenseCategories()
 }
 
 watch(() => expenseForm.value.account, account => {
   if (account !== 'BANK')
-    expenseForm.value.fee = 0
+    expenseForm.value.feePercent = ''
+
+  if (!selectedExpenseCategory.value)
+    expenseForm.value.categoryId = ''
 })
 
-// The backend debits amount + fee from the chosen account, so preview the true
-// outflow and guard against overspending before the request is sent — mirrors
-// the transfer dialog's insufficient-balance check.
+const normalizedExpenseFeePercent = computed(() => expenseForm.value.feePercent.trim().replace(',', '.'))
+
+const expenseFeePercentInvalid = computed(() => {
+  if (!isBankExpense.value || !normalizedExpenseFeePercent.value)
+    return false
+
+  return !/^(?:100(?:\.0{1,4})?|\d{1,2}(?:\.\d{1,4})?)$/.test(normalizedExpenseFeePercent.value)
+})
+
+const expenseFeeUzs = computed(() => {
+  if (!isBankExpense.value || expenseFeePercentInvalid.value || !normalizedExpenseFeePercent.value)
+    return 0
+
+  return Math.round(Number(expenseForm.value.amount || 0) * Number(normalizedExpenseFeePercent.value) / 100)
+})
+
+// The backend debits amount + its calculated bank fee from the chosen account,
+// so preview the true outflow before submitting the percentage contract.
 const expenseAccountBalance = computed(() =>
   Number(accounts.value?.[expenseForm.value.account]?.balance ?? 0),
 )
+
 const expenseTotalOut = computed(() =>
-  Math.max(0, Number(expenseForm.value.amount || 0) + (isBankExpense.value ? Number(expenseForm.value.fee || 0) : 0)),
+  Math.max(0, Number(expenseForm.value.amount || 0) + expenseFeeUzs.value),
 )
+
 const expenseInsufficient = computed(() =>
   expenseTotalOut.value > 0 && expenseTotalOut.value > expenseAccountBalance.value,
 )
+
 const expenseRemaining = computed(() =>
   expenseAccountBalance.value - expenseTotalOut.value,
 )
 
 async function doExpense() {
+  if (!canDirectExpense.value) {
+    expenseDialog.value = false
+    notify(t('err_no_permission'), 'error')
+
+    return
+  }
+  expenseValidationAttempted.value = true
   if (!expenseForm.value.amount || expenseForm.value.amount <= 0) {
     notify(t('Amount must be greater than 0'), 'error')
 
@@ -298,6 +526,13 @@ async function doExpense() {
 
     return
   }
+  if (expenseFeePercentInvalid.value) {
+    notify(t('expense_fee_percent_invalid'), 'error')
+
+    return
+  }
+  if (expenseDescriptionError.value || expenseReceiptError.value)
+    return
   if (expenseInsufficient.value) {
     notify(t('Insufficient balance: available {bal}', { bal: formatCurrency(expenseAccountBalance.value) }), 'error')
 
@@ -305,16 +540,23 @@ async function doExpense() {
   }
   expenseSaving.value = true
   try {
+    const bankFeePayload: { fee_uzs?: null; fee_percent?: string } = {}
+
+    if (isBankExpense.value && normalizedExpenseFeePercent.value) {
+      // Compatibility for the current Treasury adapter, which otherwise
+      // supplies a legacy zero fee alongside fee_percent.
+      bankFeePayload.fee_uzs = null
+      bankFeePayload.fee_percent = normalizedExpenseFeePercent.value
+    }
+
     await axios.post('/treasury/expense', {
-      account: expenseForm.value.account,
-      amount: Number(expenseForm.value.amount),
-      fee: isBankExpense.value ? Number(expenseForm.value.fee || 0) : 0,
-      // Current servers ignore this forward-compatible field and persist the
-      // name below. The category id lets the backend make the relationship
-      // authoritative without another frontend migration.
+      source_account: expenseForm.value.account,
+      amount_uzs: Number(expenseForm.value.amount),
+      ...bankFeePayload,
       category_id: selectedExpenseCategory.value.id,
       category: selectedExpenseCategory.value.name,
       description: expenseForm.value.description,
+      receipt_number: expenseForm.value.receiptNumber.trim(),
     })
     notify(t('Expense recorded'))
     expenseDialog.value = false
@@ -346,7 +588,22 @@ function deltaDisplay(t_: any) {
     />
 
     <!-- Account cards -->
-    <div class="grid cols-3 treasury-kpis">
+    <StateFill
+      v-if="accountsError && !accountsLoading"
+      class="card treasury-account-error"
+      icon="alert"
+      :title="t('Failed to load accounts')"
+      :sub="accountsError"
+      error
+    >
+      <template #action>
+        <Button variant="secondary" icon="refresh" @click="loadAccounts">
+          {{ t('Retry') }}
+        </Button>
+      </template>
+    </StateFill>
+
+    <div v-else class="grid cols-3 treasury-kpis">
       <div class="kpi-card">
         <div class="kpi-card__top">
           <div class="kpi-card__icon t-success">
@@ -442,14 +699,15 @@ function deltaDisplay(t_: any) {
 
         <div class="treasury-actions">
           <Button
-            v-if="hasClientFilters"
+            v-if="hasServerFilters"
             variant="ghost"
             icon="close"
-            @click="clearClientFilters"
+            @click="clearServerFilters"
           >
             {{ t('Clear filters') }}
           </Button>
           <Button
+            v-if="canTransfer"
             variant="secondary"
             icon="refresh"
             @click="openTransfer"
@@ -457,6 +715,7 @@ function deltaDisplay(t_: any) {
             {{ t('Transfer') }}
           </Button>
           <Button
+            v-if="canDirectExpense"
             variant="danger"
             icon="dollar"
             @click="openExpense"
@@ -467,17 +726,56 @@ function deltaDisplay(t_: any) {
       </div>
 
       <div
-        v-if="hasClientFilters && !loading"
-        class="treasury-filternote cell-muted"
+        v-if="historyTotals && !loading"
+        class="treasury-history-totals"
+        aria-live="polite"
       >
-        {{ t('Showing {n} of {total} on this page', { n: filteredTxns.length, total: txns.length }) }}
+        <div class="treasury-history-total">
+          <span class="cell-muted">{{ t('Total Deposits') }}</span>
+          <strong class="num-tabular">
+            {{ historyTotals.totalInflowUzs == null ? t('em_dash') : formatCurrency(historyTotals.totalInflowUzs) }}
+          </strong>
+        </div>
+        <div class="treasury-history-total">
+          <span class="cell-muted">{{ t('Total Withdrawals') }}</span>
+          <strong class="num-tabular">
+            {{ historyTotals.totalOutflowUzs == null ? t('em_dash') : formatCurrency(historyTotals.totalOutflowUzs) }}
+          </strong>
+        </div>
+        <div class="treasury-history-total">
+          <span class="cell-muted">{{ t('Fee') }}</span>
+          <strong class="num-tabular">
+            {{ historyTotals.totalFeeUzs == null ? t('em_dash') : formatCurrency(historyTotals.totalFeeUzs) }}
+          </strong>
+        </div>
+        <div class="treasury-history-total">
+          <span class="cell-muted">{{ t('Transactions') }}</span>
+          <strong class="num-tabular">
+            {{ historyTotals.rowCount == null ? t('em_dash') : historyTotals.rowCount }}
+          </strong>
+        </div>
       </div>
 
       <div class="card__divider" />
 
+      <StateFill
+        v-if="historyError && !loading"
+        icon="alert"
+        :title="t('Failed to load history')"
+        :sub="historyError"
+        error
+      >
+        <template #action>
+          <Button variant="secondary" icon="refresh" @click="loadHistory">
+            {{ t('Retry') }}
+          </Button>
+        </template>
+      </StateFill>
+
       <DataTable
+        v-else
         :columns="columns"
-        :rows="filteredTxns"
+        :rows="txns"
         row-key="id"
         :loading="loading"
         :pagination="dtPagination"
@@ -498,7 +796,7 @@ function deltaDisplay(t_: any) {
 
         <template #cell.type="{ row }">
           <Badge :tone="txnTypeTone[row.type] ?? 'neutral'">
-            {{ t(`treasury_txn_${row.type}`) }}
+            {{ txnTypeLabel(row.type) }}
           </Badge>
         </template>
 
@@ -557,7 +855,7 @@ function deltaDisplay(t_: any) {
 
     <!-- Transfer modal -->
     <Modal
-      :open="transferDialog"
+      :open="transferDialog && canTransfer"
       width="min(560px, 100%)"
       :title="t('Transfer between accounts')"
       :subtitle="t('Move funds between Safe and Bank')"
@@ -600,18 +898,14 @@ function deltaDisplay(t_: any) {
           :label="t('Fee')"
           :hint="t('Bank fee hint')"
         >
-          <MoneyInput
-            v-model="transferForm.fee"
-          />
+          <MoneyInput v-model="transferForm.fee" />
         </Field>
         <div style="grid-column: span 2;">
           <Field :label="t('Description')">
             <Input v-model="transferForm.description" />
           </Field>
         </div>
-        <div
-          style="grid-column: span 2; display: flex; justify-content: space-between; align-items: center; padding: 0 4px;"
-        >
+        <div style="grid-column: span 2; display: flex; justify-content: space-between; align-items: center; padding: 0 4px;">
           <span class="cell-muted">{{ t('Destination will receive') }}</span>
           <span class="num-tabular cell-strong">{{ formatCurrency(transferCredited) }}</span>
         </div>
@@ -632,7 +926,7 @@ function deltaDisplay(t_: any) {
 
     <!-- Expense modal -->
     <Modal
-      :open="expenseDialog"
+      :open="expenseDialog && canDirectExpense"
       width="min(520px, 100%)"
       :title="t('Record Treasury Expense')"
       :subtitle="t('Record an outgoing payment from Safe or Bank')"
@@ -660,11 +954,18 @@ function deltaDisplay(t_: any) {
           style="grid-column: span 2;"
         >
           <Field
-            :label="t('Fee / commission (optional)')"
-            :hint="t('Expense fee hint')"
+            :label="t('expense_fee_percent_label')"
+            :hint="t('expense_fee_percent_hint')"
+            :error="expenseFeePercentInvalid ? t('expense_fee_percent_invalid') : ''"
           >
-            <MoneyInput
-              v-model="expenseForm.fee"
+            <Input
+              v-model="expenseForm.feePercent"
+              type="number"
+              min="0"
+              max="100"
+              step="0.0001"
+              placeholder="0"
+              :error="expenseFeePercentInvalid"
             />
           </Field>
         </div>
@@ -682,14 +983,38 @@ function deltaDisplay(t_: any) {
           </Field>
         </div>
         <div style="grid-column: span 2;">
-          <Field :label="t('Description')">
+          <Field
+            :label="t('Description')"
+            :error="expenseDescriptionError"
+          >
             <Input v-model="expenseForm.description" />
+          </Field>
+        </div>
+        <div
+          v-if="selectedExpenseCategory?.requires_receipt"
+          style="grid-column: span 2;"
+        >
+          <Field
+            :label="t('Receipt #')"
+            :error="expenseReceiptError"
+          >
+            <Input
+              v-model="expenseForm.receiptNumber"
+              :placeholder="t('expense_receipt_placeholder')"
+            />
           </Field>
         </div>
         <div
           v-if="expenseTotalOut > 0"
           class="treasury-expense-preview"
         >
+          <div
+            v-if="isBankExpense && expenseFeeUzs > 0"
+            class="treasury-preview-row"
+          >
+            <span class="cell-muted">{{ t('expense_calculated_fee') }}</span>
+            <span class="num-tabular cell-strong">{{ formatCurrency(expenseFeeUzs) }}</span>
+          </div>
           <div class="treasury-preview-row">
             <span class="cell-muted">{{ t('Total debited') }}</span>
             <span class="num-tabular cell-strong">{{ formatCurrency(expenseTotalOut) }}</span>
@@ -709,7 +1034,7 @@ function deltaDisplay(t_: any) {
           variant="danger"
           icon="minus"
           :loading="expenseSaving"
-          :disabled="expenseSaving || expenseInsufficient || !selectedExpenseCategory"
+          :disabled="expenseSaving || expenseInsufficient || expenseFeePercentInvalid || !selectedExpenseCategory"
           @click="doExpense"
         >
           {{ t('Record Expense') }}
@@ -729,6 +1054,10 @@ function deltaDisplay(t_: any) {
 
 <style scoped>
 .treasury-kpis {
+  margin-bottom: var(--sp-5);
+}
+
+.treasury-account-error {
   margin-bottom: var(--sp-5);
 }
 
@@ -773,9 +1102,36 @@ function deltaDisplay(t_: any) {
 
 .treasury-total .kpi-card__value { color: rgb(var(--v-theme-info-strong, var(--v-theme-primary))); }
 
-.treasury-filternote {
-  padding: var(--sp-2) var(--sp-4) 0;
+.treasury-history-totals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-3);
+  padding: 0 var(--sp-4) var(--sp-4);
+}
+
+.treasury-history-total {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+  padding: var(--sp-3);
+  background: rgb(var(--v-theme-surface-inset));
+  border: 1px solid rgb(var(--v-theme-border));
+  border-radius: var(--r-md);
+}
+
+.treasury-history-total > span {
+  overflow: hidden;
   font-size: var(--fs-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.treasury-history-total > strong {
+  overflow: hidden;
+  font-size: var(--fs-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .treasury-form-grid {
@@ -822,6 +1178,7 @@ function deltaDisplay(t_: any) {
 }
 
 @media (max-width: 768px) {
+  .treasury-history-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .treasury-search,
   .treasury-date,
   .treasury-select { flex: 1 1 100%; min-width: 0; max-width: none; }

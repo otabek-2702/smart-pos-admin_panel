@@ -173,6 +173,8 @@ export interface MoneyControlPagination {
 }
 
 export interface RawInventoryResult {
+  completeness: MoneyControlCompleteness
+  issues: MoneyControlIssue[]
   summary: RawInventorySummary
   items: RawInventoryRow[]
   pagination: MoneyControlPagination

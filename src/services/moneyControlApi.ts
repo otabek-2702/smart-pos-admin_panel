@@ -303,6 +303,8 @@ export function normalizeRawInventory(value: unknown, params: RawInventoryParams
   const total = numberOrNull(pagination.total ?? pagination.total_items ?? pagination.count ?? root.total ?? root.total_items)
 
   return {
+    completeness: normalizeCompleteness(root.completeness),
+    issues: listFrom(root.issues, []).map(normalizeIssue),
     summary: {
       inventoryValueUzs: decimal(summary.inventory_value_uzs),
       availableValueUzs: decimal(summary.available_value_uzs),

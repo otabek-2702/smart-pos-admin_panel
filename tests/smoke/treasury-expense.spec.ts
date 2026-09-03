@@ -48,14 +48,25 @@ async function mockTreasuryApi(page: Page): Promise<ExpenseMutation[]> {
       return
     }
 
-    if (path.endsWith('/cashbox/categories/') && method === 'GET') {
+    if (path.endsWith('/expense-categories') && method === 'GET') {
+      const requestedPage = Number(new URL(request.url()).searchParams.get('page') || 1)
+      const supplies = { id: 17, name: 'Supplies', sort_order: 1, is_active: true, allowed_sources: ['SAFE', 'BANK'] }
+
+      const repairs = {
+        id: 18,
+        name: 'Repairs',
+        sort_order: 2,
+        is_active: true,
+        allowed_sources: ['SAFE', 'BANK'],
+        requires_receipt: true,
+        requires_description: true,
+      }
+
       await route.fulfill({
         json: {
           data: {
-            categories: [
-              { id: 17, name: 'Supplies', sort_order: 1 },
-              { id: 18, name: 'Repairs', sort_order: 2 },
-            ],
+            categories: requestedPage === 1 ? [supplies] : [repairs],
+            pagination: { page: requestedPage, per_page: 1, total: 2, total_pages: 2 },
           },
         },
       })
@@ -112,14 +123,14 @@ test.describe('treasury expense workflow', () => {
 
     expect(expenses[0]).toMatchObject({
       body: {
-        account: 'SAFE',
-        amount: 100_000,
-        fee: 0,
+        source_account: 'SAFE',
+        amount_uzs: 100_000,
         category_id: 17,
         category: 'Supplies',
         description: 'Cleaning materials',
       },
     })
+    expect(expenses[0].body).not.toHaveProperty('fee_percent')
     expect(expenses[0].idempotencyKey).toBeTruthy()
   })
 
@@ -135,25 +146,39 @@ test.describe('treasury expense workflow', () => {
     await page.getByRole('option', { name: 'Bank' }).click()
 
     const amount = dialog.getByLabel('Amount')
-    const commission = dialog.getByLabel('Fee / commission (optional)')
+    const commission = dialog.getByLabel('Bank commission (%)')
 
     await amount.fill('250000')
-    await commission.fill('2500')
+    await commission.fill('1.5')
     await expect(amount).toHaveValue(/250.*000/)
-    await expect(commission).toHaveValue(/2.*500/)
+    await expect(commission).toHaveValue('1.5')
+    await expect(dialog.getByText('Calculated fee').locator('..').getByText(/3.*750/)).toBeVisible()
 
     await dialog.getByRole('combobox', { name: 'Category' }).click()
     await page.getByRole('option', { name: 'Repairs' }).click()
-    await dialog.getByRole('button', { name: 'Record Expense' }).click()
+
+    const submit = dialog.getByRole('button', { name: 'Record Expense' })
+
+    await submit.click()
+    await expect(dialog.getByText('A description is required for this category.')).toBeVisible()
+    await expect(dialog.getByText('A receipt number is required for this category.')).toBeVisible()
+    expect(expenses).toHaveLength(0)
+
+    await dialog.getByLabel('Description').fill('Emergency repair')
+    await dialog.getByLabel('Receipt #').fill('INV-2048')
+    await submit.click()
 
     await expect.poll(() => expenses.length).toBe(1)
 
     expect(expenses[0].body).toMatchObject({
-      account: 'BANK',
-      amount: 250_000,
-      fee: 2_500,
+      source_account: 'BANK',
+      amount_uzs: 250_000,
+      fee_uzs: null,
+      fee_percent: '1.5',
       category_id: 18,
       category: 'Repairs',
+      description: 'Emergency repair',
+      receipt_number: 'INV-2048',
     })
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)

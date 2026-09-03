@@ -7,6 +7,17 @@ export const AUDIT_PERMISSIONS = [
   'prep.audit.view',
 ]
 
+export const EXPENSE_REQUEST_PERMISSIONS = [
+  'expense.request.view_all',
+  'expense.request.view_own',
+  'expense.request.create',
+]
+
+export const EXPENSE_CATEGORY_PERMISSIONS = [
+  'expense.category.view',
+  'expense.category.manage',
+]
+
 interface WarehouseRouteRule {
   prefix: string
   anyPermission?: string[]
@@ -24,6 +35,8 @@ const WAREHOUSE_ROUTE_RULES: WarehouseRouteRule[] = [
   { prefix: '/stock/adjustment-requests', anyPermission: ['stock.adjustment.request'] },
   { prefix: '/stock/transfers', anyPermission: ['stock.transfer.view'] },
   { prefix: '/audit', anyPermission: AUDIT_PERMISSIONS },
+  { prefix: '/hr-expenses', anyPermission: EXPENSE_REQUEST_PERMISSIONS },
+  { prefix: '/hr-expense-categories', anyPermission: EXPENSE_CATEGORY_PERMISSIONS },
 ]
 
 export function warehousePathAllowed(path: string, access: ReturnTypeReadUserAccess): boolean {

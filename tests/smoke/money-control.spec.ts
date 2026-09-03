@@ -32,7 +32,28 @@ function collectRuntimeErrors(page: Page) {
   return errors
 }
 
-async function mockPopulatedMoneyControlApi(page: Page) {
+interface MockIntegrityStatuses {
+  overview?: 'COMPLETE' | 'PARTIAL' | 'UNSAFE'
+  reconciliation?: 'BALANCED' | 'WARNING' | 'INCOMPLETE'
+  inventory?: 'COMPLETE' | 'PARTIAL' | 'UNSAFE'
+}
+
+async function mockPopulatedMoneyControlApi(page: Page, statuses: MockIntegrityStatuses = {}) {
+  const overviewStatus = statuses.overview ?? 'COMPLETE'
+  const reconciliationStatus = statuses.reconciliation ?? 'BALANCED'
+  const inventoryStatus = statuses.inventory ?? 'COMPLETE'
+
+  const statusIssue = {
+    code: 'SOURCE_REVIEW_REQUIRED',
+    severity: 'WARNING',
+    title: 'Source review required',
+    message: 'A source needs review before every total can be trusted.',
+    entity_type: null,
+    entity_id: null,
+    amount_uzs: null,
+    details: {},
+  }
+
   await page.route('**/api/**', async route => {
     const request = route.request()
     const path = new URL(request.url()).pathname
@@ -48,7 +69,10 @@ async function mockPopulatedMoneyControlApi(page: Page) {
               date_to: '2026-08-31',
               timezone: 'Asia/Tashkent',
             },
-            completeness: { status: 'COMPLETE', issues: [] },
+            completeness: {
+              status: overviewStatus,
+              issues: overviewStatus === 'COMPLETE' ? [] : [statusIssue],
+            },
             treasury: {
               drawer_unreconciled_uzs: '1250000.00',
               safe_uzs: '12500000.00',
@@ -64,8 +88,8 @@ async function mockPopulatedMoneyControlApi(page: Page) {
                 {
                   supplier_id: 'supplier-flour',
                   supplier_name: 'Samarkand Flour Co.',
-                  balance_uzs: '5400000.00',
-                  payable_uzs: '5400000.00',
+                  balance_uzs: '8400000.00',
+                  payable_uzs: '8400000.00',
                   credit_uzs: '0.00',
                   overdue_payable_uzs: '1400000.00',
                   currency: 'UZS',
@@ -73,9 +97,9 @@ async function mockPopulatedMoneyControlApi(page: Page) {
                 {
                   supplier_id: 'supplier-dairy',
                   supplier_name: 'Tashkent Dairy',
-                  balance_uzs: '3000000.00',
-                  payable_uzs: '3000000.00',
-                  credit_uzs: '0.00',
+                  balance_uzs: '-600000.00',
+                  payable_uzs: '0.00',
+                  credit_uzs: '600000.00',
                   overdue_payable_uzs: '0.00',
                   currency: 'UZS',
                 },
@@ -112,7 +136,10 @@ async function mockPopulatedMoneyControlApi(page: Page) {
               amount_uzs: '52200000.00',
               formula: 'SAFE + BANK + RAW_INVENTORY - SUPPLIER_PAYABLE',
             },
-            reconciliation: { status: 'BALANCED', issues: [] },
+            reconciliation: {
+              status: reconciliationStatus,
+              issues: reconciliationStatus === 'BALANCED' ? [] : [statusIssue],
+            },
           },
         },
       })
@@ -135,6 +162,11 @@ async function mockPopulatedMoneyControlApi(page: Page) {
               valuation_method: 'WEIGHTED_AVERAGE',
               as_of: '2026-08-31T14:25:00+05:00',
             },
+            completeness: {
+              status: inventoryStatus,
+              issues: inventoryStatus === 'COMPLETE' ? [] : [statusIssue],
+            },
+            issues: inventoryStatus === 'COMPLETE' ? [] : [statusIssue],
             items: [
               {
                 stock_item: { id: 'raw-flour', name: 'Premium flour', code: 'RAW-FLOUR' },
@@ -182,7 +214,7 @@ async function mockPopulatedMoneyControlApi(page: Page) {
                   supplier_name: 'Tashkent Dairy',
                   price: '23000.00',
                   currency: 'UZS',
-                  current_balance_uzs: '3000000.00',
+                  current_balance_uzs: '-600000.00',
                   lead_time_days: 1,
                 },
               },
@@ -208,6 +240,87 @@ async function mockPopulatedMoneyControlApi(page: Page) {
 
     // Isolate the page from optional shell hydration without creating
     // unrelated live-looking business records.
+    await route.fulfill({ json: { success: true, data: {} } })
+  })
+}
+
+async function mockInventoryEvidenceWithoutOverview(page: Page) {
+  const stockIssue = {
+    code: 'STOCK_COST_MISSING',
+    severity: 'ERROR',
+    title: 'Stock cost is missing',
+    message: 'This material cannot be valued until its cost is corrected.',
+    entity_type: 'StockItem',
+    entity_id: 'raw-unverified',
+    amount_uzs: null,
+    details: { location_id: 'central' },
+  }
+
+  await page.route('**/api/**', async route => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+
+    if (request.method() === 'GET' && path.endsWith('/money-control/overview')) {
+      await route.fulfill({
+        status: 500,
+        json: { success: false, code: 'OVERVIEW_FAILED', message: 'Overview is unavailable.' },
+      })
+      return
+    }
+
+    if (request.method() === 'GET' && path.endsWith('/stock/inventory-control/')) {
+      await route.fulfill({
+        json: {
+          success: true,
+          data: {
+            summary: {
+              inventory_value_uzs: null,
+              available_value_uzs: null,
+              raw_item_count: 1,
+              low_stock_count: null,
+              out_of_stock_count: null,
+              supplier_payable_uzs: null,
+              supplier_credit_uzs: null,
+              valuation_method: 'WEIGHTED_AVERAGE',
+              as_of: '2026-08-31T14:25:00+05:00',
+            },
+            completeness: { status: 'UNSAFE', issues: [stockIssue] },
+
+            // The deployed endpoint intentionally includes the top-level list too.
+            // The page must preserve it without rendering a duplicate issue.
+            issues: [stockIssue],
+            items: [
+              {
+                stock_item: { id: 'raw-unverified', name: 'Unverified flour', code: 'RAW-UNVERIFIED' },
+                category: { id: 'dry-goods', name: 'Dry goods' },
+                base_unit: { id: 'kg', name: 'Kilogram', code: 'kg' },
+                location: { id: 'central', name: 'Central warehouse' },
+                quantity: null,
+                reserved_quantity: null,
+                available_quantity: null,
+                pending_in_quantity: null,
+                pending_out_quantity: null,
+                avg_cost_uzs: null,
+                inventory_value_uzs: null,
+                available_value_uzs: null,
+                reorder_point: '25.000',
+                is_low_stock: true,
+                is_out_of_stock: true,
+                preferred_supplier: null,
+              },
+            ],
+            pagination: { total: 1, page: 1, per_page: 20, total_pages: 1 },
+          },
+        },
+      })
+      return
+    }
+
+    if (request.method() === 'GET' && path.endsWith('/stock/locations/')) {
+      await route.fulfill({ json: { success: true, data: { locations: [] } } })
+      return
+    }
+
     await route.fulfill({ json: { success: true, data: {} } })
   })
 }
@@ -274,11 +387,79 @@ test.describe('Money Control', () => {
 
     await expect(supplierBalances.getByRole('link', { name: 'Samarkand Flour Co.' })).toBeVisible()
     await expect(supplierBalances.getByRole('link', { name: 'Tashkent Dairy' })).toBeVisible()
+    await expect(
+      supplierBalances.locator('tbody tr').filter({ hasText: 'Tashkent Dairy' }),
+    ).toContainText(/-600[\s\u202F]000/)
     await expect(expenseCategories.getByText('Supplies', { exact: true })).toBeVisible()
     await expect(expenseCategories.getByText('Repairs', { exact: true })).toBeVisible()
     await expect(page.getByText('Backend integration is not connected yet')).toHaveCount(0)
 
+    const reconciliation = page.locator('.reconciliation-card')
+
+    await expect(reconciliation.locator('.badge.t-success').filter({ hasText: 'Complete' })).toHaveCount(2)
+    await expect(reconciliation.locator('.badge.t-success').filter({ hasText: 'Balanced' })).toBeVisible()
+
     expect(runtimeErrors, runtimeErrors.join('\n')).toHaveLength(0)
+  })
+
+  test('maps partial, warning, and unsafe backend states to deliberate badges', async ({ page }) => {
+    await mockPopulatedMoneyControlApi(page, {
+      overview: 'PARTIAL',
+      reconciliation: 'WARNING',
+      inventory: 'UNSAFE',
+    })
+    await page.goto('/money-control')
+
+    const reconciliation = page.locator('.reconciliation-card')
+
+    await expect(reconciliation.locator('.badge.t-warning').filter({ hasText: 'Partial' })).toBeVisible()
+    await expect(reconciliation.locator('.badge.t-warning').filter({ hasText: 'Needs review' })).toBeVisible()
+    await expect(reconciliation.locator('.badge.t-error').filter({ hasText: 'Unsafe' })).toBeVisible()
+  })
+
+  test('clears previously loaded figures when the selected date range is invalid', async ({ page }) => {
+    await mockPopulatedMoneyControlApi(page)
+    await page.goto('/money-control')
+
+    await expect(page.getByText(/12[\s\u202F]500[\s\u202F]000/).first()).toBeVisible()
+
+    const fromInput = page.locator('.money-control-filters input[type="date"]').first()
+
+    await fromInput.evaluate(input => {
+      const field = input as HTMLInputElement
+
+      field.value = '2099-12-31'
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+      field.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+
+    await expect(
+      page.locator('.endpoint-state-card .statefill__title'),
+    ).toHaveText('The end date cannot be before the start date.')
+    await expect(page.locator('.money-control-summary')).toHaveCount(0)
+    await expect(page.locator('.raw-materials-card')).toHaveCount(0)
+    await expect(page.getByText(/12[\s\u202F]500[\s\u202F]000/)).toHaveCount(0)
+  })
+
+  test('keeps inventory integrity evidence visible when the overview fails', async ({ page }) => {
+    await mockInventoryEvidenceWithoutOverview(page)
+    await page.goto('/money-control')
+
+    await expect(page.getByText('Money Control could not be loaded', { exact: true })).toBeVisible()
+
+    const reconciliation = page.locator('.reconciliation-card')
+
+    await expect(reconciliation.getByText('Inventory data completeness', { exact: true })).toBeVisible()
+    await expect(reconciliation.locator('.badge.t-error').filter({ hasText: 'Unsafe' })).toBeVisible()
+    await expect(
+      reconciliation.getByText('This material cannot be valued until its cost is corrected.', { exact: true }),
+    ).toHaveCount(1)
+
+    const rawMaterialRow = page.locator('.raw-materials-card tbody tr').filter({ hasText: 'Unverified flour' })
+
+    await expect(rawMaterialRow).toBeVisible()
+    await expect(rawMaterialRow.locator('.badge.t-neutral')).toHaveText('Unknown')
+    await expect(rawMaterialRow.getByText('Out of stock', { exact: true })).toHaveCount(0)
   })
 
   test('shows an honest integration state when the backend endpoints are not deployed', async ({ page }) => {

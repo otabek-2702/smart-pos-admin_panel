@@ -9,6 +9,7 @@
    ============================================================ */
 import type { DataTableColumn } from '@/components/design/DataTable.vue'
 import { stockApi } from '@/plugins/axios'
+import { supplierItemHasKnownPrice } from '@/utils/supplierItemPrice'
 import Badge from '@/components/design/Badge.vue'
 import Button from '@/components/design/Button.vue'
 import Card from '@/components/design/Card.vue'
@@ -1324,11 +1325,17 @@ function backToList() {
           {{ row.unit_short || row.unit_name || '—' }}
         </template>
         <template #cell.price="{ row }">
-          <span class="num-tabular">{{ formatCurrency(row.price ?? 0) }}</span>
+          <template v-if="supplierItemHasKnownPrice(row)">
+            <span class="num-tabular">{{ formatCurrency(row.price) }}</span>
+            <span
+              class="cell-muted"
+              style="margin-left:4px;font-size:12px;"
+            >{{ row.currency || t('currency_default') }}</span>
+          </template>
           <span
+            v-else
             class="cell-muted"
-            style="margin-left:4px;font-size:12px;"
-          >{{ row.currency || t('currency_default') }}</span>
+          >—</span>
         </template>
         <template #cell.min_order_qty="{ row }">
           <span class="num-tabular">{{ row.min_order_qty ?? '—' }}</span>

@@ -20,6 +20,7 @@ import Pagination from '@/components/design/Pagination.vue'
 import Select from '@/components/design/Select.vue'
 import StateFill from '@/components/design/StateFill.vue'
 import { useUserAccess } from '@/composables/useUserAccess'
+import { supplierItemHasKnownPrice } from '@/utils/supplierItemPrice'
 
 const { t } = useI18n({ useScope: 'global' })
 const { notify } = useNotify()
@@ -1062,7 +1063,7 @@ function sourceLabel(src: string): string {
                 <tr v-for="si in (detailItem.items as any[])" :key="si.id">
                   <td>{{ si.stock_item_name }}</td>
                   <td class="num mono">
-                    {{ si.price }}
+                    {{ supplierItemHasKnownPrice(si) ? formatCurrency(si.price) : '—' }}
                   </td>
                   <td>{{ si.unit_short }}</td>
                 </tr>

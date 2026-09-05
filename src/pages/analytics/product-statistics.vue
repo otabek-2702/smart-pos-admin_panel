@@ -16,12 +16,6 @@ import LineAreaChart from '@/components/design/LineAreaChart.vue'
 import PageHeader from '@/components/design/PageHeader.vue'
 import StateFill from '@/components/design/StateFill.vue'
 import { buildDateParams, businessPreset } from '@/composables/useBusinessDay'
-import {
-  type ProductSalesAnalytics,
-  type ProductSalesOrder,
-  type ProductSalesProductRow,
-  aggregateProductSales,
-} from '@/utils/productSalesAnalytics'
 
 interface PickerOption {
   id: string
@@ -29,17 +23,80 @@ interface PickerOption {
   categoryId?: string | null
 }
 
-interface ProductTableRow extends ProductSalesProductRow {
+interface ProductOverviewResponse {
+  avg_line_revenue?: unknown
+  distinct_products_sold?: unknown
+  gross_revenue?: unknown
+  gross_units?: unknown
+  order_lines?: unknown
+  orders?: unknown
+  refund_amount?: unknown
+  refunded_units?: unknown
+  total_revenue?: unknown
+  total_units?: unknown
+}
+
+interface ProductCategoryResponseRow {
+  category?: unknown
+  category_id?: unknown
+  gross_revenue?: unknown
+  gross_units?: unknown
+  pct_of_revenue?: unknown
+  refund_amount?: unknown
+  refunded_units?: unknown
+  revenue?: unknown
+  units?: unknown
+}
+
+interface ProductParetoResponseRow {
+  class?: unknown
+  cumulative_pct?: unknown
+  gross_qty_sold?: unknown
+  gross_revenue?: unknown
+  pct_of_revenue?: unknown
+  product_id?: unknown
+  product_name?: unknown
+  qty_sold?: unknown
+  refund_amount?: unknown
+  refunded_qty?: unknown
+  revenue?: unknown
+}
+
+interface ProductTrendResponseRow {
+  date?: unknown
+  gross_revenue?: unknown
+  gross_units?: unknown
+  refund_amount?: unknown
+  refunded_units?: unknown
+  revenue?: unknown
+  units?: unknown
+}
+
+interface ProductTableRow {
+  id: string
+  productId: string | null
+  categoryId: string | null
   displayCategory: string
   displayName: string
+  units: number
+  grossUnits: number
+  refundedUnits: number
+  netSales: number
+  grossSales: number
+  refundAmount: number
   share: number
+  paretoClass: string
 }
 
 interface DailyChartPoint {
   date: string
-  grossItemSales: number
+  netSales: number
+  grossSales: number
+  refundAmount: number
   label: string
   units: number
+  grossUnits: number
+  refundedUnits: number
 }
 
 interface PaginationResponse {
@@ -53,19 +110,24 @@ interface CatalogResponse {
   [key: string]: unknown
 }
 
-interface OrdersResponse {
-  orders?: unknown
-  pagination?: PaginationResponse
+interface AnalyticsPayload {
+  overview: ProductOverviewResponse
+  categories: ProductCategoryResponseRow[]
+  pareto: ProductParetoResponseRow[]
+  trends: ProductTrendResponseRow[]
 }
 
 const { t, locale } = useI18n({ useScope: 'global' })
 const { formatCurrency } = useFormatters()
 
 const defaultRange = businessPreset('30d')
-const PAGE_SIZE = 100
+const CATALOG_PAGE_SIZE = 100
 const dateRange = ref<DateRangeValue>({ ...defaultRange, preset: '30d' })
 const appliedDateRange = ref<DateRangeValue | null>(null)
-const rawOrders = ref<ProductSalesOrder[]>([])
+const overview = ref<ProductOverviewResponse | null>(null)
+const backendCategories = ref<ProductCategoryResponseRow[]>([])
+const backendProducts = ref<ProductParetoResponseRow[]>([])
+const backendDaily = ref<ProductTrendResponseRow[]>([])
 const catalogCategoryOptions = ref<PickerOption[]>([])
 const catalogProductOptions = ref<PickerOption[]>([])
 const selectedCategoryIds = ref<string[]>([])
@@ -79,9 +141,6 @@ const productPickerRef = ref<HTMLElement | null>(null)
 const loading = ref(false)
 const hasLoaded = ref(false)
 const failed = ref(false)
-const loadedPages = ref(0)
-const totalPages = ref<number | null>(null)
-const totalOrders = ref(0)
 const rankingMetric = ref<'gross' | 'units'>('gross')
 
 let requestSequence = 0
@@ -103,29 +162,36 @@ const quantityFormatter = computed(() => new Intl.NumberFormat(localeTag.value, 
   maximumFractionDigits: 2,
 }))
 
-const allAnalytics = computed<ProductSalesAnalytics>(() => aggregateProductSales(rawOrders.value))
-
-const analytics = computed<ProductSalesAnalytics>(() => aggregateProductSales(rawOrders.value, {
-  productIds: selectedProductIds.value,
-  categoryIds: selectedCategoryIds.value,
-}))
-
 const categoryOptions = computed<PickerOption[]>(() => mergePickerOptions([
   ...catalogCategoryOptions.value,
-  ...allAnalytics.value.categories
-    .filter(category => category.id !== null)
-    .map(category => ({ id: category.id as string, label: displayCategoryName(category.name) })),
+  ...backendCategories.value
+    .map<PickerOption | null>(category => {
+      const id = optionId(category.category_id)
+      return id
+        ? { id, label: displayCategoryName(optionText(category.category, id)) }
+        : null
+    })
+    .filter((option): option is PickerOption => option !== null),
 ]))
+
+const catalogProductsById = computed(() => new Map(
+  catalogProductOptions.value.map(product => [product.id, product]),
+))
 
 const productOptions = computed<PickerOption[]>(() => mergePickerOptions([
   ...catalogProductOptions.value,
-  ...allAnalytics.value.products
-    .filter(product => product.id !== null)
-    .map(product => ({
-      id: product.id as string,
-      label: displayProductName(product.name),
-      categoryId: product.categoryId,
-    })),
+  ...backendProducts.value
+    .map<PickerOption | null>(product => {
+      const id = optionId(product.product_id)
+      return id
+        ? {
+          id,
+          label: displayProductName(optionText(product.product_name, id)),
+          categoryId: catalogProductsById.value.get(id)?.categoryId ?? null,
+        }
+        : null
+    })
+    .filter((option): option is PickerOption => option !== null),
 ]))
 
 const filteredCategoryOptions = computed(() => filterOptions(categoryOptions.value, categorySearch.value))
@@ -153,7 +219,6 @@ const productTriggerLabel = computed(() => selectedLabel(
 
 const hasClientFilters = computed(() => selectedCategoryIds.value.length > 0 || selectedProductIds.value.length > 0)
 const initialLoading = computed(() => loading.value && !hasLoaded.value)
-const hasSales = computed(() => hasLoaded.value && analytics.value.totals.matchedLines > 0)
 const displayedDateRange = computed(() => appliedDateRange.value ?? dateRange.value)
 
 const hasUnappliedDateChange = computed(() => hasLoaded.value
@@ -162,73 +227,200 @@ const hasUnappliedDateChange = computed(() => hasLoaded.value
 
 const pageSubtitle = computed(() => (
   (hasLoaded.value && appliedDateRange.value)
-    ? t('Showing currently paid orders created in {range}.', { range: formatDateRange(appliedDateRange.value) })
-    : t('Analyze products from orders created in the selected business-day range that are currently paid.')
+    ? t('Showing server-calculated product sales settled in {range}.', { range: formatDateRange(appliedDateRange.value) })
+    : t('Analyze settled product sales and refunds in the selected business-day range.')
+))
+
+const allProductRows = computed<ProductTableRow[]>(() => backendProducts.value.map((product, index) => {
+  const productId = optionId(product.product_id)
+  const categoryId = productId ? catalogProductsById.value.get(productId)?.categoryId ?? null : null
+
+  const categoryName = categoryId
+    ? categoryOptions.value.find(option => option.id === categoryId)?.label ?? t('Uncategorized')
+    : t('Uncategorized')
+
+  return {
+    id: productId ?? `unknown-${index}`,
+    productId,
+    categoryId,
+    displayCategory: displayCategoryName(categoryName),
+    displayName: displayProductName(optionText(product.product_name, t('Unknown'))),
+    units: backendNumber(product.qty_sold),
+    grossUnits: backendNumber(product.gross_qty_sold),
+    refundedUnits: backendNumber(product.refunded_qty),
+    netSales: backendNumber(product.revenue),
+    grossSales: backendNumber(product.gross_revenue),
+    refundAmount: backendNumber(product.refund_amount),
+    share: backendNumber(product.pct_of_revenue),
+    paretoClass: optionText(product.class, 'C').toUpperCase(),
+  }
+}))
+
+// The delivered analytics contract has no product/category query parameters.
+// Keep these as presentation filters over backend-calculated rows; the daily
+// series deliberately remains the complete selected period.
+const productRows = computed<ProductTableRow[]>(() => allProductRows.value.filter(product => {
+  const productMatches = selectedProductIds.value.length === 0
+    || (product.productId !== null && selectedProductIds.value.includes(product.productId))
+
+  const categoryMatches = selectedCategoryIds.value.length === 0
+    || (product.categoryId !== null && selectedCategoryIds.value.includes(product.categoryId))
+
+  return productMatches && categoryMatches
+}))
+
+const viewTotals = computed(() => {
+  if (!hasClientFilters.value && overview.value) {
+    const units = backendNumber(overview.value.total_units)
+    const netSales = backendNumber(overview.value.total_revenue)
+    return {
+      netSales,
+      grossSales: backendNumber(overview.value.gross_revenue),
+      refundAmount: backendNumber(overview.value.refund_amount),
+      units,
+      grossUnits: backendNumber(overview.value.gross_units),
+      refundedUnits: backendNumber(overview.value.refunded_units),
+      productCount: backendNumber(overview.value.distinct_products_sold),
+      averageNetUnitRevenue: units > 0 ? netSales / units : 0,
+    }
+  }
+
+  const totals = productRows.value.reduce((result, product) => {
+    result.netSales += product.netSales
+    result.grossSales += product.grossSales
+    result.refundAmount += product.refundAmount
+    result.units += product.units
+    result.grossUnits += product.grossUnits
+    result.refundedUnits += product.refundedUnits
+    return result
+  }, {
+    netSales: 0,
+    grossSales: 0,
+    refundAmount: 0,
+    units: 0,
+    grossUnits: 0,
+    refundedUnits: 0,
+  })
+
+  return {
+    ...totals,
+    productCount: productRows.value.length,
+    averageNetUnitRevenue: totals.units > 0 ? totals.netSales / totals.units : 0,
+  }
+})
+
+const hasSales = computed(() => hasLoaded.value && (
+  viewTotals.value.grossSales !== 0
+  || viewTotals.value.refundAmount !== 0
+  || viewTotals.value.grossUnits !== 0
+  || viewTotals.value.refundedUnits !== 0
+  || viewTotals.value.productCount > 0
 ))
 
 const dailyChart = computed<DailyChartPoint[]>(() => {
-  const values = new Map(analytics.value.daily.map(row => [row.date, row]))
+  const rows = backendDaily.value
+    .map(row => {
+      const date = typeof row.date === 'string' ? row.date.slice(0, 10) : ''
+      return {
+        date,
+        netSales: backendNumber(row.revenue),
+        grossSales: backendNumber(row.gross_revenue),
+        refundAmount: backendNumber(row.refund_amount),
+        units: backendNumber(row.units),
+        grossUnits: backendNumber(row.gross_units),
+        refundedUnits: backendNumber(row.refunded_units),
+      }
+    })
+    .filter(row => /^\d{4}-\d{2}-\d{2}$/.test(row.date))
+
+  const values = new Map(rows.map(row => [row.date, row]))
   const rangeDates = boundedRangeDates(displayedDateRange.value.from, displayedDateRange.value.to)
 
   const source = rangeDates.length
     ? rangeDates.map(date => ({
       date,
-      grossItemSales: values.get(date)?.grossItemSales ?? 0,
+      netSales: values.get(date)?.netSales ?? 0,
+      grossSales: values.get(date)?.grossSales ?? 0,
+      refundAmount: values.get(date)?.refundAmount ?? 0,
       units: values.get(date)?.units ?? 0,
+      grossUnits: values.get(date)?.grossUnits ?? 0,
+      refundedUnits: values.get(date)?.refundedUnits ?? 0,
     }))
-    : analytics.value.daily
+    : rows
 
   return source.map(row => ({ ...row, label: formatBusinessDate(row.date, false) }))
 })
 
-const topProducts = computed(() => analytics.value.products.slice(0, 6).map(product => ({
-  name: displayProductName(product.name),
-  value: rankingMetric.value === 'gross' ? product.grossItemSales : product.units,
-})))
+const topProducts = computed(() => [...productRows.value]
+  .sort((left, right) => rankingMetric.value === 'gross'
+    ? right.grossSales - left.grossSales
+    : right.grossUnits - left.grossUnits)
+  .map(product => ({
+    name: product.displayName,
+    value: Math.max(0, rankingMetric.value === 'gross' ? product.grossSales : product.grossUnits),
+  }))
+  .filter(product => product.value > 0)
+  .slice(0, 6))
 
 const categoryDonut = computed(() => {
   const colors = ['#6366f1', '#0ea5e9', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6']
 
-  return analytics.value.categories.slice(0, 6).map((category, index) => ({
-    color: colors[index % colors.length],
-    label: displayCategoryName(category.name),
-    value: category.units,
-  }))
+  const rows = hasClientFilters.value
+    ? [...productRows.value.reduce((grouped, product) => {
+      const current = grouped.get(product.displayCategory) ?? 0
+
+      grouped.set(product.displayCategory, current + product.grossUnits)
+
+      return grouped
+    }, new Map<string, number>()).entries()].map(([label, value]) => ({ label, value }))
+    : backendCategories.value.map(category => ({
+      label: displayCategoryName(optionText(category.category, t('Uncategorized'))),
+      value: backendNumber(category.gross_units),
+    }))
+
+  return rows
+    .sort((left, right) => right.value - left.value)
+    .filter(category => category.value > 0)
+    .slice(0, 6)
+    .map((category, index) => ({ ...category, color: colors[index % colors.length] }))
 })
 
 const peakDay = computed(() => dailyChart.value.reduce<DailyChartPoint | null>((peak, row) => {
-  if (!peak || row.grossItemSales > peak.grossItemSales)
+  if (row.grossSales > 0 && (!peak || row.grossSales > peak.grossSales))
     return row
   return peak
 }, null))
 
-const peakHour = computed(() => analytics.value.hourly.reduce<{ grossItemSales: number; label: string } | null>((peak, row) => {
-  if (!peak || row.grossItemSales > peak.grossItemSales)
+const peakUnitsDay = computed(() => dailyChart.value.reduce<DailyChartPoint | null>((peak, row) => {
+  if (row.grossUnits > 0 && (!peak || row.grossUnits > peak.grossUnits))
     return row
   return peak
 }, null))
 
-const averageUnitsPerOrder = computed(() => analytics.value.totals.matchedOrders > 0
-  ? analytics.value.totals.units / analytics.value.totals.matchedOrders
-  : 0)
+const paretoBreakdown = computed(() => {
+  const counts = new Map([['A', 0], ['B', 0], ['C', 0]])
+  for (const product of productRows.value) {
+    const key = counts.has(product.paretoClass) ? product.paretoClass : 'C'
 
-const productRows = computed<ProductTableRow[]>(() => analytics.value.products.map(product => ({
-  ...product,
-  displayCategory: displayCategoryName(product.categoryName),
-  displayName: displayProductName(product.name),
-  share: analytics.value.totals.grossItemSales > 0
-    ? product.grossItemSales / analytics.value.totals.grossItemSales * 100
-    : 0,
-})))
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  const total = Math.max(1, productRows.value.length)
+  return [...counts.entries()].map(([key, count]) => ({
+    key,
+    count,
+    share: count / total * 100,
+  }))
+})
 
 const productColumns = computed<DataTableColumn<ProductTableRow>[]>(() => [
   { key: 'displayName', label: t('Product'), sortable: true },
   { key: 'displayCategory', label: t('Category'), sortable: true },
-  { key: 'units', label: t('Units sold'), align: 'right', sortable: true },
-  { key: 'grossItemSales', label: t('Gross item sales'), align: 'right', sortable: true },
-  { key: 'orderCount', label: t('Orders containing product'), align: 'right', sortable: true },
-  { key: 'avgUnitPrice', label: t('Average unit price'), align: 'right', sortable: true },
+  { key: 'units', label: t('Net units sold'), align: 'right', sortable: true },
+  { key: 'netSales', label: t('Net product sales'), align: 'right', sortable: true },
+  { key: 'grossSales', label: t('Gross sales'), align: 'right', sortable: true },
+  { key: 'refundAmount', label: t('Refunds'), align: 'right', sortable: true },
   { key: 'share', label: t('Sales share'), align: 'right', sortable: true },
+  { key: 'paretoClass', label: t('Pareto class'), align: 'center', sortable: true },
 ])
 
 async function loadAnalytics() {
@@ -243,15 +435,16 @@ async function loadAnalytics() {
   resetAnalyticsLoad()
 
   try {
-    const collected = await fetchOrders(requestedRange, controller.signal, requestId)
-    if (collected === null)
+    const payload = await fetchAnalytics(requestedRange, controller.signal, requestId)
+    if (payload === null)
       return
     if (requestId !== requestSequence)
       return
 
-    rawOrders.value = collected
-    if (totalOrders.value === 0)
-      totalOrders.value = collected.length
+    overview.value = payload.overview
+    backendCategories.value = payload.categories
+    backendProducts.value = payload.pareto
+    backendDaily.value = payload.trends
     pruneUnavailableSelections()
     appliedDateRange.value = requestedRange
     hasLoaded.value = true
@@ -276,58 +469,44 @@ function resetAnalyticsLoad() {
   loading.value = true
   hasLoaded.value = false
   failed.value = false
-  rawOrders.value = []
-  loadedPages.value = 0
-  totalPages.value = null
-  totalOrders.value = 0
+  overview.value = null
+  backendCategories.value = []
+  backendProducts.value = []
+  backendDaily.value = []
   categoryPickerOpen.value = false
   productPickerOpen.value = false
 }
 
-async function fetchOrders(
+async function fetchAnalytics(
   requestedRange: DateRangeValue,
   signal: AbortSignal,
   requestId: number,
-): Promise<ProductSalesOrder[] | null> {
-  const collected: ProductSalesOrder[] = []
-  let page = 1
-  let hasNext = true
+): Promise<AnalyticsPayload | null> {
+  const params = buildDateParams(requestedRange)
 
-  while (hasNext) {
-    const params: Record<string, string | number | boolean> = {
-      include_items: true,
-      order_by: 'created_at',
-      page,
-      per_page: PAGE_SIZE,
-      ...buildDateParams(requestedRange, { orders: true }),
-    }
+  const [overviewResponse, categoriesResponse, paretoResponse, trendsResponse] = await Promise.all([
+    axios.get('/analytics/products/overview', { params, signal }),
+    axios.get('/analytics/products/categories', { params, signal }),
+    axios.get('/analytics/products/pareto', { params, signal }),
+    axios.get('/analytics/products/trends', { params: { ...params, top_n: 6 }, signal }),
+  ])
 
-    const response = await axios.get('/orders', { params, signal })
-    if (requestId !== requestSequence)
-      return null
+  if (requestId !== requestSequence)
+    return null
 
-    const payload = (response.data?.data ?? response.data ?? {}) as OrdersResponse
-    const orders: ProductSalesOrder[] = Array.isArray(payload.orders) ? payload.orders as ProductSalesOrder[] : []
-    const pagination = payload.pagination ?? {}
-    const reportedPages = reportedPageCount(pagination.total_pages)
-    const reportedOrders = Number(pagination.total_orders)
+  const overviewPayload = asRecord(unwrapAnalyticsResponse(overviewResponse))
+  const categoriesPayload = asRecord(unwrapAnalyticsResponse(categoriesResponse))
+  const paretoPayload = asRecord(unwrapAnalyticsResponse(paretoResponse))
+  const trendsPayload = asRecord(unwrapAnalyticsResponse(trendsResponse))
+  if (!overviewPayload || !categoriesPayload || !paretoPayload || !trendsPayload)
+    throw new Error('Invalid product analytics response')
 
-    collected.push(...orders)
-    loadedPages.value = page
-    totalPages.value = reportedPages ?? (pagination.has_next === true ? page + 1 : page)
-    if (isReportedOrderCount(reportedOrders))
-      totalOrders.value = reportedOrders
-
-    hasNext = pageHasNext(page, reportedPages, pagination.has_next, orders.length)
-
-    // Avoid an unbounded request loop if a non-standard response claims more
-    // pages while returning no rows and no total page count.
-    if (hasNext && orders.length === 0 && reportedPages === null)
-      hasNext = false
-    page++
+  return {
+    overview: overviewPayload,
+    categories: recordRows(categoriesPayload.categories) as ProductCategoryResponseRow[],
+    pareto: recordRows(paretoPayload.products) as ProductParetoResponseRow[],
+    trends: recordRows(trendsPayload.daily) as ProductTrendResponseRow[],
   }
-
-  return collected
 }
 
 function reportedPageCount(value: unknown): number | null {
@@ -338,17 +517,13 @@ function reportedPageCount(value: unknown): number | null {
   return Math.floor(count)
 }
 
-function isReportedOrderCount(value: number): boolean {
-  return Number.isFinite(value) && value >= 0
-}
-
 function pageHasNext(page: number, reportedPages: number | null, hasNext: unknown, rowCount: number): boolean {
   if (reportedPages !== null)
     return page < reportedPages
   if (hasNext === true)
     return true
 
-  return hasNext === undefined && rowCount === PAGE_SIZE
+  return hasNext === undefined && rowCount === CATALOG_PAGE_SIZE
 }
 
 async function loadCatalogOptions() {
@@ -393,8 +568,8 @@ async function fetchCatalogRows(path: string, collectionKey: string, signal: Abo
 
   while (hasNext) {
     const params = path === '/products'
-      ? { page, per_page: PAGE_SIZE, order_by: 'name', popular: false }
-      : { page, per_page: PAGE_SIZE, order_by: 'sort_order' }
+      ? { page, per_page: CATALOG_PAGE_SIZE, order_by: 'name', popular: false }
+      : { page, per_page: CATALOG_PAGE_SIZE, order_by: 'sort_order' }
 
     const response = await axios.get(path, {
       params,
@@ -415,6 +590,35 @@ async function fetchCatalogRows(path: string, collectionKey: string, signal: Abo
   }
 
   return rows
+}
+
+function unwrapAnalyticsResponse(response: unknown): unknown {
+  const responseRecord = asRecord(response)
+  const body = asRecord(responseRecord?.data)
+
+  if (body?.success === false)
+    throw new Error(optionText(body.message, 'Failed to load product analytics'))
+
+  return (body && Object.prototype.hasOwnProperty.call(body, 'data'))
+    ? body.data
+    : responseRecord?.data
+}
+
+function recordRows(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value))
+    return []
+
+  return value.filter((row): row is Record<string, unknown> => row !== null && typeof row === 'object')
+}
+
+function backendNumber(value: unknown): number {
+  const parsed = typeof value === 'number'
+    ? value
+    : typeof value === 'string'
+      ? Number(value.trim())
+      : Number.NaN
+
+  return Number.isFinite(parsed) ? parsed : 0
 }
 
 function isCancellation(error: unknown): boolean {
@@ -591,13 +795,6 @@ function boundedRangeDates(from: string, to: string): string[] {
   })
 }
 
-function orderTypeLabel(orderType: string): string {
-  const normalized = orderType.toUpperCase()
-  if (['HALL', 'DELIVERY', 'PICKUP'].includes(normalized))
-    return t(`order_type_${normalized}`)
-  return t('Unknown')
-}
-
 onMounted(() => {
   loadAnalytics()
   loadCatalogOptions()
@@ -610,7 +807,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="product-statistics">
+  <div class="page product-statistics">
     <PageHeader
       :title="t('Product sales analytics')"
       :subtitle="pageSubtitle"
@@ -782,7 +979,14 @@ onBeforeUnmount(() => {
             tone="success"
             dot
           >
-            {{ t('Paid, non-canceled orders only') }}
+            {{ t('Server-calculated sales and refunds') }}
+          </Badge>
+          <Badge
+            v-if="hasClientFilters"
+            tone="info"
+            dot
+          >
+            {{ t('Product and category filters apply to summary totals and rankings.') }}
           </Badge>
           <Badge
             v-if="hasUnappliedDateChange"
@@ -814,10 +1018,8 @@ onBeforeUnmount(() => {
         aria-hidden="true"
       />
       <div>
-        <strong>{{ t('Loading all matching orders') }}</strong>
-        <span v-if="totalPages !== null">
-          {{ t('Loading {loaded} of {total} pages', { loaded: loadedPages, total: totalPages }) }}
-        </span>
+        <strong>{{ t('Loading product analytics') }}</strong>
+        <span>{{ t('The server is calculating sales and refunds for the selected period.') }}</span>
       </div>
     </div>
 
@@ -847,27 +1049,27 @@ onBeforeUnmount(() => {
       >
         <Kpi
           :data="{
-            label: t('Gross item sales'),
-            value: hasLoaded ? analytics.totals.grossItemSales : null,
+            label: t('Net product sales'),
+            value: hasLoaded ? viewTotals.netSales : null,
             money: true,
             icon: 'coins',
             tone: 'success',
-            sub: t('Paid, non-canceled orders only'),
+            sub: t('After product refunds'),
           }"
         />
         <Kpi
           :data="{
-            label: t('Units sold'),
-            value: hasLoaded ? analytics.totals.units : null,
+            label: t('Net units sold'),
+            value: hasLoaded ? viewTotals.units : null,
             icon: 'box',
             tone: 'primary',
-            sub: hasLoaded ? t('Average units per order') : undefined,
+            sub: t('After refunded units'),
           }"
         />
         <Kpi
           :data="{
             label: t('Products sold'),
-            value: hasLoaded ? analytics.products.length : null,
+            value: hasLoaded ? viewTotals.productCount : null,
             icon: 'grid',
             tone: 'info',
             sub: hasLoaded ? t('All products sold in this range') : undefined,
@@ -875,11 +1077,12 @@ onBeforeUnmount(() => {
         />
         <Kpi
           :data="{
-            label: t('Paid orders'),
-            value: hasLoaded ? analytics.totals.matchedOrders : null,
+            label: t('Gross sales'),
+            value: hasLoaded ? viewTotals.grossSales : null,
+            money: true,
             icon: 'receipt',
             tone: 'warning',
-            sub: hasLoaded ? t('Paid, non-canceled orders only') : undefined,
+            sub: t('Before product refunds'),
           }"
         />
       </section>
@@ -890,26 +1093,26 @@ onBeforeUnmount(() => {
       >
         <Card>
           <div class="product-statistics__fact">
-            <span>{{ t('Average unit price') }}</span>
-            <strong class="mono">{{ formatCurrency(analytics.totals.avgUnitPrice) }} UZS</strong>
+            <span>{{ t('Refunds') }}</span>
+            <strong class="mono">{{ formatCurrency(viewTotals.refundAmount) }} UZS</strong>
           </div>
         </Card>
         <Card>
           <div class="product-statistics__fact">
-            <span>{{ t('Average units per order') }}</span>
-            <strong class="mono">{{ formatQuantity(averageUnitsPerOrder) }}</strong>
+            <span>{{ t('Refunded units') }}</span>
+            <strong class="mono">{{ formatQuantity(viewTotals.refundedUnits) }}</strong>
           </div>
         </Card>
         <Card>
           <div class="product-statistics__fact">
-            <span>{{ t('Peak sales day') }}</span>
+            <span>{{ t('Average net unit revenue') }}</span>
+            <strong class="mono">{{ formatCurrency(viewTotals.averageNetUnitRevenue) }} UZS</strong>
+          </div>
+        </Card>
+        <Card>
+          <div class="product-statistics__fact">
+            <span>{{ t('Overall peak gross-sales day') }}</span>
             <strong>{{ peakDay ? formatBusinessDate(peakDay.date, true) : '—' }}</strong>
-          </div>
-        </Card>
-        <Card>
-          <div class="product-statistics__fact">
-            <span>{{ t('Peak sales hour') }}</span>
-            <strong class="mono">{{ peakHour?.label ?? '—' }}</strong>
           </div>
         </Card>
       </section>
@@ -920,10 +1123,10 @@ onBeforeUnmount(() => {
         aria-live="polite"
       >
         <div>
-          <strong>{{ t('Calculated in your browser from every matching paid order.') }}</strong>
-          <span>{{ t('All matching paid orders are included.') }}</span>
+          <strong>{{ t('Calculated by the server from settled product sales.') }}</strong>
+          <span>{{ t('Sales follow payment time; refunds follow refund time.') }}</span>
         </div>
-        <p>{{ t('Gross item sales use historical item price x quantity; discounts and refunds are not allocated per product.') }}</p>
+        <p>{{ t('Gross sales include settled line revenue after allocated discounts. Net sales subtract product refund events.') }}</p>
       </section>
 
       <section
@@ -931,12 +1134,15 @@ onBeforeUnmount(() => {
         class="product-statistics__charts"
       >
         <ChartCard
-          :title="t('Daily gross item sales')"
-          :sub="t('Gross item sales')"
+          :title="t('Daily product sales')"
+          :sub="t('All products in the selected period')"
         >
           <LineAreaChart
             :categories="dailyChart.map(row => row.label)"
-            :series="[{ key: 'gross', label: t('Gross item sales'), color: 'rgb(var(--v-theme-chart-revenue))', data: dailyChart.map(row => row.grossItemSales) }]"
+            :series="[
+              { key: 'gross', label: t('Gross sales'), color: 'rgb(var(--v-theme-chart-revenue))', data: dailyChart.map(row => row.grossSales) },
+              { key: 'refunds', label: t('Refunds'), color: 'rgb(var(--v-theme-error))', data: dailyChart.map(row => row.refundAmount), dashed: true },
+            ]"
             :height="270"
             :y-format="formatCurrency"
             :loading="initialLoading"
@@ -944,13 +1150,13 @@ onBeforeUnmount(() => {
         </ChartCard>
 
         <ChartCard
-          :title="t('Daily units sold')"
-          :sub="t('Units sold')"
+          :title="t('Daily gross units sold')"
+          :sub="t('All products in the selected period')"
         >
           <BarChart
-            :data="dailyChart.map(row => ({ label: row.label, value: row.units, peak: peakDay?.date === row.date }))"
+            :data="dailyChart.map(row => ({ label: row.label, value: row.grossUnits, peak: peakUnitsDay?.date === row.date }))"
             :height="270"
-            :value-label="t('Units sold')"
+            :value-label="t('Gross units sold')"
             :y-format="formatQuantity"
             :x-label-every="Math.max(1, Math.ceil(dailyChart.length / 7))"
             :loading="initialLoading"
@@ -959,7 +1165,7 @@ onBeforeUnmount(() => {
 
         <ChartCard
           :title="t('Top products')"
-          :sub="rankingMetric === 'gross' ? t('By gross item sales') : t('By units sold')"
+          :sub="rankingMetric === 'gross' ? t('By gross sales') : t('By gross units sold')"
         >
           <template #actions>
             <div
@@ -985,7 +1191,7 @@ onBeforeUnmount(() => {
                 role="tab"
                 @click="rankingMetric = 'units'"
               >
-                {{ t('Units sold') }}
+                {{ t('Gross units sold') }}
               </button>
             </div>
           </template>
@@ -998,12 +1204,12 @@ onBeforeUnmount(() => {
 
         <ChartCard
           :title="t('Category mix')"
-          :sub="t('By units sold')"
+          :sub="t('By gross units sold')"
         >
           <DonutChart
             :data="categoryDonut"
-            :center-label="t('Units sold')"
-            :center-value="formatQuantity(analytics.totals.units)"
+            :center-label="t('Gross units sold')"
+            :center-value="formatQuantity(viewTotals.grossUnits)"
             :size="180"
             :loading="initialLoading"
           />
@@ -1018,27 +1224,27 @@ onBeforeUnmount(() => {
           <div class="card__head">
             <div class="card__head-text">
               <div class="kpi__label">
-                {{ t('Order types') }}
+                {{ t('Pareto distribution') }}
               </div>
               <h2 class="card__title">
-                {{ t('Gross item sales') }}
+                {{ t('Product concentration') }}
               </h2>
             </div>
           </div>
           <div class="card__body product-statistics__type-list">
             <div
-              v-for="row in analytics.orderTypes"
-              :key="row.orderType"
+              v-for="row in paretoBreakdown"
+              :key="row.key"
               class="product-statistics__type-row"
             >
               <div class="product-statistics__type-head">
-                <span>{{ orderTypeLabel(row.orderType) }}</span>
-                <strong class="mono">{{ formatCurrency(row.grossItemSales) }} UZS</strong>
+                <span>{{ t('Class {class}', { class: row.key }) }}</span>
+                <strong class="mono">{{ formatQuantity(row.count) }}</strong>
               </div>
               <div class="product-statistics__type-track">
-                <span :style="{ width: `${analytics.totals.grossItemSales > 0 ? row.grossItemSales / analytics.totals.grossItemSales * 100 : 0}%` }" />
+                <span :style="{ width: `${row.share}%` }" />
               </div>
-              <small>{{ formatQuantity(row.units) }} · {{ formatQuantity(row.orderCount) }} {{ t('Orders').toLocaleLowerCase() }}</small>
+              <small>{{ row.share.toFixed(1) }}% · {{ t('Products').toLocaleLowerCase() }}</small>
             </div>
           </div>
         </Card>
@@ -1061,7 +1267,7 @@ onBeforeUnmount(() => {
               :rows="productRows"
               row-key="id"
               :loading="initialLoading"
-              :empty-title="t('No paid product sales found')"
+              :empty-title="t('No product sales activity found')"
               :empty-sub="t('Try another business-day range or clear the product and category filters.')"
               :per-page="10"
             >
@@ -1080,17 +1286,22 @@ onBeforeUnmount(() => {
               <template #cell.units="{ row }">
                 <span class="mono">{{ formatQuantity(row.units) }}</span>
               </template>
-              <template #cell.grossItemSales="{ row }">
-                <span class="mono cell-strong">{{ formatCurrency(row.grossItemSales) }}</span>
+              <template #cell.netSales="{ row }">
+                <span class="mono cell-strong">{{ formatCurrency(row.netSales) }}</span>
               </template>
-              <template #cell.orderCount="{ row }">
-                <span class="mono">{{ formatQuantity(row.orderCount) }}</span>
+              <template #cell.grossSales="{ row }">
+                <span class="mono">{{ formatCurrency(row.grossSales) }}</span>
               </template>
-              <template #cell.avgUnitPrice="{ row }">
-                <span class="mono">{{ formatCurrency(row.avgUnitPrice) }}</span>
+              <template #cell.refundAmount="{ row }">
+                <span class="mono">{{ formatCurrency(row.refundAmount) }}</span>
               </template>
               <template #cell.share="{ row }">
                 <span class="mono">{{ row.share.toFixed(1) }}%</span>
+              </template>
+              <template #cell.paretoClass="{ row }">
+                <Badge :tone="row.paretoClass === 'A' ? 'success' : row.paretoClass === 'B' ? 'warning' : 'neutral'">
+                  {{ row.paretoClass }}
+                </Badge>
               </template>
             </DataTable>
           </div>
@@ -1103,7 +1314,7 @@ onBeforeUnmount(() => {
       >
         <StateFill
           icon="box"
-          :title="t('No paid product sales found')"
+          :title="t('No product sales activity found')"
           :sub="t('Try another business-day range or clear the product and category filters.')"
         >
           <Button
@@ -1122,7 +1333,9 @@ onBeforeUnmount(() => {
 <style scoped>
 .product-statistics {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sp-4);
+  min-width: 0;
 }
 
 .product-statistics__filters-card {
@@ -1264,8 +1477,18 @@ onBeforeUnmount(() => {
   display: flex;
   flex: 0 1 auto;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--sp-2);
+  max-width: 100%;
   min-height: 38px;
+}
+
+.product-statistics__scope :deep(.badge) {
+  height: auto;
+  min-height: 22px;
+  padding-block: 3px;
+  line-height: 1.3;
+  white-space: normal;
 }
 
 .product-statistics__loading {
@@ -1453,13 +1676,13 @@ onBeforeUnmount(() => {
   }
 
   .product-statistics__bottom-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
 @media (max-width: 780px) {
   .product-statistics__charts {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .product-statistics__method-card {
@@ -1479,7 +1702,7 @@ onBeforeUnmount(() => {
   }
 
   .product-statistics__scope {
-    justify-content: space-between;
+    justify-content: flex-start;
   }
 
   .product-statistics__picker-popover {
@@ -1494,7 +1717,7 @@ onBeforeUnmount(() => {
 
   .product-statistics__kpis,
   .product-statistics__fact-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

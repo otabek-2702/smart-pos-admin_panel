@@ -56,7 +56,7 @@ Smart POS / Alpha POS restaurant-administration SPA covering:
 
 - dashboards, analytics, forecasting, audit, and AI assistance;
 - users, categories, products, orders, places/tables, discounts, and loyalty;
-- shifts, settlement, inkassa, treasury, and cashbox flows;
+- shifts, settlement, treasury, and cashbox flows;
 - stock, suppliers, purchasing, receiving, recipes, production, transfers,
   counts, reservations, alerts, and adjustments;
 - HR employees, payroll, attendance, leave, contracts, expenses, reviews,
@@ -207,10 +207,10 @@ no `@axios` alias—import `@/plugins/axios`.
   clearly labeled demo data while `/analytics/comparison` is unavailable.
 - The shift receive-money flow currently blind-counts CASH/HUMO/UZCARD/PAYME,
   reveals expected/variance, and settles cash to SAFE and cards/Payme to BANK.
-- `MONEY_SHIFT_SPEC.md` is a target-state document. It calls for per-shift
-  drawers and removal of Inkassa, but current code still exposes and recently
-  improved Inkassa. Do not delete Inkassa or perform structural money-model
-  changes without reconfirming the product decision.
+- `MONEY_SHIFT_SPEC.md` is a target-state document. The frontend Inkassa page
+  was removed by explicit product decision on 2026-09-05. Historical Inkassa
+  transaction labels and backend records remain valid; do not erase or remap
+  them as part of unrelated money-model work.
 - Some cash-sale paths may not create `OrderPayment`; shift reconciliation has
   a defensive `expected_cash` fallback. Do not remove it without backend proof.
 - Running shift status is defensively mapped across `OPEN`/`ACTIVE`; confirm

@@ -11,7 +11,6 @@
    ============================================================ */
 import dashboardNav from '@/navigation/vertical/dashboard'
 import managementNav from '@/navigation/vertical/management'
-import hrNav from '@/navigation/vertical/hr'
 import stockNav from '@/navigation/vertical/stock'
 import systemNav from '@/navigation/vertical/system'
 import analyticsNav from '@/navigation/vertical/analytics'
@@ -117,7 +116,6 @@ const items = computed<CmdItem[]>(() => {
   const routes = [
     ...flattenNav(t('Dashboard'), dashboardNav as any),
     ...flattenNav(t('Management'), managementNav as any),
-    ...flattenNav(t('HR'), hrNav as any),
     ...flattenNav(t('Stock'), stockNav as any),
     ...flattenNav(t('Analytics'), analyticsNav as any),
     ...flattenNav(t('Settings'), systemNav as any),

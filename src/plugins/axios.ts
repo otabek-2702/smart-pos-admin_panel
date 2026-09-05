@@ -108,7 +108,6 @@ const IDEMPOTENT_ROUTES: IdempotentRoute[] = [
   { method: 'POST', path: /^\/orders\/?$/ },
   { method: 'POST', path: /^\/orders\/\d+\/(?:pay|unpay|cancel)$/ },
   { method: 'PATCH', path: /^\/orders\/\d+\/status$/ },
-  { method: 'POST', path: /^\/inkassa\/perform$/ },
   { method: 'POST', path: /^\/treasury\/(?:transfer|expense)$/ },
   { method: 'POST', path: /^\/expenses\/\d+\/(?:pay|void)\/?$/ },
   { method: 'POST', path: /^\/shifts\/\d+\/reconcile\/?$/ },

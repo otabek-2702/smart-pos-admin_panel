@@ -15,7 +15,6 @@ const NAV_ROUTES = [
   '/places',
   '/discounts',
   '/shifts',
-  '/inkassa',
   '/users',
   '/hr-departments',
   '/hr-salaries',

@@ -339,7 +339,8 @@ test.describe('warehouse operational audit readiness', () => {
     const navigation = page.getByRole('navigation', { name: 'Navigation' })
 
     await expect(navigation.getByRole('link', { name: 'Warehouse operations' })).toBeVisible()
-    await expect(navigation.getByRole('link', { name: 'Operational Audit' })).toBeVisible()
+    await expect(navigation.getByText('HR', { exact: true })).toHaveCount(0)
+    await expect(navigation.getByRole('link', { name: 'Operational Audit' })).toHaveCount(0)
     await expect(navigation.getByText('Treasury', { exact: true })).toHaveCount(0)
     await expect(navigation.getByText('Adjustments', { exact: true })).toHaveCount(0)
 

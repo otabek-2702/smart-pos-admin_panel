@@ -66,6 +66,13 @@ export default [
     subject: 'all',
   },
   {
+    title: 'Goods Receiving',
+    icon: { icon: 'bx-package' },
+    to: 'stock-receiving',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
     title: 'Stock adjustment requests',
     icon: { icon: 'bx-slider-alt' },
     to: 'stock-adjustment-requests',
@@ -99,6 +106,13 @@ export default [
     title: 'Stock Alerts',
     icon: { icon: 'bx-error-circle' },
     to: 'stock-alerts',
+    action: 'manage',
+    subject: 'all',
+  },
+  {
+    title: 'Stock Reservations',
+    icon: { icon: 'bx-lock' },
+    to: 'stock-reservations',
     action: 'manage',
     subject: 'all',
   },

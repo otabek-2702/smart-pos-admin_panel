@@ -1,5 +1,3 @@
-import { EXPENSE_REQUEST_PERMISSIONS } from '../access'
-
 export default [
   {
     heading: 'Management',
@@ -47,16 +45,16 @@ export default [
     subject: 'all',
   },
   {
-    title: 'Shifts',
-    icon: { icon: 'bx-time-five' },
-    to: 'shifts',
+    title: 'discount_secret_title',
+    icon: { icon: 'bx-lock' },
+    to: 'discounts-secret-word',
     action: 'manage',
     subject: 'all',
   },
   {
-    title: 'Cash Register',
-    icon: { icon: 'bx-wallet' },
-    to: 'inkassa',
+    title: 'Cashbox Expense Categories',
+    icon: { icon: 'bx-folder-open' },
+    to: 'cashbox-categories',
     action: 'manage',
     subject: 'all',
   },
@@ -77,24 +75,9 @@ export default [
     anyPermission: ['treasury.account.view'],
   },
   {
-    title: 'Expenses',
-    icon: { icon: 'bx-receipt' },
-    to: 'hr-expenses',
-    action: 'manage',
-    subject: 'all',
-    anyPermission: EXPENSE_REQUEST_PERMISSIONS,
-  },
-  {
     title: 'Loyalty',
     icon: { icon: 'bx-medal' },
     to: 'loyalty',
-    action: 'manage',
-    subject: 'all',
-  },
-  {
-    title: 'Sessions',
-    icon: { icon: 'bx-lock' },
-    to: 'sessions',
     action: 'manage',
     subject: 'all',
   },

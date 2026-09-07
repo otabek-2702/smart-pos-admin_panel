@@ -205,8 +205,11 @@ no `@axios` alias—import `@/plugins/axios`.
 - Preserve the rich Orders status/cashier/category/type filters.
 - Compare Periods is an approved ECharts exception and may use deterministic,
   clearly labeled demo data while `/analytics/comparison` is unavailable.
-- The shift receive-money flow currently blind-counts CASH/HUMO/UZCARD/PAYME,
-  reveals expected/variance, and settles cash to SAFE and cards/Payme to BANK.
+- The shift receive-money dialog counts Cash, Card, and Payme. Card is the
+  combined terminal amount sent as `HUMO`; Payme remains `PAYME`. The dialog
+  sends `CASH`/`HUMO`/`PAYME`, not separate `CARD` or `UZCARD` confirmations.
+  Tender-specific reporting is unchanged; cash settles to SAFE and cards/Payme
+  to BANK.
 - `MONEY_SHIFT_SPEC.md` is a target-state document. The frontend Inkassa page
   was removed by explicit product decision on 2026-09-05. Historical Inkassa
   transaction labels and backend records remain valid; do not erase or remap

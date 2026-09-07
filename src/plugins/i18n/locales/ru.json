@@ -4500,6 +4500,8 @@
   "Total hours · {window}": "Всего часов · {window}",
   "Receive money": "Приём денег",
   "All payment types": "Все способы оплаты",
+  "Cash, Card and Payme": "Наличные, карта и Payme",
+  "Check the cash, total card and Payme amounts before confirming.": "Перед подтверждением проверьте наличные, общую сумму по картам и сумму Payme.",
   "Awaiting settlement": "Ожидает сверки",
   "Settlement to receive": "Сумма к приёму",
   "Failed to record settlement": "Не удалось зафиксировать расчёт",

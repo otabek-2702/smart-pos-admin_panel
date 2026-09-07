@@ -4503,6 +4503,8 @@
   "Total hours · {window}": "Jami soat · {window}",
   "Receive money": "Pulni qabul qilish",
   "All payment types": "Barcha to'lov turlari",
+  "Cash, Card and Payme": "Naqd pul, karta va Payme",
+  "Check the cash, total card and Payme amounts before confirming.": "Tasdiqlashdan oldin naqd pul, kartalardagi jami summa va Payme summasini tekshiring.",
   "Awaiting settlement": "Hisob-kitob kutilmoqda",
   "Settlement to receive": "Qabul qilinadigan summa",
   "Failed to record settlement": "Hisob-kitobni qayd etib bo'lmadi",

@@ -19,7 +19,6 @@ import {
   outstandingNoncash,
   outstandingPhysicalCash,
   reconciliationSetup,
-  rowRequiresManagerConfirmation,
   safeSettlementExpected,
   settlementMethod,
   settlementRowIsUncounted,
@@ -338,41 +337,33 @@ const note = ref('')
 const busy = ref(false)
 
 type Tender = string
-const STANDARD_TENDERS = ['CASH', 'HUMO', 'UZCARD', 'CARD', 'PAYME'] as const
+
+// Card is the combined terminal amount, stored under the backend's HUMO key.
+// Payme is counted separately; CARD and UZCARD are not sent by this dialog.
+const RECEIVE_TENDERS = ['CASH', 'HUMO', 'PAYME'] as const
 const TENDER_LABEL: Record<string, string> = {
   CASH: 'Cash',
-  HUMO: 'Humo',
-  UZCARD: 'Uzcard',
-  CARD: 'Card',
+  HUMO: 'Card',
   PAYME: 'Payme',
 }
 
 function emptyTenderCounts(): Record<Tender, string> {
-  return Object.fromEntries(STANDARD_TENDERS.map(method => [method, '']))
+  return Object.fromEntries(RECEIVE_TENDERS.map(method => [method, '']))
 }
 
 const settlementLoading = ref(false)
 const settlementReady = ref(false)
 const settlementError = ref(false)
 const settlementDetail = ref<any | null>(null)
-const settlementMethods = ref<Tender[]>([])
 const countedByTender = ref<Record<Tender, string>>(emptyTenderCounts())
 let settlementRequestId = 0
 
 const settlementSetup = computed(() => reconciliationSetup(settlementDetail.value))
 const settlementRows = computed<SettlementRow[]>(() => settlementSetup.value.rows)
 
-// Render only the exact tender rows returned by the fresh shift detail.
-const visibleTenders = computed<Tender[]>(() => [
-  ...new Set(settlementRows.value.flatMap(row => {
-    const method = settlementMethod(row)
-    return method ? [method] : []
-  })),
-])
-const requiredTenders = computed(() => settlementRows.value.flatMap(row => {
-  const method = settlementMethod(row)
-  return method && rowRequiresManagerConfirmation(row) ? [method] : []
-}))
+// Keep the operational form stable even though the backend exposes additional
+// accounting tenders in `expected_by_tender` and `settlement`.
+const visibleTenders = RECEIVE_TENDERS
 
 function tenderLabel(method: Tender): string {
   return TENDER_LABEL[method] ? t(TENDER_LABEL[method]) : method
@@ -414,14 +405,14 @@ function tenderVariance(method: Tender): number | null {
   const expected = expectedOf(method)
   return counted === null || expected === null ? null : counted - expected
 }
-const allExpectedTendersCounted = computed(() => requiredTenders.value.every(method => countedOf(method) !== null))
+const allReceiveTendersCounted = computed(() => RECEIVE_TENDERS.every(method => countedOf(method) !== null))
 const canConfirmSettlement = computed(() => settlementReady.value
   && settlementSetup.value.ok
   && !settlementLoading.value
   && settlementRows.value.length > 0
   && settlementRows.value.every(row => !!settlementMethod(row))
-  && allExpectedTendersCounted.value)
-const totalReceived = computed(() => visibleTenders.value.reduce(
+  && allReceiveTendersCounted.value)
+const totalReceived = computed(() => visibleTenders.reduce(
   (total, method) => total + (countedOf(method) ?? 0),
   0,
 ))
@@ -437,19 +428,8 @@ async function loadSettlement(id: number | string) {
     const responseData = res.data?.data ?? res.data ?? {}
     const base = (responseData?.shift && typeof responseData.shift === 'object') ? responseData.shift : responseData
     const data = { ...(base ?? {}), settlement: responseData?.settlement ?? base?.settlement ?? [] }
-    const setup = reconciliationSetup(data)
-    const rows = setup.rows
-    const methods: Tender[] = []
-    for (const row of rows) {
-      const method = settlementMethod(row)
-      if (!method) continue
-      methods.push(method)
-    }
     settlementDetail.value = data
-    settlementMethods.value = [...new Set(methods)]
-    countedByTender.value = Object.fromEntries(
-      [...new Set([...STANDARD_TENDERS, ...methods])].map(method => [method, '']),
-    )
+    countedByTender.value = emptyTenderCounts()
     settlementReady.value = true
   }
   catch {
@@ -468,7 +448,6 @@ function openReceive(s: any) {
   busy.value = false
   settlementReady.value = false
   settlementError.value = false
-  settlementMethods.value = []
   settlementDetail.value = null
   countedByTender.value = emptyTenderCounts()
   void loadSettlement(s.id)
@@ -572,20 +551,23 @@ async function confirmReceive() {
   busy.value = true
   const s = receiving.value
   try {
-    const confirmed: Record<string, number> = {}
-    for (const method of settlementMethods.value) {
-      const counted = countedOf(method)
-      if (counted !== null)
-        confirmed[method] = counted
-    }
-
-    if (confirmed.CASH === undefined)
+    const cash = countedOf('CASH')
+    const card = countedOf('HUMO')
+    const payme = countedOf('PAYME')
+    if (cash === null || card === null || payme === null)
       return
+
+    // Keep the backend tender identities while showing the operational labels.
+    const confirmed = {
+      CASH: cash,
+      HUMO: card,
+      PAYME: payme,
+    }
 
     const res = await axios.post(`/shifts/${s.id}/reconcile`, {
       // The backend still requires this cash audit field alongside the
-      // full per-tender confirmation map.
-      actual_cash: confirmed.CASH,
+      // cash, combined-card and Payme confirmation map.
+      actual_cash: cash,
       confirmed,
       notes: note.value || undefined,
     })
@@ -1258,7 +1240,7 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               {{ t('Receive money') }} &middot; {{ fullName(receiving.user) }}
             </h3>
             <div class="modal__sub">
-              {{ t('Shift') }} #{{ receiving.id }} &middot; {{ t('All payment types') }}
+              {{ t('Shift') }} #{{ receiving.id }} &middot; {{ t('Cash, Card and Payme') }}
             </div>
           </div>
           <button type="button" class="iconaction" :title="t('Close')" @click="closeReceive">
@@ -1299,73 +1281,73 @@ const varCounted = useCountUp(() => Math.abs(Number(summary.value.netVariance ??
               </div>
 
               <p class="settlement-intro">
-                {{ t('Confirm every returned tender. Do not enter a value that was not physically reviewed.') }}
+                {{ t('Check the cash, total card and Payme amounts before confirming.') }}
               </p>
 
-            <div class="settlement-grid reconcile-table">
-              <div class="settlement-grid__head">
-                <span>{{ t('Payment type') }}</span>
-                <span>{{ t('Counted') }}</span>
-                <span>{{ t('System expected') }}</span>
-                <span>{{ t('Difference') }}</span>
-              </div>
+              <div class="settlement-grid reconcile-table">
+                <div class="settlement-grid__head">
+                  <span>{{ t('Payment type') }}</span>
+                  <span>{{ t('Counted') }}</span>
+                  <span>{{ t('System expected') }}</span>
+                  <span>{{ t('Difference') }}</span>
+                </div>
 
-              <div
-                v-for="method in visibleTenders"
-                :key="method"
-                class="settlement-grid__row"
-              >
-                <div class="settlement-grid__tender">
-                  {{ tenderLabel(method) }}
-                  <small v-if="cashierCountNote(method)">{{ cashierCountNote(method) }}</small>
-                </div>
-                <div class="settlement-grid__input">
-                  <input
-                    :value="countedByTender[method]"
-                    class="settlement-input"
-                    inputmode="numeric"
-                    :aria-label="`${tenderLabel(method)}: ${t('Counted')}`"
-                    :placeholder="t('Enter counted amount')"
-                    @input="setCountedAmount(method, $event)"
-                  >
-                </div>
-                <div class="settlement-grid__expected" :data-label="t('System expected')">
-                  <span v-if="countedOf(method) !== null && expectedOf(method) !== null" class="mono">
-                    {{ fmtMoney(expectedOf(method)) }}
-                  </span>
-                  <span v-else class="tertiary">&mdash;</span>
-                </div>
-                <div class="settlement-grid__difference" :data-label="t('Difference')">
-                  <template v-if="tenderVariance(method) !== null">
-                    <span
-                      class="settlement-difference"
-                      :class="{
-                        'settlement-difference--exact': tenderVariance(method) === 0,
-                        'settlement-difference--over': (tenderVariance(method) ?? 0) > 0,
-                        'settlement-difference--short': (tenderVariance(method) ?? 0) < 0,
-                      }"
+                <div
+                  v-for="method in visibleTenders"
+                  :key="method"
+                  class="settlement-grid__row"
+                >
+                  <div class="settlement-grid__tender">
+                    {{ tenderLabel(method) }}
+                    <small v-if="cashierCountNote(method)">{{ cashierCountNote(method) }}</small>
+                  </div>
+                  <div class="settlement-grid__input">
+                    <input
+                      :value="countedByTender[method]"
+                      class="settlement-input"
+                      inputmode="numeric"
+                      :aria-label="`${tenderLabel(method)}: ${t('Counted')}`"
+                      :placeholder="t('Enter counted amount')"
+                      @input="setCountedAmount(method, $event)"
                     >
-                      {{ tenderVariance(method) === 0 ? t('Exact') : (tenderVariance(method) ?? 0) > 0 ? t('Over') : t('Short') }}
-                      {{ tenderVariance(method) === 0 ? '' : `${(tenderVariance(method) ?? 0) > 0 ? '+' : '-'}${fmtMoney(Math.abs(tenderVariance(method) ?? 0))}` }}
+                  </div>
+                  <div class="settlement-grid__expected" :data-label="t('System expected')">
+                    <span v-if="countedOf(method) !== null && expectedOf(method) !== null" class="mono">
+                      {{ fmtMoney(expectedOf(method)) }}
                     </span>
-                  </template>
-                  <span v-else class="tertiary">{{ countedOf(method) === null && settlementRowIsUncounted(rowForTender(method) ?? {}) ? t('Variance unavailable') : '—' }}</span>
+                    <span v-else class="tertiary">&mdash;</span>
+                  </div>
+                  <div class="settlement-grid__difference" :data-label="t('Difference')">
+                    <template v-if="tenderVariance(method) !== null">
+                      <span
+                        class="settlement-difference"
+                        :class="{
+                          'settlement-difference--exact': tenderVariance(method) === 0,
+                          'settlement-difference--over': (tenderVariance(method) ?? 0) > 0,
+                          'settlement-difference--short': (tenderVariance(method) ?? 0) < 0,
+                        }"
+                      >
+                        {{ tenderVariance(method) === 0 ? t('Exact') : (tenderVariance(method) ?? 0) > 0 ? t('Over') : t('Short') }}
+                        {{ tenderVariance(method) === 0 ? '' : `${(tenderVariance(method) ?? 0) > 0 ? '+' : '-'}${fmtMoney(Math.abs(tenderVariance(method) ?? 0))}` }}
+                      </span>
+                    </template>
+                    <span v-else class="tertiary">{{ countedOf(method) === null && settlementRowIsUncounted(rowForTender(method) ?? {}) ? t('Variance unavailable') : '—' }}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div class="settlement-total">
-              <div>
-                <div class="settlement-total__label">{{ t('Total received') }}</div>
-                <div class="settlement-total__hint">{{ t('All payment types') }}</div>
+              <div class="settlement-total">
+                <div>
+                  <div class="settlement-total__label">{{ t('Total received') }}</div>
+                  <div class="settlement-total__hint">{{ t('Cash, Card and Payme') }}</div>
+                </div>
+                <strong class="mono">{{ fmtMoney(totalReceived) }} <span>UZS</span></strong>
               </div>
-              <strong class="mono">{{ fmtMoney(totalReceived) }} <span>UZS</span></strong>
-            </div>
 
-            <label class="field" style="margin-top:16px;">
-              <span class="field__label">{{ t('Note (optional)') }}</span>
-              <textarea v-model="note" class="control" :placeholder="t('Reason for any difference, deposits, etc.')" />
-            </label>
+              <label class="field" style="margin-top:16px;">
+                <span class="field__label">{{ t('Note (optional)') }}</span>
+                <textarea v-model="note" class="control" :placeholder="t('Reason for any difference, deposits, etc.')" />
+              </label>
             </template>
           </template>
         </div>

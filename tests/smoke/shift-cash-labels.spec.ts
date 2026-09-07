@@ -59,6 +59,18 @@ const detail = {
       reconciled: false,
       difference: null,
     },
+    {
+      method: 'PAYME',
+      expected: '0.00',
+      expected_source: 'CANONICAL_DERIVED',
+      counted: null,
+      cashier_count_status: 'UNCOUNTED',
+      status: 'UNCOUNTED',
+      confirmed: null,
+      manager_confirmed: false,
+      reconciled: false,
+      difference: null,
+    },
   ],
 }
 
@@ -157,8 +169,14 @@ test.describe('shift physical-cash labels', () => {
 
     const inputs = page.locator('.reconcile-table input')
 
+    await expect(inputs).toHaveCount(3)
+    await expect(page.getByRole('textbox', { name: 'Cash: Counted', exact: true })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'Card: Counted', exact: true })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'Payme: Counted', exact: true })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: /Humo: Counted|Uzcard: Counted/i })).toHaveCount(0)
     await inputs.nth(0).fill('2431000')
     await inputs.nth(1).fill('217000')
+    await inputs.nth(2).fill('0')
     await page.getByRole('button', { name: 'Confirm settlement' }).click()
 
     await expect(page.getByText('A manager confirmation is required.')).toBeVisible()
@@ -173,6 +191,7 @@ test.describe('shift physical-cash labels', () => {
         settlement: [
           { ...detail.settlement[0], expected_source: 'FUTURE_UNRECOGNIZED_SOURCE' },
           detail.settlement[1],
+          detail.settlement[2],
         ],
       },
     })
@@ -195,6 +214,7 @@ test.describe('shift physical-cash labels', () => {
             cashier_count_status: 'COUNTED',
             status: 'COUNTED',
           },
+          detail.settlement[2],
         ],
       },
     })
@@ -204,6 +224,7 @@ test.describe('shift physical-cash labels', () => {
     const inputs = page.locator('.reconcile-table input')
 
     await inputs.nth(0).fill('2431000')
+    await inputs.nth(2).fill('0')
     await expect(page.getByRole('button', { name: 'Confirm settlement' })).toBeDisabled()
 
     await inputs.nth(1).fill('5000')
@@ -219,8 +240,15 @@ test.describe('shift physical-cash labels', () => {
 
     await inputs.nth(0).fill('2431000')
     await inputs.nth(1).fill('217000')
+    await inputs.nth(2).fill('0')
+    const reconciliationRequest = page.waitForRequest(request => request.url().endsWith('/shifts/11/reconcile') && request.method() === 'POST')
+
     await page.getByRole('button', { name: 'Confirm settlement' }).click()
 
+    expect((await reconciliationRequest).postDataJSON()).toEqual({
+      actual_cash: 2431000,
+      confirmed: { CASH: 2431000, HUMO: 217000, PAYME: 0 },
+    })
     await expect(page.locator('[role="dialog"]')).toHaveCount(0)
   })
 

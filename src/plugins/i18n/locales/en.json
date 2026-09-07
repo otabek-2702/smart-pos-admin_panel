@@ -4593,6 +4593,8 @@
   "Total hours · {window}": "Total hours · {window}",
   "Receive money": "Receive money",
   "All payment types": "All payment types",
+  "Cash, Card and Payme": "Cash, Card and Payme",
+  "Check the cash, total card and Payme amounts before confirming.": "Check the cash, total card and Payme amounts before confirming.",
   "Awaiting settlement": "Awaiting settlement",
   "Settlement to receive": "Settlement to receive",
   "Failed to record settlement": "Failed to record settlement",

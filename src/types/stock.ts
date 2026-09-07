@@ -13,6 +13,8 @@ export interface StockItem {
   base_unit: { id: number; name: string; short_name: string } | null
   base_unit_id: number | null
   cost_price: string
+  avg_cost_price?: string | number | null
+  last_cost_price?: string | number | null
   min_stock_level: number | null
   max_stock_level: number | null
   reorder_point: number | null

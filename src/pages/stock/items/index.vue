@@ -86,7 +86,7 @@ const columns = computed<DataTableColumn<any>[]>(() => [
   { key: 'item_type', label: t('Type') },
   { key: 'category', label: t('Category') },
   { key: 'base_unit', label: t('Unit') },
-  { key: 'cost_price', label: t('Cost Price'), align: 'right' },
+  { key: 'avg_cost_price', label: t('item_drill_avg_cost'), align: 'right' },
   { key: 'is_active', label: t('Status') },
 ])
 
@@ -507,8 +507,8 @@ const dtPagination = computed(() => ({
           <span class="cell-muted">{{ row.base_unit?.short_name ?? row.base_unit?.name ?? '—' }}</span>
         </template>
 
-        <template #cell.cost_price="{ row }">
-          <span class="mono cell-strong">{{ formatCurrency(row.cost_price ?? 0) }}</span>
+        <template #cell.avg_cost_price="{ row }">
+          <span class="mono cell-strong">{{ formatCurrency(row.avg_cost_price ?? row.cost_price ?? 0) }}</span>
         </template>
 
         <template #cell.is_active="{ row }">

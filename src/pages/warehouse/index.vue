@@ -5,7 +5,7 @@ import PageHeader from '@/components/design/PageHeader.vue'
 import { useUserAccess } from '@/composables/useUserAccess'
 
 const { t } = useI18n({ useScope: 'global' })
-const { hasPermission, hasAnyPermission } = useUserAccess()
+const { hasAnyPermission } = useUserAccess()
 
 interface WorkspaceLink {
   id: string
@@ -20,6 +20,15 @@ interface WorkspaceLink {
 const links = computed<WorkspaceLink[]>(() => {
   const allLinks: WorkspaceLink[] = [
     {
+      id: 'purchase-invoices',
+      title: t('warehouse.purchaseInvoices'),
+      subtitle: t('warehouse.purchaseInvoicesSubtitle'),
+      icon: 'inbox',
+      to: '/stock/purchase-invoices',
+      permissions: ['stock.purchase_invoice.view', 'stock.purchase_invoice.receive', 'stock.receiving.create', 'stock.receiving.complete'],
+      tone: 'success',
+    },
+    {
       id: 'purchase-orders',
       title: t('warehouse.purchaseOrders'),
       subtitle: t('warehouse.purchaseOrdersSubtitle'),
@@ -30,8 +39,8 @@ const links = computed<WorkspaceLink[]>(() => {
     },
     {
       id: 'receiving',
-      title: t('warehouse.receiving'),
-      subtitle: t('warehouse.receivingSubtitle'),
+      title: t('warehouse.poReceiving'),
+      subtitle: t('warehouse.poReceivingSubtitle'),
       icon: 'inbox',
       to: '/stock/receiving',
       permissions: ['stock.purchase.view'],
@@ -128,14 +137,14 @@ const canAudit = computed(() => hasAnyPermission([
           />{{ t('warehouse.openAudit') }}
         </RouterLink>
         <RouterLink
-          v-if="hasPermission('stock.purchase.view') && hasAnyPermission(['stock.receiving.create', 'stock.receiving.update_draft', 'stock.receiving.complete'])"
-          to="/stock/receiving"
+          v-if="hasAnyPermission(['stock.purchase_invoice.receive', 'stock.receiving.create', 'stock.receiving.complete'])"
+          to="/stock/purchase-invoices"
           class="btn btn--primary link-reset"
         >
           <DesignIcon
             name="inbox"
             :size="18"
-          />{{ t('warehouse.receiveGoods') }}
+          />{{ t('warehouse.receiveInvoice') }}
         </RouterLink>
       </template>
     </PageHeader>
@@ -192,19 +201,19 @@ const canAudit = computed(() => hasAnyPermission([
       <ol class="receiving-steps">
         <li>
           <span>1</span>
-          <div><strong>{{ t('warehouse.stepPurchaseOrder') }}</strong><p>{{ t('warehouse.stepPurchaseOrderText') }}</p></div>
+          <div><strong>{{ t('warehouse.stepSupplier') }}</strong><p>{{ t('warehouse.stepSupplierText') }}</p></div>
         </li>
         <li>
           <span>2</span>
-          <div><strong>{{ t('warehouse.stepActualGoods') }}</strong><p>{{ t('warehouse.stepActualGoodsText') }}</p></div>
+          <div><strong>{{ t('warehouse.stepProducts') }}</strong><p>{{ t('warehouse.stepProductsText') }}</p></div>
         </li>
         <li>
           <span>3</span>
-          <div><strong>{{ t('warehouse.stepQuality') }}</strong><p>{{ t('warehouse.stepQualityText') }}</p></div>
+          <div><strong>{{ t('warehouse.stepInvoiceTotal') }}</strong><p>{{ t('warehouse.stepInvoiceTotalText') }}</p></div>
         </li>
         <li>
           <span>4</span>
-          <div><strong>{{ t('warehouse.stepComplete') }}</strong><p>{{ t('warehouse.stepCompleteText') }}</p></div>
+          <div><strong>{{ t('warehouse.stepPostInvoice') }}</strong><p>{{ t('warehouse.stepPostInvoiceText') }}</p></div>
         </li>
       </ol>
     </Card>
@@ -255,6 +264,8 @@ meta:
     - stock.receiving.create
     - stock.receiving.update_draft
     - stock.receiving.complete
+    - stock.purchase_invoice.view
+    - stock.purchase_invoice.receive
     - stock.transfer.view
     - stock.transfer.create
     - stock.count.view

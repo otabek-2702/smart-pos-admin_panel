@@ -32,7 +32,7 @@ const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 const route = useRoute()
-const { hasPermission } = useUserAccess()
+const { hasPermission, hasAnyPermission } = useUserAccess()
 
 const canViewSupplier = computed(() => hasPermission('stock.supplier.view'))
 const canManageSupplier = computed(() => hasPermission('stock.manage'))
@@ -43,6 +43,12 @@ const canPaySupplier = computed(() =>
 const canManageSupplierItems = computed(() =>
   hasPermission('stock.manage') && hasPermission('stock.catalog.view'),
 )
+
+const canReceiveSupplierInvoice = computed(() => hasAnyPermission([
+  'stock.purchase_invoice.receive',
+  'stock.receiving.create',
+  'stock.receiving.complete',
+]))
 
 const supplierReferenceLabels: Record<string, string> = {
   PurchaseOrder: 'ref_PurchaseOrder',
@@ -993,6 +999,15 @@ function backToList() {
           @click="loadSupplier"
         >
           {{ t('supplier_action_refresh') }}
+        </Button>
+        <Button
+          v-if="canReceiveSupplierInvoice"
+          variant="primary"
+          icon="inbox"
+          :disabled="!supplier"
+          @click="router.push({ path: '/stock/purchase-invoices', query: { supplier: supplierId } })"
+        >
+          {{ t('purchaseInvoice.receiveForSupplier') }}
         </Button>
         <Button
           v-if="canManageSupplier"

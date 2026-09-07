@@ -26,6 +26,7 @@ const exposed = [
   'historyState', 'historyError', 'historyLoading', 'selectedTotal',
   'validateEditor', 'receivePayload', 'receiveInvoice', 'handleReceiveError',
   'openEditor', 'openConfirmation', 'loadHistory', 'lineTotal',
+  'loadSupplierProducts', 'catalogLoading', 'catalogError',
 ]
 
 function compile(source) {
@@ -137,6 +138,145 @@ function deferred() {
 
   return { promise, resolve, reject }
 }
+
+// Matches core 6393830 stock/services/purchase_invoices/queries.py.
+function receivableItem(id, overrides = {}) {
+  return {
+    supplier_item_id: id, supplier_id: 59, stock_item_id: id + 100,
+    stock_item_name: `Product ${id}`, stock_item_sku: `RAW-${id}`, item_type: 'RAW',
+    purchase_unit: { id: 1, name: 'Kilogram', short_name: 'kg', decimal_places: 4, conversion_to_base: 1 },
+    base_unit: { id: 1, name: 'Kilogram', short_name: 'kg' },
+    suggested_unit_price_uzs: null, price_is_known: false, last_price_update: null,
+    track_batches: false, track_expiry: false, default_expiry_days: null,
+    current_stock_base_quantity: 0, ...overrides,
+  }
+}
+
+function catalogResponse(items, { page = 1, total = items.length, perPage = 100 } = {}) {
+  return { data: { success: true, data: { items, pagination: {
+    page, per_page: perPage, total, total_pages: Math.max(1, Math.ceil(total / perPage)),
+    has_next: page * perPage < total, has_previous: page > 1,
+  } } } }
+}
+
+test('deployed catalog maps purchase units and keeps unknown prices blank', async () => {
+  const page = loadPage({ transport: { get: async () => catalogResponse([
+    receivableItem(72), receivableItem(73, { suggested_unit_price_uzs: 100000, price_is_known: true }),
+  ]) } })
+
+  ready(page)
+  await page.loadSupplierProducts()
+  assert.equal(page.catalogMode.value, 'receivable')
+  assert.equal(page.catalogLoading.value, false)
+  assert.equal(page.catalogError.value, '')
+  assert.equal(page.invoiceLines.value.length, 2)
+  assert.equal(page.invoiceLines.value[0].unitId, 1)
+  assert.equal(page.invoiceLines.value[0].unitName, 'kg')
+  assert.equal(page.invoiceLines.value[0].quantityDecimals, 4)
+  assert.equal(page.invoiceLines.value[0].suggestedPrice, null)
+  assert.equal(page.invoiceLines.value[0].unitPrice, null)
+  page.invoiceLines.value[1].quantity = '12'
+  assert.equal(page.validateEditor(), true)
+  page.openConfirmation()
+  assert.equal(page.confirmationOpen.value, true)
+  assert.equal(page.receivePayload().declared_total_uzs, 1200000)
+})
+
+test('canonical catalog loads every page before making products receivable', async () => {
+  const requests = []
+  const items = Array.from({ length: 102 }, (_, index) => receivableItem(index + 1))
+  const page = loadPage({ transport: { get: async (url, config) => {
+    requests.push({ url, ...config.params })
+    const number = config.params.page
+    return catalogResponse(items.slice((number - 1) * 100, number * 100), { page: number, total: 102 })
+  } } })
+
+  ready(page)
+  await page.loadSupplierProducts()
+  assert.deepEqual(requests, [
+    { url: '/suppliers/59/receivable-items/', page: 1, per_page: 100 },
+    { url: '/suppliers/59/receivable-items/', page: 2, per_page: 100 },
+  ])
+  assert.equal(page.invoiceLines.value.length, 102)
+  assert.equal(page.invoiceLines.value[101].supplierItemId, 102)
+  assert.equal(page.catalogMode.value, 'receivable')
+})
+
+test('missing canonical routes use a display-only preview that cannot post', async () => {
+  for (const status of [404, 405]) {
+    const requests = []
+    let posts = 0
+    const page = loadPage({ transport: {
+      get: async url => {
+        requests.push(url)
+        if (url.endsWith('/receivable-items/'))
+          throw { response: { status, data: {} } }
+        return catalogResponse([receivableItem(72, { suggested_unit_price_uzs: 100000, price_is_known: true })])
+      },
+      post: async () => { posts += 1 },
+    } })
+
+    ready(page)
+    await page.loadSupplierProducts()
+    assert.deepEqual(requests, ['/suppliers/59/receivable-items/', '/suppliers/59/items/'])
+    assert.equal(page.catalogMode.value, 'preview')
+    page.invoiceLines.value[0].quantity = '1'
+    assert.equal(page.validateEditor(), false)
+    page.openConfirmation()
+    await page.receiveInvoice()
+    assert.equal(page.confirmationOpen.value, false)
+    assert.equal(posts, 0)
+  }
+})
+
+test('catalog authorization, outage and structured not-found errors never fall back', async () => {
+  for (const [status, data] of [[403, {}], [500, {}], [404, { code: 'SUPPLIER_NOT_FOUND' }]]) {
+    const requests = []
+    const page = loadPage({ transport: { get: async url => {
+      requests.push(url)
+      throw { response: { status, data } }
+    } } })
+
+    ready(page)
+    await page.loadSupplierProducts()
+    assert.deepEqual(requests, ['/suppliers/59/receivable-items/'])
+    assert.equal(page.catalogMode.value, 'none')
+    assert.equal(page.catalogLoading.value, false)
+    assert.ok(page.catalogError.value)
+    assert.equal(page.invoiceLines.value.length, 0)
+  }
+})
+
+test('switching supplier ignores stale catalog successes and failures', async () => {
+  for (const fails of [false, true]) {
+    const first = deferred()
+    const second = deferred()
+    const requests = []
+    const page = loadPage({ transport: { get: url => {
+      requests.push(url)
+      return requests.length === 1 ? first.promise : second.promise
+    } } })
+
+    ready(page)
+    const oldLoad = page.loadSupplierProducts()
+    page.form.value.supplierId = '60'
+    const currentLoad = page.loadSupplierProducts()
+
+    second.resolve(catalogResponse([receivableItem(80, { supplier_id: 60 })]))
+    await currentLoad
+    if (fails)
+      first.reject({ response: { status: 404, data: {} } })
+    else
+      first.resolve(catalogResponse([receivableItem(72)]))
+    await oldLoad
+    assert.equal(page.invoiceLines.value.length, 1)
+    assert.equal(page.invoiceLines.value[0].supplierItemId, 80)
+    assert.equal(page.catalogMode.value, 'receivable')
+    assert.equal(page.catalogError.value, '')
+    assert.equal(page.catalogLoading.value, false)
+    assert.equal(requests.length, 2)
+  }
+})
 
 test('flat price conflict maps the submitted index past unselected catalog rows', () => {
   const page = loadPage()

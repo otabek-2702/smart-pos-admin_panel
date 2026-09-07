@@ -92,6 +92,11 @@ export interface PurchaseInvoiceReceiveRequest {
   declared_total_uzs: number
   notes: string
   lines: PurchaseInvoiceReceiveLine[]
+  replaces_invoice_id?: number
+}
+
+export interface PurchaseInvoiceReverseRequest {
+  reason: string
 }
 
 export interface PurchaseInvoiceLine {
@@ -115,11 +120,14 @@ export interface PurchaseInvoiceLine {
   previous_average_cost_uzs: number
   new_average_cost_uzs: number
   stock_transaction_id: number
+  batch_id?: number | null
   is_free?: boolean
   free_reason?: string
   batch_number?: string | null
   expiry_date?: string | null
   notes?: string
+  price_change_confirmed?: boolean
+  price_change_reason?: string
 }
 
 export interface PurchaseInvoiceListItem {
@@ -141,17 +149,23 @@ export interface PurchaseInvoiceListItem {
 }
 
 export interface PurchaseInvoiceActionHistoryEntry {
-  id: number
   action: string
-  actor: PurchaseInvoiceActor | null
-  reason: string
-  created_at: string
+  at: string
+  actor_id: number | null
+  reason?: string
 }
 
-export interface PurchaseInvoiceLink {
-  id: number
-  receiving_number: string
-  status: PurchaseInvoiceStatus
+export interface PurchaseInvoiceReversal {
+  version: number
+  correction_id: number
+  reason: string
+  reversed_at: string
+  reversed_by_id: number
+  stock_transaction_ids: number[]
+  supplier_transaction_id: number
+  total_uzs: number
+  supplier_balance_before_uzs?: number | null
+  supplier_balance_after_uzs?: number | null
 }
 
 export interface PurchaseInvoiceDetail extends PurchaseInvoiceListItem {
@@ -164,9 +178,9 @@ export interface PurchaseInvoiceDetail extends PurchaseInvoiceListItem {
   supplier_balance_after_uzs?: number | null
   notes?: string
   action_history?: PurchaseInvoiceActionHistoryEntry[]
-  reversed_invoice?: PurchaseInvoiceLink | null
-  reversal_invoice?: PurchaseInvoiceLink | null
-  replacement_invoice?: PurchaseInvoiceLink | null
+  reversal?: PurchaseInvoiceReversal
+  replaces_invoice_id?: number | null
+  replacement_invoice_ids?: number[]
 }
 
 export interface PurchaseInvoiceListParams {
@@ -179,6 +193,10 @@ export interface PurchaseInvoiceListParams {
   posted_date_from?: string
   posted_date_to?: string
   stock_item_id?: number
+  creator_id?: number
+  poster_id?: number
+
+  /** Compatibility aliases mapped to the backend's creator_id/poster_id filters. */
   created_by_id?: number
   posted_by_id?: number
   page?: number
@@ -188,6 +206,9 @@ export interface PurchaseInvoiceListParams {
 export interface PurchaseInvoiceListResponse {
   invoices: PurchaseInvoiceListItem[]
   pagination: PurchaseInvoicePagination
+
+  /** Total across every filtered row, not just the loaded page. */
+  total_uzs: number | null
 }
 
 export interface PurchaseInvoiceDetailResponse {
@@ -195,6 +216,10 @@ export interface PurchaseInvoiceDetailResponse {
 }
 
 export interface PurchaseInvoicePostedResponse {
+  invoice: PurchaseInvoiceDetail
+}
+
+export interface PurchaseInvoiceReversedResponse {
   invoice: PurchaseInvoiceDetail
 }
 
@@ -216,10 +241,17 @@ export type PurchaseInvoiceErrorCode =
   | 'IDEMPOTENCY_KEY_REQUIRED'
   | 'IDEMPOTENCY_KEY_REUSED'
   | 'STOCK_SCOPE_FORBIDDEN'
+  | 'INVOICE_NOT_FOUND'
+  | 'INVOICE_ALREADY_REVERSED'
+  | 'INVOICE_NOT_POSTED'
+  | 'INVOICE_TOTAL_MISMATCH'
+  | 'IDEMPOTENCY_KEY_INVALID'
+  | 'VALIDATION_ERROR'
+  | 'INVOICE_OPERATION_FAILED'
 
 export interface PurchaseInvoicePriceChange {
   line_index: number
-  supplier_item_id: number
+  supplier_item_id?: number
   old_unit_price_uzs: number
   new_unit_price_uzs: number
   difference_uzs: number
@@ -229,10 +261,13 @@ export interface PurchaseInvoicePriceChange {
 export interface PurchaseInvoiceStockConflict {
   supplier_item_id?: number
   stock_item_id: number
-  stock_item_name: string
+  stock_item_name?: string
+  batch_id?: number
   batch_number?: string | null
   received_quantity?: number
   available_quantity?: number
+  required_base_quantity?: number
+  reason?: string
 }
 
 export type PurchaseInvoiceFieldErrors = Record<string, string[]>

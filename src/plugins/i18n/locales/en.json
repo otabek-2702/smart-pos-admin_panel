@@ -4926,7 +4926,12 @@
   "Supplier invoices": "Supplier invoices",
   "PO receiving": "PO receiving",
   "purchaseInvoice": {
-    "receiveForSupplier": "Receive supplier invoice"
+    "receiveForSupplier": "Receive supplier invoice",
+    "statusPosted": "Posted",
+    "statusReversed": "Reversed",
+    "quantityTooLarge": "Quantity exceeds the maximum allowed for one line",
+    "unitPriceTooLarge": "Unit price exceeds the maximum allowed",
+    "lineTotalTooLarge": "Line total is too large"
   },
   "warehouse": {
     "title": "Warehouse operations",

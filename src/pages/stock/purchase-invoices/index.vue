@@ -92,15 +92,16 @@ const { t } = useI18n({ useScope: 'global' })
 const { formatCurrency, formatDate, formatDateShort } = useFormatters()
 const { notify } = useNotify()
 const { translate } = useApiError()
-const { hasAnyPermission } = useUserAccess()
+const { hasPermission } = useUserAccess()
 const route = useRoute()
 
-const canCreate = computed(() => hasAnyPermission([
-  'stock.purchase_invoice.receive',
-  'stock.receiving.create',
-  'stock.receiving.complete',
-  'stock.manage',
-]))
+const canCreate = computed(() => hasPermission('stock.purchase_invoice.receive'))
+
+// Match the direct-invoice backend's decimal storage limits.
+const MAX_QUANTITY_UNITS = 999999999999999n
+const MAX_QUANTITY = '99999999999.9999'
+const MAX_LINE_VALUE = 99999999999
+const MAX_INVOICE_VALUE = 9999999999999
 
 function tashkentToday(): string {
   const parts = new Intl.DateTimeFormat('en-GB', {
@@ -188,6 +189,7 @@ const historySearch = ref('')
 const historyLoading = ref(false)
 const historyState = ref<HistoryState>('ready')
 const historyError = ref('')
+let historyRequestId = 0
 
 const historyColumns = computed<DataTableColumn<any>[]>(() => [
   { key: 'invoice_number', label: t('Invoice'), width: 150 },
@@ -217,6 +219,16 @@ const STATUS_TONES: Record<string, BadgeTone> = {
   CANCELED: 'error',
   CANCELLED: 'error',
   REVERSED: 'warning',
+}
+
+function invoiceStatusLabel(status: unknown, display?: string): string {
+  const normalized = String(status ?? '').toUpperCase()
+  if (normalized === 'POSTED')
+    return t('purchaseInvoice.statusPosted')
+  if (normalized === 'REVERSED')
+    return t('purchaseInvoice.statusReversed')
+
+  return display || String(status || '—')
 }
 
 function invoiceNumber(row: any): string {
@@ -300,6 +312,8 @@ function closeInvoiceDetail() {
 }
 
 async function loadHistory() {
+  const requestId = ++historyRequestId
+
   historyLoading.value = true
   historyError.value = ''
   try {
@@ -309,11 +323,17 @@ async function loadHistory() {
       ...(historySearch.value.trim() ? { search: historySearch.value.trim() } : {}),
     })
 
+    if (requestId !== historyRequestId)
+      return
+
     historyRows.value = data.invoices
     historyTotal.value = data.pagination.total_items
     historyState.value = 'ready'
   }
   catch (error: any) {
+    if (requestId !== historyRequestId)
+      return
+
     historyRows.value = []
     historyTotal.value = 0
     if ([404, 405].includes(statusOf(error))) {
@@ -326,7 +346,8 @@ async function loadHistory() {
     }
   }
   finally {
-    historyLoading.value = false
+    if (requestId === historyRequestId)
+      historyLoading.value = false
   }
 }
 
@@ -664,6 +685,9 @@ function resetEditor() {
 }
 
 function openEditor() {
+  if (!canCreate.value)
+    return
+
   if (!editorStarted.value) {
     resetEditor()
     editorStarted.value = true
@@ -794,7 +818,7 @@ function quantityPattern(decimalPlaces: number): RegExp {
     : /^\d+$/
 }
 
-function applyServerFieldErrors(fieldErrors: Record<string, string[]>): boolean {
+function applyServerFieldErrors(fieldErrors: Record<string, string[]>, submittedPayload: PurchaseInvoiceReceiveRequest): boolean {
   let applied = false
   for (const [path, messages] of Object.entries(fieldErrors)) {
     const message = messages.filter(Boolean).join(' ')
@@ -823,7 +847,10 @@ function applyServerFieldErrors(fieldErrors: Record<string, string[]>): boolean 
     }
 
     const lineMatch = path.match(/lines\.(\d+)/)
-    const line = lineMatch ? selectedLines.value[Number(lineMatch[1])] : undefined
+    const supplierItemId = submittedPayload.lines[Number(lineMatch?.[1])]?.supplier_item_id
+
+    const line = invoiceLines.value.find(candidate => Number(candidate.supplierItemId) === supplierItemId)
+
     if (line) {
       lineErrors.value[line.id] = message
       applied = true
@@ -854,8 +881,16 @@ function hasPositiveValidQuantity(line: InvoiceLine): boolean {
 
   const quantity = quantityNumber(line)
 
-  if (!quantityPattern(line.quantityDecimals).test(rawQuantity) || quantity < 0) {
+  if (!quantityPattern(line.quantityDecimals).test(rawQuantity) || !Number.isFinite(quantity) || quantity < 0) {
     lineErrors.value[line.id] = t('Enter a valid quantity for this unit', { count: line.quantityDecimals })
+
+    return false
+  }
+
+  const [whole, fraction = ''] = rawQuantity.split('.')
+  const quantityUnits = BigInt(whole) * 10000n + BigInt(fraction.padEnd(4, '0'))
+  if (quantityUnits > MAX_QUANTITY_UNITS) {
+    lineErrors.value[line.id] = t('purchaseInvoice.quantityTooLarge')
 
     return false
   }
@@ -871,6 +906,9 @@ function priceValidationMessage(line: InvoiceLine): string {
 
   if (!Number.isSafeInteger(price) || price <= 0)
     return t('Enter a whole UZS unit price greater than zero')
+
+  if (price > MAX_LINE_VALUE)
+    return t('purchaseInvoice.unitPriceTooLarge')
 
   if (priceChangePercent(line) === null)
     return ''
@@ -897,7 +935,9 @@ function validateInvoiceLine(line: InvoiceLine): boolean {
   if (!hasPositiveValidQuantity(line))
     return false
 
-  const message = priceValidationMessage(line) || trackingValidationMessage(line)
+  const message = priceValidationMessage(line)
+    || trackingValidationMessage(line)
+    || (lineTotal(line) > MAX_LINE_VALUE ? t('purchaseInvoice.lineTotalTooLarge') : '')
 
   if (message)
     lineErrors.value[line.id] = message
@@ -916,7 +956,7 @@ function validateEditor(): boolean {
 
   if (positiveLineCount === 0)
     submitError.value = submitError.value || t('Enter a quantity for at least one product')
-  else if (!Number.isSafeInteger(selectedTotal.value))
+  else if (!Number.isSafeInteger(selectedTotal.value) || selectedTotal.value > MAX_INVOICE_VALUE)
     submitError.value = submitError.value || t('Invoice total is too large')
 
   return !Object.values(formErrors.value).some(Boolean)
@@ -925,7 +965,7 @@ function validateEditor(): boolean {
 }
 
 function openConfirmation() {
-  if (!validateEditor())
+  if (!canCreate.value || !validateEditor())
     return
 
   editorOpen.value = false
@@ -981,9 +1021,12 @@ function reopenEditor() {
   editorOpen.value = true
 }
 
-function applyRequiredPriceChanges(error: ReturnType<typeof normalizePurchaseInvoiceApiError>) {
+function applyRequiredPriceChanges(error: ReturnType<typeof normalizePurchaseInvoiceApiError>, submittedPayload: PurchaseInvoiceReceiveRequest) {
   for (const change of error.price_changes) {
-    const line = invoiceLines.value.find(candidate => Number(candidate.supplierItemId) === change.supplier_item_id)
+    const supplierItemId = change.supplier_item_id
+      ?? submittedPayload.lines[change.line_index]?.supplier_item_id
+
+    const line = invoiceLines.value.find(candidate => Number(candidate.supplierItemId) === supplierItemId)
 
     if (line) {
       line.suggestedPrice = change.old_unit_price_uzs
@@ -993,7 +1036,7 @@ function applyRequiredPriceChanges(error: ReturnType<typeof normalizePurchaseInv
   }
 }
 
-function handleReceiveError(error: any) {
+function handleReceiveError(error: any, submittedPayload: PurchaseInvoiceReceiveRequest) {
   const normalizedError = normalizePurchaseInvoiceApiError(error)
   const status = normalizedError.status ?? statusOf(error)
 
@@ -1005,7 +1048,7 @@ function handleReceiveError(error: any) {
   }
 
   if (normalizedError.known_code === 'PRICE_CHANGE_CONFIRMATION_REQUIRED') {
-    applyRequiredPriceChanges(normalizedError)
+    applyRequiredPriceChanges(normalizedError, submittedPayload)
     reopenEditor()
     submitError.value = normalizedError.message || t('Confirm the large price change and enter a reason')
 
@@ -1013,12 +1056,12 @@ function handleReceiveError(error: any) {
   }
 
   submitError.value = normalizedError.message || errorText(error, t('Failed to receive supplier invoice'))
-  if (applyServerFieldErrors(normalizedError.field_errors))
+  if (applyServerFieldErrors(normalizedError.field_errors, submittedPayload))
     reopenEditor()
 }
 
 async function receiveInvoice() {
-  if (saving.value || !validateEditor())
+  if (!canCreate.value || saving.value || !validateEditor())
     return
 
   saving.value = true
@@ -1037,10 +1080,12 @@ async function receiveInvoice() {
     editorStarted.value = false
     notify(t('Supplier invoice received and stock updated'))
     resetEditor()
+    historySearch.value = ''
+    historyPage.value = 1
     await loadHistory()
   }
   catch (error: any) {
-    handleReceiveError(error)
+    handleReceiveError(error, payload)
   }
   finally {
     saving.value = false
@@ -1053,7 +1098,7 @@ onMounted(async () => {
     form.value.locationId = String(locations.value[0].id)
 
   const requestedSupplier = String(Array.isArray(route.query.supplier) ? route.query.supplier[0] : route.query.supplier ?? '')
-  if (requestedSupplier && suppliers.value.some(supplier => String(supplier.id) === requestedSupplier)) {
+  if (canCreate.value && requestedSupplier && suppliers.value.some(supplier => String(supplier.id) === requestedSupplier)) {
     editorStarted.value = true
     editorOpen.value = true
     form.value.supplierId = requestedSupplier
@@ -1197,7 +1242,7 @@ onMounted(async () => {
             :tone="STATUS_TONES[String(row.status ?? '').toUpperCase()] ?? 'neutral'"
             dot
           >
-            {{ row.status_display ?? row.status ?? '—' }}
+            {{ invoiceStatusLabel(row.status, row.status_display) }}
           </Badge>
         </template>
       </DataTable>
@@ -1255,7 +1300,7 @@ onMounted(async () => {
                 :tone="STATUS_TONES[detailInvoice.status] ?? 'neutral'"
                 dot
               >
-                {{ detailInvoice.status }}
+                {{ invoiceStatusLabel(detailInvoice.status) }}
               </Badge>
             </dd>
           </div>
@@ -1300,6 +1345,13 @@ onMounted(async () => {
             <dd class="mono num-tabular">
               {{ formatCurrency(detailInvoice.supplier_balance_after_uzs) }} UZS
             </dd>
+          </div>
+          <div
+            v-if="detailInvoice.notes"
+            class="invoice-detail-note"
+          >
+            <dt>{{ t('Notes') }}</dt>
+            <dd>{{ detailInvoice.notes }}</dd>
           </div>
         </dl>
 
@@ -1374,6 +1426,27 @@ onMounted(async () => {
                 <dd class="mono">
                   {{ formatDateShort(line.expiry_date) }}
                 </dd>
+              </div>
+              <div
+                v-if="line.free_reason"
+                class="invoice-detail-note"
+              >
+                <dt>{{ t('Free product reason') }}</dt>
+                <dd>{{ line.free_reason }}</dd>
+              </div>
+              <div
+                v-if="line.price_change_reason"
+                class="invoice-detail-note"
+              >
+                <dt>{{ t('Price change reason') }}</dt>
+                <dd>{{ line.price_change_reason }}</dd>
+              </div>
+              <div
+                v-if="line.notes"
+                class="invoice-detail-note"
+              >
+                <dt>{{ t('Notes') }}</dt>
+                <dd>{{ line.notes }}</dd>
               </div>
             </dl>
           </article>
@@ -1599,6 +1672,7 @@ onMounted(async () => {
                   type="number"
                   inputmode="decimal"
                   min="0"
+                  :max="MAX_QUANTITY"
                   :step="line.quantityDecimals > 0 ? 1 / 10 ** line.quantityDecimals : 1"
                   :aria-label="`${t('Quantity Received')}: ${line.name}`"
                   :error="!!lineErrors[line.id]"
@@ -1984,6 +2058,14 @@ onMounted(async () => {
   display: grid;
   justify-items: start;
   gap: 3px;
+}
+
+.invoice-detail-note {
+  grid-column: 1 / -1;
+}
+
+.invoice-detail-note dd {
+  white-space: pre-wrap;
 }
 
 .invoice-detail-summary small,
@@ -2476,6 +2558,4 @@ meta:
   anyPermission:
     - stock.purchase_invoice.view
     - stock.purchase_invoice.receive
-    - stock.receiving.create
-    - stock.receiving.complete
 </route>

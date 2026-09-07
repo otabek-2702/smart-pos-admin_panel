@@ -4837,7 +4837,12 @@
   "Supplier invoices": "Накладные поставщиков",
   "PO receiving": "Приёмка по заказу",
   "purchaseInvoice": {
-    "receiveForSupplier": "Принять накладную поставщика"
+    "receiveForSupplier": "Принять накладную поставщика",
+    "statusPosted": "Проведена",
+    "statusReversed": "Сторнирована",
+    "quantityTooLarge": "Количество превышает допустимый максимум для одной позиции",
+    "unitPriceTooLarge": "Цена за единицу превышает допустимый максимум",
+    "lineTotalTooLarge": "Сумма позиции слишком велика"
   },
   "warehouse": {
     "title": "Работа склада",

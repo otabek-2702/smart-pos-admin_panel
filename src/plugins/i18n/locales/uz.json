@@ -4837,7 +4837,12 @@
   "Supplier invoices": "Yetkazib beruvchi hisob-fakturalari",
   "PO receiving": "Xarid buyurtmasi bo‘yicha qabul",
   "purchaseInvoice": {
-    "receiveForSupplier": "Yetkazib beruvchi hisob-fakturasini qabul qilish"
+    "receiveForSupplier": "Yetkazib beruvchi hisob-fakturasini qabul qilish",
+    "statusPosted": "Kirim qilingan",
+    "statusReversed": "Kirim qaytarilgan",
+    "quantityTooLarge": "Miqdor bir qator uchun ruxsat etilgan chegaradan oshdi",
+    "unitPriceTooLarge": "Birlik narxi ruxsat etilgan chegaradan oshdi",
+    "lineTotalTooLarge": "Qator summasi juda katta"
   },
   "warehouse": {
     "title": "Ombor ishlari",

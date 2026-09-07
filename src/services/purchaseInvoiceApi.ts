@@ -11,6 +11,8 @@ import type {
   PurchaseInvoicePostedResponse,
   PurchaseInvoicePriceChange,
   PurchaseInvoiceReceiveRequest,
+  PurchaseInvoiceReverseRequest,
+  PurchaseInvoiceReversedResponse,
   PurchaseInvoiceStockConflict,
   SupplierReceivableItem,
   SupplierReceivableItemsParams,
@@ -38,6 +40,13 @@ const PURCHASE_INVOICE_ERROR_CODES = new Set<PurchaseInvoiceErrorCode>([
   'IDEMPOTENCY_KEY_REQUIRED',
   'IDEMPOTENCY_KEY_REUSED',
   'STOCK_SCOPE_FORBIDDEN',
+  'INVOICE_NOT_FOUND',
+  'INVOICE_ALREADY_REVERSED',
+  'INVOICE_NOT_POSTED',
+  'INVOICE_TOTAL_MISMATCH',
+  'IDEMPOTENCY_KEY_INVALID',
+  'VALIDATION_ERROR',
+  'INVOICE_OPERATION_FAILED',
 ])
 
 const API_ENVELOPE_KEYS = new Set([
@@ -188,7 +197,7 @@ export function normalizePurchaseInvoiceListResponse(
   const invoices = listFrom(unwrapped, ['invoices', 'purchase_invoices', 'items', 'results']) as PurchaseInvoiceListItem[]
   const pagination = normalizePagination(paginationFrom(value, root), invoices.length, params.page, params.per_page)
 
-  return { invoices, pagination }
+  return { invoices, pagination, total_uzs: finiteNumber(root.total_uzs) }
 }
 
 export function normalizePurchaseInvoiceDetailResponse(value: unknown): PurchaseInvoiceDetailResponse {
@@ -196,6 +205,10 @@ export function normalizePurchaseInvoiceDetailResponse(value: unknown): Purchase
 }
 
 export function normalizePurchaseInvoicePostedResponse(value: unknown): PurchaseInvoicePostedResponse {
+  return { invoice: invoiceFrom(value) }
+}
+
+export function normalizePurchaseInvoiceReversedResponse(value: unknown): PurchaseInvoiceReversedResponse {
   return { invoice: invoiceFrom(value) }
 }
 
@@ -209,7 +222,7 @@ function assertIdempotencyKey(idempotencyKey: string): string {
   const key = idempotencyKey.trim()
 
   if (!key)
-    throw new TypeError('Idempotency-Key is required to receive a purchase invoice')
+    throw new TypeError('Idempotency-Key is required for a purchase invoice command')
 
   return key
 }
@@ -258,12 +271,12 @@ function normalizePriceChange(value: unknown): PurchaseInvoicePriceChange | null
   const difference = finiteNumber(item.difference_uzs ?? item.price_difference_uzs ?? item.difference)
   const percentage = finiteNumber(item.change_percent ?? item.price_change_percent ?? item.percentage)
 
-  if (lineIndex === null || supplierItemId === null || oldPrice === null || newPrice === null || difference === null || percentage === null)
+  if (lineIndex === null || !Number.isInteger(lineIndex) || lineIndex < 0 || oldPrice === null || newPrice === null || difference === null || percentage === null)
     return null
 
   return {
     line_index: lineIndex,
-    supplier_item_id: supplierItemId,
+    supplier_item_id: supplierItemId ?? undefined,
     old_unit_price_uzs: oldPrice,
     new_unit_price_uzs: newPrice,
     difference_uzs: difference,
@@ -276,16 +289,19 @@ function normalizeStockConflict(value: unknown): PurchaseInvoiceStockConflict | 
   const stockItemId = finiteNumber(item.stock_item_id)
   const stockItemName = stringOrNull(item.stock_item_name ?? item.name)
 
-  if (stockItemId === null || stockItemName === null)
+  if (stockItemId === null || !Number.isSafeInteger(stockItemId) || stockItemId <= 0)
     return null
 
   return {
     supplier_item_id: finiteNumber(item.supplier_item_id) ?? undefined,
     stock_item_id: stockItemId,
-    stock_item_name: stockItemName,
+    stock_item_name: stockItemName ?? undefined,
+    batch_id: finiteNumber(item.batch_id) ?? undefined,
     batch_number: stringOrNull(item.batch_number),
     received_quantity: finiteNumber(item.received_quantity) ?? undefined,
     available_quantity: finiteNumber(item.available_quantity) ?? undefined,
+    required_base_quantity: finiteNumber(item.required_base_quantity) ?? undefined,
+    reason: stringOrNull(item.reason) ?? undefined,
   }
 }
 
@@ -304,11 +320,24 @@ export function normalizePurchaseInvoiceApiError(error: unknown): PurchaseInvoic
 
   collectFieldErrors(body.field_errors ?? body.errors ?? nested.field_errors ?? nested.errors, fieldErrors)
 
-  const priceChanges = listFrom(details, ['price_changes', 'changes'])
+  const priceChangeRows = listFrom(details, ['price_changes', 'changes'])
+
+  // The delivered command returns the first conflicting line as flat details.
+  // Retain array support for responses that report several conflicts at once.
+  if (priceChangeRows.length === 0 && code === 'PRICE_CHANGE_CONFIRMATION_REQUIRED')
+    priceChangeRows.push(details)
+
+  const priceChanges = priceChangeRows
     .map(normalizePriceChange)
     .filter((item): item is PurchaseInvoicePriceChange => item !== null)
 
-  const stockConflicts = listFrom(details, ['stock_conflicts', 'affected_items', 'items'])
+  const stockConflictRows = listFrom(details, ['stock_conflicts', 'affected_items', 'items'])
+
+  // Cost-basis failures identify a single affected item in flat details.
+  if (stockConflictRows.length === 0 && finiteNumber(details.stock_item_id) !== null)
+    stockConflictRows.push(details)
+
+  const stockConflicts = stockConflictRows
     .map(normalizeStockConflict)
     .filter((item): item is PurchaseInvoiceStockConflict => item !== null)
 
@@ -335,8 +364,14 @@ export async function fetchSupplierReceivableItems(
 }
 
 export async function fetchPurchaseInvoices(params: PurchaseInvoiceListParams = {}): Promise<PurchaseInvoiceListResponse> {
+  const { created_by_id, posted_by_id, ...canonicalParams } = params
+
   const response = await stockApi.get('/purchase-invoices/', {
-    params: paramsWithoutEmpty(params as Record<string, unknown>),
+    params: paramsWithoutEmpty({
+      ...canonicalParams,
+      creator_id: canonicalParams.creator_id ?? created_by_id,
+      poster_id: canonicalParams.poster_id ?? posted_by_id,
+    }),
   })
 
   return normalizePurchaseInvoiceListResponse(response.data, params)
@@ -359,9 +394,22 @@ export async function receivePurchaseInvoice(
   return normalizePurchaseInvoicePostedResponse(response.data)
 }
 
+export async function reversePurchaseInvoice(
+  invoiceId: number,
+  payload: PurchaseInvoiceReverseRequest,
+  idempotencyKey: string,
+): Promise<PurchaseInvoiceReversedResponse> {
+  const response = await stockApi.post(`/purchase-invoices/${invoiceId}/reverse/`, payload, {
+    headers: { 'Idempotency-Key': assertIdempotencyKey(idempotencyKey) },
+  })
+
+  return normalizePurchaseInvoiceReversedResponse(response.data)
+}
+
 export const purchaseInvoiceApi = {
   supplierItems: fetchSupplierReceivableItems,
   list: fetchPurchaseInvoices,
   detail: fetchPurchaseInvoice,
   receive: receivePurchaseInvoice,
+  reverse: reversePurchaseInvoice,
 }

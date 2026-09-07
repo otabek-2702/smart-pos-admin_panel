@@ -30,7 +30,7 @@ const WAREHOUSE_ROUTE_RULES: WarehouseRouteRule[] = [
   { prefix: '/stock/levels', anyPermission: ['stock.level.view'] },
   { prefix: '/stock/batches', anyPermission: ['stock.batch.view'] },
   { prefix: '/stock/suppliers', anyPermission: ['stock.supplier.view'] },
-  { prefix: '/stock/purchase-invoices', anyPermission: ['stock.purchase_invoice.view', 'stock.purchase_invoice.receive', 'stock.receiving.create', 'stock.receiving.complete'] },
+  { prefix: '/stock/purchase-invoices', anyPermission: ['stock.purchase_invoice.view', 'stock.purchase_invoice.receive'] },
   { prefix: '/stock/purchase-orders', anyPermission: ['stock.purchase.view'] },
   { prefix: '/stock/receiving', anyPermission: ['stock.purchase.view'] },
   { prefix: '/stock/counts', anyPermission: ['stock.count.view'] },

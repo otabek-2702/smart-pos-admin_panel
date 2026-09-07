@@ -32,7 +32,7 @@ const { t } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 const route = useRoute()
-const { hasPermission, hasAnyPermission } = useUserAccess()
+const { hasPermission } = useUserAccess()
 
 const canViewSupplier = computed(() => hasPermission('stock.supplier.view'))
 const canManageSupplier = computed(() => hasPermission('stock.manage'))
@@ -44,11 +44,7 @@ const canManageSupplierItems = computed(() =>
   hasPermission('stock.manage') && hasPermission('stock.catalog.view'),
 )
 
-const canReceiveSupplierInvoice = computed(() => hasAnyPermission([
-  'stock.purchase_invoice.receive',
-  'stock.receiving.create',
-  'stock.receiving.complete',
-]))
+const canReceiveSupplierInvoice = computed(() => hasPermission('stock.purchase_invoice.receive'))
 
 const supplierReferenceLabels: Record<string, string> = {
   PurchaseOrder: 'ref_PurchaseOrder',

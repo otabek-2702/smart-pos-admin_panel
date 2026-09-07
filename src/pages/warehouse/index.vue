@@ -25,7 +25,7 @@ const links = computed<WorkspaceLink[]>(() => {
       subtitle: t('warehouse.purchaseInvoicesSubtitle'),
       icon: 'inbox',
       to: '/stock/purchase-invoices',
-      permissions: ['stock.purchase_invoice.view', 'stock.purchase_invoice.receive', 'stock.receiving.create', 'stock.receiving.complete'],
+      permissions: ['stock.purchase_invoice.view', 'stock.purchase_invoice.receive'],
       tone: 'success',
     },
     {
@@ -137,7 +137,7 @@ const canAudit = computed(() => hasAnyPermission([
           />{{ t('warehouse.openAudit') }}
         </RouterLink>
         <RouterLink
-          v-if="hasAnyPermission(['stock.purchase_invoice.receive', 'stock.receiving.create', 'stock.receiving.complete'])"
+          v-if="hasAnyPermission(['stock.purchase_invoice.receive'])"
           to="/stock/purchase-invoices"
           class="btn btn--primary link-reset"
         >

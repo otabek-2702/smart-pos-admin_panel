@@ -42,7 +42,7 @@ const tabItems = computed<Tab[]>(() => {
     { id: 'warehouse', label: 'Warehouse', icon: 'package', to: '/warehouse' },
   ]
 
-  if (hasAnyPermission(['stock.purchase_invoice.view', 'stock.purchase_invoice.receive', 'stock.receiving.create', 'stock.receiving.complete']))
+  if (hasAnyPermission(['stock.purchase_invoice.view', 'stock.purchase_invoice.receive']))
     items.push({ id: 'purchase-invoices', label: 'Supplier invoices', icon: 'inbox', to: '/stock/purchase-invoices' })
 
   if (hasAnyPermission(['stock.supplier.view']))

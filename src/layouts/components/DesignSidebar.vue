@@ -3,6 +3,7 @@ import { storeToRefs } from 'pinia'
 import { useMediaQuery } from '@vueuse/core'
 import DesignIcon from '@/components/design/DesignIcon.vue'
 import { routeLabelForPath } from '@/navigation/routeLabels'
+import { EXPENSE_CATEGORY_PERMISSIONS } from '@/navigation/access'
 import { useNavCountsStore } from '@/stores/navCounts'
 import { useUserAccess } from '@/composables/useUserAccess'
 
@@ -96,6 +97,7 @@ const NAV: NavEntry[] = [
   { type: 'item', id: 'cash', label: 'Cashbox Expense Categories', icon: 'register', to: '/cashbox/categories' },
   { type: 'item', id: 'money-control', label: 'Money Control', icon: 'wallet', to: '/money-control', anyPermission: ['money.control.view'] },
   { type: 'item', id: 'treasury', label: 'Treasury', icon: 'store', to: '/treasury', anyPermission: ['treasury.account.view'] },
+  { type: 'item', id: 'expense-categories', label: 'Expense Categories', icon: 'grid', to: '/expense-categories', anyPermission: EXPENSE_CATEGORY_PERMISSIONS },
   { type: 'item', id: 'loyalty', label: 'Loyalty', icon: 'gift', to: '/loyalty' },
   { type: 'section', label: 'Analytics' },
   { type: 'item', id: 'product-statistics', label: 'Product sales analytics', icon: 'trend', to: '/analytics/product-statistics' },
@@ -167,6 +169,7 @@ const WAREHOUSE_NAV: NavEntry[] = [
     anyPermission: ['stock.level.view', 'stock.inventory_control.view'],
   },
   { type: 'item', id: 'stock-transfers', label: 'Transfers', icon: 'share', to: '/stock/transfers', anyPermission: ['stock.transfer.view'] },
+  { type: 'item', id: 'expense-categories', label: 'Expense Categories', icon: 'grid', to: '/expense-categories', anyPermission: EXPENSE_CATEGORY_PERMISSIONS },
 ]
 
 const visibleNav = computed<NavEntry[]>(() => {

@@ -211,6 +211,7 @@ test('uses the canonical expense request, approval, payment, and category-deacti
   expect(payCall?.idempotencyKey).toBeTruthy()
 
   await page.goto('/hr-expense-categories')
+  await expect(page).toHaveURL(/\/expense-categories$/)
 
   await page.getByRole('button', { name: 'New category' }).click()
 
@@ -231,6 +232,7 @@ test('uses the canonical expense request, approval, payment, and category-deacti
   const categoryCreateCall = businessCalls.find(call => call.method === 'POST' && call.path === '/api/admins/expense-categories')
 
   expect(categoryCreateCall?.body.budget_limit).toBeNull()
+  expect(categoryCreateCall?.body.allowed_sources).toEqual(['SAFE', 'BANK'])
 
   const categoryRow = page.locator('tbody tr').filter({ hasText: 'Utilities' })
 

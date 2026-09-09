@@ -93,7 +93,7 @@ test.describe('Warehouse per-user permissions', () => {
       .toEqual(EXPENSE_REQUEST_PERMISSIONS)
     expect(hrItems.find(item => item.to === 'hr-expenses')?.anyPermission)
       .toEqual(EXPENSE_REQUEST_PERMISSIONS)
-    expect(hrItems.find(item => item.to === 'hr-expense-categories')?.anyPermission)
+    expect(managementItems.find(item => item.to === 'expense-categories')?.anyPermission)
       .toEqual(EXPENSE_CATEGORY_PERMISSIONS)
   })
 
@@ -110,6 +110,7 @@ test.describe('Warehouse per-user permissions', () => {
 
     expect(warehousePathAllowed('/hr-expenses', access)).toBe(true)
     expect(warehousePathAllowed('/hr-expense-categories', access)).toBe(true)
+    expect(warehousePathAllowed('/expense-categories', access)).toBe(true)
     expect(warehousePathAllowed('/treasury', access)).toBe(false)
     expect(warehousePathAllowed('/money-control', access)).toBe(false)
   })

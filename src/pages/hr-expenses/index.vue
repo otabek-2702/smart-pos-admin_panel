@@ -462,7 +462,7 @@ function sourceLabel(source: ExpenseSource | null) {
           v-if="canViewCategories"
           variant="ghost"
           icon="folder"
-          @click="router.push('/hr-expense-categories')"
+          @click="router.push('/expense-categories')"
         >
           {{ t('Categories') }}
         </Button>

@@ -20,10 +20,12 @@ const { t, te } = useI18n({ useScope: 'global' })
 const { snackbar, snackbarMsg, snackbarColor, notify } = useNotify()
 const { formatCurrency, formatDate } = useFormatters()
 const route = useRoute()
+const router = useRouter()
 const { hasPermission } = useUserAccess()
 
 const canTransfer = computed(() => hasPermission('treasury.transfer'))
 const canDirectExpense = computed(() => hasPermission('expense.direct.pay'))
+const canViewExpenseCategories = computed(() => hasPermission('expense.category.view') || hasPermission('expense.category.manage'))
 
 const TXN_TYPES = [
   'INKASSA',
@@ -585,7 +587,18 @@ function deltaDisplay(t_: any) {
     <PageHeader
       :title="t('Treasury')"
       :subtitle="t('Ledger')"
-    />
+    >
+      <template #actions>
+        <Button
+          v-if="canViewExpenseCategories"
+          variant="secondary"
+          icon="grid"
+          @click="router.push('/expense-categories')"
+        >
+          {{ t('Expense Categories') }}
+        </Button>
+      </template>
+    </PageHeader>
 
     <!-- Account cards -->
     <StateFill

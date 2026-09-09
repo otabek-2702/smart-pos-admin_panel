@@ -1,4 +1,4 @@
-import { EXPENSE_CATEGORY_PERMISSIONS, EXPENSE_REQUEST_PERMISSIONS } from '../access'
+import { EXPENSE_REQUEST_PERMISSIONS } from '../access'
 
 export default [
   {
@@ -81,14 +81,6 @@ export default [
     to: 'hr-events',
     action: 'manage',
     subject: 'all',
-  },
-  {
-    title: 'Expense Categories',
-    icon: { icon: 'bx-grid' },
-    to: 'hr-expense-categories',
-    action: 'manage',
-    subject: 'all',
-    anyPermission: EXPENSE_CATEGORY_PERMISSIONS,
   },
   {
     title: 'Goals',

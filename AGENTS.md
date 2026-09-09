@@ -197,6 +197,9 @@ no `@axios` alias—import `@/plugins/axios`.
 
 ## Important domain decisions
 
+- Shared expense categories live at `/expense-categories`, outside the hidden
+  HR navigation. `/hr-expense-categories` redirects there for old links. New
+  categories default to SAFE/BANK; DRAWER remains an explicit option.
 - Business day defaults to 03:00 Asia/Tashkent and supports backend-owned
   `business_day_start`, `business_open`, and `business_close`.
 - Backend order status spelling is `CANCELED` (one L).

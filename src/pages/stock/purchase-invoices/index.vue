@@ -1456,7 +1456,7 @@ onMounted(async () => {
 
     <Modal
       :open="editorOpen"
-      :width="1120"
+      fullscreen
       :title="t('New supplier invoice')"
       :subtitle="t('Enter only the quantities that physically arrived')"
       :close-on-backdrop="false"
@@ -2161,8 +2161,6 @@ onMounted(async () => {
 }
 
 .product-list {
-  max-height: min(48vh, 520px);
-  overflow: auto;
   border: 1px solid rgb(var(--v-theme-border));
   border-radius: var(--r-lg);
   background: rgb(var(--v-theme-surface));
@@ -2512,7 +2510,6 @@ onMounted(async () => {
   }
 
   .product-list {
-    max-height: 52vh;
     border: 0;
     background: transparent;
   }

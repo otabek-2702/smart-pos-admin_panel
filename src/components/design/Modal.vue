@@ -7,6 +7,7 @@ interface Props {
   title?: string
   subtitle?: string
   width?: number | string
+  fullscreen?: boolean
   closeOnBackdrop?: boolean
   closeOnEsc?: boolean
 }
@@ -55,12 +56,18 @@ function onBackdropDown(ev: MouseEvent) {
 // Focus trap: Tab/Shift-Tab cycle within the modal, never escape to background.
 // Escape closes when closeOnEsc.
 function onKey(e: KeyboardEvent) {
-  if (!props.open) return
+  if (!props.open || e.defaultPrevented)
+    return
   if (e.key === 'Escape' && props.closeOnEsc) {
     close()
     return
   }
-  if (e.key !== 'Tab' || !modalRef.value) return
+  trapFocus(e)
+}
+
+function trapFocus(e: KeyboardEvent) {
+  if (e.key !== 'Tab' || !modalRef.value)
+    return
   const items = focusableIn(modalRef.value)
   if (!items.length) {
     e.preventDefault()
@@ -82,7 +89,7 @@ function onKey(e: KeyboardEvent) {
 }
 
 const maxWidthStyle = computed(() => {
-  if (props.width === undefined)
+  if (props.fullscreen || props.width === undefined)
     return undefined
   return {
     maxWidth:
@@ -92,13 +99,15 @@ const maxWidthStyle = computed(() => {
 
 // On open: cache previously-focused element + move focus into the modal.
 // On close: restore focus to whatever opened it (a button, a row, etc.).
-watch(() => props.open, async (open) => {
+watch(() => props.open, async open => {
   if (open) {
     previouslyFocused = document.activeElement as HTMLElement | null
     await nextTick()
     if (modalRef.value) {
       const preferred = modalRef.value.querySelector<HTMLElement>('[autofocus]:not([disabled])')
+
       const items = focusableIn(modalRef.value)
+
       ;(preferred || items[0] || modalRef.value).focus()
     }
   }
@@ -126,11 +135,13 @@ onBeforeUnmount(() => {
       <div
         v-if="open"
         class="overlay"
+        :class="{ 'overlay--fullscreen': fullscreen }"
         @mousedown="onBackdropDown"
       >
         <div
           ref="modalRef"
           class="modal"
+          :class="{ 'modal--fullscreen': fullscreen }"
           role="dialog"
           aria-modal="true"
           :aria-labelledby="title ? titleId : undefined"
@@ -178,6 +189,64 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+:global(html:has(.overlay--fullscreen)) {
+  overflow: hidden;
+}
+
+.overlay--fullscreen {
+  padding: 0;
+  place-items: stretch;
+}
+
+.modal--fullscreen {
+  width: 100%;
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  animation: none;
+}
+
+.modal--fullscreen .modal__head,
+.modal--fullscreen .modal__foot {
+  flex-shrink: 0;
+  border-radius: 0;
+}
+
+.modal--fullscreen .modal__head,
+.modal--fullscreen .modal__body,
+.modal--fullscreen .modal__foot {
+  padding-inline: max(var(--sp-5), env(safe-area-inset-left)) max(var(--sp-5), env(safe-area-inset-right));
+}
+
+.modal--fullscreen .modal__head {
+  padding-top: max(var(--sp-4), env(safe-area-inset-top));
+}
+
+.modal--fullscreen .modal__title,
+.modal--fullscreen .modal__sub {
+  overflow-wrap: anywhere;
+}
+
+.modal--fullscreen .modal__body {
+  flex: 1;
+  overscroll-behavior: contain;
+}
+
+.modal--fullscreen .modal__foot {
+  padding-bottom: max(var(--sp-4), env(safe-area-inset-bottom));
+}
+
+@media (max-width: 620px) {
+  .modal--fullscreen .modal__head,
+  .modal--fullscreen .modal__body,
+  .modal--fullscreen .modal__foot {
+    padding-inline: max(var(--sp-4), env(safe-area-inset-left)) max(var(--sp-4), env(safe-area-inset-right));
+  }
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.16s ease;

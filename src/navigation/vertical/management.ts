@@ -1,3 +1,5 @@
+import { EXPENSE_CATEGORY_PERMISSIONS } from '../access'
+
 export default [
   {
     heading: 'Management',
@@ -73,6 +75,14 @@ export default [
     action: 'manage',
     subject: 'all',
     anyPermission: ['treasury.account.view'],
+  },
+  {
+    title: 'Expense Categories',
+    icon: { icon: 'bx-folder-open' },
+    to: 'expense-categories',
+    action: 'manage',
+    subject: 'all',
+    anyPermission: EXPENSE_CATEGORY_PERMISSIONS,
   },
   {
     title: 'Loyalty',

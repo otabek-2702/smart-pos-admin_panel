@@ -44,6 +44,7 @@ const WAREHOUSE_ROUTE_RULES: WarehouseRouteRule[] = [
   { prefix: '/audit', anyPermission: AUDIT_PERMISSIONS },
   { prefix: '/hr-expenses', anyPermission: EXPENSE_REQUEST_PERMISSIONS },
   { prefix: '/hr-expense-categories', anyPermission: EXPENSE_CATEGORY_PERMISSIONS },
+  { prefix: '/expense-categories', anyPermission: EXPENSE_CATEGORY_PERMISSIONS },
 ]
 
 export function warehousePathAllowed(path: string, access: ReturnTypeReadUserAccess): boolean {

@@ -46,6 +46,7 @@ playwright/.cache/
 .env.local
 .env.*.local
 .playwright-mcp/
+.private/customer-retention/
 /*.png
 /*.jpeg
 /*.jpg

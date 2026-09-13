@@ -142,9 +142,25 @@ Current login contract:
 - response expected as `{ data: { token, user } }`;
 - `/auth-me` and `/app-settings` hydrate business-day/working-hour settings.
 
-Current frontend authorization is intentionally broad: every authenticated
-user receives CASL `manage/all`. Backend permission checks are the real
-security boundary. Do not claim that current UI routes are role-restricted.
+Credential-bearing `/login` links (2026-09-13) are captured and scrubbed by
+`src/bootstrap/loginLink.ts` before router/session hydration and telemetry.
+A complete pair always starts a fresh login, never trusts a saved token, and
+never persists the password. Keep that bootstrap import first in `main.ts`.
+Login and explicit account-switch logout are bound to the initiating token/API
+host; stale responses must not overwrite or clear a newer session. Failed
+`/auth-me` authentication stays on the login form. See
+`docs/operator-login-link.md` for compatibility, exposure limits, and backend
+requirements; this convenience feature is not a one-time magic link.
+
+Frontend authorization is role-aware for restricted workspaces. WAREHOUSE uses
+permission-mapped navigation. Per the 2026-09-11 decision, USER (case-insensitive)
+opens only `/operator/calls`; OPERATOR remains a compatible calling-workspace
+role. These calling roles never receive or restore CASL `manage/all`, and the
+admin sidebar/command palette/settings hydration stay unavailable to them.
+Other roles retain the broader existing behavior. Backend permission checks
+remain the real security boundary; USER login and the dedicated call queue still
+require backend implementation/verification. Do not substitute an ADMIN token or
+general Orders fallback for a calling-role account.
 
 Backend response envelopes and pagination shapes vary. Existing pages often
 normalize with `res.data?.data ?? res.data` and tolerate multiple collection or

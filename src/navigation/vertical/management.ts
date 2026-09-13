@@ -12,6 +12,14 @@ export default [
     subject: 'all',
   },
   {
+    title: 'oc_title',
+    icon: { icon: 'bx-user-check' },
+    to: 'operator-calls',
+    action: 'manage',
+    subject: 'all',
+    anyPermission: ['operator.call_queue.view'],
+  },
+  {
     title: 'Categories',
     icon: { icon: 'bx-category' },
     to: 'categories',

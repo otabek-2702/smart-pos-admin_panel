@@ -1,4 +1,5 @@
 /* eslint-disable import/order */
+import '@/bootstrap/loginLink'
 import '@/@iconify/icons-bundle'
 import App from '@/App.vue'
 import ability from '@/plugins/casl/ability'
@@ -10,6 +11,7 @@ import router from '@/router'
 import { abilitiesPlugin } from '@casl/vue'
 import '@core/scss/template/index.scss'
 import '@styles/styles.scss'
+
 // vue-virtual-scroller — purely-structural CSS (no colors). Imported once
 // globally so DynamicScroller / RecycleScroller in the AI thread render right.
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
@@ -27,6 +29,7 @@ if (sentryDsn) {
   Sentry.init({
     app,
     dsn: sentryDsn,
+
     // PII / replay / trace rates are opt-in via env so prod doesn't ship IPs
     // and 100% trace sampling by default. Defaults below match a sane prod.
     sendDefaultPii: import.meta.env.VITE_SENTRY_PII === 'true',

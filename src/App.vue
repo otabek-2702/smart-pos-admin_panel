@@ -7,6 +7,12 @@ import ShortcutHelp from '@/components/design/ShortcutHelp.vue'
 import ScrollToTop from '@core/components/ScrollToTop.vue'
 import { useThemeConfig } from '@core/composable/useThemeConfig'
 import { hexToRgb } from '@layouts/utils'
+import { useUserAccess } from '@/composables/useUserAccess'
+
+const { isOperator, refresh: refreshAccess } = useUserAccess()
+const route = useRoute()
+
+watch(() => route.fullPath, refreshAccess, { flush: 'sync' })
 
 const { syncInitialLoaderTheme, syncVuetifyThemeWithTheme: syncConfigThemeWithVuetifyTheme, isAppRtl, handleSkinChanges } = useThemeConfig()
 
@@ -26,16 +32,16 @@ const sonnerTheme = computed<'dark' | 'light'>(() => global.current.value.dark ?
     <!-- ℹ️ This is required to set the background color of active nav link based on currently active global theme's primary -->
     <VApp :style="`--v-global-theme-primary: ${hexToRgb(global.current.value.colors.primary)}`">
       <RouterView />
-      <ScrollToTop />
+      <ScrollToTop v-if="!isOperator && route.path !== '/login'" />
       <!-- Global Cmd/Ctrl+K command palette (mount-once; listens at the window level). -->
-      <CommandPalette />
+      <CommandPalette v-if="!isOperator && route.path !== '/login'" />
       <!-- Global "?" key opens keyboard-shortcut reference. -->
-      <ShortcutHelp />
+      <ShortcutHelp v-if="!isOperator && route.path !== '/login'" />
       <!-- vue-sonner: replaces the per-page VSnackbar plumbing. useNotify() now dispatches to toast(). -->
       <Toaster
         :theme="sonnerTheme"
-        :rich-colors="true"
-        :close-button="true"
+        rich-colors
+        close-button
         position="bottom-right"
         :duration="3500"
         :toast-options="{ style: { zIndex: 3000 } }"

@@ -1,9 +1,8 @@
+<!--
+  ALPHA POS icons: stroke, 24px grid, currentColor.
+  Original set ported from .tmp-alpha-design/alpha-design-source/icons.jsx.
+-->
 <script lang="ts">
-// ============================================================
-// ALPHA POS - icon set (stroke, 24px grid, currentColor)
-// Ported verbatim from .tmp-alpha-design/alpha-design-source/icons.jsx
-// ============================================================
-
 export const ICON_PATHS: Record<string, string> = {
   dashboard: '<path d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm9 0h7v-9h-7v9Zm0-16v5h7V4h-7Z"/>',
   ai: '<rect x="4.5" y="7" width="15" height="12" rx="3"/><path d="M12 7V4M9 12h.01M15 12h.01M9.5 16h5"/><path d="M2.5 12.5v2M21.5 12.5v2"/>',
@@ -55,6 +54,7 @@ export const ICON_PATHS: Record<string, string> = {
   download: '<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',
   lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   mail: '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4 7 8 6 8-6"/>',
+  phone: '<path d="M20 16.5v3a1.5 1.5 0 0 1-1.7 1.5A17.5 17.5 0 0 1 3 5.7 1.5 1.5 0 0 1 4.5 4h3l1.5 4-2 2a14 14 0 0 0 7 7l2-2 4 1.5Z"/>',
   user: '<circle cx="12" cy="8" r="3.6"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/>',
   userok: '<circle cx="10" cy="8" r="3.4"/><path d="M4 20a6 6 0 0 1 12 0M16 12l2 2 3.5-3.5"/>',
   logout: '<path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M9 12h9"/>',

@@ -26,6 +26,7 @@ export const ROUTE_LABELS: Record<string, string> = {
   '/shifts': 'Shifts',
   '/shifts-analytics': 'Shifts',
   '/users': 'Users',
+  '/operator/calls': 'oc_title',
   '/categories': 'Categories',
   '/products': 'Products',
   '/orders': 'Orders',

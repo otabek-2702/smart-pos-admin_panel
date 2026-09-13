@@ -1,10 +1,7 @@
 import { getStoredUserData } from '@/utils/storage'
+import { isOperatorRole, sessionRole } from '@/navigation/operatorAccess'
 
 type StoredUser = Record<string, any>
-
-function normalizeRole(user: StoredUser): string {
-  return String(user?.role ?? user?.user?.role ?? '').trim().toUpperCase()
-}
 
 function normalizeUserId(user: StoredUser): string | number | null {
   return user?.id ?? user?.user_id ?? user?.user?.id ?? user?.user?.user_id ?? null
@@ -43,11 +40,15 @@ function normalizePermissions(user: StoredUser): Set<string> {
 
 export function readUserAccess() {
   const user = getStoredUserData<StoredUser>()
-  const role = normalizeRole(user)
+  const role = sessionRole(user)
   const userId = normalizeUserId(user)
   const permissions = normalizePermissions(user)
 
   function has(permission: string): boolean {
+    // USER owns the calling page by product policy; OPERATOR still needs its
+    // explicit permission. Neither role inherits any other access or wildcard.
+    if (isOperatorRole(role))
+      return permission === 'operator.call_queue.view' && (role === 'USER' || permissions.has(permission))
     return role === 'ADMIN' || permissions.has('*') || permissions.has(permission)
   }
 
@@ -65,6 +66,9 @@ export function readUserAccess() {
     role,
     permissions,
     isWarehouse: role === 'WAREHOUSE',
+
+    // Calling-workspace flag, not a replacement for the persisted server role.
+    isOperator: isOperatorRole(role),
     isAdministrator: role === 'ADMIN',
     isManager: role === 'MANAGER',
     has,
@@ -85,8 +89,14 @@ export function useUserAccess() {
       refresh()
   }
 
-  onMounted(() => window.addEventListener('storage', onStorage))
-  onBeforeUnmount(() => window.removeEventListener('storage', onStorage))
+  onMounted(() => {
+    window.addEventListener('storage', onStorage)
+    window.addEventListener('user-access-changed', refresh)
+  })
+  onBeforeUnmount(() => {
+    window.removeEventListener('storage', onStorage)
+    window.removeEventListener('user-access-changed', refresh)
+  })
 
   return {
     access: readonly(access),
@@ -94,6 +104,7 @@ export function useUserAccess() {
     role: computed(() => access.value.role),
     permissions: computed(() => access.value.permissions),
     isWarehouse: computed(() => access.value.isWarehouse),
+    isOperator: computed(() => access.value.isOperator),
     isAdministrator: computed(() => access.value.isAdministrator),
     isManager: computed(() => access.value.isManager),
     hasPermission: (permission: string) => access.value.has(permission),

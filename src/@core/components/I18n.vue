@@ -14,7 +14,7 @@ interface Props {
   location?: any
 }
 
-const { locale } = useI18n({ useScope: 'global' })
+const { locale, t } = useI18n({ useScope: 'global' })
 
 // Initialize from localStorage or default to 'uz'
 const savedLocale = localStorage.getItem('appLocale') || 'uz'
@@ -30,7 +30,7 @@ watch(locale, val => {
 </script>
 
 <template>
-  <IconBtn>
+  <IconBtn :aria-label="t('switch_language')">
     <VIcon
       size="22"
       icon="mdi-translate"

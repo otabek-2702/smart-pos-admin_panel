@@ -1,6 +1,24 @@
 import axios from 'axios'
 import { getStoredToken } from '@/utils/storage'
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+
+    /** The session-validation caller handles its own unauthorized response. */
+    skipAuthRedirect?: boolean
+
+    /** Abort before dispatch if the caller's account or API origin changed. */
+    expectedAuthContext?: { token: string | null; host: string }
+  }
+}
+
+interface SessionRequestConfig {
+  url?: string
+  skipAuthRedirect?: boolean
+  __sessionToken?: string | null
+  __sessionApiHost?: string
+}
+
 const API_TIMEOUT_MS = 30_000
 
 function normalizeHost(host: string): string | null {
@@ -191,6 +209,36 @@ function setHeader(headers: any, name: string, value: string) {
     headers[name] = value
 }
 
+function isAuthLoginRequest(url: string | undefined): boolean {
+  return /(?:^|\/)auth-login\/?$/.test((url ?? '').split(/[?#]/, 1)[0])
+}
+
+function removeAuthorization(headers: any) {
+  if (typeof headers?.delete === 'function') {
+    headers.delete('Authorization')
+    return
+  }
+  for (const key of Object.keys(headers ?? {})) {
+    if (key.toLowerCase() === 'authorization')
+      delete headers[key]
+  }
+}
+
+function shouldClearUnauthorizedSession(config?: SessionRequestConfig): boolean {
+  if (!config || isAuthLoginRequest(config.url) || config.skipAuthRedirect === true)
+    return false
+
+  // A delayed failure from an older account or API host must not destroy the
+  // currently selected session, even if two hosts happen to use the same token.
+  return config.__sessionToken !== undefined && config.__sessionToken === getStoredToken()
+    && config.__sessionApiHost === getCurrentApiHost()
+}
+
+function assertExpectedAuthContext(expected: { token: string | null; host: string } | undefined, host: string) {
+  if (expected && (expected.token !== getStoredToken() || expected.host !== host))
+    throw Object.assign(new Error('Authentication context changed'), { code: 'ERR_AUTH_CONTEXT' })
+}
+
 function releaseIdempotencyKey(config: any) {
   const signature = config?.__idempotencySignature as string | undefined
   const key = config?.__idempotencyKey as string | undefined
@@ -207,16 +255,22 @@ function releaseIdempotencyKey(config: any) {
 // "/api/..." suffix and rewrite baseURL per-request from the current host.
 function attachInterceptors(instance: ReturnType<typeof axios.create>, suffix = '') {
   instance.interceptors.request.use(config => {
-    if (suffix) {
-      const host = getCurrentApiHost()
+    const host = getCurrentApiHost()
 
+    assertExpectedAuthContext(config.expectedAuthContext, host)
+    if (suffix)
       config.baseURL = `${host}${suffix}`
-    }
 
-    const token = getStoredToken()
-    if (token) {
+    const anonymousLogin = isAuthLoginRequest(config.url)
+
+    const token = anonymousLogin ? null : getStoredToken()
+
+    ;(config as SessionRequestConfig).__sessionToken = token
+    ;(config as SessionRequestConfig).__sessionApiHost = host
+    if (anonymousLogin) { removeAuthorization(config.headers) }
+    else if (token) {
       config.headers = config.headers || {}
-      config.headers.Authorization = `Bearer ${token}`
+      setHeader(config.headers, 'Authorization', `Bearer ${token}`)
     }
 
     // Auto-attach Idempotency-Key on admin endpoints that honor it.
@@ -258,7 +312,7 @@ function attachInterceptors(instance: ReturnType<typeof axios.create>, suffix = 
       if (status && status < 500 && ![408, 409].includes(status))
         releaseIdempotencyKey(error.config)
 
-      if (error.response?.status === 401) {
+      if (error.response?.status === 401 && shouldClearUnauthorizedSession(error.config)) {
         localStorage.removeItem('accessToken')
         localStorage.removeItem('userData')
         localStorage.removeItem('userAbilities')

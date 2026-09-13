@@ -5,10 +5,13 @@ import boyWithRocketLight from '@images/illustrations/boy-with-rocket-light.png'
 import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
 import NavBarApiHost from '@/layouts/components/NavBarApiHost.vue'
 import { themeConfig } from '@themeConfig'
-import axiosIns from '@/plugins/axios'
-import ability from '@/plugins/casl/ability'
+import axiosIns, { getCurrentApiHost } from '@/plugins/axios'
+import ability, { initialAbility } from '@/plugins/casl/ability'
 import { useApiError } from '@/composables/useApiError'
 import { hydrateBusinessSettings, setBusinessDayStart } from '@/composables/useBusinessDay'
+import { canHydrateBusinessSettings, loginAbilities, postLoginPath, sessionRole } from '@/navigation/operatorAccess'
+import { finishLoginLink, takeLoginLink } from '@/bootstrap/loginLink'
+import { getStoredToken } from '@/utils/storage'
 
 const { t, locale } = useI18n({ useScope: 'global' })
 const { translate } = useApiError()
@@ -19,6 +22,19 @@ const form = ref({ email: '', password: '' })
 const isPasswordVisible = ref(false)
 const isLoading = ref(false)
 const errorMsg = ref('')
+const isLinkLogin = ref(false)
+const accountSwitchRequired = ref(false)
+
+interface LoginContext {
+  token: string | null
+  host: string
+}
+
+interface AccountSwitchContext extends LoginContext {
+  logoutToken: string | null
+}
+
+let accountSwitchContext: AccountSwitchContext | null = null
 
 const boyWithRocket = useGenerateImageVariant(boyWithRocketLight, boyWithRocketDark)
 
@@ -33,70 +49,246 @@ const setLocale = (code: string) => {
   localStorage.setItem('appLocale', code)
 }
 
+function persistSessionUser(user: Record<string, any>) {
+  const userAbilities = loginAbilities(sessionRole(user))
+
+  localStorage.setItem('userData', JSON.stringify(user))
+  localStorage.setItem('userAbilities', JSON.stringify(userAbilities))
+  ability.update(userAbilities)
+  window.dispatchEvent(new Event('user-access-changed'))
+}
+
+function clearLocalSession() {
+  localStorage.removeItem('accessToken')
+  localStorage.removeItem('userData')
+  localStorage.removeItem('userAbilities')
+  ability.update(initialAbility)
+  window.dispatchEvent(new Event('user-access-changed'))
+}
+
+function assertLoginContext(token: string | null, host: string) {
+  if (getStoredToken() !== token || getCurrentApiHost() !== host)
+    throw new Error('login_session_changed')
+}
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function userIdentity(user: Record<string, any>): unknown {
+  return user.id ?? user.user_id ?? user.user?.id ?? user.user?.user_id
+}
+
+function validUserIdentity(id: unknown): boolean {
+  return (typeof id === 'string' && Boolean(id.trim()))
+    || (typeof id === 'number' && Number.isSafeInteger(id) && id > 0)
+}
+
+function validSessionUser(user: unknown): user is Record<string, any> {
+  if (!isRecord(user))
+    return false
+  const role = user.role ?? user.user?.role
+
+  return typeof role === 'string' && Boolean(role.trim()) && validUserIdentity(userIdentity(user))
+}
+
+function loginResponse(body: any): { token: string; user: Record<string, any> } {
+  const token = body?.data?.token
+  const user = body?.data?.user
+  if (body?.success === false || typeof token !== 'string' || !token.trim()
+    || !validSessionUser(user))
+    throw new Error('login_invalid_response')
+  return { token, user }
+}
+
+function beginLoginContext(): AccountSwitchContext {
+  const logoutToken = getStoredToken()
+  const host = getCurrentApiHost()
+
+  accountSwitchContext = null
+  accountSwitchRequired.value = false
+
+  // A credential link deliberately starts a new session, even if one was saved.
+  if (isLinkLogin.value)
+    clearLocalSession()
+
+  return { token: getStoredToken(), host, logoutToken }
+}
+
+function parseSessionMetadata(body: any, user: Record<string, any>) {
+  const me = body?.data
+  if (body?.success === false || !isRecord(me) || ('user' in me && !isRecord(me.user)))
+    throw new Error('login_invalid_response')
+  const identity = me.user ?? me
+  const receivedId = userIdentity(identity)
+  if (receivedId != null && String(receivedId) !== String(userIdentity(user)))
+    throw new Error('login_invalid_response')
+  const sessionUser = { ...user, ...me, ...identity }
+  if (!validSessionUser(sessionUser))
+    throw new Error('login_invalid_response')
+
+  return { me, sessionUser }
+}
+
+function applyBusinessDayMetadata(me: Record<string, any>) {
+  const bds: unknown = me.business_day_start ?? me.user?.business_day_start ?? me.restaurant?.business_day_start
+  if (typeof bds === 'string' && /^\d{1,2}:\d{2}/.test(bds))
+    setBusinessDayStart(bds.slice(0, 5))
+}
+
+function handleMetadataError(err: any, context: LoginContext) {
+  assertLoginContext(context.token, context.host)
+  if (err?.code === 'ERR_AUTH_CONTEXT' || err?.message === 'login_session_changed')
+    throw err
+  if ([401, 403].includes(err?.response?.status)) {
+    clearLocalSession()
+    throw new Error('login_session_rejected')
+  }
+  if (err?.message === 'login_invalid_response') {
+    clearLocalSession()
+    throw err
+  }
+
+  // Optional metadata outages are non-fatal; replaced or rejected sessions are not.
+}
+
+async function hydrateSessionUser(user: Record<string, any>, context: LoginContext) {
+  try {
+    const response = await axiosIns.get('/auth-me', { skipAuthRedirect: true, expectedAuthContext: context })
+
+    assertLoginContext(context.token, context.host)
+
+    const { me, sessionUser } = parseSessionMetadata(response?.data, user)
+
+    applyBusinessDayMetadata(me)
+    persistSessionUser(sessionUser)
+    return sessionUser
+  }
+  catch (err: any) {
+    handleMetadataError(err, context)
+    return user
+  }
+}
+
+async function completeLogin(user: Record<string, any>, context: LoginContext) {
+  assertLoginContext(context.token, context.host)
+
+  const role = sessionRole(user)
+  if (canHydrateBusinessSettings(role))
+    hydrateBusinessSettings().catch(() => { /* Settings hydration is non-fatal. */ })
+  finishLoginLink()
+  accountSwitchContext = null
+  accountSwitchRequired.value = false
+  await router.replace(postLoginPath(role, route.query.to))
+}
+
+function displayLoginError(err: any, context: AccountSwitchContext) {
+  const safeErrors = ['login_session_changed', 'login_session_rejected', 'login_invalid_response']
+
+  if (err?.code === 'ERR_AUTH_CONTEXT') {
+    errorMsg.value = t('login_session_changed')
+    return
+  }
+  if (err?.response?.status === 409 && err?.response?.data?.code === 'account_switch_requires_logout') {
+    if (getStoredToken() !== context.token || getCurrentApiHost() !== context.host) {
+      errorMsg.value = t('login_session_changed')
+      return
+    }
+    accountSwitchContext = context
+    accountSwitchRequired.value = true
+    errorMsg.value = t('login_link_logout_required')
+    return
+  }
+  accountSwitchContext = null
+  errorMsg.value = safeErrors.includes(err?.message) ? t(err.message) : (translate(err) || t('login_error'))
+}
+
 const login = async () => {
+  if (isLoading.value)
+    return
   isLoading.value = true
   errorMsg.value = ''
 
+  const context = beginLoginContext()
+
   try {
-    const { data } = await axiosIns.post('/auth-login', {
-      email: form.value.email,
-      password: form.value.password,
+    const { data } = await axiosIns.post('/auth-login', { email: form.value.email, password: form.value.password }, {
+      expectedAuthContext: { token: context.token, host: context.host },
     })
 
-    const { token, user } = data.data
-    let sessionUser = user
+    assertLoginContext(context.token, context.host)
+
+    const { token, user } = loginResponse(data)
+    const nextContext = { token, host: context.host }
 
     localStorage.setItem('accessToken', JSON.stringify(token))
-    localStorage.setItem('userData', JSON.stringify(user))
+    persistSessionUser(user)
 
-    // Per-restaurant overnight-shift boundary (default 03:00). BE exposes it
-    // on /auth-me (top-level) and /app-settings (under data.settings). The
-    // /auth-login response does NOT carry it, so we fan out to /auth-me after
-    // login. Best-effort: failure here is non-fatal — useBusinessDay falls
-    // back to its 03:00 default.
-    try {
-      const meRes = await axiosIns.get('/auth-me')
-      const me = meRes?.data?.data ?? {}
-      const bds: unknown = me?.business_day_start
-        ?? me?.user?.business_day_start
-        ?? me?.restaurant?.business_day_start
-      if (typeof bds === 'string' && /^\d{1,2}:\d{2}/.test(bds))
-        setBusinessDayStart(bds.slice(0, 5))
-      // Refresh cached userData with the fuller /auth-me payload so other
-      // pages that read userData see the new field too.
-      if (me && typeof me === 'object') {
-        sessionUser = { ...user, ...me }
-        localStorage.setItem('userData', JSON.stringify(sessionUser))
-      }
-    }
-    catch { /* noop — keep prior default */ }
+    const sessionUser = await hydrateSessionUser(user, nextContext)
 
-    // Pull operating-hours settings (day-start + working open/close) from
-    // /app-settings so the picker's "Working hours" filter is correct.
-    // Warehouse is the first back-office role with a deliberately restricted
-    // surface. Its route/action visibility is driven by backend permissions;
-    // do not persist the legacy manage-all ability for this account.
-    const normalizedRole = String(sessionUser?.role ?? sessionUser?.user?.role ?? '').toUpperCase()
-    if (normalizedRole !== 'WAREHOUSE')
-      void hydrateBusinessSettings()
-    const userAbilities = normalizedRole === 'WAREHOUSE'
-      ? [{ action: 'read', subject: 'Auth' }]
-      : [{ action: 'manage', subject: 'all' }]
-
-    localStorage.setItem('userAbilities', JSON.stringify(userAbilities))
-    ability.update(userAbilities)
-
-    const redirectTo = route.query.to ? String(route.query.to) : '/'
-
-    router.replace(redirectTo)
+    await completeLogin(sessionUser, nextContext)
   }
   catch (err: any) {
-    errorMsg.value = translate(err) || t('login_error')
+    displayLoginError(err, context)
   }
   finally {
+    if (isLinkLogin.value)
+      form.value.password = ''
     isLoading.value = false
   }
 }
+
+async function logoutForAccountSwitch() {
+  const context = accountSwitchContext
+  if (isLoading.value || !accountSwitchRequired.value || !context)
+    return
+  isLoading.value = true
+  try {
+    // The server can retain an HTTP-only session cookie. Revoke only after this
+    // explicit user action, never by bypassing its account-switch guard.
+    assertLoginContext(context.token, context.host)
+
+    const response = await axiosIns.post('/auth-logout', undefined, {
+      skipAuthRedirect: true,
+      expectedAuthContext: { token: context.token, host: context.host },
+      headers: context.logoutToken ? { Authorization: `Bearer ${context.logoutToken}` } : undefined,
+    })
+
+    assertLoginContext(context.token, context.host)
+    if (response?.data?.success === false)
+      throw new Error('login_invalid_response')
+    clearLocalSession()
+    accountSwitchRequired.value = false
+    accountSwitchContext = null
+    errorMsg.value = ''
+  }
+  catch (err: any) {
+    errorMsg.value = (err?.message === 'login_session_changed' || err?.code === 'ERR_AUTH_CONTEXT')
+      ? t('login_session_changed')
+      : (translate(err) || t('login_error'))
+  }
+  finally { isLoading.value = false }
+}
+
+async function initializeLoginLink() {
+  const link = takeLoginLink()
+  if (!link)
+    return
+  form.value.email = link.email
+  if (link.invalid) {
+    errorMsg.value = t('login_link_invalid')
+    return
+  }
+  if (!link.password)
+    return
+  form.value.password = link.password
+  link.password = ''
+  isLinkLogin.value = true
+  try { await login() }
+  finally { isLinkLogin.value = false }
+}
+
+onMounted(initializeLoginLink)
 </script>
 
 <template>
@@ -188,6 +380,25 @@ const login = async () => {
           >
             {{ errorMsg }}
           </VAlert>
+
+          <VBtn
+            v-if="accountSwitchRequired"
+            class="mb-4"
+            variant="outlined"
+            :loading="isLoading"
+            @click="logoutForAccountSwitch"
+          >
+            {{ t('login_link_logout') }}
+          </VBtn>
+
+          <p
+            v-if="isLinkLogin && isLoading"
+            class="mb-4 text-body-2"
+            role="status"
+            aria-live="polite"
+          >
+            {{ t('login_link_signing_in') }}
+          </p>
 
           <VForm @submit.prevent="login">
             <VRow>

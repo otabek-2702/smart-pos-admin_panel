@@ -88,6 +88,7 @@ const NAV: NavEntry[] = [
   { type: 'item', id: 'shifts', label: 'Shifts', icon: 'clock', to: '/shifts-analytics' },
   { type: 'section', label: 'Management' },
   { type: 'item', id: 'users', label: 'Users', icon: 'users', to: '/users' },
+  { type: 'item', id: 'operator-calls', label: 'oc_title', icon: 'phone', to: '/operator/calls', anyPermission: ['operator.call_queue.view'] },
   { type: 'item', id: 'categories', label: 'Categories', icon: 'grid', to: '/categories' },
   { type: 'item', id: 'products', label: 'Products', icon: 'box', to: '/products' },
   { type: 'item', id: 'orders', label: 'Orders', icon: 'receipt', to: '/orders' },

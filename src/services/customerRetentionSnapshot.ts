@@ -201,12 +201,12 @@ function appendPage(result: PageResult, first: PageResult, orders: RetentionOrde
 
 function actorStamp(): string {
   const actor = readUserAccess()
-  if (!actor.has('customer.retention.view'))
+  if (!actor.has('customer.retention.view') && !(actor.isOperator && actor.canReadOperatorOrders))
     return fail('cr_error_forbidden')
   if (actor.userId == null)
     return fail('cr_error_auth')
 
-  return JSON.stringify([actor.userId, actor.role])
+  return JSON.stringify([actor.userId, actor.role, actor.serverRole, actor.email])
 }
 
 async function collectWindow(options: {

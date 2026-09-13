@@ -133,7 +133,7 @@ function contextStamp(): string {
   const access = readUserAccess()
   if (access.userId == null || !(access.isAdministrator || (access.isOperator && access.has('operator.call_queue.view'))))
     return fail('oc_error_permission')
-  return JSON.stringify([access.userId, access.role, getCurrentApiHost()])
+  return JSON.stringify([access.userId, access.role, access.serverRole, access.email, getCurrentApiHost()])
 }
 
 function checkContext(stamp: string, signal?: AbortSignal) {
@@ -170,8 +170,9 @@ export async function loadOperatorQueue(date: string, options: {
   const bounds = operatorDayWindow(date, requestedAt)
 
   checkContext(stamp, options.signal)
-  if (readUserAccess().isAdministrator) {
-    // Admin data adapter only. Calling-role USER/OPERATOR never query general orders.
+  if (readUserAccess().canReadOperatorOrders) {
+    // Only an actual backend ADMIN can use Orders, including an email-selected
+    // operator workspace. Prefix matching never grants backend permissions.
     const snapshot = await collectRetentionSnapshot({ fromAt: bounds.from_at, toAt: bounds.to_at, ...options })
 
     checkContext(stamp, options.signal)
@@ -216,7 +217,7 @@ export async function loadAdminOrderItems(order: OperatorOrder, signal?: AbortSi
   const stamp = contextStamp()
 
   checkContext(stamp, signal)
-  if (!readUserAccess().isAdministrator)
+  if (!readUserAccess().canReadOperatorOrders)
     return fail('oc_error_permission')
   let response
   try { response = await axiosIns.get(`/orders/${positiveId(order.id)}`, { signal }) }

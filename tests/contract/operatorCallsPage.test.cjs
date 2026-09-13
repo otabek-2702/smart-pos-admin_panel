@@ -45,6 +45,8 @@ function queue(date = '2026-08-08', preview = false) {
 
 function setup() {
   const role = vue.ref('OPERATOR')
+  const serverRole = vue.ref('ADMIN')
+  const email = vue.ref('operator@example.invalid')
   const currentUserId = vue.ref(1)
   const permission = vue.ref(true)
   const queues = []
@@ -55,7 +57,7 @@ function setup() {
   const dependencies = {
     'vuetify': { useTheme: () => ({}) },
     '@/composables/useAlphaTheme': { useAlphaTheme: () => ({ theme: vue.ref('light'), toggleTheme: () => undefined }) },
-    '@/composables/useUserAccess': { useUserAccess: () => ({ role, currentUserId, isAdministrator: vue.computed(() => role.value === 'ADMIN'), isOperator: vue.computed(() => ['USER', 'OPERATOR'].includes(role.value.trim().toUpperCase())), hasPermission: () => permission.value }) },
+    '@/composables/useUserAccess': { useUserAccess: () => ({ role, serverRole, email, currentUserId, isAdministrator: vue.computed(() => role.value === 'ADMIN'), isOperator: vue.computed(() => role.value.trim().toUpperCase() === 'OPERATOR'), hasPermission: () => permission.value }) },
     '@/composables/useSessionLogout': { useSessionLogout: () => ({ logout: () => undefined }) },
     '@/services/operatorCalls': {
       operatorCalendarDate: () => '2026-08-08',
@@ -95,6 +97,8 @@ function setup() {
     queues,
     items,
     role,
+    serverRole,
+    email,
     currentUserId,
     permission,
     dispose: () => { unmount.forEach(callback => callback()); scope.stop() },
@@ -112,10 +116,10 @@ test('operator page starts without automatic requests or administrative layout m
   page.dispose()
 })
 
-test('USER sees the full calling page with items and navigation, without the removed administrator banner', async () => {
+test('an operator workspace sees the full calling page with items and navigation without an administrator banner', async () => {
   const page = setup()
 
-  page.role.value = 'user'
+  page.role.value = 'OPERATOR'
   assert.doesNotMatch(descriptor.template.content, /oc_admin_preview|operator-notice/)
 
   const loading = page.loadDay()
@@ -171,13 +175,17 @@ test('changing the selected day invalidates an older response without clearing t
   page.dispose()
 })
 
-test('account changes, permission loss and unmount cancel pending responses and clear customer data', async () => {
-  for (const change of ['account', 'permission', 'unmount']) {
+test('account, email or backend role changes, permission loss and unmount cancel pending responses and clear customer data', async () => {
+  for (const change of ['account', 'email', 'backend-role', 'permission', 'unmount']) {
     const page = setup()
     const pending = page.loadDay()
 
     if (change === 'account')
       page.currentUserId.value = 2
+    else if (change === 'email')
+      page.email.value = 'operator-other@example.invalid'
+    else if (change === 'backend-role')
+      page.serverRole.value = 'USER'
     else if (change === 'permission')
       page.permission.value = false
     else

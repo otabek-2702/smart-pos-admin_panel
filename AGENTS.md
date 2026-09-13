@@ -153,14 +153,21 @@ host; stale responses must not overwrite or clear a newer session. Failed
 requirements; this convenience feature is not a one-time magic link.
 
 Frontend authorization is role-aware for restricted workspaces. WAREHOUSE uses
-permission-mapped navigation. Per the 2026-09-11 decision, USER (case-insensitive)
-opens only `/operator/calls`; OPERATOR remains a compatible calling-workspace
-role. These calling roles never receive or restore CASL `manage/all`, and the
-admin sidebar/command palette/settings hydration stay unavailable to them.
-Other roles retain the broader existing behavior. Backend permission checks
-remain the real security boundary; USER login and the dedicated call queue still
-require backend implementation/verification. Do not substitute an ADMIN token or
-general Orders fallback for a calling-role account.
+permission-mapped navigation. The 2026-09-13 decision supersedes the earlier
+USER-role rule: an authenticated email beginning with `operator` (trimmed and
+case-insensitive, from flat or nested user data) selects the effective OPERATOR
+workspace, including when the actual backend role is ADMIN. Explicit OPERATOR
+remains compatible; USER alone no longer selects this workspace. These accounts
+open only `/operator/calls`, never receive or restore CASL `manage/all`, and do
+not mount the admin sidebar, command palette or settings hydration.
+
+This is a frontend-only restriction, not a backend role change: an actual ADMIN
+retains ADMIN server privileges and uses its already-authorized read-only Orders
+adapter/detail API on the calling page. Actual non-admin calling accounts use
+only the dedicated queue; never promote their role, swap in an ADMIN token, or
+fall back to general Orders APIs. Backend permission checks remain the real
+security boundary. See `docs/customer-operator-backend-spec.md` for the separate,
+historical least-privilege backend target and its unverified delivery status.
 
 Backend response envelopes and pagination shapes vary. Existing pages often
 normalize with `res.data?.data ?? res.data` and tolerate multiple collection or

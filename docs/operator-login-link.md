@@ -61,8 +61,12 @@ parameter delimiters or modify characters inside a correctly encoded password.
 6. Keep a visible signing-in state until the backend accepts the credentials
    and normal session initialization completes. Disable duplicate submission
    while pending. Do not flash the previously authenticated dashboard.
-7. On success, use the authenticated server role. `USER` and `OPERATOR`
-   (case-insensitive) enter `/operator/calls`; they do not restore `manage/all`,
+7. On success, use the authenticated server identity, not link-supplied role or
+   destination fields. Per the 2026-09-13 decision, an email beginning with
+   `operator` (trimmed and case-insensitive, from flat or nested user data)
+   selects the effective OPERATOR workspace even when the backend role is
+   ADMIN. Explicit OPERATOR remains compatible; USER alone does not select it.
+   Effective operators enter only `/operator/calls`, do not restore `manage/all`,
    open the admin shell, or honor an admin destination from the link.
 8. On rejection, network failure, or an invalid link, show an understandable
    error and an editable login form. Clear the password and release the
@@ -108,9 +112,11 @@ The fragment still contains the reusable password. Anyone who receives or
 copies the link can try that account until the password is changed or the
 account is disabled. Browser extensions, clipboard/history synchronization,
 screenshots and the channel used to share the link remain exposure risks.
-Share only through an approved private channel. Use a dedicated least-privilege
-operator account, not an administrator password. Rotate a password if its link
-has been exposed; editing the link does not revoke it.
+Share only through an approved private channel. A least-privilege backend account
+remains the safer target. Under the current email-prefix policy an actual ADMIN
+account still has ADMIN server privileges: hiding admin pages does not restrict
+its token at the API. Rotate a password if its link has been exposed; editing the
+link does not revoke it.
 
 Clicking a link selects the account represented by that link, which may differ
 from the person using the browser. Treat unknown senders and unexpected account
@@ -121,11 +127,15 @@ identity. OWASP discusses this class of risk in
 
 ## Backend requirement and future replacement
 
-The backend must still accept the intended `USER`/`OPERATOR` account through
-the normal authentication endpoint and enforce its calling-workspace access.
-A frontend link cannot repair rejected USER login, a missing call-queue
-endpoint, or missing permissions. Never substitute an ADMIN token or a general
-Orders fallback. See [the operator backend specification](customer-operator-backend-spec.md).
+The backend must still authenticate the actual account and enforce its actual
+permissions. Current email-prefix ADMIN accounts use their own existing ADMIN
+session and the already-authorized read-only Orders collector/detail adapter on
+the calling page. The frontend does not change the stored backend role, provision
+an ADMIN account, substitute tokens, or confer ADMIN access from an email prefix.
+Actual non-admin calling accounts use only the dedicated queue; they never fall
+back to Orders. A frontend link cannot repair rejected login, a missing queue,
+or missing permissions. See [the historical least-privilege backend target and
+current policy notice](customer-operator-backend-spec.md).
 
 This feature is not a magic link: it has no server-issued one-time token,
 independent expiry, or one-use invalidation. A future replacement should use an
@@ -155,7 +165,7 @@ copy an operator's actual password into a fixture or test report.
 - Success, failure, keyboard use, mobile layout and all three locales are
   checked without recording real credentials or credential-bearing URLs.
 
-### Executed checks (2026-09-13)
+### Login-link checks before the email-prefix policy (2026-09-13)
 
 - All 184 contract tests passed, including 19 bootstrap parsing/navigation
   cases and mocked fresh-login, rejection, logout, and token/host race cases.
@@ -167,6 +177,6 @@ copy an operator's actual password into a fixture or test report.
   URL cleanup, native same-tab repeat links, and keyboard focus. The existing
   signed-in administrator session was preserved; no real credential POST or
   operator queue authorization was claimed as verified by these UI checks.
-- No account was created and no frontend deployment was performed in this
-  change. Production USER authentication and queue delivery remain separate
-  backend/integration verification requirements.
+- That original verification did not create an account, deploy the frontend or
+  verify production operator authentication/queue authorization. It is not
+  acceptance evidence for the later email-prefix policy or deployment.

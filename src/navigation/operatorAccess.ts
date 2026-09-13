@@ -2,13 +2,26 @@ import type { UserAbility } from '@/plugins/casl/AppAbility'
 
 export const OPERATOR_HOME = '/operator/calls'
 
-export function sessionRole(user: Record<string, any> | null | undefined): string {
+export function serverRole(user: Record<string, any> | null | undefined): string {
   return String(user?.role ?? user?.user?.role ?? '').trim().toUpperCase()
 }
 
-/** USER and OPERATOR share the call-only workspace; this never changes the server role. */
+export function sessionEmail(user: Record<string, any> | null | undefined): string {
+  return String(user?.email ?? user?.user?.email ?? '').trim().toLowerCase()
+}
+
+export function hasOperatorEmail(user: Record<string, any> | null | undefined): boolean {
+  return sessionEmail(user).startsWith('operator')
+}
+
+/** Frontend workspace only; preserve the authenticated backend role unchanged. */
+export function sessionRole(user: Record<string, any> | null | undefined): string {
+  return hasOperatorEmail(user) ? 'OPERATOR' : serverRole(user)
+}
+
+/** Ordinary USER accounts no longer select the operator workspace by role alone. */
 export function isOperatorRole(role: unknown): boolean {
-  return ['USER', 'OPERATOR'].includes(String(role ?? '').trim().toUpperCase())
+  return String(role ?? '').trim().toUpperCase() === 'OPERATOR'
 }
 
 /** Client navigation isolation only; the backend must enforce the same boundary. */

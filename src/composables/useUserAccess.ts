@@ -1,5 +1,5 @@
 import { getStoredUserData } from '@/utils/storage'
-import { isOperatorRole, sessionRole } from '@/navigation/operatorAccess'
+import { hasOperatorEmail, isOperatorRole, serverRole, sessionEmail, sessionRole } from '@/navigation/operatorAccess'
 
 type StoredUser = Record<string, any>
 
@@ -41,14 +41,17 @@ function normalizePermissions(user: StoredUser): Set<string> {
 export function readUserAccess() {
   const user = getStoredUserData<StoredUser>()
   const role = sessionRole(user)
+  const backendRole = serverRole(user)
+  const email = sessionEmail(user)
+  const operatorEmail = hasOperatorEmail(user)
   const userId = normalizeUserId(user)
   const permissions = normalizePermissions(user)
 
   function has(permission: string): boolean {
-    // USER owns the calling page by product policy; OPERATOR still needs its
-    // explicit permission. Neither role inherits any other access or wildcard.
+    // Email-selected operators have only calling-page access in the UI, even
+    // when their real backend account is ADMIN. Never inherit its wildcard here.
     if (isOperatorRole(role))
-      return permission === 'operator.call_queue.view' && (role === 'USER' || permissions.has(permission))
+      return permission === 'operator.call_queue.view' && (operatorEmail || permissions.has(permission))
     return role === 'ADMIN' || permissions.has('*') || permissions.has(permission)
   }
 
@@ -64,6 +67,12 @@ export function readUserAccess() {
     user,
     userId,
     role,
+    serverRole: backendRole,
+    email,
+    hasOperatorEmail: operatorEmail,
+
+    // Transport capability, not admin navigation access. No role/token promotion.
+    canReadOperatorOrders: backendRole === 'ADMIN',
     permissions,
     isWarehouse: role === 'WAREHOUSE',
 
@@ -102,6 +111,8 @@ export function useUserAccess() {
     access: readonly(access),
     currentUserId: computed(() => access.value.userId),
     role: computed(() => access.value.role),
+    serverRole: computed(() => access.value.serverRole),
+    email: computed(() => access.value.email),
     permissions: computed(() => access.value.permissions),
     isWarehouse: computed(() => access.value.isWarehouse),
     isOperator: computed(() => access.value.isOperator),

@@ -13,7 +13,7 @@ import type { OperatorQueue } from '@/types/operatorCalls'
 import type { RetentionCollectionProgress } from '@/types/customerRetention'
 
 const { t, locale } = useI18n({ useScope: 'global' })
-const { isAdministrator, isOperator, role, currentUserId, hasPermission } = useUserAccess()
+const { isAdministrator, isOperator, role, serverRole, email, currentUserId, hasPermission } = useUserAccess()
 const { logout } = useSessionLogout()
 const { theme, toggleTheme } = useAlphaTheme(useTheme())
 const allowed = computed(() => isAdministrator.value || (isOperator.value && hasPermission('operator.call_queue.view')))
@@ -164,7 +164,7 @@ async function resumeLast() {
 }
 
 watch(date, clearQueue)
-watch([currentUserId, role, allowed], clearQueue, { flush: 'sync' })
+watch([currentUserId, role, serverRole, email, allowed], clearQueue, { flush: 'sync' })
 watch(locale, () => { document.title = `${t('oc_title')} · Alpha POS` }, { immediate: true })
 onBeforeUnmount(clearQueue)
 </script>

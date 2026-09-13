@@ -1,8 +1,33 @@
 # Customer feedback operator — backend implementation request
 
+## Superseding frontend policy — 2026-09-13
+
+The current user decision selects the calling workspace by authenticated email:
+trim and compare case-insensitively; any email beginning with `operator` (flat or
+nested user data) has effective OPERATOR UI, including an actual backend ADMIN.
+Explicit OPERATOR remains compatible. USER alone no longer selects this page.
+Effective operators see only `/operator/calls`, without the admin shell or broad
+frontend abilities. The stored backend role and session token are not promoted,
+replaced or rewritten to implement this policy.
+
+An actual ADMIN uses its existing authorized read-only Orders collector/detail
+adapter on the calling page. An actual non-admin calling account uses only the
+dedicated queue, never a general Orders fallback. **This is UI isolation only:
+an ADMIN token retains its backend privileges.** It does not deliver the
+least-privilege security boundary described below.
+
+The remaining 2026-09-11 document is the historical secure-backend target, not
+the current frontend identity-selection policy or proof of deployed endpoints.
+Its USER-specific provisioning and role-selection instructions are superseded
+for this frontend release; backend implementation/provisioning still requires a
+separate confirmed contract and verified delivery. Do not infer authorization
+to change backend roles, passwords or server code from this UI change.
+
+## Historical backend request — 2026-09-11
+
 Updated: 2026-09-11. Status: requested contract, not a claim of deployed support.
 
-Latest explicit product decision: use the existing `USER` role for the calling
+Product decision at that date: use the existing `USER` role for the calling
 page. This supersedes the earlier request to introduce an `OPERATOR` role. The
 `operator` endpoint/permission namespace names the feature, not a new account
 role. Backend authorization, password support and the dedicated queue are still

@@ -97,7 +97,7 @@ function loadRouter(user, loggedIn = true, loginLink = false) {
 }
 
 function loadLogin(options = {}) {
-  const user = options.user ?? { id: 1, role: 'USER', permissions: ['operator.call_queue.view'] }
+  const user = options.user ?? { id: 1, role: 'ADMIN', email: 'operator@example.invalid' }
   const local = storage(options.cachedUser ?? {})
   const posts = []
   const postCalls = []
@@ -192,11 +192,27 @@ async function loginAs(role, requested = '/treasury') {
   return result
 }
 
-test('USER and OPERATOR roles receive the calling workspace with case-insensitive nested normalization', () => {
-  for (const role of [' operator ', 'USER', 'user', ' User '])
+test('operator email prefixes and explicit OPERATOR roles normalize without changing server identity', () => {
+  for (const role of [' operator ', 'OPERATOR'])
     assert.equal(helper.isOperatorRole(role), true)
-  for (const role of ['ADMIN', 'WAREHOUSE', 'MANAGER', 'SUPERUSER', '', null])
+  for (const role of ['USER', 'user', 'ADMIN', 'WAREHOUSE', 'MANAGER', 'SUPERUSER', '', null])
     assert.equal(helper.isOperatorRole(role), false)
+  for (const user of [
+    { role: 'ADMIN', email: 'operator@example.invalid' },
+    { role: 'USER', email: ' OPERATOR.one@example.invalid ' },
+    { user: { role: 'admin', email: 'OperatorTwo@example.invalid' } },
+    { role: 'OPERATOR', email: 'caller@example.invalid' },
+  ])
+    assert.equal(helper.sessionRole(user), 'OPERATOR')
+  for (const user of [
+    { role: 'USER', email: 'caller@example.invalid' },
+    { role: 'ADMIN', email: 'myoperator@example.invalid' },
+    { role: 'ADMIN', email: 'ordinary@operator.invalid' },
+    { role: 'ADMIN' },
+    {},
+  ])
+    assert.notEqual(helper.sessionRole(user), 'OPERATOR')
+  assert.equal(helper.sessionEmail({ user: { email: ' OperatorTwo@example.invalid ' } }), 'operatortwo@example.invalid')
   assert.equal(helper.sessionRole({ user: { role: 'OPERATOR' } }), 'OPERATOR')
   assert.equal(helper.sessionRole({ user: { role: ' user ' } }), 'USER')
   assert.equal(helper.operatorPathAllowed('/operator/calls/'), true)
@@ -215,16 +231,18 @@ test('an operator requires its explicit queue permission; stale wildcard never g
   assert.equal(loadAccess(storage({ id: 1, role: 'OPERATOR', permissions: ['*'] })).readUserAccess().has('operator.call_queue.view'), false)
 })
 
-test('USER gets only the queue permission from its role, even with absent permissions or stale wildcard grants', () => {
+test('operator-prefixed accounts get only queue UI permission even when the backend role is ADMIN', () => {
   for (const user of [
-    { id: 1, role: 'USER' },
-    { id: 1, role: 'user', permissions: ['*', 'treasury.view', 'customer.retention.view'] },
-    { user: { id: 1, role: ' user ', permissions: { '*': true, 'orders.view': true } } },
+    { id: 1, role: 'ADMIN', email: 'operator@example.invalid' },
+    { id: 1, role: 'admin', email: ' Operator.one@example.invalid ', permissions: ['*', 'treasury.view', 'customer.retention.view'] },
+    { user: { id: 1, role: ' admin ', email: 'operatorTwo@example.invalid', permissions: { '*': true, 'orders.view': true } } },
   ]) {
     const local = storage(user)
     const access = loadAccess(local).readUserAccess()
 
-    assert.equal(access.role, 'USER')
+    assert.equal(access.role, 'OPERATOR')
+    assert.equal(access.serverRole, 'ADMIN')
+    assert.equal(access.canReadOperatorOrders, true)
     assert.equal(access.userId, 1)
     assert.equal(access.isOperator, true)
     assert.equal(access.isAdministrator, false)
@@ -238,7 +256,7 @@ test('USER gets only the queue permission from its role, even with absent permis
 })
 
 test('calling-workspace guards bypass stale manage/all while containing every administrative deep link', () => {
-  for (const user of [{ id: 1, role: 'OPERATOR', permissions: [] }, { id: 1, role: 'USER' }, { user: { id: 1, role: 'user' } }]) {
+  for (const user of [{ id: 1, role: 'OPERATOR', permissions: [] }, { id: 1, role: 'ADMIN', email: 'operator@example.invalid' }, { user: { id: 1, role: 'admin', email: ' Operator2@example.invalid ' } }]) {
     const router = loadRouter(user)
 
     for (const path of ['/', '/login', '/treasury', '/stock/items', '/dashboard', '/orders', '/licensing/setup', '/unknown', '/operator/calls/extra'])
@@ -253,6 +271,8 @@ test('calling-workspace guards bypass stale manage/all while containing every ad
 test('anonymous and unrelated roles cannot access the calling page; ADMIN and WAREHOUSE behavior remains', () => {
   assert.deepEqual(json(loadRouter({}, false).guard('/operator/calls')), { name: 'login' })
   assert.deepEqual(json(loadRouter({ id: 1, role: 'MANAGER', permissions: ['operator.call_queue.view'] }).guard('/operator/calls')), { name: 'not-authorized' })
+  assert.deepEqual(json(loadRouter({ id: 1, role: 'USER', email: 'ordinary@example.invalid', permissions: ['operator.call_queue.view'] }).guard('/operator/calls')), { name: 'not-authorized' })
+  assert.equal(loadAccess(storage({ id: 1, role: 'USER', email: 'ordinary@example.invalid' })).readUserAccess().isOperator, false)
   assert.equal(loadRouter({ id: 1, role: 'ADMIN' }).guard('/operator/calls'), undefined)
   assert.equal(loadRouter({ id: 1, role: 'ADMIN' }).guard('/orders'), undefined)
   assert.equal(loadRouter({ id: 1, role: 'WAREHOUSE' }).guard('/warehouse'), true)
@@ -260,8 +280,8 @@ test('anonymous and unrelated roles cannot access the calling page; ADMIN and WA
   assert.equal(loadRouter({ id: 1, role: 'ADMIN' }).settingsCalls, 1)
 })
 
-test('USER and OPERATOR login ignore administrative or external return URLs without altering server roles', async () => {
-  for (const user of [{ id: 1, role: 'OPERATOR' }, { id: 1, role: 'USER' }, { user: { id: 1, role: 'user' } }]) {
+test('operator-prefixed and OPERATOR login ignore administrative return URLs without altering server roles', async () => {
+  for (const user of [{ id: 1, role: 'OPERATOR' }, { id: 1, role: 'ADMIN', email: 'operator@example.invalid' }, { user: { id: 1, role: 'admin', email: 'operator2@example.invalid' } }]) {
     for (const destination of ['/treasury', '//untrusted.invalid', 'https://untrusted.invalid', ['/orders', '/settings']]) {
       const result = await loginAs(user, destination)
 
@@ -276,8 +296,8 @@ test('USER and OPERATOR login ignore administrative or external return URLs with
   }
 })
 
-test('existing ADMIN and WAREHOUSE login contracts are unchanged', async () => {
-  for (const role of ['ADMIN', 'WAREHOUSE']) {
+test('ordinary USER, ADMIN and WAREHOUSE login contracts are unchanged', async () => {
+  for (const role of ['USER', 'ADMIN', 'WAREHOUSE']) {
     const result = await loginAs(role, '/orders')
 
     assert.deepEqual(result.destinations, ['/orders'])
@@ -287,15 +307,15 @@ test('existing ADMIN and WAREHOUSE login contracts are unchanged', async () => {
   }
 })
 
-test('restarting USER and OPERATOR sessions discards persisted manage/all while preserving ADMIN', () => {
-  for (const user of [{ id: 1, role: 'OPERATOR' }, { id: 1, role: 'ADMIN' }, { id: 1, role: 'USER' }, { user: { id: 1, role: 'user' } }]) {
+test('restarting operator-email and OPERATOR sessions discards persisted manage/all while preserving ordinary accounts', () => {
+  for (const user of [{ id: 1, role: 'OPERATOR' }, { id: 1, role: 'ADMIN' }, { id: 1, role: 'USER' }, { id: 1, role: 'ADMIN', email: 'operator@example.invalid' }, { user: { id: 1, role: 'admin', email: 'Operator2@example.invalid' } }]) {
     const ability = execute(read('src/plugins/casl/ability.ts'), {
       '@casl/ability': { Ability },
       '@/utils/storage': storage(user),
       '@/navigation/operatorAccess': helper,
     }).default
 
-    assert.equal(ability.can('manage', 'all'), helper.sessionRole(user) === 'ADMIN')
+    assert.equal(ability.can('manage', 'all'), !helper.isOperatorRole(helper.sessionRole(user)))
     assert.equal(ability.can('read', 'Auth'), true)
   }
 })
@@ -321,8 +341,8 @@ const deferred = () => {
 
 const nextTurn = () => new Promise(resolve => setImmediate(resolve))
 
-test('credential-link initialization wins over cached USER routing and suppresses startup settings requests', () => {
-  for (const cachedUser of [{ id: 1, role: 'USER' }, { id: 1, role: 'ADMIN' }]) {
+test('credential-link initialization wins over cached operator routing and suppresses startup settings requests', () => {
+  for (const cachedUser of [{ id: 1, role: 'ADMIN', email: 'operator@example.invalid' }, { id: 1, role: 'ADMIN' }]) {
     const router = loadRouter(cachedUser, true, true)
 
     assert.equal(router.guard('/login', { redirectIfLoggedIn: true }), true)
@@ -334,9 +354,9 @@ test('credential-link initialization wins over cached USER routing and suppresse
   }
 })
 
-test('mounted credential link freshly authenticates a cached USER exactly once and clears the password', async () => {
+test('mounted credential link freshly authenticates a cached operator exactly once and clears the password', async () => {
   const link = fixtureLink()
-  const result = loadLogin({ link, cachedUser: { id: 90, role: 'USER' }, user: { id: 91, role: 'USER' } })
+  const result = loadLogin({ link, cachedUser: { id: 90, role: 'ADMIN', email: 'operator@example.invalid' }, user: { id: 91, role: 'ADMIN', email: 'operator@example.invalid' } })
 
   assert.equal(result.mounted.length, 1)
   assert.equal(result.posts.length, 0)
@@ -366,7 +386,7 @@ test('a credential link clears cached local identity before sending its fresh lo
       assert.equal(result.local.getItem('accessToken'), null)
       assert.equal(result.local.getItem('userData'), null)
       assert.equal(result.local.getItem('userAbilities'), null)
-      return { data: { success: true, data: { token: 'synthetic-next-token', user: { id: 91, role: 'USER' } } } }
+      return { data: { success: true, data: { token: 'synthetic-next-token', user: { id: 91, role: 'ADMIN', email: 'operator@example.invalid' } } } }
     },
   })
 
@@ -433,7 +453,7 @@ test('an in-flight login prevents duplicate submission and clears link password 
   assert.equal(result.page.isLoading.value, true)
   await result.page.login()
   assert.equal(result.posts.length, 1)
-  request.resolve({ data: { success: true, data: { token: 'synthetic-new-token', user: { id: 1, role: 'USER' } } } })
+  request.resolve({ data: { success: true, data: { token: 'synthetic-new-token', user: { id: 1, role: 'ADMIN', email: 'operator@example.invalid' } } } })
   await initialization
   assert.equal(result.page.form.value.password, '')
   assert.deepEqual(result.destinations, ['/operator/calls'])

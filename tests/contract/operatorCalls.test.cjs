@@ -72,8 +72,8 @@ function retentionOrder(id = 1, overrides = {}) {
   }
 }
 
-function setup({ role = 'OPERATOR', get, previewOrders = [retentionOrder()], now = NOW } = {}) {
-  let access = { userId: 1, role, allowed: true }
+function setup({ role = 'OPERATOR', email = '', get, collect, previewOrders = [retentionOrder()], now = NOW } = {}) {
+  let access = { userId: 1, role, email, allowed: true }
   let host = 'https://operator-fixture.invalid'
   let currentNow = now
   const calls = []
@@ -87,12 +87,24 @@ function setup({ role = 'OPERATOR', get, previewOrders = [retentionOrder()], now
   const dependencies = {
     '@/utils/customerRetention': engineContext.exports,
     '@/composables/useUserAccess': {
-      readUserAccess: () => ({
-        ...access,
-        isAdministrator: access.role === 'ADMIN',
-        isOperator: ['USER', 'OPERATOR'].includes(String(access.role).trim().toUpperCase()),
-        has: permission => access.allowed && permission === 'operator.call_queue.view',
-      }),
+      readUserAccess: () => {
+        const serverRole = String(access.role).trim().toUpperCase()
+        const normalizedEmail = String(access.email).trim().toLowerCase()
+        const hasOperatorEmail = normalizedEmail.startsWith('operator')
+        const effectiveRole = hasOperatorEmail ? 'OPERATOR' : serverRole
+
+        return {
+          ...access,
+          role: effectiveRole,
+          serverRole,
+          email: normalizedEmail,
+          hasOperatorEmail,
+          isAdministrator: effectiveRole === 'ADMIN',
+          isOperator: effectiveRole === 'OPERATOR',
+          canReadOperatorOrders: serverRole === 'ADMIN',
+          has: permission => access.allowed && permission === 'operator.call_queue.view',
+        }
+      },
     },
     '@/plugins/axios': {
       getCurrentApiHost: () => host,
@@ -106,6 +118,8 @@ function setup({ role = 'OPERATOR', get, previewOrders = [retentionOrder()], now
     '@/services/customerRetentionSnapshot': {
       collectRetentionSnapshot: async options => {
         previews.push(options)
+        if (collect)
+          await collect(options)
         return { orders: previewOrders, record_count: previewOrders.length, to_at: TO, collected_at: TO }
       },
     },
@@ -128,6 +142,63 @@ function setup({ role = 'OPERATOR', get, previewOrders = [retentionOrder()], now
     setAccess: value => { access = { ...access, ...value } },
     setHost: value => { host = value },
     setNow: value => { currentNow = value },
+  }
+}
+
+function setupIntegrated(user, afterResponse = () => undefined) {
+  let storedUser = user
+  const calls = []
+  const modules = new Map()
+  const source = 'https://operator-fixture.invalid'
+
+  const dependencies = {
+    '@/utils/storage': { getStoredUserData: () => storedUser },
+    '@/plugins/axios': {
+      getCurrentApiHost: () => source,
+      default: {
+        get: async (url, config) => {
+          calls.push({ url, config })
+
+          const response = url === '/orders'
+            ? {
+              data: {
+                success: true,
+                data: {
+                  orders: [retentionOrder()],
+                  filters: { start_at: config.params.datetime_from, end_at: config.params.datetime_to },
+                  pagination: { total_orders: 1, total_pages: 1, per_page: 100, current_page: 1, has_next: false, has_previous: false },
+                },
+              },
+            }
+            : { data: body() }
+
+          afterResponse()
+          return response
+        },
+      },
+    },
+  }
+
+  function loadModule(request) {
+    if (Object.hasOwn(dependencies, request))
+      return dependencies[request]
+    if (modules.has(request))
+      return modules.get(request)
+    assert.ok(request.startsWith('@/'), `Unexpected dependency: ${request}`)
+
+    const context = vm.createContext({ exports: {}, Date: FixedDate, URL, Blob, window: { location: { origin: source } }, require: loadModule })
+
+    vm.runInContext(compile(`src/${request.slice(2)}.ts`), context)
+    modules.set(request, context.exports)
+    return context.exports
+  }
+
+  return {
+    ...loadModule('@/services/operatorCalls'),
+    ...loadModule('@/services/customerRetentionSnapshot'),
+    readUserAccess: loadModule('@/composables/useUserAccess').readUserAccess,
+    calls,
+    setUser: value => { storedUser = value },
   }
 }
 
@@ -287,9 +358,9 @@ test('known backend error codes retain actionable states without exposing messag
   }
 })
 
-test('USER loads the complete dedicated queue, never general orders or admin detail', async () => {
+test('operator-prefixed non-admin users load only the dedicated queue and never gain admin transport', async () => {
   for (const role of ['USER', 'user']) {
-    const service = setup({ role })
+    const service = setup({ role, email: 'operator@example.invalid' })
     const result = await service.loadOperatorQueue(DATE)
 
     assert.equal(result.total_customers, 1)
@@ -299,7 +370,7 @@ test('USER loads the complete dedicated queue, never general orders or admin det
     await assert.rejects(service.loadAdminOrderItems(fixtureOrder()), /oc_error_permission/)
     assert.equal(service.calls.length, 1)
 
-    const unavailable = setup({ role, get: async () => { throw Object.assign(new Error('Not ready'), { response: { status: 404 } }) } })
+    const unavailable = setup({ role, email: 'Operator@example.invalid', get: async () => { throw Object.assign(new Error('Not ready'), { response: { status: 404 } }) } })
 
     await assert.rejects(unavailable.loadOperatorQueue(DATE), /oc_error_backend/)
     assert.deepEqual(unavailable.calls.map(call => call.url), ['/operator/call-queue'])
@@ -307,8 +378,8 @@ test('USER loads the complete dedicated queue, never general orders or admin det
   }
 })
 
-test('queue and detail access deny unrelated roles or missing permission without issuing requests', async () => {
-  for (const state of [{ role: 'CASHIER' }, { role: 'MANAGER' }, { allowed: false }, { userId: null }]) {
+test('queue and detail access deny ordinary USER and unrelated roles or missing permission without requests', async () => {
+  for (const state of [{ role: 'USER' }, { role: 'CASHIER' }, { role: 'MANAGER' }, { allowed: false }, { userId: null }]) {
     const service = setup()
 
     service.setAccess(state)
@@ -323,11 +394,13 @@ test('queue and detail access deny unrelated roles or missing permission without
 })
 
 test('source, identity and permission changes invalidate a response before data is returned', async () => {
-  for (const change of ['host', 'user', 'permission']) {
+  for (const change of ['host', 'user', 'permission', 'email']) {
     const service = setup({
       get: async () => {
         if (change === 'host')
           service.setHost('https://changed-fixture.invalid')
+        else if (change === 'email')
+          service.setAccess({ email: 'operator-other@example.invalid' })
         else
           service.setAccess(change === 'user' ? { userId: 2 } : { allowed: false })
         return { data: body() }
@@ -342,7 +415,7 @@ test('already canceled operations never dispatch queue, preview, or detail reque
   const controller = new AbortController()
 
   controller.abort()
-  for (const role of ['USER', 'OPERATOR', 'ADMIN']) {
+  for (const role of ['OPERATOR', 'ADMIN']) {
     const service = setup({ role })
 
     await assert.rejects(service.loadOperatorQueue(DATE, { signal: controller.signal }), /oc_error_canceled/)
@@ -377,6 +450,90 @@ test('ADMIN preview uses the exact day collector and retains only eligible custo
   assert.equal(result.customers[0].orders.length, 2)
   assert.ok(result.customers[0].orders.every(order => order.items === null))
   assert.doesNotMatch(JSON.stringify(result), /total_amount|phone_number|customer_is_staff|is_paid/)
+})
+
+test('operator-prefix ADMIN uses its own existing Orders adapter while returning only calling fields', async () => {
+  const service = setup({ role: 'ADMIN', email: ' Operator.one@example.invalid ' })
+  const result = await service.loadOperatorQueue(DATE)
+
+  assert.equal(service.calls.length, 0)
+  assert.equal(service.previews.length, 1)
+  assert.equal(service.previews[0].fromAt, FROM)
+  assert.equal(service.previews[0].toAt, TO)
+  assert.equal(result.total_customers, 1)
+  assert.equal(result.customers[0].orders[0].items, null)
+  assert.doesNotMatch(JSON.stringify(result), /total_amount|phone_number|customer_is_staff|is_paid/)
+})
+
+test('real prefix ADMIN access passes the actual collector actor guard without admin UI permission', async () => {
+  for (const user of [
+    { id: 1, role: 'ADMIN', email: 'operator@example.invalid' },
+    { user: { id: 1, role: ' admin ', email: ' Operator.one@example.invalid ' } },
+  ]) {
+    const service = setupIntegrated(user)
+    const access = service.readUserAccess()
+
+    assert.equal(access.role, 'OPERATOR')
+    assert.equal(access.serverRole, 'ADMIN')
+    assert.equal(access.isAdministrator, false)
+    assert.equal(access.has('customer.retention.view'), false)
+
+    const result = await service.loadOperatorQueue(DATE)
+
+    assert.deepEqual(service.calls.map(call => call.url), ['/orders', '/orders'])
+    assert.equal(result.total_customers, 1)
+    assert.equal(result.customers[0].phone, PHONE)
+    assert.equal(result.customers[0].orders[0].id, 1)
+    assert.doesNotMatch(JSON.stringify(result), /total_amount|customer_is_staff|is_paid/)
+  }
+})
+
+test('real non-admin calling access never falls back to the Orders collector or detail transport', async () => {
+  for (const user of [
+    { id: 1, role: 'USER', email: 'operator@example.invalid' },
+    { id: 1, role: 'MANAGER', email: 'Operator.one@example.invalid', permissions: ['*'] },
+    { id: 1, role: 'OPERATOR', email: 'caller@example.invalid', permissions: ['operator.call_queue.view'] },
+  ]) {
+    const service = setupIntegrated(user)
+    const result = await service.loadOperatorQueue(DATE)
+
+    assert.equal(result.total_customers, 1)
+    assert.deepEqual(service.calls.map(call => call.url), ['/operator/call-queue'])
+    await assert.rejects(service.collectRetentionSnapshot({ fromAt: FROM, toAt: TO }), /cr_error_forbidden/)
+    await assert.rejects(service.loadAdminOrderItems(fixtureOrder()), /oc_error_permission/)
+    assert.equal(service.calls.length, 1)
+  }
+})
+
+test('real collector discards prefix ADMIN responses when email or actual server role changes', async () => {
+  for (const change of [{ email: 'operator-other@example.invalid' }, { role: 'USER' }]) {
+    const user = { id: 1, role: 'ADMIN', email: 'operator@example.invalid' }
+    const service = setupIntegrated(user, () => service.setUser({ ...user, ...change }))
+
+    await assert.rejects(service.loadOperatorQueue(DATE), /cr_error_(source_changed|forbidden)/)
+    assert.deepEqual(service.calls.map(call => call.url), ['/orders'])
+  }
+})
+
+test('operator-prefix ADMIN may lazily read product names and quantities from its own order detail', async () => {
+  const service = setup({
+    role: 'ADMIN',
+    email: 'operator@example.invalid',
+    get: async () => ({ data: { success: true, data: { order: { ...fixtureOrder(), total_amount: '100000', items: [{ product: { name: 'Synthetic product', cost: '1000' }, quantity: '2.5', price: '10000' }] } } } }),
+  })
+
+  assert.deepEqual(json(await service.loadAdminOrderItems(fixtureOrder())), [{ name: 'Synthetic product', quantity: 2.5 }])
+  assert.deepEqual(service.calls.map(call => call.url), ['/orders/1'])
+})
+
+test('changing email or backend authority invalidates pending operator ADMIN adapter results', async () => {
+  for (const change of [{ email: 'operator-other@example.invalid' }, { role: 'USER' }]) {
+    const service = setup({ role: 'ADMIN', email: 'operator@example.invalid', collect: async () => service.setAccess(change) })
+
+    await assert.rejects(service.loadOperatorQueue(DATE), /oc_error_(context|permission)/)
+    assert.equal(service.previews.length, 1)
+    assert.equal(service.calls.length, 0)
+  }
 })
 
 test('only ADMIN lazily requests the real detail path and extracts product names with quantities', async () => {

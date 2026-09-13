@@ -13,5 +13,5 @@ export const initialAbility: UserAbility[] = [
 const existingAbility = getStoredAbilities<UserAbility[]>()
 const operatorSession = isOperatorRole(sessionRole(getStoredUserData()))
 
-// Old sessions may still persist manage/all. Never restore it for calling-role USER/OPERATOR.
+// Never restore manage/all for an operator workspace, including email-selected ADMINs.
 export default new Ability(operatorSession ? initialAbility : (existingAbility || initialAbility))

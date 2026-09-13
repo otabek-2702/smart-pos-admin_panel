@@ -1,10 +1,21 @@
-export interface OperatorItem { name: string; quantity: number }
+export interface OperatorItem { name: string; quantity: number; comment?: string | null }
+export interface OperatorOrderDetails {
+  items: OperatorItem[]
+  comment: string | null
+  delivery_address: string | null
+  ready_at: string | null
+  preparation_time_seconds: number | null
+}
 export interface OperatorOrder {
   id: number
   order_number: string | null
   created_at: string
   order_type: 'HALL' | 'DELIVERY' | 'PICKUP'
   place_label: string | null
+  comment?: string | null
+  delivery_address?: string | null
+  ready_at?: string | null
+  preparation_time_seconds?: number | null
   items: OperatorItem[] | null
 }
 export interface OperatorCustomer {

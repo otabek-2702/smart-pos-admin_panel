@@ -228,6 +228,66 @@ test('queue whitelists minimal customer, order and item fields without money or 
   assert.doesNotMatch(JSON.stringify(result), /synthetic-secret|total_amount|loyalty_balance|cashier|profit|"price"|"cost"/)
 })
 
+test('dedicated queue accepts only the optional approved order context and item comments', () => {
+  const service = setup()
+  const raw = body()
+  const order = raw.data.customers[0].orders[0]
+
+  Object.assign(order, {
+    comment: 'Synthetic order note\nRing once',
+    delivery_address: 'Synthetic street, 10',
+    description: 'unrelated-secret',
+    coordinates: 'unrelated-secret',
+  })
+  Object.assign(order.items[0], { comment: 'No onions', detail: 'unrelated-secret' })
+
+  const result = service.parseOperatorQueue(raw, DATE).customers[0].orders[0]
+
+  assert.equal(result.comment, 'Synthetic order note\nRing once')
+  assert.equal(result.delivery_address, 'Synthetic street, 10')
+  assert.equal(result.items[0].comment, 'No onions')
+  assert.doesNotMatch(JSON.stringify(result), /unrelated-secret|description|coordinates|detail/)
+
+  order.comment = null
+  order.delivery_address = ''
+  order.items[0].comment = null
+
+  const empty = service.parseOperatorQueue(raw, DATE).customers[0].orders[0]
+
+  assert.equal(empty.comment, null)
+  assert.equal(empty.delivery_address, null)
+  assert.equal(empty.items[0].comment, null)
+})
+
+test('queue context rejects non-text and oversized notes without truncating allowed source strings', () => {
+  const service = setup()
+
+  for (const field of ['comment', 'delivery_address', 'item_comment']) {
+    for (const value of [42, false, [], {}, 'x'.repeat(20_001)]) {
+      const raw = body()
+      const order = raw.data.customers[0].orders[0]
+
+      if (field === 'item_comment')
+        order.items[0].comment = value
+      else
+        order[field] = value
+      assert.throws(() => service.parseOperatorQueue(raw, DATE), /oc_error_contract/)
+    }
+  }
+
+  const raw = body()
+  const value = 'x'.repeat(20_000)
+
+  Object.assign(raw.data.customers[0].orders[0], { comment: value, delivery_address: value })
+  raw.data.customers[0].orders[0].items[0].comment = value
+
+  const result = service.parseOperatorQueue(raw, DATE).customers[0].orders[0]
+
+  assert.equal(result.comment, value)
+  assert.equal(result.delivery_address, value)
+  assert.equal(result.items[0].comment, value)
+})
+
 test('queue rejects malformed, noncanonical or duplicate phones, keys and order IDs', () => {
   const service = setup()
 
@@ -559,6 +619,200 @@ test('only ADMIN lazily requests the real detail path and extracts product names
     const mismatch = setup({ role: 'ADMIN', get: async () => ({ data: { success: true, data: { order: { ...fixtureOrder(), ...changed } } } }) })
 
     await assert.rejects(mismatch.loadAdminOrderItems(fixtureOrder()), /oc_error_contract/)
+  }
+})
+
+test('ADMIN order details map exact backend context fields and never retain unrelated detail data', async () => {
+  const service = setup({
+    role: 'ADMIN',
+    email: 'operator@example.invalid',
+    get: async () => ({
+      data: {
+        success: true,
+        data: {
+          order: {
+            ...fixtureOrder({ order_type: 'DELIVERY' }),
+            description: 'Synthetic note\nUse the side entrance',
+            delivery_address: 'Synthetic street, 10',
+            comment: 'unrelated-secret',
+            cashier: { email: 'unrelated-secret' },
+            place: { name: 'unrelated-secret' },
+            table: { name: 'unrelated-secret' },
+            payments: 'unrelated-secret',
+            items: [{ product: { name: 'Synthetic product' }, quantity: 2, detail: 'No onions', comment: 'unrelated-secret', price: 20000 }],
+          },
+        },
+      },
+    }),
+  })
+
+  const controller = new AbortController()
+  const result = await service.loadAdminOrderDetails(fixtureOrder({ order_type: 'DELIVERY' }), controller.signal)
+
+  assert.deepEqual(json(result), {
+    comment: 'Synthetic note\nUse the side entrance',
+    delivery_address: 'Synthetic street, 10',
+    ready_at: null,
+    preparation_time_seconds: null,
+    items: [{ name: 'Synthetic product', quantity: 2, comment: 'No onions' }],
+  })
+  assert.deepEqual(service.calls.map(call => call.url), ['/orders/1'])
+  assert.equal(service.calls[0].config.signal, controller.signal)
+  assert.doesNotMatch(JSON.stringify(result), /unrelated-secret|cashier|payments|table|place|"price"/)
+})
+
+test('ADMIN details support absent legacy context and null or empty comments without invented text', async () => {
+  for (const fields of [{}, { description: null, delivery_address: null }, { description: '', delivery_address: '' }]) {
+    const service = setup({
+      role: 'ADMIN',
+      get: async () => ({ data: { success: true, data: { order: { ...fixtureOrder(), ...fields, items: [] } } } }),
+    })
+
+    assert.deepEqual(json(await service.loadAdminOrderDetails(fixtureOrder())), {
+      comment: null, delivery_address: null, ready_at: null, preparation_time_seconds: null, items: [],
+    })
+  }
+})
+
+test('recorded preparation accepts coherent backend duration and timestamp pairs including instant orders', async () => {
+  const timingCases = [
+    { ready_at: '2026-08-08T12:05:30+05:00', preparation_time_seconds: 330 },
+    { ready_at: '2026-08-08T07:00:00.000Z', preparation_time_seconds: 0 },
+    { ready_at: '2026-08-08T12:00:00.000999+05:00', preparation_time_seconds: 0.000999 },
+    { ready_at: '2026-08-09T00:05:00+05:00', preparation_time_seconds: 43500 },
+  ]
+
+  for (const timing of timingCases) {
+    const service = setup({
+      role: 'ADMIN',
+      get: async () => ({ data: { success: true, data: { order: { ...fixtureOrder(), ...timing, items: [] } } } }),
+    })
+
+    const result = await service.loadAdminOrderDetails(fixtureOrder())
+
+    assert.equal(result.ready_at, timing.ready_at)
+    assert.equal(result.preparation_time_seconds, timing.preparation_time_seconds)
+    assert.deepEqual(service.calls.map(call => call.url), ['/orders/1'])
+  }
+})
+
+test('missing or untrustworthy preparation remains unknown without hiding otherwise usable details', async () => {
+  const validReady = '2026-08-08T12:05:00+05:00'
+
+  const timingCases = [
+    {},
+    { ready_at: null, preparation_time_seconds: null },
+    { ready_at: validReady },
+    { preparation_time_seconds: 300 },
+    { ready_at: validReady, preparation_time_seconds: '300' },
+    { ready_at: validReady, preparation_time_seconds: true },
+    { ready_at: validReady, preparation_time_seconds: Infinity },
+    { ready_at: validReady, preparation_time_seconds: NaN },
+    { ready_at: validReady, preparation_time_seconds: -1 },
+    { ready_at: validReady, preparation_time_seconds: 301 },
+    { ready_at: '2026-08-08T11:59:59+05:00', preparation_time_seconds: 0 },
+    { ready_at: '2026-08-08', preparation_time_seconds: 300 },
+    { ready_at: 'not-a-date', preparation_time_seconds: 300 },
+    { ready_at: true, preparation_time_seconds: 300 },
+    { ready_at: '2027-08-08T12:00:00+05:00', preparation_time_seconds: 365 * 86400 },
+    { paid_at: validReady, updated_at: validReady, status: 'COMPLETED' },
+  ]
+
+  for (const timing of timingCases) {
+    const service = setup({
+      role: 'ADMIN',
+      get: async () => ({ data: { success: true, data: { order: { ...fixtureOrder(), ...timing, description: 'Synthetic note', items: [] } } } }),
+    })
+
+    const result = await service.loadAdminOrderDetails(fixtureOrder())
+
+    assert.equal(result.ready_at, null)
+    assert.equal(result.preparation_time_seconds, null)
+    assert.equal(result.comment, 'Synthetic note')
+    assert.deepEqual(service.calls.map(call => call.url), ['/orders/1'])
+  }
+})
+
+test('dedicated queue optionally projects recorded timing and never fills absent timing from unrelated timestamps', async () => {
+  const raw = body()
+  const timing = { ready_at: '2026-08-08T12:05:30+05:00', preparation_time_seconds: 330 }
+
+  Object.assign(raw.data.customers[0].orders[0], timing, { updated_at: TO, paid_at: TO, preparation_time_formatted: 'unrelated-secret' })
+
+  const service = setup({ get: async () => ({ data: raw }) })
+  const result = await service.loadOperatorQueue(DATE)
+  const order = result.customers[0].orders[0]
+
+  assert.equal(order.ready_at, timing.ready_at)
+  assert.equal(order.preparation_time_seconds, 330)
+  assert.doesNotMatch(JSON.stringify(result), /updated_at|paid_at|unrelated-secret|preparation_time_formatted/)
+  assert.deepEqual(service.calls.map(call => call.url), ['/operator/call-queue'])
+  assert.equal(service.previews.length, 0)
+
+  raw.data.customers[0].orders[0].preparation_time_seconds = 999
+
+  const inconsistent = service.parseOperatorQueue(raw, DATE).customers[0].orders[0]
+
+  assert.equal(inconsistent.ready_at, null)
+  assert.equal(inconsistent.preparation_time_seconds, null)
+  assert.equal(inconsistent.items[0].name, 'Synthetic product')
+})
+
+test('ADMIN details reject wrong order type, malformed identity or invalid context without fallback', async () => {
+  const mutations = [
+    { order_type: 'PICKUP' },
+    { id: 2 },
+    { created_at: '2026-08-08' },
+    { description: {} },
+    { delivery_address: false },
+    { description: 'x'.repeat(20_001) },
+    { delivery_address: 'x'.repeat(20_001) },
+    { items: [{ product: { name: 'Synthetic product' }, quantity: 1, detail: 42 }] },
+    { items: [{ product: { name: 'Synthetic product' }, quantity: 1, detail: 'x'.repeat(20_001) }] },
+  ]
+
+  for (const fields of mutations) {
+    const service = setup({
+      role: 'ADMIN',
+      get: async () => ({ data: { success: true, data: { order: { ...fixtureOrder(), items: [], ...fields } } } }),
+    })
+
+    await assert.rejects(service.loadAdminOrderDetails(fixtureOrder()), /oc_error_contract/)
+    assert.deepEqual(service.calls.map(call => call.url), ['/orders/1'])
+    assert.equal(service.previews.length, 0)
+  }
+})
+
+test('new detail context API remains actual-admin-only and discards stale or aborted results', async () => {
+  for (const role of ['USER', 'MANAGER', 'WAREHOUSE', 'OPERATOR']) {
+    const service = setup({ role, email: 'operator@example.invalid' })
+
+    await assert.rejects(service.loadAdminOrderDetails(fixtureOrder()), /oc_error_permission/)
+    assert.equal(service.calls.length, 0)
+  }
+  for (const change of ['host', 'user', 'role', 'email', 'abort']) {
+    const controller = new AbortController()
+
+    const service = setup({
+      role: 'ADMIN',
+      email: 'operator@example.invalid',
+      get: async () => {
+        if (change === 'host')
+          service.setHost('https://changed-fixture.invalid')
+        else if (change === 'user')
+          service.setAccess({ userId: 2 })
+        else if (change === 'role')
+          service.setAccess({ role: 'USER' })
+        else if (change === 'email')
+          service.setAccess({ email: 'operator-other@example.invalid' })
+        else
+          controller.abort()
+        return { data: { success: true, data: { order: { ...fixtureOrder(), description: 'Synthetic note', items: [] } } } }
+      },
+    })
+
+    await assert.rejects(service.loadAdminOrderDetails(fixtureOrder(), controller.signal), /oc_error_(context|permission|canceled)/)
+    assert.deepEqual(service.calls.map(call => call.url), ['/orders/1'])
   }
 })
 

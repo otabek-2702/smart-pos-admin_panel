@@ -147,6 +147,21 @@ not evidence that this application already provides them.
 
 ## Verification checklist
 
+### Operator position after repeated links
+
+The calling page stores a separate account/API-origin-scoped navigation bookmark
+under `operator-call-progress:v1:`. It contains only its format version, selected
+day, order ID, list-end flag and customer count. The authenticated calling page
+reloads its authorized queue and matches that order before resuming; it never
+uses this bookmark as an authentication or authorization signal.
+
+Fresh link login, explicit logout and 401 cleanup remove session keys only, so
+the bookmark survives on this same browser/origin. No password, token, customer
+phone, name, address or comments are added to this record. The existing fresh
+login and expired-session protections are unchanged. Clearing site data or
+using another browser/device does not preserve the position. Tests cover the
+bootstrap and session-cleanup paths with synthetic inputs.
+
 Use synthetic credentials and a mocked transport for automated checks. Never
 copy an operator's actual password into a fixture or test report.
 

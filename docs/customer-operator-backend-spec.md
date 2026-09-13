@@ -23,6 +23,114 @@ for this frontend release; backend implementation/provisioning still requires a
 separate confirmed contract and verified delivery. Do not infer authorization
 to change backend roles, passwords or server code from this UI change.
 
+## Additive calling context — 2026-09-13
+
+The user now requests the order type, delivery address, order comment and each
+item's comment on the calling page. This supersedes the historical exclusion of
+order addresses/descriptions below, **only for these explicit display fields**.
+It does not authorize customer-profile addresses, coordinates, cashier/courier
+profiles, payments, other-day history or any new write capability.
+
+Read-only inspection of server checkout `2c24860`, core `4972f17` confirms the
+existing ADMIN detail serializer at `admins/services/order_service.py`,
+`_serialize_order_detail`, exposes:
+
+| Existing ADMIN response field | Frontend calling detail field |
+| --- | --- |
+| `data.order.order_type` | Existing selected-day order type; detail must match |
+| `data.order.description` | `comment` |
+| `data.order.delivery_address` | `delivery_address` |
+| `data.order.items[].product.name` | `items[].name` |
+| `data.order.items[].quantity` | `items[].quantity` |
+| `data.order.items[].detail` | `items[].comment` |
+
+These paths refer to the response body, before the Axios `response.data` prefix.
+The detail serializer still does not expose a place/table display label. Keep
+that label absent; never infer it from the address or description. Load this
+context lazily for the currently selected phone group, not for the whole day.
+Retain only the allowlisted fields; render comments as plain text, not HTML.
+
+`src/services/operatorCalls.ts` now exposes `loadAdminOrderDetails`, retaining
+the actual-ADMIN-only authorization, request cancellation, actor/API-host change
+checks and order ID/time matching. It additionally checks the detail's order type
+against the selected-day header. The old item-only wrapper uses the same path.
+No call completion or answer storage is introduced.
+
+For the separately authorized dedicated queue, add these optional fields to the
+order/item projection when backend support is implemented:
+
+```ts
+orders: Array<{
+  // Existing required fields are unchanged.
+  comment?: string | null
+  delivery_address?: string | null
+  ready_at?: string | null
+  preparation_time_seconds?: number | null
+  items: Array<{
+    name: string
+    quantity: number
+    comment?: string | null
+  }>
+}>
+```
+
+Use the exact source mappings above. Missing/null/empty values display no
+invented context, and older queue responses remain compatible. Each context
+string accepts at most **20,000 JavaScript UTF-16 code units**, preserving line
+breaks. This is an explicit frontend transport safety ceiling: the source
+`Order.description`, `Order.delivery_address` and `OrderItem.detail` are Django
+TextFields without `max_length`. Never claim 20,000 is a backend model limit,
+and never silently truncate a longer source value to fit; return an explicit
+safe contract/resource error instead. Non-string or oversized supplied values
+are rejected by the frontend. Existing overall queue/item count limits remain.
+
+The dedicated queue still requires backend delivery/permission verification.
+An actual non-admin account never requests generic Orders detail to fill missing
+comments or addresses. This amendment documents integration readiness, not proof
+that the dedicated queue was deployed.
+
+### Received time and recorded preparation duration
+
+The operator now also needs the received time and how long preparation took.
+`created_at` is the existing order-received timestamp, displayed in
+`Asia/Tashkent`. It is not `paid_at`, `updated_at`, delivery completion time or the
+phone-call time. Keep the selected-day membership based on `created_at` even if
+the order became ready after midnight.
+
+The existing ADMIN detail response supplies `data.order.ready_at` and
+`data.order.preparation_time_seconds`. The latter is the numeric result of
+`ready_at - created_at`, in seconds; it may be fractional and zero is valid.
+Project only these two additional fields alongside the existing header's
+`created_at`. No HR/audit endpoint or broader permission is needed by this page.
+
+The frontend accepts a timing pair only when `ready_at` has an explicit-offset
+ISO timestamp, is not in the future and is at or after `created_at`, and the
+duration is a finite nonnegative JSON number agreeing with the timestamp delta
+within 0.002 seconds. The small tolerance handles source ISO microseconds versus
+JavaScript Date's millisecond precision. Missing, malformed, negative or
+inconsistent timing becomes `ready_at:null, preparation_time_seconds:null` while
+the otherwise valid contact/order remains usable. Do not fill an unknown value
+from payment/status/update timestamps, infer a duration from item readiness, run
+a timer, coerce a negative value to zero, or parse a formatted duration string.
+The UI can show `ceil(seconds / 60)` whole minutes, matching the Orders page's
+presentation; null means not recorded, not zero minutes.
+
+The dedicated queue can optionally supply the same two fields as the schema
+above. Omit both for old responses or send both null when timing is unavailable.
+Supplied inconsistent timing is shown as unknown; it never triggers a fallback
+to generic Orders or HR endpoints for non-admin accounts.
+
+This is **recorded Orders preparation**, not an assertion of immutable first
+READY timing. Read-only inspection of already-fetched server `7926299` and core
+`826849e` confirms Orders detail still exposes the mutable `Order.ready_at`,
+which can reset when kitchen items are added/reopened. Immutable audit timing
+exists separately as `created_at_snapshot`, `ready_at_snapshot`,
+`elapsed_seconds` in HR preparation audits and is not projected into this detail
+response. If first-READY history later becomes a product requirement, the
+backend must add an explicitly authorized, documented minimal projection; do
+not silently substitute the current ready timestamp or fetch broader audit
+records. These local source revisions do not prove the current deployed API.
+
 ## Historical backend request — 2026-09-11
 
 Updated: 2026-09-11. Status: requested contract, not a claim of deployed support.

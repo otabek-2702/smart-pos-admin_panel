@@ -2,12 +2,16 @@ import axiosIns, { getCurrentApiHost } from '@/plugins/axios'
 import { readUserAccess } from '@/composables/useUserAccess'
 import { collectRetentionSnapshot } from '@/services/customerRetentionSnapshot'
 import { analyzeRetentionSnapshot, normalizeRetentionPhone } from '@/utils/customerRetention'
-import type { OperatorCustomer, OperatorItem, OperatorOrder, OperatorQueue } from '@/types/operatorCalls'
+import type { OperatorCustomer, OperatorItem, OperatorOrder, OperatorOrderDetails, OperatorQueue } from '@/types/operatorCalls'
 import type { RetentionCollectionProgress } from '@/types/customerRetention'
 
 const DAY = 86_400_000
 const MAX_CUSTOMERS = 2000
 const MAX_ORDERS = 5000
+
+// Source notes/addresses are unbounded TextFields. This is a client safety
+// ceiling, not a backend max_length; reject oversized data, never truncate it.
+const MAX_CONTEXT_TEXT = 20_000
 const TYPES = ['HALL', 'DELIVERY', 'PICKUP']
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/
 
@@ -57,7 +61,7 @@ export function parseOperatorItems(raw: unknown): OperatorItem[] {
     const quantity = Number(item?.quantity)
     if (!name || !Number.isFinite(quantity) || quantity <= 0 || quantity > 100_000)
       return fail()
-    return { name, quantity }
+    return { name, quantity, ...(item.comment === undefined ? {} : { comment: text(item.comment, MAX_CONTEXT_TEXT) }) }
   })
 }
 
@@ -66,6 +70,37 @@ function correctQueueEnd(from: number, to: number, expectedTo: number, requested
   if (fullDayEnd <= requestedAt)
     return to === fullDayEnd
   return to <= fullDayEnd && to <= expectedTo + 5000
+}
+
+function parseOrderContext(raw: any): Pick<OperatorOrder, 'comment' | 'delivery_address'> {
+  return {
+    ...(raw.comment === undefined ? {} : { comment: text(raw.comment, MAX_CONTEXT_TEXT) }),
+    ...(raw.delivery_address === undefined ? {} : { delivery_address: text(raw.delivery_address, MAX_CONTEXT_TEXT) }),
+  }
+}
+
+function recordedPreparation(raw: any, createdAt: string): Pick<OperatorOrderDetails, 'ready_at' | 'preparation_time_seconds'> {
+  const unknown = { ready_at: null, preparation_time_seconds: null }
+  const readyAt = raw.ready_at
+  const seconds = raw.preparation_time_seconds
+  if (typeof readyAt !== 'string' || !ISO.test(readyAt)
+    || typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0)
+    return unknown
+  const ready = Date.parse(readyAt)
+  const elapsed = (ready - Date.parse(createdAt)) / 1000
+
+  // ISO source timestamps can carry microseconds; JS Date retains milliseconds.
+  // No payment/update timestamp fallback, live timer, or negative-to-zero clamp.
+  if (!Number.isFinite(elapsed) || elapsed < 0 || ready > Date.now()
+    || Math.abs(seconds - elapsed) > 0.002)
+    return unknown
+  return { ready_at: readyAt, preparation_time_seconds: seconds }
+}
+
+function optionalPreparation(raw: any, createdAt: string): Pick<OperatorOrder, 'ready_at' | 'preparation_time_seconds'> {
+  if (raw.ready_at === undefined && raw.preparation_time_seconds === undefined)
+    return {}
+  return recordedPreparation(raw, createdAt)
 }
 
 /** A minimal, server-authorized queue; never forwards unrelated order fields. */
@@ -111,6 +146,8 @@ export function parseOperatorQueue(body: any, date: string, requestedAt = Date.n
         created_at: createdAt,
         order_type: order.order_type,
         place_label: text(order.place_label),
+        ...parseOrderContext(order),
+        ...optionalPreparation(order, createdAt),
         items: parseOperatorItems(order.items),
       }
     })
@@ -213,7 +250,7 @@ export async function loadOperatorQueue(date: string, options: {
   return parseOperatorQueue(response.data, date, requestedAt)
 }
 
-export async function loadAdminOrderItems(order: OperatorOrder, signal?: AbortSignal): Promise<OperatorItem[]> {
+export async function loadAdminOrderDetails(order: OperatorOrder, signal?: AbortSignal): Promise<OperatorOrderDetails> {
   const stamp = contextStamp()
 
   checkContext(stamp, signal)
@@ -226,7 +263,21 @@ export async function loadAdminOrderItems(order: OperatorOrder, signal?: AbortSi
 
   const detail = response?.data?.data?.order
   if (response?.data?.success !== true || detail?.id !== order.id || !Array.isArray(detail.items)
-    || Date.parse(detail.created_at) !== Date.parse(order.created_at))
+    || detail.order_type !== order.order_type || Date.parse(timestamp(detail.created_at)) !== Date.parse(order.created_at))
     return fail()
-  return parseOperatorItems(detail.items.map((item: any) => ({ name: item?.product?.name, quantity: item?.quantity })))
+  return {
+    comment: text(detail.description, MAX_CONTEXT_TEXT),
+    delivery_address: text(detail.delivery_address, MAX_CONTEXT_TEXT),
+    ...recordedPreparation(detail, order.created_at),
+    items: parseOperatorItems(detail.items.map((item: any) => ({
+      name: item?.product?.name,
+      quantity: item?.quantity,
+      ...(item?.detail === undefined ? {} : { comment: item.detail }),
+    }))),
+  }
+}
+
+/** Kept for callers that only need items; the same authorization checks apply. */
+export async function loadAdminOrderItems(order: OperatorOrder, signal?: AbortSignal): Promise<OperatorItem[]> {
+  return (await loadAdminOrderDetails(order, signal)).items
 }
